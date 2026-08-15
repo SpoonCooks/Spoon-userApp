@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+coverage/
+ios/
+android/
+assets/
+.figma-audit/
+# Hand-maintained audit documents — formatting them would churn the record
+docs/
+package-lock.json
+expo-env.d.ts

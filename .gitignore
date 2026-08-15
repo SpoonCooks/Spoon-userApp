@@ -1,0 +1,55 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files — never commit real environment values (.env.example IS committed)
+.env
+.env.*
+!.env.example
+
+# test output
+coverage/
+
+# typescript
+*.tsbuildinfo
+
+example
+
+# generated native folders
+/ios
+/android
+
+# Figma audit working directory — device screenshots and Figma renders (~75 MB of PNGs).
+# Deliberately NOT committed: every measurement, node value, classification and verdict derived
+# from these images is written into docs/FIGMA_PIXEL_PERFECT_AUDIT.md, Figma remains the live
+# source of truth for the renders, and nothing in the build or at runtime reads this directory
+# (it is already excluded from Prettier for the same reason). Kept on disk locally.
+.figma-audit/
