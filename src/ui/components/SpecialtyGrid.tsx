@@ -7,16 +7,17 @@ import type { DishViewModel } from '@ui/types/viewModels';
 import { DISH_GLYPHS, DISH_GLYPH_BOX, dishGlyphBox } from './dishGlyphs';
 
 /**
- * The "cooks best" dish grid — Figma `94:947`, a 304.222pt block: 3 columns × 3 rows of 96 × 51
- * cells at an 8.111 column gutter and a **7.333** row gutter (the rows pitch at 58.333).
+ * The "cooks best" dish grid — Figma `289:7552`: 3 columns × 3 rows of 96 × 50 cells at an
+ * **8pt gutter in BOTH axes** (the superseded revision drew 8.111 across and 7.333 down).
  *
- * Each cell (`94:948`) is NOT a plain chip. A `#FFE666` plate sits at the cell's BOTTOM — top
+ * Each cell (`289:7553`) is NOT a plain chip. A `#FFE666` plate sits at the cell's BOTTOM — top
  * 16.111, height 34, radius 12, px 7.889 — carrying a Livvic Regular 9/13.5 centred label whose
- * box starts **18pt** below the plate's top edge (`94:950`), and a 31pt circle holding the dish
+ * box starts **18pt** below the plate's top edge (`289:7555`), and a 31pt circle holding the dish
  * glyph overlaps that top edge by 14.889.
  *
- * The label used to be pinned 7.889 from the plate's BOTTOM, which floated it ~7pt high inside
- * the plate; it is now anchored at the designed 18.
+ * The circle is `Ellipse 8` (`289:7558`): **white with a 1pt `#FFE666` stroke**, not the flat
+ * `#FFEF99` fill the implementation drew. On a white card the difference is the ring itself,
+ * which is what separates the glyph from the plate behind it.
  *
  * Nine is treated as a DISPLAY CAP, not a data guarantee: the grid truncates a longer list and
  * renders fewer chips for a shorter one, rather than assuming the server always sends nine.
@@ -27,20 +28,20 @@ import { DISH_GLYPHS, DISH_GLYPH_BOX, dishGlyphBox } from './dishGlyphs';
  * neither is given the disc stays empty, and no glyph is invented from the label.
  */
 
-const COLUMNS = 3;
+/** `289:7552` — three tracks, and the cap is three rows of them. */
 const DISPLAY_CAP = 9;
 
-/** `94:952` — the 31pt circle overlapping the plate. */
+/** `289:7558` — the 31pt circle overlapping the plate. */
 const CIRCLE = 31;
-/** `94:948` / `94:949` — a 51pt cell whose 34pt plate starts at 16.111. */
-const CELL_HEIGHT = 51;
+/** `289:7553` / `289:7554` — a 50pt cell whose 34pt plate starts at 16.111. */
+const CELL_HEIGHT = 50;
 const PLATE_HEIGHT = 34;
 const PLATE_TOP = 16.111;
-/** `94:950` — the label box sits 18pt below the plate's top edge. */
+/** `289:7555` — the label box sits 18pt below the plate's top edge. */
 const LABEL_TOP = 18;
-/** `94:947` — 8.111 between columns, 7.333 between rows. They are not the same value. */
-const COLUMN_GAP = 8.111;
-const ROW_GAP = 7.333;
+/** `289:7552` — `gap-x-[8px] gap-y-[8px]`. */
+const COLUMN_GAP = 8;
+const ROW_GAP = 8;
 
 export interface SpecialtyGridProps {
   readonly dishes: readonly DishViewModel[];
@@ -92,31 +93,40 @@ export function SpecialtyGrid({ dishes, testID = 'specialty-grid' }: SpecialtyGr
 }
 
 const styles = StyleSheet.create({
+  /**
+   * Real `columnGap` / `rowGap` rather than per-cell padding: the previous form added a trailing
+   * `ROW_GAP` beneath the LAST row, which the frame does not draw (`289:7552` measures
+   * 3 × 50 + 2 × 8 = 166, not 174).
+   */
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignSelf: 'stretch',
-    marginHorizontal: -COLUMN_GAP / 2,
+    columnGap: COLUMN_GAP,
+    rowGap: ROW_GAP,
   },
-  cell: {
-    width: `${100 / COLUMNS}%`,
-    height: CELL_HEIGHT + ROW_GAP,
-    paddingHorizontal: COLUMN_GAP / 2,
-    paddingBottom: ROW_GAP,
-  },
-  /** `94:949` — the `#FFE666` plate, pinned to the cell's bottom 34pt. */
+  /**
+   * A 30 % basis that GROWS. Three cells plus two 8pt gutters always fit (90 % + 16pt ≤ 100 % for
+   * any row wider than 160pt) and a fourth never can (120 % > 100 %), so the wrap lands on three
+   * per row at every width without measuring, and the three then share the row exactly.
+   */
+  cell: { flexBasis: '30%', flexGrow: 1, minWidth: 0, height: CELL_HEIGHT },
+  /** `289:7554` — the `#FFE666` plate, pinned to the cell's bottom 34pt. */
   plate: {
     position: 'absolute',
     top: PLATE_TOP,
-    left: COLUMN_GAP / 2,
-    right: COLUMN_GAP / 2,
+    left: 0,
+    right: 0,
     height: PLATE_HEIGHT,
     paddingTop: LABEL_TOP,
     paddingHorizontal: 7.889,
     borderRadius: lightTheme.layout.optionRadius,
     backgroundColor: lightTheme.colors.surfaceAccentBold,
   },
-  /** `94:952` — centred horizontally, overlapping the plate's top edge by 14.889. */
+  /**
+   * `289:7558` — centred horizontally, overlapping the plate's top edge by 14.889: white, with
+   * the 1pt `#FFE666` ring the frame draws.
+   */
   circle: {
     position: 'absolute',
     top: 0,
@@ -124,8 +134,10 @@ const styles = StyleSheet.create({
     width: CIRCLE,
     height: CIRCLE,
     borderRadius: CIRCLE / 2,
+    borderWidth: lightTheme.stroke.thin,
+    borderColor: lightTheme.colors.surfaceAccentBold,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: lightTheme.colors.surfaceAccentStrong,
+    backgroundColor: lightTheme.colors.surface,
   },
 });

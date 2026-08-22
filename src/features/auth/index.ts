@@ -1,5 +1,3 @@
-import { createKeyFactory } from '@core/query';
-
 /**
  * Feature: auth.
  *
@@ -10,14 +8,48 @@ import { createKeyFactory } from '@core/query';
  * The OTP screen's previous DESIGN_PENDING / B-7 status is OBSOLETE: it is now fully designed.
  * Ruling R-6: T&C / Privacy live in Profile; no additional legal UI is to be added to Login.
  *
- * Headless session machinery lives in `@core/auth` (it is cross-cutting). This module owns the
- * auth *screens* and their hooks only.
- * TODO(backend-contract): no auth endpoints or payloads exist.
+ * Headless session machinery (the machine, the token store, the controller) lives in
+ * `@core/auth` because it is cross-cutting. This module owns the auth SCREENS, the auth
+ * ENDPOINTS and the adapter between them.
+ *
+ * `createSessionGateway` is exported from here rather than from `@core/auth` because it is the
+ * only piece of session machinery that knows a URL: `POST /v1/auth/refresh`. Keeping the endpoint
+ * with the other endpoints means there is exactly one description of the auth contract in the
+ * codebase, and the composition root wires the two halves together.
  */
-export const authKeys = createKeyFactory('auth');
 
 export { LoginScreen } from './screens/LoginScreen';
 export type { LoginScreenProps } from './screens/LoginScreen';
 export { OtpScreen } from './screens/OtpScreen';
 export type { OtpScreenProps } from './screens/OtpScreen';
 export type { LoginViewModel, OtpViewModel } from './types';
+
+export {
+  AUTH_PATHS,
+  authKeys,
+  createAuthApi,
+  createSessionGateway,
+  loginWithError,
+  meResponseSchema,
+  otpViewModel,
+  otpWithError,
+  resendLabelFor,
+  profileDataSchema,
+  sentToLabelFor,
+  toE164,
+  updateProfileResponseSchema,
+  useMe,
+  useSendOtp,
+  useSignOut,
+  useUpdateProfile,
+  useVerifyOtp,
+} from './api';
+export type {
+  AuthApi,
+  AuthUser,
+  MeResponse,
+  OtpSendResponse,
+  OtpVerifyResponse,
+  ProfileData,
+  ProfileUpdateRequest,
+} from './api';

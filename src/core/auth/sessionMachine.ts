@@ -8,6 +8,7 @@
  * bootstrapping -> unauthenticated | authenticated
  * authenticated -> refreshing -> authenticated | expired
  * expired -> unauthenticated (after teardown)
+ * expired -> authenticated (the customer signed in again without restarting the app)
  */
 
 export type SessionStatus =
@@ -66,9 +67,25 @@ export function sessionReducer(status: SessionStatus, event: SessionEvent): Sess
       }
 
     case 'expired':
-      return event.type === 'SIGNED_OUT' || event.type === 'BOOTSTRAP_NO_SESSION'
-        ? 'unauthenticated'
-        : status;
+      switch (event.type) {
+        /**
+         * The RECOVERY edge.
+         *
+         * An expired session sends the customer to `/login`, they complete the OTP flow, and
+         * `sessionController.signIn` writes fresh tokens and dispatches this. Without the
+         * transition the machine stayed `expired` forever: `canAccessApp` kept returning false,
+         * the boot gate kept redirecting back to `/login`, and the only escape was killing the
+         * app. Credentials that have just been written are exactly as good as ones found at
+         * bootstrap, so `expired` accepts a sign-in for the same reason `unauthenticated` does.
+         */
+        case 'SIGNED_IN':
+          return 'authenticated';
+        case 'SIGNED_OUT':
+        case 'BOOTSTRAP_NO_SESSION':
+          return 'unauthenticated';
+        default:
+          return status;
+      }
   }
 }
 

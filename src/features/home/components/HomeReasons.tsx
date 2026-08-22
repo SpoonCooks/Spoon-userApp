@@ -1,30 +1,32 @@
 import { Image, StyleSheet, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
-import { Text, lightTheme } from '@ui';
+import { Text } from '@ui';
 
 import { HOME_REASON_ART } from '../assets';
 import { HOME_DESIGN, useHomeContentWidth } from '../layout';
 import type { HomeMediaTileViewModel } from '../types';
 import { SectionTitle, sectionStyles } from './SectionTitle';
 
-const { reasons: DESIGN } = HOME_DESIGN;
-/** `209:1279` — Livvic Medium 10/13.33. */
-const LABEL_LINE_HEIGHT = 13.33;
+const { reasons: DESIGN, section: SECTION } = HOME_DESIGN;
 
 /**
- * "Reasons to rely on Spoon cooks" — Figma Page 3a `135:53`, re-read on `209:1276`.
+ * "Reasons to rely on Spoon cooks" — Figma `135:53`, grid `135:71`.
  *
- * A 3 × 2 grid on `#FFEF99` at a 10pt radius, 10pt gutters, rows 125pt tall. Each tile holds an
- * illustration at top 12 — sized PER TILE, 85 / 85 / 80 / 80 / 75 / 78, not uniformly — with its
- * Livvic Medium 10/13.33 label vertically centred on y 109 (110 for the two the frame nudges).
+ * REWORKED in the current file. The superseded grid was six 125pt `#FFEF99` tiles with the label
+ * vertically centred at y 109, BELOW the artwork. `135:71` is a 150pt-tall 3 × 2 grid of **67pt**
+ * tiles with **no fill at all**, the Livvic **Bold 12/16** label at the TOP and the illustration
+ * beneath it — 10pt column gutters, **16pt** row gutters.
  *
- * This grid REPLACES the three-item "Homely / Fresh / Trustworthy" trust row the previous Home
- * rendered — that row does not exist anywhere in the new file.
+ * Five of the six artworks changed with it, and the labels and order changed too:
+ * Trained · Verified · Hygienic / Reliable · Available · Compliant. Only "Trained" survives.
  *
- * RESPONSIVENESS: the three columns are `flex: 1` with the real 10pt gutters, so at the reference
- * column they resolve to 106.667pt each — the measured Figma width — and they narrow on a small
- * phone instead of wrapping. Row height and artwork stay fixed, because they are fixed in the
+ * Each illustration is sized PER TILE — 63 × 54, 63 × 52, 54 × 53, 57 × 54, 60 × 54, 60 × 53 —
+ * and each asset already carries its node's own crop (see `assets.ts`).
+ *
+ * RESPONSIVENESS: the three columns come from the AVAILABLE COLUMN, not from a
+ * `screenWidth / 390` scale factor. At the reference (330 inner) they resolve to 103.33 each —
+ * the measured Figma width. Row height and artwork stay fixed, because they are fixed in the
  * design and hold fixed-size type.
  */
 export interface HomeReasonsProps {
@@ -32,24 +34,24 @@ export interface HomeReasonsProps {
   readonly reasons: readonly HomeMediaTileViewModel[];
 }
 
-const artSize = (id: string): number =>
-  (DESIGN.art as Record<string, number | undefined>)[id] ?? DESIGN.artDefault;
+type ArtSize = { readonly width: number; readonly height: number };
 
-const labelCentre = (id: string): number =>
-  (DESIGN.labelCentre as Record<string, number | undefined>)[id] ?? DESIGN.labelCentreDefault;
+const artSize = (id: string): ArtSize =>
+  (DESIGN.art as Record<string, ArtSize | undefined>)[id] ?? DESIGN.artDefault;
 
 export function HomeReasons({ title, reasons }: HomeReasonsProps) {
-  const content = useHomeContentWidth();
+  const content = useHomeContentWidth() - SECTION.paddingHorizontal * 2;
   /**
    * A wrapping grid cannot express "three per row" with flex alone, so the track width comes from
-   * the AVAILABLE COLUMN — not from a `screenWidth / 390` scale factor. At the reference column
-   * (340) this is exactly the 106.667 the frame measures. Floored, because three tracks plus two
-   * gutters fill the column exactly and a sub-pixel rounding error wraps the third tile.
+   * the section's inner column. Floored, because three tracks plus two gutters fill it exactly and
+   * a sub-pixel rounding error wraps the third tile.
    */
-  const tileWidth = Math.floor((content - DESIGN.gap * (DESIGN.columns - 1)) / DESIGN.columns);
+  const tileWidth = Math.floor(
+    (content - DESIGN.columnGap * (DESIGN.columns - 1)) / DESIGN.columns,
+  );
 
   return (
-    <View style={sectionStyles.section} testID="home-reasons">
+    <View style={[sectionStyles.section, sectionStyles.gapWide]} testID="home-reasons">
       <SectionTitle>{title}</SectionTitle>
 
       <View style={styles.grid}>
@@ -66,23 +68,17 @@ export function HomeReasons({ title, reasons }: HomeReasonsProps) {
               accessible
               accessibilityLabel={tile.label}
             >
+              <Text variant="bodyBold" color="textPrimary" align="center" numberOfLines={1}>
+                {tile.label}
+              </Text>
               {art === undefined ? null : (
                 <Image
                   source={art as ImageSourcePropType}
-                  style={{ width: size, height: size, marginTop: DESIGN.artTop }}
+                  style={{ width: size.width, height: size.height }}
                   resizeMode="contain"
                   accessibilityIgnoresInvertColors
                 />
               )}
-              <Text
-                variant="captionStrong"
-                color="textPrimary"
-                align="center"
-                numberOfLines={1}
-                style={[styles.label, { top: labelCentre(tile.id) - LABEL_LINE_HEIGHT / 2 }]}
-              >
-                {tile.label}
-              </Text>
             </View>
           );
         })}
@@ -92,13 +88,16 @@ export function HomeReasons({ title, reasons }: HomeReasonsProps) {
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', alignSelf: 'stretch', gap: DESIGN.gap },
-  tile: {
-    height: DESIGN.tileHeight,
-    alignItems: 'center',
-    borderRadius: lightTheme.layout.thumbRadius,
-    backgroundColor: lightTheme.colors.surfaceAccentStrong,
-    overflow: 'hidden',
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignSelf: 'stretch',
+    columnGap: DESIGN.columnGap,
+    rowGap: DESIGN.rowGap,
   },
-  label: { position: 'absolute', left: 0, right: 0 },
+  /**
+   * `153:500` — 103 × 67, no fill, no border. The artwork overflows the 67pt box by design
+   * (16 + 54 = 70), and the frame does NOT clip it, so neither does this.
+   */
+  tile: { height: DESIGN.tileHeight, alignItems: 'center' },
 });

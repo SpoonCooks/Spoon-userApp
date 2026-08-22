@@ -18,6 +18,7 @@ import { createKeyFactory } from '@core/query';
 export const scheduledKeys = createKeyFactory('scheduled');
 
 export { useScheduleData } from './data';
+export { devScheduleSelection } from './devSteps';
 export { ScheduleView } from './screens/ScheduleScreen';
 export type { ScheduleActions, ScheduleViewProps } from './screens/ScheduleScreen';
 export type * from './types';

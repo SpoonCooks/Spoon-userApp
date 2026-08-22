@@ -1,0 +1,29 @@
+diff --git a/node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h b/node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h
+index 37fcc87..6f1313b 100644
+--- a/node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h
++++ b/node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h
+@@ -10,6 +10,8 @@
+ #include <array>
+ #include <unordered_map>
+ 
++#include <folly/Conv.h>
++
+ #include <glog/logging.h>
+ #include <react/debug/react_native_expect.h>
+ #include <react/renderer/core/PropsParserContext.h>
+@@ -68,7 +70,14 @@ inline folly::dynamic toDynamic(const YGValue &dimension)
+     case YGUnitPoint:
+       return dimension.value;
+     case YGUnitPercent:
+-      return std::format("{}%", dimension.value);
++      // `std::format` is unusable here: NDK 27's libc++ classifies <format> as an INCOMPLETE
++      // feature and defines `_LIBCPP_HAS_NO_INCOMPLETE_FORMAT` unless `_LIBCPP_ENABLE_EXPERIMENTAL`
++      // is set, which cannot be done from this header (the guard is resolved by <array> above).
++      // React Native ships a prebuilt AAR, so its own build never compiles this line — only
++      // third-party native modules that include it with RN_SERIALIZABLE_STATE do, and they fail.
++      // `folly::to<std::string>` is the shortest round-trip conversion folly already provides
++      // and this file already depends on folly. See patches/README.md.
++      return folly::to<std::string>(dimension.value) + "%";
+   }
+ 
+   return nullptr;

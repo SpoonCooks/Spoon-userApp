@@ -99,13 +99,15 @@ export function AutoCancelledBody({
 
         {/* `201:92` draws both answers unconditionally; an unwired host gets inert buttons. */}
         <View style={styles.rebookActions}>
+          {/* `201:93` — white behind a 1pt `#FFDE33` edge. Now the shared `outlineSoft` variant,
+              which Confirmation's "Cancel" (`250:2979`) draws identically. */}
           <Button
             label={cancelled.rebookDeclineLabel}
             onPress={onDeclineRebook ?? noop}
-            variant="secondary"
+            variant="outlineSoft"
             size="bar"
             fullWidth={false}
-            style={[styles.rebookButton, styles.declineOutline]}
+            style={styles.rebookButton}
             testID="auto-cancelled-decline"
           />
           <Button
@@ -147,11 +149,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: lightTheme.space.md,
   },
-  /** `201:477` — 10pt between the prompt and the answers, 6pt of vertical padding. */
-  rebook: { gap: lightTheme.space.s10, paddingVertical: lightTheme.space.s6 },
+  /**
+   * `201:477` — the block grew 126 → **138** in the current file, and the growth is entirely the
+   * gap: the `201:89` panel ends at 81.78 and `201:92` is pinned at 98.78, so the answers now sit
+   * **17** clear of the prompt rather than 10. Vertical padding stays 6.
+   */
+  rebook: { gap: 17, paddingVertical: lightTheme.space.s6 },
   /** `201:92` — two 162 × 34 buttons at a 15pt radius, 10pt apart. */
   rebookActions: { flexDirection: 'row', gap: lightTheme.space.s10 },
   rebookButton: { flex: 1, maxWidth: 162 },
-  /** `201:93` — outlined in `#FFDE33`, not the shared slate border. */
-  declineOutline: { borderColor: lightTheme.colors.borderCtaSoft },
 });

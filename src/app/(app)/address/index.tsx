@@ -1,47 +1,112 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { AddressEditSheet, SavedAddressesView, useSavedAddressesData } from '@features/address';
-import { DEMO_ADDRESS_EDIT } from '@/demo/fixtures/screens';
+import {
+  AddressEditSheet,
+  SavedAddressesView,
+  useAddressEditData,
+  useDeleteAddress,
+  useSavedAddressesData,
+} from '@features/address';
+import { getUserMessage, isAppError } from '@core/errors';
+import { useAndroidBackHandler, useDeterministicBack } from '@core/navigation';
+import { InfoDialog } from '@ui';
 
 /**
  * Saved addresses — Figma `68:214`. A list screen, not a map screen.
  *
- * Tapping a saved row raises `228:1801`, the NEW Edit / Delete sheet. Nothing beyond opening and
- * closing it is decided here: whether an address may be deleted, and what deleting does to a live
- * booking, are backend rules with no contract yet.
+ * Tapping a saved row raises `228:1801`, the Edit / Delete sheet, FOR THAT ROW. The id the list
+ * hands back is carried through to the sheet, to the edit route and to the delete call, so the
+ * three can never disagree about which address is being acted on — the defect §5 was raised
+ * against, where Edit opened a blank "add" form unrelated to the row that was tapped.
+ *
+ * Edit navigates to `60:655` (`18b`) with the address id, and that screen opens PREFILLED with
+ * the saved record for review. It is an UPDATE of an existing address, not the creation of an
+ * unrelated one — `PUT /v1/me/addresses/:id` preserves identity, which is what keeps a booking's
+ * address reference intact.
  */
 export default function SavedAddressesRoute() {
   const router = useRouter();
   const { state, refetch } = useSavedAddressesData();
-  // `?edit=1` opens the sheet directly, so `228:1801` is reachable without a tap in review builds.
+  // `?edit=<id>` opens the sheet directly, so `228:1801` is reachable without a tap in review builds.
   const { edit } = useLocalSearchParams<{ edit?: string }>();
-  const [editing, setEditing] = useState(__DEV__ && edit === '1');
+  const [selectedId, setSelectedId] = useState<string | null>(
+    __DEV__ && typeof edit === 'string' && edit !== '' ? edit : null,
+  );
+  const { edit: editModel } = useAddressEditData(selectedId);
+  const remove = useDeleteAddress();
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * `68:214` back -> `6:663` PROFILE (V7 founder comment, task §5/§15).
+   *
+   * Deterministic, so the destination is the one the routing matrix names rather than whichever
+   * screen happens to sit underneath. This list is also reachable from Home's serving-at banner;
+   * that entry now returns to Profile too, which is the founder's stated mapping and one tap from
+   * Home either way.
+   */
+  const goBack = useDeterministicBack('/profile');
+
+  /**
+   * The `228:1801` sheet is a native modal and closes itself on Android back. The DELETE FAILURE
+   * dialog is one too. Neither is handled here — what is, is the SELECTION behind them: a row
+   * whose sheet has just closed must not leave this screen holding an id, or the next back press
+   * would look like it did nothing while the sheet re-opened.
+   */
+  useAndroidBackHandler(() => {
+    if (selectedId === null) return false;
+    setSelectedId(null);
+    return true;
+  });
 
   return (
     <>
       <SavedAddressesView
         state={state}
         onRetry={refetch}
-        onBack={() => router.back()}
+        onBack={goBack}
         onAdd={() => router.push('/address/location')}
-        onSelect={() => setEditing(true)}
-        onOpenActions={() => setEditing(true)}
+        onSelect={setSelectedId}
+        onOpenActions={setSelectedId}
       />
 
-      <AddressEditSheet
-        visible={editing}
-        edit={DEMO_ADDRESS_EDIT}
-        onClose={() => setEditing(false)}
-        onEdit={() => {
-          setEditing(false);
-          router.push('/address/details');
-        }}
-        onDelete={() => {
-          // TODO(backend-contract): no delete endpoint exists, and the frame draws no
-          // confirmation step. Deleting is not simulated.
-          setEditing(false);
-        }}
+      {/* Rendered only once the row is known: the sheet shows a real address or it does not open. */}
+      {editModel === null ? null : (
+        <AddressEditSheet
+          visible
+          edit={editModel}
+          onClose={() => setSelectedId(null)}
+          onEdit={() => {
+            const id = selectedId;
+            setSelectedId(null);
+            router.push(`/address/details?addressId=${id ?? ''}`);
+          }}
+          onDelete={() => {
+            if (remove.isPending || selectedId === null) return;
+
+            remove
+              .mutateAsync(selectedId)
+              .then(() => {
+                // The list is invalidated by the mutation; closing is all this screen decides.
+                setSelectedId(null);
+              })
+              .catch((thrown: unknown) => {
+                setSelectedId(null);
+                setError(
+                  isAppError(thrown) ? getUserMessage(thrown) : 'We could not delete this address.',
+                );
+              });
+          }}
+        />
+      )}
+
+      {/* FIGMA_PENDING — `228:1801` draws no failure state for either action. */}
+      <InfoDialog
+        visible={error !== null}
+        onClose={() => setError(null)}
+        title="Couldn’t delete address"
+        body={error ?? ''}
+        testID="address-delete-error"
       />
     </>
   );

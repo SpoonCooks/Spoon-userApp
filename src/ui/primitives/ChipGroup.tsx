@@ -39,18 +39,41 @@ export interface ChipGroupProps {
 const HALF_GAP = lightTheme.space.xs;
 
 /**
- * `34:3485` — the start-time grid is drawn on a **85.5pt column pitch** over 75.55pt chips, so its
- * gutter is **10**, and its **40.1pt row pitch** over 31.2pt chips makes the row gap **8.9**.
- * Neither matches the 8/8 the Day and Time rows use.
+ * `34:3485` in the V8 file, measured node by node.
  *
- * The slot chips are also CONTENT-SIZED in the frame, not stretched onto a 4-column track. That
- * distinction is what makes the grid responsive: forcing four equal columns onto a 320dp screen
- * leaves 64.5pt per chip against a 75.55pt chip, and every label ellipsized to "05:0…" on the
- * handset. Left at their drawn size they simply wrap — four per row at the 370pt reference and at
- * 393/412/430, three per row below ~365 — and no time is ever truncated and no type is scaled.
+ * The grid is 330 wide and holds FOUR chips of **76.5** at x 0 / 84.5 / 169 / 253.5, seven rows
+ * deep at y 6 / 50 / 95 / 140 / 185 / 230 / 275, each chip 36–37 tall. Both gutters are therefore
+ * **8**, and the arithmetic closes exactly: 4 x 76.5 + 3 x 8 = 330, the frame's own width.
+ *
+ * That last identity is the point. The columns FILL their container; 76.5 is not an intrinsic
+ * chip width, it is what a quarter of 330 comes to once the three gutters are removed. Every chip
+ * in the frame is the same width whatever time it carries.
+ *
+ * ## Why the chips are no longer content-sized
+ *
+ * They used to be, to avoid truncating "05:00 AM" on a 320dp handset. It solved that by
+ * abandoning the grid: a row of chips whose widths follow their labels has ragged columns, uneven
+ * gaps wherever a row wraps early, and no alignment down the screen — which is exactly the defect
+ * this replaces.
+ *
+ * Laying each row out as a flex row of equal `flex: 1` cells keeps BOTH properties. At the
+ * frame's own 330 the cells come to 76.5 and the grid is pixel-identical to Figma; at 320dp they
+ * come to 64, which still clears the ~55pt a time label needs, so nothing is truncated and no
+ * type is scaled. The gutters stay 8 at every width because `gap` is not part of the division.
+ *
+ * A short final row is padded with empty cells rather than letting its chips stretch, so the last
+ * row aligns to the same column track as every row above it.
  */
-const SLOT_HALF_GAP = 5;
-const SLOT_ROW_GAP = 8.9;
+const SLOT_GAP = lightTheme.space.sm;
+
+/** Splits the options into fixed-size rows so each row can own its own column track. */
+function rowsOf<T>(items: readonly T[], size: number): readonly (readonly T[])[] {
+  const rows: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    rows.push(items.slice(index, index + size));
+  }
+  return rows;
+}
 
 export function ChipGroup({
   options,
@@ -62,35 +85,68 @@ export function ChipGroup({
   testID = 'chip-group',
 }: ChipGroupProps) {
   const slot = density === 'slot';
-  // Slot chips keep their drawn width and wrap; every other group may use a fixed column track.
-  const width: DimensionValue = typeof columns === 'number' && !slot ? `${100 / columns}%` : 'auto';
+  const width: DimensionValue = typeof columns === 'number' ? `${100 / columns}%` : 'auto';
+  const group = {
+    testID,
+    accessibilityRole: 'radiogroup' as const,
+    ...(accessibilityLabel === undefined ? {} : { accessibilityLabel }),
+  };
+
+  const chipFor = (option: ChipOption) => (
+    <Chip
+      label={option.label}
+      {...(option.caption === undefined ? {} : { caption: option.caption })}
+      {...(option.icon === undefined ? {} : { icon: option.icon })}
+      selected={selectedId === option.id}
+      disabled={option.disabled ?? false}
+      density={density}
+      onPress={() => onSelect(option.id)}
+      testID={`${testID}-${option.id}`}
+    />
+  );
+
+  if (slot) {
+    // `columns` is the frame's own track count (4 on `34:3485`); a `row` caller falls back to it.
+    const perRow = typeof columns === 'number' ? columns : 4;
+
+    return (
+      <View {...group} style={styles.slotGrid}>
+        {rowsOf(options, perRow).map((row, rowIndex) => (
+          <View key={`slot-row-${rowIndex}`} style={styles.slotRow}>
+            {row.map((option) => (
+              <View key={option.id} style={styles.slotCell}>
+                {chipFor(option)}
+              </View>
+            ))}
+            {/* Holds the track open so a short last row does not stretch across it. */}
+            {Array.from({ length: perRow - row.length }, (_, spacer) => (
+              <View key={`slot-spacer-${rowIndex}-${spacer}`} style={styles.slotCell} />
+            ))}
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  /**
+   * The row-gutter correction below is only correct when there IS a row to correct.
+   *
+   * With no options the group has no cell carrying `paddingBottom`, so the negative margin has
+   * nothing to cancel and instead shortens the group to −8. Its parent section then measures 8pt
+   * shorter than its own label, and the label is drawn CLIPPED THROUGH THE MIDDLE — which is the
+   * "Start time is cut off" defect in task §2: an empty slot list (a day/daypart the server
+   * offers nothing for) cropped the heading above it rather than simply showing nothing.
+   */
+  const empty = options.length === 0;
 
   return (
-    <View
-      testID={testID}
-      accessibilityRole="radiogroup"
-      {...(accessibilityLabel === undefined ? {} : { accessibilityLabel })}
-      style={[styles.container, slot ? styles.slotContainer : null]}
-    >
+    <View {...group} style={[styles.container, empty ? styles.empty : null]}>
       {options.map((option) => (
         <View
           key={option.id}
-          style={[
-            styles.cell,
-            slot ? styles.slotCell : null,
-            slot ? null : typeof columns === 'number' ? { width } : styles.auto,
-          ]}
+          style={[styles.cell, typeof columns === 'number' ? { width } : styles.auto]}
         >
-          <Chip
-            label={option.label}
-            {...(option.caption === undefined ? {} : { caption: option.caption })}
-            {...(option.icon === undefined ? {} : { icon: option.icon })}
-            selected={selectedId === option.id}
-            disabled={option.disabled ?? false}
-            density={density}
-            onPress={() => onSelect(option.id)}
-            testID={`${testID}-${option.id}`}
-          />
+          {chipFor(option)}
         </View>
       ))}
     </View>
@@ -109,11 +165,21 @@ const styles = StyleSheet.create({
     marginHorizontal: -HALF_GAP,
     marginBottom: -lightTheme.space.sm,
   },
-  slotContainer: { marginHorizontal: -SLOT_HALF_GAP, marginBottom: -SLOT_ROW_GAP },
   cell: {
     paddingHorizontal: HALF_GAP,
     paddingBottom: lightTheme.space.sm,
   },
-  slotCell: { paddingHorizontal: SLOT_HALF_GAP, paddingBottom: SLOT_ROW_GAP },
+  /**
+   * `gap` rather than the negative-margin trick the wrapping groups use: the rows are explicit
+   * here, so the gutters can be stated once and cannot leave a trailing row of padding to cancel.
+   * It also removes the empty-list hazard entirely — no cells, no margin to pull back, nothing to
+   * shorten the section and clip the label above it.
+   */
+  slotGrid: { rowGap: SLOT_GAP },
+  slotRow: { flexDirection: 'row', columnGap: SLOT_GAP },
+  /** Equal quarters of whatever the row is wide, with the gutters already taken out by `gap`. */
+  slotCell: { flex: 1 },
+  /** No cells, no trailing row padding, so nothing to pull back off. */
+  empty: { marginBottom: 0 },
   auto: { flexGrow: 1, flexShrink: 1 },
 });

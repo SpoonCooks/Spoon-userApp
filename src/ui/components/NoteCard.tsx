@@ -37,6 +37,12 @@ export interface NoteCardProps {
   readonly artSize?: 'tall' | 'square';
   readonly icon?: IconName;
   readonly tone?: NoteTone;
+  /**
+   * The same card is drawn at two shadow strengths. `99:1602` (En route / Arrived / In service)
+   * carries `0 0 2 rgba(0,0,0,0.15)`; Confirmation's `250:2942` carries the same offset and blur
+   * at **0.07**. One value cannot serve both, and the difference is visible against `#FFF7CC`.
+   */
+  readonly depth?: 'soft' | 'softer';
   readonly testID?: string;
 }
 
@@ -53,11 +59,16 @@ export function NoteCard({
   artSize = 'tall',
   icon,
   tone = 'accent',
+  depth = 'soft',
   testID = 'note-card',
 }: NoteCardProps) {
   return (
     <View
-      style={[styles.card, { backgroundColor: TONE_SURFACE[tone] }]}
+      style={[
+        styles.card,
+        depth === 'soft' ? styles.depthSoft : styles.depthSofter,
+        { backgroundColor: TONE_SURFACE[tone] },
+      ]}
       testID={testID}
       accessible
       accessibilityLabel={title === undefined ? body : `${title}. ${body}`}
@@ -95,9 +106,14 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.s10,
     padding: 11.889,
     borderRadius: lightTheme.radius.md,
+  },
+  /** `99:1602` — `0 0 2 rgba(0,0,0,0.15)`. */
+  depthSoft: lightTheme.elevation.soft,
+  /** `250:2942` — the same shape at 7 % on Confirmation. */
+  depthSofter: {
     shadowColor: lightTheme.colors.textPrimary,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.07,
     shadowRadius: 1,
     elevation: 2,
   },

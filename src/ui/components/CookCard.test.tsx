@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import {
+  DEMO_COOK_JYOTI,
   DEMO_COOK_MINIMAL,
   DEMO_COOK_PARTIAL_BADGES,
   DEMO_COOK_REKHA,
@@ -18,6 +19,12 @@ function renderedText(node: unknown): string {
 }
 
 describe('CookCard — standard', () => {
+  it('renders a languages attribute when the payload carries one', () => {
+    // `289:7392` (Jyoti) is the card that DOES list languages; `289:8388` (Rekha) does not.
+    render(<CookCard cook={DEMO_COOK_JYOTI} />);
+    expect(screen.getByText('Hindi, Odiya')).toBeTruthy();
+  });
+
   it('renders identity, attributes and the specialty grid', () => {
     render(<CookCard cook={DEMO_COOK_REKHA} />);
 
@@ -25,7 +32,6 @@ describe('CookCard — standard', () => {
     expect(screen.getByText('Female')).toBeTruthy();
     expect(screen.getByText('North Indian')).toBeTruthy();
     expect(screen.getByText('West Bengal')).toBeTruthy();
-    expect(screen.getByText('Hindi, Bengali')).toBeTruthy();
     expect(screen.getByText('Chicken biryani')).toBeTruthy();
   });
 
@@ -77,8 +83,8 @@ describe('CookCard — trust badges are conditional', () => {
 
     expect(screen.getByTestId('cook-card-badges-spoonTrained')).toBeTruthy();
     expect(screen.queryByTestId('cook-card-badges-backgroundVerified')).toBeNull();
-    // On-time must never be assumed true.
-    expect(screen.queryByTestId('cook-card-badges-onTime')).toBeNull();
+    // Hygienic must never be assumed true.
+    expect(screen.queryByTestId('cook-card-badges-hygienic')).toBeNull();
   });
 
   it('hides the row entirely when nothing is earned', () => {
@@ -87,17 +93,17 @@ describe('CookCard — trust badges are conditional', () => {
     expect(screen.queryByTestId('cook-card-badges')).toBeNull();
   });
 
-  it('never shows On-time for a cook whose flag is explicitly false', () => {
+  it('never shows Hygienic for a cook whose flag is explicitly false', () => {
     render(
       <CookCard
         cook={{
           ...DEMO_COOK_REKHA,
-          badges: { spoonTrained: true, backgroundVerified: true, onTime: false },
+          badges: { spoonTrained: true, backgroundVerified: true, hygienic: false },
         }}
       />,
     );
 
-    expect(screen.queryByTestId('cook-card-badges-onTime')).toBeNull();
+    expect(screen.queryByTestId('cook-card-badges-hygienic')).toBeNull();
     expect(screen.getByTestId('cook-card-badges-backgroundVerified')).toBeTruthy();
   });
 });

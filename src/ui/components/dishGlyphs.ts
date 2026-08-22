@@ -24,6 +24,7 @@ export type DishGlyphKey =
   | 'bananaSplit'
   | 'beefBurger'
   | 'broccoli'
+  | 'carrot'
   | 'cauliflower'
   | 'coffeeBeans'
   | 'cucumber'
@@ -35,6 +36,7 @@ export type DishGlyphKey =
   | 'naan'
   | 'nachos'
   | 'noodles'
+  | 'okra'
   | 'onion'
   | 'peas'
   | 'potato'
@@ -52,6 +54,7 @@ export const DISH_GLYPHS: Record<DishGlyphKey, ImageSourcePropType> = {
   bananaSplit: require('../../../assets/figma/dishes/banana-split.png') as ImageSourcePropType,
   beefBurger: require('../../../assets/figma/dishes/beef-burger.png') as ImageSourcePropType,
   broccoli: require('../../../assets/figma/dishes/broccoli.png') as ImageSourcePropType,
+  carrot: require('../../../assets/figma/dishes/carrot.png') as ImageSourcePropType,
   cauliflower: require('../../../assets/figma/dishes/cauliflower.png') as ImageSourcePropType,
   coffeeBeans: require('../../../assets/figma/dishes/coffee-beans.png') as ImageSourcePropType,
   cucumber: require('../../../assets/figma/dishes/cucumber.png') as ImageSourcePropType,
@@ -63,6 +66,12 @@ export const DISH_GLYPHS: Record<DishGlyphKey, ImageSourcePropType> = {
   naan: require('../../../assets/figma/dishes/naan.png') as ImageSourcePropType,
   nachos: require('../../../assets/figma/dishes/nachos.png') as ImageSourcePropType,
   noodles: require('../../../assets/figma/dishes/noodles.png') as ImageSourcePropType,
+  /**
+   * `87:324` "Bhindi masala" — the ONE dish mark the file draws as inline vector paths inside its
+   * disc rather than as an image fill, so it is extracted from that group and bundled like the
+   * rest. Without it the cell renders an empty circle.
+   */
+  okra: require('../../../assets/figma/dishes/okra.png') as ImageSourcePropType,
   onion: require('../../../assets/figma/dishes/onion.png') as ImageSourcePropType,
   peas: require('../../../assets/figma/dishes/peas.png') as ImageSourcePropType,
   potato: require('../../../assets/figma/dishes/potato.png') as ImageSourcePropType,

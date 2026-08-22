@@ -1,8 +1,7 @@
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
-import { IntroLoading } from '@features/loading';
 import { BookingCard, EmptyState, QueryBoundary, ScreenHeader, lightTheme } from '@ui';
 import type { BookingCardVariant } from '@ui';
 
@@ -38,12 +37,27 @@ export function BookingListView({
 }: BookingListViewProps) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']} testID={testID}>
-      <QueryBoundary state={state} onRetry={onRetry} loadingFallback={<IntroLoading />}>
+      <QueryBoundary state={state} onRetry={onRetry} loadingVariant="card">
         {(list) => (
-          <>
-            <ScreenHeader title={list.title} onBack={onBack} />
+          <ScrollView contentContainerStyle={styles.body}>
+            {/*
+              The two frames give this header different HEIGHTS and that difference is real:
+              `65:35` on `6:227` is overridden to **45**, `71:620` on `71:615` keeps the
+              component's **38**. Same component, two instances.
 
-            <ScrollView contentContainerStyle={styles.list}>
+              Their OFFSETS are not different, and the superseded reading that Past bookings sat
+              flush at y 0 was wrong: re-read on the final file, `65:35` and `71:620` are both at
+              x 16 / y 16 inside their body column, exactly like every other instance of `63:783`.
+              The 16pt lead is therefore unconditional.
+            */}
+            <ScreenHeader
+              title={list.title}
+              onBack={onBack}
+              density={variant === 'refund' ? 'default' : 'band'}
+            />
+
+            {/* `6:239` / `71:621` — px 4 / py 6, 16pt between cards. */}
+            <View style={styles.list}>
               {list.bookings.length === 0 ? (
                 <EmptyState
                   title={list.emptyTitle}
@@ -62,8 +76,8 @@ export function BookingListView({
                   />
                 ))
               )}
-            </ScrollView>
-          </>
+            </View>
+          </ScrollView>
         )}
       </QueryBoundary>
     </SafeAreaView>
@@ -73,10 +87,20 @@ export function BookingListView({
 const styles = StyleSheet.create({
   /** `6:228` — the list sits on `#F8FAFC`, not the app cream. */
   screen: { flex: 1, backgroundColor: lightTheme.colors.surfaceForm },
-  /** `6:239` — 16pt padding, 16pt between cards, 24pt of tail. */
-  list: {
-    padding: lightTheme.space.lg,
+  /**
+   * `6:228` / `71:619` — the 16pt-gutter body column, with the header inside it and 16pt between
+   * the header and the card block.
+   */
+  body: {
+    paddingHorizontal: lightTheme.space.lg,
+    paddingTop: lightTheme.space.lg,
     paddingBottom: lightTheme.space.xl,
+    gap: lightTheme.space.lg,
+  },
+  /** `6:239` / `71:621` — px 4 / py 6, 16pt between cards. */
+  list: {
+    paddingHorizontal: lightTheme.space.xs,
+    paddingVertical: lightTheme.space.s6,
     gap: lightTheme.space.lg,
   },
 });

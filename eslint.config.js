@@ -109,7 +109,7 @@ module.exports = [
     },
   },
   {
-    files: ['**/*.test.{ts,tsx}', 'jest.setup.ts'],
+    files: ['**/*.test.{ts,tsx}', '**/*.e2e.ts', 'jest.setup.ts'],
     rules: {
       'no-restricted-imports': 'off',
     },

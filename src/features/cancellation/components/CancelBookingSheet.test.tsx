@@ -6,10 +6,18 @@ import { CancelBookingSheet } from './CancelBookingSheet';
 import type { CancellationStep } from './CancelBookingSheet';
 
 /**
- * The sheet is implemented visually but NOT wired to any screen (blocker B-11), so these tests
- * are its only consumer for now.
+ * Stands in for `app/(app)/booking/[id].tsx`, which owns the cancellation mutation.
+ *
+ * The `confirmed` step is deliberately NOT reachable from inside the sheet: `115:2703` says "your
+ * booking has been cancelled", and only the server may cause that sentence to appear. The harness
+ * therefore advances the step the way the real host does — from the RESOLUTION of the request,
+ * not from the press.
  */
-function Harness({ initial = 'policy' as CancellationStep }) {
+function Harness({
+  initial = 'policy' as CancellationStep,
+  onConfirmCancel = jest.fn(),
+  cancelling = false,
+}) {
   const [step, setStep] = useState<CancellationStep>(initial);
 
   return (
@@ -20,8 +28,13 @@ function Harness({ initial = 'policy' as CancellationStep }) {
       onStepChange={setStep}
       onClose={jest.fn()}
       onReschedule={jest.fn()}
-      onConfirmCancel={jest.fn()}
+      onConfirmCancel={(reasonId, detail) => {
+        onConfirmCancel(reasonId, detail);
+        // What the host does in `.then()` — i.e. once the backend has answered.
+        setStep('confirmed');
+      }}
       onBookAgain={jest.fn()}
+      cancelling={cancelling}
     />
   );
 }
@@ -42,6 +55,7 @@ describe('Cancellation sheet (6:2 → 104:2260 → 104:2336 → 115:2703)', () =
 
     fireEvent.press(screen.getByTestId('cancel-confirm'));
     expect(screen.getByTestId('cancel-step-confirmed')).toBeTruthy();
+    // ^ reached because the harness's `onConfirmCancel` resolved, never because of the press.
   });
 
   it('renders the fee schedule as content, never evaluating a tier', () => {
@@ -179,5 +193,57 @@ describe('Cancellation sheet (6:2 → 104:2260 → 104:2336 → 115:2703)', () =
 
     fireEvent.press(screen.getByTestId('cancel-sheet-back'));
     expect(screen.getByTestId('cancel-step-policy')).toBeTruthy();
+  });
+});
+
+/**
+ * `104:2386` -> `115:2703` is the SERVER's transition (task §12, §30).
+ *
+ * The sheet used to fire `onStepChange('confirmed')` alongside `onConfirmCancel`, which drew
+ * "Your booking has been cancelled" the instant the button was pressed — including when the
+ * backend refused, on the app's most legally consequential surface.
+ */
+describe('the cancelled step is the server’s to grant', () => {
+  it('does not advance itself when the request has not resolved', () => {
+    const onConfirmCancel = jest.fn();
+    render(
+      <CancelBookingSheet
+        visible
+        cancellation={DEMO_CANCELLATION}
+        step="refund"
+        onStepChange={jest.fn()}
+        onClose={jest.fn()}
+        onConfirmCancel={onConfirmCancel}
+        onBookAgain={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('cancel-confirm'));
+
+    expect(onConfirmCancel).toHaveBeenCalledTimes(1);
+    // The host owns the step. Nothing here promised the customer anything.
+    expect(screen.getByTestId('cancel-step-refund')).toBeTruthy();
+    expect(screen.queryByTestId('cancel-step-confirmed')).toBeNull();
+  });
+
+  it('refuses a second press while the cancellation is in flight', () => {
+    const onConfirmCancel = jest.fn();
+    render(
+      <CancelBookingSheet
+        visible
+        cancellation={DEMO_CANCELLATION}
+        step="refund"
+        onStepChange={jest.fn()}
+        onClose={jest.fn()}
+        onConfirmCancel={onConfirmCancel}
+        onBookAgain={jest.fn()}
+        cancelling
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('cancel-confirm'));
+    fireEvent.press(screen.getByTestId('cancel-confirm'));
+
+    expect(onConfirmCancel).not.toHaveBeenCalled();
   });
 });

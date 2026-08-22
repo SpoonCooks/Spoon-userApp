@@ -36,6 +36,31 @@ describe('sessionReducer', () => {
     expect(sessionReducer('expired', { type: 'REFRESH_SUCCEEDED' })).toBe('expired');
   });
 
+  /**
+   * The recovery edge, and the reason this test exists.
+   *
+   * An expired session routes the customer to `/login`. They complete the OTP flow,
+   * `sessionController.signIn` writes fresh tokens and dispatches `SIGNED_IN` — and the machine
+   * used to ignore it, because `expired` accepted only `SIGNED_OUT` and `BOOTSTRAP_NO_SESSION`.
+   * `canAccessApp('expired')` is false, so the boot gate bounced them straight back to `/login`,
+   * and the only escape was force-quitting the app.
+   */
+  it('recovers to authenticated when the customer signs in again', () => {
+    expect(sessionReducer('expired', { type: 'SIGNED_IN' })).toBe('authenticated');
+    expect(canAccessApp(sessionReducer('expired', { type: 'SIGNED_IN' }))).toBe(true);
+  });
+
+  /** The whole round trip, one event at a time: live -> expired -> signed in -> live again. */
+  it('survives an expiry and a re-authentication without a restart', () => {
+    const expired = sessionReducer('authenticated', { type: 'SESSION_EXPIRED' });
+    expect(expired).toBe('expired');
+    expect(canAccessApp(expired)).toBe(false);
+
+    const recovered = sessionReducer(expired, { type: 'SIGNED_IN' });
+    expect(recovered).toBe('authenticated');
+    expect(canAccessApp(recovered)).toBe(true);
+  });
+
   it('ignores events that do not apply to the current state', () => {
     expect(sessionReducer('unauthenticated', { type: 'REFRESH_STARTED' })).toBe('unauthenticated');
     expect(sessionReducer('bootstrapping', { type: 'SIGNED_IN' })).toBe('bootstrapping');

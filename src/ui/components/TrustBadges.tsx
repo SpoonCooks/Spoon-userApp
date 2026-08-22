@@ -7,17 +7,24 @@ import type { CookBadgesViewModel } from '@ui/types/viewModels';
 import { COOK_BADGE_ART } from './cookAssets';
 
 /**
- * The trust row: Spoon Trained · Background Verified · On-time — Figma `94:1012`.
+ * The trust row: Spoon Trained · Background Verified · Hygienic — Figma `289:7616`.
+ *
+ * CHANGED this pass. The third badge is no longer "On-time" with a clock; the current file draws
+ * **Hygienic** with the Clean Hands mark, and every one of the eight cook cards agrees.
  *
  * Geometry, verbatim: `rgba(236,255,155,0.7)` at a 16pt radius with `0 0 2 rgba(0,0,0,0.08)`,
- * 49pt tall, ~15pt horizontal padding, 9.889pt vertical, 11pt between items. Each item is an 18pt
- * exported glyph over a Livvic 10/13.33 label, and the separators are 3.3pt `rgba(0,0,0,0.8)`
- * dots — not the flat lime `#ECFF9B` strip with Feather icons that was drawn before.
+ * 49pt tall, ~15pt horizontal padding, 9.889pt vertical, 11pt between items, and 3.3pt
+ * `rgba(0,0,0,0.8)` separator dots.
+ *
+ * Each item is an 18pt **`rgba(0,0,0,0.8)` disc** (`289:7622`) carrying a lime glyph at a
+ * per-badge size — 16 / 15 / 13 — over a Livvic SemiBold 10/13.33 label, also at 80 % black. The
+ * disc was missing from the implementation entirely, which drew the lime glyphs straight onto the
+ * lime row.
  *
  * RENDERS CONDITIONALLY. Every sample card in Figma happens to show all three, which the audit
  * explicitly warns is not evidence that every cook has all three. A missing or `false` flag hides
- * that badge, and `onTime` is never assumed true — it is the one most likely to vary per cook.
- * The whole row disappears when nothing is earned, rather than rendering an empty strip.
+ * that badge; nothing here is assumed true. The whole row disappears when nothing is earned,
+ * rather than rendering an empty strip.
  */
 
 export interface TrustBadgesProps {
@@ -25,10 +32,11 @@ export interface TrustBadgesProps {
   readonly testID?: string;
 }
 
-const DEFINITIONS: readonly { key: keyof CookBadgesViewModel; label: string }[] = [
-  { key: 'spoonTrained', label: 'Spoon Trained' },
-  { key: 'backgroundVerified', label: 'Background Verified' },
-  { key: 'onTime', label: 'On-time' },
+/** `289:7623` / `289:7631` / `289:7639` — the glyph sizes inside the shared 18pt disc. */
+const DEFINITIONS: readonly { key: keyof CookBadgesViewModel; label: string; glyph: number }[] = [
+  { key: 'spoonTrained', label: 'Spoon Trained', glyph: 16 },
+  { key: 'backgroundVerified', label: 'Background Verified', glyph: 15 },
+  { key: 'hygienic', label: 'Hygienic', glyph: 13 },
 ];
 
 export function TrustBadges({ badges, testID = 'trust-badges' }: TrustBadgesProps) {
@@ -49,13 +57,15 @@ export function TrustBadges({ badges, testID = 'trust-badges' }: TrustBadgesProp
             accessibilityLabel={definition.label}
             testID={`${testID}-${definition.key}`}
           >
-            <Image
-              source={COOK_BADGE_ART[definition.key]}
-              style={styles.glyph}
-              resizeMode="contain"
-              accessibilityIgnoresInvertColors
-            />
-            <Text variant="captionStrong" color="textPrimary" align="center" numberOfLines={2}>
+            <View style={styles.disc}>
+              <Image
+                source={COOK_BADGE_ART[definition.key]}
+                style={{ width: definition.glyph, height: definition.glyph }}
+                resizeMode="contain"
+                accessibilityIgnoresInvertColors
+              />
+            </View>
+            <Text variant="labelUpperQuiet" color="textTrust" align="center" numberOfLines={2}>
               {definition.label}
             </Text>
           </View>
@@ -83,7 +93,16 @@ const styles = StyleSheet.create({
   },
   slot: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 11 },
   item: { alignItems: 'center', gap: 1, flexShrink: 1 },
-  glyph: { width: 18, height: 18 },
+  /** `289:7622` — an 18pt `rgba(0,0,0,0.8)` disc, with 2pt of clearance beneath it. */
+  disc: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginBottom: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: lightTheme.colors.surfaceTrustDisc,
+  },
   /** `94:1020` — a 3.3pt `rgba(0,0,0,0.8)` separator dot. */
   dot: {
     width: 3.3,

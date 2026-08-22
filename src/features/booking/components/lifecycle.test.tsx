@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
+
+import { renderWithDefaultRuntime as render } from '@/test/renderWithRuntime';
 import { StyleSheet } from 'react-native';
 import type { ViewStyle } from 'react-native';
 

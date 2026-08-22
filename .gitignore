@@ -53,3 +53,25 @@ example
 # source of truth for the renders, and nothing in the build or at runtime reads this directory
 # (it is already excluded from Prettier for the same reason). Kept on disk locally.
 .figma-audit/
+
+# Local build artefacts — `eas build --local` / `gradlew assemble` drop installables here.
+# A universal dev APK is ~110 MB; it is a build OUTPUT, reproducible from this source tree,
+# and has no business in git history.
+build-output/
+*.apk
+*.aab
+
+# Signing material and service credentials. `*.jks`, `*.p8`, `*.p12`, `*.key` and
+# `*.mobileprovision` are already excluded above; these complete the set.
+*.keystore
+credentials.json
+service-account*.json
+
+# Firebase / Google service descriptors. `.env.example` documents GOOGLE_SERVICES_JSON as a
+# PATH to this file precisely so the file itself never enters the repo — it carries the Firebase
+# project identifiers and is regenerated per Android package.
+google-services.json
+GoogleService-Info.plist
+
+# Machine-local agent settings. Records one developer's tool permissions, not project policy.
+.claude/settings.local.json

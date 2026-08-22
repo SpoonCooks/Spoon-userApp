@@ -1,5 +1,6 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
+import { BOOKING_RATING_STAR } from '@ui/components/cookAssets';
 import { Text } from '@ui/primitives/Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { BookingCardViewModel, StatusTone } from '@ui/types/viewModels';
@@ -107,16 +108,23 @@ export function BookingCard({
             <Text variant="labelMedium" color="textPrimary" style={styles.grow} numberOfLines={1}>
               {booking.subtitle ?? ''}
             </Text>
+            {/* `275:5708` — the score 3pt clear of the exported 13pt star. */}
             {showRating ? (
-              <Text
-                variant="bodyBold"
-                color="textStrong"
-                align="right"
+              <View
+                style={styles.rating}
                 accessibilityLabel={`Rated ${String(booking.rating)}`}
                 testID={`${testID}-rating`}
               >
-                {String(booking.rating)}
-              </Text>
+                <Text variant="bodyBold" color="textStrong" align="right">
+                  {String(booking.rating)}
+                </Text>
+                <Image
+                  source={BOOKING_RATING_STAR}
+                  style={styles.ratingStar}
+                  resizeMode="contain"
+                  accessibilityIgnoresInvertColors
+                />
+              </View>
             ) : null}
           </View>
         </View>
@@ -164,8 +172,10 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.sm,
   },
   headline: { flexShrink: 1 },
-  /** `6:252` — px 9.889 / py 1.889, fully rounded. */
+  /** `6:252` — a FIXED 94 wide, px 9.889 / py 1.889, fully rounded, label centred. */
   pill: {
+    width: 94,
+    alignItems: 'center',
     paddingHorizontal: 9.889,
     paddingVertical: 1.889,
     borderRadius: lightTheme.radius.pill,
@@ -182,11 +192,16 @@ const styles = StyleSheet.create({
   },
   /** `6:256` — the two rows sit 2pt apart. */
   details: { flex: 1, minWidth: 0, gap: lightTheme.space.xxs },
+  /** `6:257` / `6:262` — the name and the subtitle sit 30pt clear of the right-hand column. */
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: lightTheme.space.md,
+    gap: 30,
   },
+  /** `275:5708` — the score and the star, 3pt apart. */
+  rating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  /** `275:5710` — the exported 13pt star. */
+  ratingStar: { width: 13, height: 13 },
   grow: { flex: 1, minWidth: 0 },
   pressed: { opacity: 0.85 },
 });

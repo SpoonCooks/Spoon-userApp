@@ -26,7 +26,15 @@ import type { ColorToken, TypographyToken } from '@ui/tokens/semantic';
  */
 
 export type ButtonVariant =
-  'primary' | 'accent' | 'bright' | 'inverse' | 'secondary' | 'subtle' | 'link' | 'danger';
+  | 'primary'
+  | 'accent'
+  | 'bright'
+  | 'inverse'
+  | 'secondary'
+  | 'outlineSoft'
+  | 'subtle'
+  | 'link'
+  | 'danger';
 /**
  * The file draws three distinct CTA geometries, so `size` is not decoration:
  *  - `lg`  `37:3908` — px 20 / py 14, 12pt radius, Livvic Black 14/20. The standard screen bar.
@@ -40,8 +48,9 @@ export type ButtonVariant =
  *                      Below 44pt, so `hitSlop` restores the target without redrawing it.
  *  - `barSm` `143:364` — the Extension fallback's "Book NOW": 32pt at a 15pt radius with a Livvic
  *                      **Bold** 16/24 label, where `bar` is Black.
- *  - `form` `53:110` / `60:728` — the address CTA: px 24 / py 12, 16pt radius, Livvic Bold
- *                      14/20. Its `#FEE685` glow is applied by the screen, not the size.
+ *  - `form` `53:110` / `275:4485` — the address CTA: a FIXED 34pt bar, px 12 / py 6, 30pt radius,
+ *                      Livvic Black 16/24 at −0.4. Below 44pt, so `hitSlop` restores the target.
+ *                      The finalized file draws NO glow under it; the screens no longer add one.
  */
 export type ButtonSize = 'md' | 'lg' | 'bar' | 'barSm' | 'form' | 'pill' | 'pillSm';
 
@@ -55,6 +64,11 @@ export interface ButtonProps {
   readonly leftIcon?: IconName;
   readonly rightIcon?: IconName;
   readonly fullWidth?: boolean;
+  /**
+   * Suppresses the variant's own lift. `250:2981` draws the same `#FFD600` bar as `1:821` with NO
+   * drop shadow, so the lift is a property of the placement rather than of the fill.
+   */
+  readonly flat?: boolean;
   /**
    * Overrides the size's label style. The file draws the SAME `#CFFF04` 32pt pill with a Bold
    * 12/16 label on `6:74` and a Bold 16/24 label on `104:2385` / `143:365`, so the label style is
@@ -82,6 +96,15 @@ const SURFACE: Record<ButtonVariant, ViewStyle> = {
     borderWidth: lightTheme.stroke.thin,
     borderColor: lightTheme.colors.border,
   },
+  /**
+   * `250:2979` Confirmation "Cancel" and `201:93` the auto-cancel "No" — white behind a 1pt
+   * `#FFDE33` edge. Distinct from `secondary`, whose edge is the `#CAD5E2` slate hairline.
+   */
+  outlineSoft: {
+    backgroundColor: lightTheme.colors.surface,
+    borderWidth: lightTheme.stroke.thin,
+    borderColor: lightTheme.colors.borderCtaSoft,
+  },
   /** `37:3918` — the flat `#F1F5F9` "Share your requests" bar. No border in the frame. */
   subtle: { backgroundColor: lightTheme.colors.surfaceSubtle },
   link: { backgroundColor: 'transparent' },
@@ -94,6 +117,7 @@ const LABEL_COLOR: Record<ButtonVariant, ColorToken> = {
   bright: 'textOnAccent',
   inverse: 'textInverse',
   secondary: 'textPrimary',
+  outlineSoft: 'textPrimary',
   subtle: 'textSecondaryStrong',
   link: 'danger',
   danger: 'danger',
@@ -110,6 +134,7 @@ export function Button({
   rightIcon,
   trailing,
   fullWidth = true,
+  flat = false,
   labelVariant,
   accessibilityLabel,
   accessibilityHint,
@@ -117,7 +142,11 @@ export function Button({
   style,
 }: ButtonProps) {
   const inactive = disabled || loading;
-  const labelColor: ColorToken = inactive ? 'textDisabled' : LABEL_COLOR[variant];
+  /**
+   * `275:4690` — the file's one drawn disabled CTA: `rgba(0,0,0,0.07)` behind a `rgba(0,0,0,0.5)`
+   * label. NOT the slate `textDisabled`, which belongs to list rows and icons.
+   */
+  const labelColor: ColorToken = inactive ? 'textCtaDisabled' : LABEL_COLOR[variant];
 
   return (
     <Pressable
@@ -136,6 +165,7 @@ export function Button({
         trailing === undefined ? null : styles.split,
         variant === 'link' ? styles.link : SHAPE[size],
         SURFACE[variant],
+        flat ? styles.flat : null,
         fullWidth ? styles.fullWidth : null,
         inactive ? styles.inactive : null,
         pressed && !inactive ? styles.pressed : null,
@@ -172,6 +202,7 @@ const BAR_TOUCH_SLOP = 7;
 const SHORT_SIZES: ReadonlySet<ButtonSize> = new Set<ButtonSize>([
   'bar',
   'barSm',
+  'form',
   'pill',
   'pillSm',
 ]);
@@ -181,7 +212,7 @@ const LABEL_VARIANT: Record<ButtonSize, TypographyToken> = {
   md: 'bodyBold',
   bar: 'headingCta',
   barSm: 'headingBold',
-  form: 'title',
+  form: 'headingCtaTight',
   pill: 'titleLead',
   pillSm: 'title',
 };
@@ -192,6 +223,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /** Cancels a variant's lift on both platforms — iOS reads `shadow*`, Android `elevation`. */
+  flat: { ...lightTheme.elevation.none, shadowColor: 'transparent' },
   split: { justifyContent: 'space-between' },
   link: {
     minHeight: lightTheme.layout.minTouchTarget,
@@ -219,11 +252,16 @@ const styles = StyleSheet.create({
     borderRadius: lightTheme.layout.ctaRadius,
     paddingHorizontal: lightTheme.space.xl,
   },
-  /** `53:110` / `60:728` — the address CTA. */
+  /**
+   * `53:110` / `275:4485` — the address CTA. Both frames draw the SAME bar: a fixed 34pt at a
+   * 30pt radius, `px 12 / py 6`, with a Livvic Black 16/24 label at −0.4 tracking. The superseded
+   * file drew it 44 tall (`py 12`) at a 16pt radius with a Bold 14/20 label.
+   */
   form: {
-    borderRadius: lightTheme.radius.md,
-    paddingHorizontal: lightTheme.space.xl,
-    paddingVertical: lightTheme.space.md,
+    height: 34,
+    borderRadius: lightTheme.radius.r30,
+    paddingHorizontal: lightTheme.space.md,
+    paddingVertical: lightTheme.space.s6,
   },
   /** `143:364` — the Extension fallback's 32pt "Book NOW" pill. */
   barSm: {
@@ -249,7 +287,11 @@ const styles = StyleSheet.create({
     ...lightTheme.elevation.soft,
   },
   fullWidth: { alignSelf: 'stretch' },
-  inactive: { backgroundColor: lightTheme.colors.surfaceMuted, borderColor: 'transparent' },
+  /**
+   * `275:4690` — the drained bar. The geometry, the radius and the variant's lift all stay; only
+   * the fill and the ink change, which is what makes the disabled state read as the SAME control.
+   */
+  inactive: { backgroundColor: lightTheme.colors.surfaceCtaDisabled, borderColor: 'transparent' },
   inactiveTrailing: { opacity: 0.4 },
   pressed: { opacity: 0.85 },
   content: {

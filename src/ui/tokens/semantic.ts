@@ -7,6 +7,7 @@ import {
   palette,
   radius,
   space,
+  withAlpha,
 } from './primitives';
 import type { Elevation, TextTokenStyle } from './primitives';
 
@@ -31,8 +32,19 @@ export const lightColors = {
   surfaceNote: palette.butterySoft,
   /** `3:776` — the "Optional" badge. */
   surfaceOptional: palette.roseSurface,
-  /** `94:1012` — the cook-card trust row. */
+  /** `289:7617` — the cook-card trust row. */
   surfaceTrust: palette.limeTrust,
+  /**
+   * `456:3408` / `341:4650` / `341:4633` — a SELECTED chip in the profile page's lime family.
+   *
+   * The frame fills it `rgba(236,255,155,0.7)`, i.e. `lime300` at 70 %. Carried PRE-COMPOSITED
+   * over white for the same reason `limeTrust` is: the chip draws a `0 1 2 rgba(0,0,0,0.05)`
+   * shadow, and a translucent fill lets that shadow read through as a dirty edge.
+   * 0.7 × #ECFF9B + 0.3 × #FFFFFF = (241.7, 255, 185) — the same value, reached the same way.
+   */
+  surfaceOptionSelected: palette.limeTrust,
+  /** `289:7622` — the 18pt disc each trust glyph is drawn on. */
+  surfaceTrustDisc: palette.black80,
   /** `21:1105` — the Start-OTP panel behind the Arrived service handover. */
   surfaceOtpStart: palette.limeSoft,
   /** `101:1905` — the End-OTP panel on In service. The two panels differ ONLY in hue. */
@@ -51,6 +63,11 @@ export const lightColors = {
   surfaceInverse: palette.black,
   /** Scrim over the "what's not included" photography (`156:38`). */
   surfaceScrim: palette.black40,
+  /**
+   * `44:5632` — the Instant sheet's unavailable veil: a FLAT white fill at 45 %, not a blur, and
+   * it stops above the CTA so the CTA stays fully saturated.
+   */
+  surfaceVeil: palette.white45,
 
   border: palette.slate200,
   /** `59:587` — the lime hairline around the active-booking card. */
@@ -100,16 +117,26 @@ export const lightColors = {
   textPlaceholder: palette.black50,
   /** `3:777` — the "Optional" badge ink. */
   textOptional: palette.rose,
-  /** `94:1020` — the trust-row separator dots. */
+  /** `289:7625` — the trust-row separator dots. */
   textSeparator: palette.black80,
+  /** `289:7624` — the trust-row labels, at the same 80 % black as the dots and the disc. */
+  textTrust: palette.black80,
+  /**
+   * `337:4356` — the Home active-booking card's title ("Upcoming booking" / "Live booking" /
+   * "Share your rating!"). The only place the file sets TYPE to the brand yellow.
+   */
+  textBrand: palette.yellow500,
   /** `3:1147` — the Confirmation reschedule action. */
   textReschedule: palette.amber700,
   /** `3:1151` — the Confirmation cancel action. */
   textDestructive: palette.rose600,
   /** `6:22` — a fee tier that costs nothing ("Free"). Only the value is tinted, not the row. */
   textFree: palette.emerald,
-  /** `6:789` — the Profile logout label. A different rose to `textDestructive`. */
-  textLogout: palette.rose39,
+  /**
+   * `6:789` — the Profile logout label. v4 sets it to **`#FF0404`**, the same red the OTP error
+   * uses; the superseded file drew `#C70036` (`palette.rose39`, now unused).
+   */
+  textLogout: palette.danger,
   textDisabled: palette.slate400,
   textInverse: palette.white,
   /** Text drawn on the yellow/lime accents — always the dark ink, never white. */
@@ -127,8 +154,12 @@ export const lightColors = {
   surfaceMapCanvas: palette.yellowCanvas,
   /** `6:784` — the Profile logout surface. */
   surfaceLogout: palette.roseLogout,
-  /** `73:1040` — the splash ground. */
-  surfaceSplash: palette.canaryWash,
+  /**
+   * `73:1039` — the splash ground. The wash above it (`73:1040`) is drawn at 70 %, so this is the
+   * WHITE the frame computes those stops over, not a tint of its own. v4's flat `canaryWash` was
+   * the whole surface; it is now `gradients.splash`.
+   */
+  surfaceSplash: palette.white,
   /** `71:887` — the loading-interstitial ground. */
   surfaceLoading: palette.limeWash,
 
@@ -141,6 +172,25 @@ export const lightColors = {
   /** `1:818` — a struck-through price on a disabled tile. */
   textDisabledMuted: palette.black30,
 
+  /**
+   * `275:4690` — the DISABLED CTA bar, read off the only disabled call-to-action the file draws:
+   * Scheduled steps 5a-5c, where "Book Now" waits for the rest of the selection.
+   *
+   * The node is `bg-[rgba(0,0,0,0.07)]` over a `rgba(0,0,0,0.5)` Livvic Black label, and it keeps
+   * the active bar's geometry AND its `0 0 4 rgba(0,0,0,0.15)` lift — a disabled CTA is the same
+   * bar drained of colour, not a different shape. That is the same pair `1:815` uses on a
+   * disabled duration tile, so the primitives already existed; only the CTA-facing names are new.
+   *
+   * `surfaceMuted` / `textDisabled` (the `#F3F4F6` + slate `#8A94A6` pair the buttons used before)
+   * are the SLATE ramp and appear nowhere in this treatment.
+   */
+  /**
+   * PRE-COMPOSITED, unlike the tile it shares a value with: the bar keeps its lift, and Android
+   * renders that shadow through a translucent fill. See `palette.ctaDisabled`.
+   */
+  surfaceCtaDisabled: palette.ctaDisabled,
+  textCtaDisabled: palette.black50,
+
   accentPrimary: palette.yellow400,
   accentSecondary: palette.lime300,
 
@@ -148,6 +198,8 @@ export const lightColors = {
   dangerSurface: palette.dangerSurface,
 
   scrim: palette.scrim,
+  /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */
+  scrimSheet: palette.black65,
 } as const;
 
 /** TODO(designer): no dark theme exists in Figma. Mirrors light until one does. */
@@ -169,6 +221,102 @@ export const toneColors = {
 } as const;
 
 export type Tone = keyof typeof toneColors;
+
+/**
+ * Gradients, each read verbatim off its node rather than sampled.
+ *
+ * Every lead stop is a FOUNDER colour at a stated opacity, so all of them are built with
+ * `withAlpha` rather than written as fresh literals.
+ *
+ * `angleDeg` is carried on every token so the axis decision stays visible and reversible. The
+ * four cuisine scrims are all within 0.3° of CSS 180°, which is what `expo-linear-gradient` draws
+ * by default; across the widest card the file draws (330pt) that tilt displaces the band by 1.7pt,
+ * below the width of the softest stop transition, so they use the default vertical axis. The
+ * splash's 154.26° is a genuine diagonal and is resolved through `gradientAxis` instead.
+ */
+export const gradients = {
+  /**
+   * `73:1040` — the Login loading ground. v5 replaces the flat `canaryWash` splash with a
+   * diagonal wash:
+   *
+   *   linear-gradient(154.26259710299553deg,
+   *     rgba(255,214,0,0.7) 0%, rgba(207,255,4,0.7) 98.789%)
+   *
+   * Both stops are FOUNDER colours at 70 % (`#FFD600`, `#CFFF04`), so they are built with
+   * `withAlpha` rather than written as literals. The node sits on `#FFFFFF`, so the drawn
+   * colours are (255,226,77) → (221,255,79); the stops are kept translucent and the surface
+   * beneath is painted white, which is what the frame does.
+   *
+   * ANGLE: 154.26° is a real diagonal, not a rounded-off vertical, so it is NOT flattened the
+   * way the two Home scrims are. `SplashLoading` resolves `start`/`end` from the measured box so
+   * the axis stays at 154.26° on any screen instead of degrading to a corner-to-corner diagonal.
+   */
+  splash: {
+    colors: [withAlpha(palette.yellow500, 0.7), withAlpha(palette.lime500, 0.7)],
+    locations: [0, 0.98789],
+    angleDeg: 154.26259710299553,
+  },
+  /**
+   * `140:188` — "Daily meals". `#FFD600` at 7 % into black at 50 %, straight top-to-bottom.
+   */
+  cuisineDaily: {
+    colors: [withAlpha(palette.yellow500, 0.07), palette.black50],
+    angleDeg: 180,
+  },
+  /**
+   * `140:186` / `140:187` — "North Indian" and "South Indian". The same wash, one stop darker:
+   * `#FFD600` at 7 % into black at **70 %**. `140:186` measures 179.716°, `140:187` is drawn as a
+   * plain `to bottom`; across a 158pt card a 0.28° tilt displaces the band by 0.8pt, so both are
+   * drawn on the vertical axis and the measurement is recorded rather than forked.
+   */
+  cuisineIndian: {
+    colors: [withAlpha(palette.yellow500, 0.07), palette.black70],
+    angleDeg: 179.7159092576303,
+  },
+  /**
+   * `140:189` — the "Chinese and Asian" band. A LIGHTER wash than the other three:
+   * `#FFD600` at 10 % into black at 40 %, running 4.486 % → 99.057 % at 179.703°.
+   */
+  cuisineAsian: {
+    colors: [withAlpha(palette.yellow500, 0.1), palette.black40],
+    locations: [0.044863, 0.99057],
+    angleDeg: 179.70251199528715,
+  },
+} as const;
+
+export type GradientToken = keyof typeof gradients;
+
+/**
+ * Convert a CSS `linear-gradient` angle into the unit `start` / `end` points
+ * `expo-linear-gradient` wants, for a box of the given size.
+ *
+ * CSS measures the angle clockwise from "to top", so the axis direction in screen coordinates
+ * (x right, y down) is `(sin θ, −cos θ)`, and the gradient line is centred on the box with length
+ * `|W·sin θ| + |H·cos θ|` — the projection of the box onto that axis, which is what puts the 0 %
+ * and 100 % stops exactly on the box's bounding corners.
+ *
+ * Without this, a diagonal token has to be approximated as a corner-to-corner sweep, which only
+ * matches the frame at the frame's own aspect ratio.
+ */
+export function gradientAxis(
+  angleDeg: number,
+  width: number,
+  height: number,
+): { start: { x: number; y: number }; end: { x: number; y: number } } {
+  if (width <= 0 || height <= 0) return { start: { x: 0, y: 0 }, end: { x: 0, y: 1 } };
+
+  const radians = (angleDeg * Math.PI) / 180;
+  const dx = Math.sin(radians);
+  const dy = -Math.cos(radians);
+  const length = Math.abs(width * dx) + Math.abs(height * dy);
+  const halfX = ((length / 2) * dx) / width;
+  const halfY = ((length / 2) * dy) / height;
+
+  return {
+    start: { x: 0.5 - halfX, y: 0.5 - halfY },
+    end: { x: 0.5 + halfX, y: 0.5 + halfY },
+  };
+}
 
 /**
  * Rating scale fills — the reference frame (`119:2885`) varies the selected chip's colour with
@@ -261,6 +409,17 @@ export const typography = {
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
+  /**
+   * `129:37` "Plan your meal", `337:4412` "Arriving in", `337:4370` "Confirmed!" — Livvic Bold
+   * 12/**15.11**. A third 12pt Bold leading, and the one the current file uses for short labels
+   * that sit inside a fixed box; `bodyBold`'s 16 would push them off their centres.
+   */
+  bodyBoldTight: {
+    fontSize: fontSize.md,
+    lineHeight: 15.11,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
   /** `209:1400` upcoming-booking date — the general Livvic Bold 12/16. */
   bodyBold: {
     fontSize: fontSize.md,
@@ -341,6 +500,21 @@ export const typography = {
     fontSize: fontSize.sm,
     lineHeight: lineHeight.md,
     fontFamily: fontFamily.medium,
+    letterSpacing: letterSpacing.none,
+  },
+  /**
+   * `456:3404` / `456:3418` / `338:4534` / `341:4658` / `341:4629` — the profile page's section
+   * labels: Livvic SemiBold 13/16 (the 13 is literal in the frame, not a rounded 12).
+   *
+   * 13 is not on the type scale, and it is not a rounding of 12: `456:3432` ("What is the most
+   * pressing issue…") on the SAME page resolves `font-size/12` from the variable, while these five
+   * carry a literal 13. Two sizes, one page, both drawn — so both are transcribed rather than
+   * averaged into one. See §22: no "looks close enough".
+   */
+  fieldSection: {
+    fontSize: 13,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.semibold,
     letterSpacing: letterSpacing.none,
   },
   /** `59:376` "Home" — Livvic SemiBold 11/16.5. */
@@ -525,9 +699,12 @@ export const typography = {
     fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.none,
   },
-  /** `94:1097` the en-route ETA box — Livvic Black 24/25. */
+  /**
+   * `94:1097` the en-route ETA box — Livvic Black 23/25. The current file drops it a point
+   * from the superseded 24; `StatusBanner`'s highlight is the only consumer.
+   */
   headingEta: {
-    fontSize: 24,
+    fontSize: 23,
     lineHeight: 25,
     fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.none,
@@ -574,6 +751,19 @@ export const typography = {
     fontFamily: fontFamily.semibold,
     letterSpacing: letterSpacing.none,
   },
+  /**
+   * `104:2284` — a cancellation reason row: Livvic Medium 13/16 at 70 % black.
+   *
+   * 13 appears nowhere else in the file, so it stays a literal rather than joining `fontSize`.
+   * The rows were previously drawn with `body` (Regular 12/16), a lighter weight AND a smaller
+   * size than the node.
+   */
+  optionLabel: {
+    fontSize: 13,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.medium,
+    letterSpacing: letterSpacing.none,
+  },
   /** `227:1671` / `230:2086` — the OTP tagline and resend line: Livvic Medium 11/16.5. */
   otpTagline: {
     fontSize: fontSize.sm,
@@ -581,25 +771,86 @@ export const typography = {
     fontFamily: fontFamily.medium,
     letterSpacing: letterSpacing.none,
   },
-  /** `225:1598` — "Enter your phone number to proceed": Livvic Regular 12/15. */
+  /**
+   * `250:2437` — the trailing run of the resend line ("26s"): Livvic **Bold** 11/16.5. Same size
+   * and leading as `otpTagline`, one weight up, so the two runs sit on a single baseline.
+   */
+  otpTaglineStrong: {
+    fontSize: fontSize.sm,
+    lineHeight: lineHeight.md,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /**
+   * `250:2414` — "Enter your phone number to proceed", and `275:4317` "OTP has been sent to …":
+   * Livvic Regular **12/16** at 70 %. The line height moved 15 → 16 in `fsgGIC4c6DJulb64TTt9yg`;
+   * both auth screens now share this one ramp, which is why the OTP screen no longer uses
+   * `caption` (Regular 10/15).
+   */
   bodyQuiet: {
     fontSize: fontSize.md,
-    lineHeight: lineHeight.xs,
+    lineHeight: lineHeight.sm,
     fontFamily: fontFamily.regular,
     letterSpacing: letterSpacing.none,
   },
-  /** `53:229` / `53:232` — the phone field's dial code and value: Livvic SemiBold 14/16. */
+  /**
+   * `250:2417` / `250:2420` — the phone field's dial code and value.
+   *
+   * Livvic **Bold 16/24 at +1.6** tracking. This replaced SemiBold 14/16 in
+   * `fsgGIC4c6DJulb64TTt9yg`; the tracking is what opens the digits out to the drawn width.
+   * LoginScreen is the only consumer.
+   */
   fieldValue: {
+    fontSize: fontSize.xl,
+    lineHeight: lineHeight.xl,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.wider,
+  },
+  /** `6:781` — the Profile legal link: Livvic **Bold 11/14.67**, drawn underlined. */
+  profileLegal: {
+    fontSize: fontSize.sm,
+    lineHeight: 14.67,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `6:789` — the Profile logout label: Livvic **SemiBold 13/16** at `#FF0404`. */
+  profileLogout: {
+    fontSize: 13,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `275:4324` — an OTP digit: Livvic Bold 18/28 at 70 %. Unchanged in the new file. */
+  otpDigit: {
+    fontSize: fontSize.xxl,
+    lineHeight: lineHeight.xxl,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /**
+   * `275:4340` / `275:4469` — the resend line: Livvic **SemiBold 14/16**.
+   *
+   * This is NOT `otpTagline` (Medium 11/16.5). In `fsgGIC4c6DJulb64TTt9yg` the tagline sub and the
+   * resend line stopped sharing a ramp, so they are two tokens.
+   */
+  otpResend: {
     fontSize: fontSize.lg,
     lineHeight: lineHeight.sm,
     fontFamily: fontFamily.semibold,
     letterSpacing: letterSpacing.none,
   },
-  /** `230:2093` — an OTP digit: Livvic Bold 18/28. */
-  otpDigit: {
-    fontSize: fontSize.xxl,
-    lineHeight: lineHeight.xxl,
+  /** `275:4340` trailing run ("25s" / "via SMS") — Livvic **Bold 14/20** against the SemiBold lead. */
+  otpResendStrong: {
+    fontSize: fontSize.lg,
+    lineHeight: lineHeight.lg,
     fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `275:4467` — "Incorrect OTP. Please try again": Livvic **Medium 12/16** at `#FF0404`. */
+  otpError: {
+    fontSize: fontSize.md,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.medium,
     letterSpacing: letterSpacing.none,
   },
   /** `53:244` / `227:1688` — the auth CTAs: Livvic Black 16/24 at **-0.4**, unlike `headingCta`. */
@@ -629,12 +880,23 @@ export const elevation = {
   side: elevations.side,
   hairline: elevations.hairline,
   badge: elevations.badge,
+  /** `63:779` — the map helper pill: `0 0 4 rgba(0,0,0,0.1)`. */
+  pill: elevations.pill,
+  /** `222:1558` — the out-of-service disc: `0 0 2 rgba(0,0,0,0.07)`. */
+  disc: elevations.disc,
+  /** `69:514` — the add-address bar: `0 0 1 rgba(0,0,0,0.1)`. */
+  hairlineSoft: elevations.hairlineSoft,
   subtle: elevations.subtle,
   /** `0 0 2 rgba(0,0,0,0.15)` — status banner, note card, Help pill, Extend pill. */
   soft: elevations.soft,
   /** `0 0 2 rgba(0,0,0,0.08)` — the cook card, its photo panel and its trust row. */
   softer: elevations.softer,
-  /** `53:111` — the address CTA's yellow glow. */
+  /**
+   * `53:111` — the address CTA's yellow glow.
+   *
+   * UNUSED since pass 8: `sbIXeBfaMzUFUz2NYJIJTm` drops both `53:111` and `60:729`, and neither
+   * `53:110` nor `275:4485` carries a shadow. Kept as a token, applied by nothing.
+   */
   glow: elevations.glow,
   sheet: elevations.raised,
   cta: elevations.cta,

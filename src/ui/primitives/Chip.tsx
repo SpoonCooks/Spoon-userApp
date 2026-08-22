@@ -95,7 +95,7 @@ export function Chip({
         pressed && !disabled ? styles.pressed : null,
       ]}
     >
-      <View style={styles.content}>
+      <View style={[styles.content, slot ? styles.slotContent : null]}>
         {icon === undefined ? null : (
           <Icon name={icon} size={14} color={disabled ? 'textDisabledOnTile' : 'textPrimary'} />
         )}
@@ -132,8 +132,27 @@ const styles = StyleSheet.create({
     paddingVertical: 7.8,
     borderRadius: lightTheme.layout.optionRadius,
   },
-  /** `34:3155` — px **14.02**, and the vertical padding is asymmetric: pt 6.9 / pb 7.8. */
-  slotBase: { paddingHorizontal: 14.02, paddingTop: 6.9, paddingBottom: 7.8 },
+  /**
+   * `34:3155` re-measured against the V8 node tree: the chip is 76.5 x 36–37 and its label frame
+   * is 55 x 16 at x 10.75 / y 10. So the drawn insets are **10 on every side**, not the
+   * asymmetric 6.9 / 7.8 an earlier pass recorded — which rendered the chip 31.2 tall against the
+   * frame's 36.5 and left the grid visibly shallower than the file.
+   *
+   * Height is stated as padding rather than a fixed value so it follows the label's own line box:
+   * 10 + 16.5 (`slotLabel`) + 10 = 36.5, which is the 36/37 the frame rounds to.
+   *
+   * The HORIZONTAL inset is deliberately NOT the drawn 10.75. Width now comes from the grid's
+   * column track (`ChipGroup`), so this padding is only a floor that keeps the label off the
+   * edge — and at 320dp, where a cell is 64 wide, a 10.75 inset would leave 42.5 for a label that
+   * needs ~55 and truncate every time. At 2 the label has 60 and centring does the rest, so the
+   * chip reads identically at the frame's width and stays whole at the narrowest one.
+   */
+  slotBase: {
+    paddingHorizontal: lightTheme.space.xxs,
+    paddingVertical: 10,
+  },
+  /** The label centres in the column track rather than sitting against its leading edge. */
+  slotContent: { justifyContent: 'center' },
   slotDisabled: { opacity: 0.4 },
   content: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.s6 },
   stack: { alignItems: 'center', flexShrink: 1 },

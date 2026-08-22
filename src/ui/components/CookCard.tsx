@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
@@ -6,26 +5,30 @@ import { Text } from '@ui/primitives/Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { CookViewModel, DishViewModel } from '@ui/types/viewModels';
 
-import { COOK_ATTRIBUTE_ART, COOK_CALL_GLYPH, COOK_SPECIALTIES_GLYPH } from './cookAssets';
+import { COOK_ATTRIBUTE_ART, COOK_CALL_GLYPH } from './cookAssets';
 import { SpecialtyGrid } from './SpecialtyGrid';
 import { TrustBadges } from './TrustBadges';
 
 /**
- * The cook profile card — Figma `94:906`, embedded unchanged in Confirmation (`3:1041`),
- * En route (`3:1381` / `99:1413`), Arrived (`3:1658`), In service (`101:1812`) and
- * Completion (`143:207`).
+ * The cook profile card — Figma section "Cook profiles" `289:8515`, read this pass off `289:7518`
+ * (Rekha) and cross-checked on all eight frames. The same card is embedded in the Service flow:
+ * Confirmation (`3:1041`), En route (`3:1381` / `292:469`), Arrived (`3:1658`) and
+ * In service (`101:1812`).
  *
- * Geometry, verbatim:
+ * Geometry, verbatim from `289:7518`:
  *   card    white, 1pt `#FFD600` border, radius 24, px 15.889 / py 20, gap 21,
  *           `0 0 2 rgba(0,0,0,0.08)`
- *   photo   `94:909` — an 85 × 90 `#FFF7CC` PANEL at a 16pt radius, cover-cropped.
- *           NOT a circular avatar; the previous card drew one.
- *   name    Livvic Black 16/24, black
- *   meta    `94:915` — a wrapping row of 16pt exported glyphs with Livvic Medium 11/16.5
- *           `rgba(0,0,0,0.7)` labels, separated by `#FFD600` bullets
- *   call    `94:937` — a `#E2FF68` pill at a 8pt radius, 21pt tall, with a 14pt handset and a
- *           Livvic SemiBold 10/13.33 label
- *   header  `94:943` — a 16pt frying pan + "What {first} cooks best?" Livvic Bold 12/16
+ *   header  `289:7519` — a **105pt** row, gap 12, items CENTRED, with 2pt of tail padding
+ *   photo   `289:7520` — an 85 × 90 `#FFF7CC` PANEL at a 16pt radius carrying the portrait at
+ *           89 × 133.5 from (−0.89, −12): a deliberate crop onto the face, not a centred `cover`.
+ *           NOT a circular avatar.
+ *   name    `299:1797` — Livvic Black 16/24 at tracking **0**, centred over the column
+ *   meta    `299:1798` — a WRAPPING grid of fixed **97pt** cells, 5 across and 3 down, each a
+ *           16pt glyph 3pt clear of a Livvic Medium 11/16.5 `rgba(0,0,0,0.7)` label
+ *   call    `299:1816` — a `#E2FF68` pill at an 8pt radius, 21pt tall, with a 14pt handset and a
+ *           Livvic Bold 11/16.5 label, inside a 25pt row padded 2pt
+ *   heading `289:7550` — "What {first} cooks best?" Livvic Bold 12/16, and NOTHING else: the
+ *           16pt frying pan the superseded revision drew beside it no longer exists
  *
  * Confirmed C-6: the regular and pure-veg cards are identical in every respect EXCEPT the 3×3
  * specialty grid — same photo, name, attribute row, CTA and trust row. So `variant` selects which
@@ -36,6 +39,12 @@ import { TrustBadges } from './TrustBadges';
  *
  * Heading: always interpolated as "What {firstName} cooks best?" — the Figma file hardcodes
  * "rekha" on 6 of 8 cards (defect D-4).
+ *
+ * FIGMA CONTENT QUIRK, recorded not reproduced: six of the eight cards — Rekha, Sanchita and
+ * Barsha in both variants (`299:1811`, `299:2277`, `299:2070`, `299:1892`, `299:2096`, `299:2122`)
+ * — draw the language GLYPH with no label beside it, because those cards carry no language data.
+ * Only Jyoti labels it ("Hindi, Odiya"). An orphan icon is not a state, so the attribute is
+ * omitted when the payload has no languages.
  */
 
 export type CookCardVariant = 'standard' | 'pureVeg';
@@ -84,22 +93,6 @@ function initialsOf(name: string): string {
   return `${first}${second}`.toUpperCase();
 }
 
-/**
- * `94:915` is a 2 × 2 GRID, not a wrapping list: each row is `col1 • col2`, with the bullets
- * vertically aligned at x = 90 because column one is a fixed 86 wide.
- *
- * Rendering it as one flowing list put a separator BEFORE every item but the first, so when the
- * list wrapped, row one ended with a dangling "•" that the frame does not draw. Pairing the
- * attributes makes the separator an in-row element, which is what the node actually contains.
- */
-function attributeRows(attributes: readonly Attribute[]): readonly (readonly Attribute[])[] {
-  const rows: Attribute[][] = [];
-  for (let index = 0; index < attributes.length; index += 2) {
-    rows.push(attributes.slice(index, index + 2));
-  }
-  return rows;
-}
-
 function dishesFor(cook: CookViewModel, variant: CookCardVariant): readonly DishViewModel[] {
   if (variant === 'pureVeg') {
     return cook.pureVegSpecialties ?? [];
@@ -136,80 +129,76 @@ export function CookCard({
         </View>
 
         <View style={styles.identityText}>
-          <Text variant="heading" color="textPrimary" accessibilityRole="header" numberOfLines={1}>
+          {/* `299:1797` — centred over the column, and at tracking 0 rather than −0.4. */}
+          <Text
+            variant="headingCta"
+            color="textPrimary"
+            align="center"
+            accessibilityRole="header"
+            numberOfLines={1}
+            style={styles.name}
+          >
             {cook.displayName}
           </Text>
 
           {attributes.length === 0 ? null : (
             <View style={styles.attributes} testID={`${testID}-attributes`}>
-              {attributeRows(attributes).map((row) => (
-                <View key={row[0]?.key ?? 'row'} style={styles.attributeRow}>
-                  {row.map((attribute, column) => (
-                    <Fragment key={attribute.key}>
-                      {column === 0 ? null : (
-                        <Text variant="labelMedium" color="surfaceCta" style={styles.separator}>
-                          •
-                        </Text>
-                      )}
-                      <View
-                        style={column === 0 ? styles.attributeLead : styles.attribute}
-                        accessible
-                      >
-                        {attribute.art === undefined ? null : (
-                          <Image
-                            source={attribute.art}
-                            style={styles.attributeGlyph}
-                            resizeMode="contain"
-                            accessibilityIgnoresInvertColors
-                          />
-                        )}
-                        <Text variant="labelMedium" color="textSecondary" numberOfLines={1}>
-                          {attribute.value}
-                        </Text>
-                      </View>
-                    </Fragment>
-                  ))}
+              {attributes.map((attribute) => (
+                <View key={attribute.key} style={styles.attribute} accessible>
+                  {attribute.art === undefined ? null : (
+                    <Image
+                      source={attribute.art}
+                      style={styles.attributeGlyph}
+                      resizeMode="contain"
+                      accessibilityIgnoresInvertColors
+                    />
+                  )}
+                  <Text
+                    variant="labelMedium"
+                    color="textSecondary"
+                    numberOfLines={1}
+                    style={styles.attributeLabel}
+                  >
+                    {attribute.value}
+                  </Text>
                 </View>
               ))}
             </View>
           )}
 
           {onCallCook === undefined ? null : (
-            <Pressable
-              onPress={onCallCook}
-              accessibilityRole="button"
-              accessibilityLabel={`Call ${cook.firstName}`}
-              hitSlop={12}
-              style={styles.call}
-              testID={`${testID}-call`}
-            >
-              <Image
-                source={COOK_CALL_GLYPH}
-                style={styles.callGlyph}
-                resizeMode="contain"
-                accessibilityIgnoresInvertColors
-              />
-              <Text variant="captionStrong" color="textSecondary">
-                Call Cook
-              </Text>
-            </Pressable>
+            /* `257:3108` — the CTA sits in its own 2pt-inset row and spans the column. */
+            <View style={styles.callRow}>
+              <Pressable
+                onPress={onCallCook}
+                accessibilityRole="button"
+                accessibilityLabel={`Call ${cook.firstName}`}
+                hitSlop={12}
+                style={styles.call}
+                testID={`${testID}-call`}
+              >
+                <Image
+                  source={COOK_CALL_GLYPH}
+                  style={styles.callGlyph}
+                  resizeMode="contain"
+                  accessibilityIgnoresInvertColors
+                />
+                {/* `299:1819` — a fixed 51 × 14 single line. Allowed to wrap, "Cook" dropped
+                    below the pill's 21pt box and the control read "Call" on a narrow card. */}
+                <Text variant="slotLabel" color="textSecondary" numberOfLines={1}>
+                  Call Cook
+                </Text>
+              </Pressable>
+            </View>
           )}
         </View>
       </View>
 
       {showSpecialties && dishes.length > 0 ? (
         <View style={styles.specialties}>
-          <View style={styles.specialtiesHeading}>
-            <Image
-              source={COOK_SPECIALTIES_GLYPH}
-              style={styles.attributeGlyph}
-              resizeMode="contain"
-              accessibilityIgnoresInvertColors
-            />
-            <Text variant="bodyBold" color="textPrimary" accessibilityRole="header">
-              {`What ${cook.firstName} cooks best?`}
-            </Text>
-          </View>
+          <Text variant="bodyBold" color="textPrimary" accessibilityRole="header">
+            {`What ${cook.firstName} cooks best?`}
+          </Text>
           <SpecialtyGrid dishes={dishes} testID={`${testID}-specialties`} />
         </View>
       ) : null}
@@ -230,7 +219,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     borderRadius: lightTheme.layout.cardRadius,
     borderWidth: lightTheme.stroke.thin,
-    borderColor: lightTheme.colors.surfaceCta,
+    borderColor: lightTheme.colors.borderNotice,
     backgroundColor: lightTheme.colors.surface,
     shadowColor: lightTheme.colors.textPrimary,
     shadowOffset: { width: 0, height: 0 },
@@ -238,8 +227,15 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
     elevation: 1,
   },
-  identity: { flexDirection: 'row', alignItems: 'flex-start', gap: lightTheme.space.md },
-  /** `94:909` — an 85 × 90 panel, not a circle. */
+  /** `289:7519` — a 105pt row with a 2pt tail; the photo and the text block are CENTRED in it. */
+  identity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 105,
+    paddingBottom: 2,
+    gap: lightTheme.space.md,
+  },
+  /** `289:7520` — an 85 × 90 panel, not a circle. */
   photo: {
     width: 85,
     height: 90,
@@ -254,31 +250,51 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
     elevation: 1,
   },
-  photoImage: { width: '100%', height: '100%' },
-  identityText: { flex: 1, minWidth: 0, gap: lightTheme.space.sm, paddingVertical: 5 },
-  /** `94:915` — two 16pt rows 3.5pt apart. */
-  attributes: { gap: 3.5 },
-  attributeRow: { flexDirection: 'row', alignItems: 'center' },
-  /** `94:916` / `94:926` — column one is a fixed 86 so the two bullets line up at x = 90. */
-  attributeLead: { flexDirection: 'row', alignItems: 'center', gap: 3, width: 86 },
-  attribute: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 1 },
-  /** `94:920` sits at x 90 with column two at 98.93 — 4pt clear on each side. */
-  separator: { marginHorizontal: 4 },
+  /**
+   * `289:7521` — the portrait is drawn 89 × 133.5 from (−0.89, −12) inside the 85 × 90 panel:
+   * wider and much taller than the box, lifted so the crop lands on the face. Stated as
+   * percentages so the same crop window holds for whatever photo the server sends.
+   */
+  photoImage: {
+    position: 'absolute',
+    left: '-1.047%',
+    top: '-13.333%',
+    width: '104.7%',
+    height: '148.33%',
+  },
+  /** `299:1794` — a 101pt column at an 8pt gap; the row above centres it. */
+  identityText: { flex: 1, minWidth: 0, height: 101, gap: lightTheme.space.sm },
+  /** `299:1796` — centred across the column. */
+  name: { alignSelf: 'stretch' },
+  /**
+   * `299:1798` — a WRAPPING grid of fixed 97pt cells, 5 apart across and 3 down. Two of them plus
+   * the gutter fill the 199pt column exactly and a third cannot fit, so the wrap produces the
+   * 2 × 2 the frame draws without hard-coding pairs, and a narrow phone degrades to one per row
+   * instead of truncating both.
+   */
+  attributes: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 5, rowGap: 3 },
+  /** `299:1799` — a 97 × 16 cell whose label starts 3pt clear of the 16pt glyph. */
+  attribute: { flexDirection: 'row', alignItems: 'center', gap: 3, width: 97, height: 16 },
+  attributeLabel: { flex: 1, minWidth: 0 },
   attributeGlyph: { width: 16, height: 16 },
-  /** `94:937` — a canary pill, 21pt tall. `hitSlop` restores the 44pt target. */
+  /** `299:1815` — a 25pt row with a 2pt vertical inset around the CTA. */
+  callRow: { alignSelf: 'stretch', height: 25, paddingVertical: lightTheme.space.xxs },
+  /**
+   * `299:1816` — a `#E2FF68` pill at an 8pt radius, 21pt tall, spanning the column. `hitSlop`
+   * restores the 44pt target without redrawing it.
+   */
   call: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'flex-start',
+    alignSelf: 'stretch',
     gap: lightTheme.space.s6,
-    minWidth: 90,
     paddingHorizontal: lightTheme.space.sm,
     paddingVertical: 5.889,
     borderRadius: lightTheme.radius.xs,
     backgroundColor: lightTheme.colors.surfaceEta,
   },
   callGlyph: { width: 14, height: 14 },
+  /** `289:7548` — the heading and the grid, 9 apart. */
   specialties: { gap: 9 },
-  specialtiesHeading: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.xs },
 });

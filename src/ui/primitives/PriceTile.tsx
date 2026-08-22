@@ -163,11 +163,16 @@ const styles = StyleSheet.create({
   pricesWide: { gap: lightTheme.space.s6 },
   pricesCompact: { gap: lightTheme.space.xs, justifyContent: 'center' },
   strike: { textDecorationLine: 'line-through' },
-  /** `1:798` — right 6.1 / top 6.8, px 6 / py 2, 6pt radius, `0 1 1 rgba(0,0,0,0.05)`. */
+  /**
+   * `267:3586` — top 6.8, px 6 / py 2, 6pt radius, `0 1 1 rgba(0,0,0,0.05)`.
+   *
+   * RIGHT is **5.6**, not the 6.1 the superseded `1:798` drew: the badge is 44 wide at x 114.9 on
+   * a 164.5 tile, so 164.5 − 114.9 − 44 = 5.6.
+   */
   badge: {
     position: 'absolute',
     top: 6.8,
-    right: 6.1,
+    right: 5.6,
     paddingHorizontal: lightTheme.space.s6,
     paddingVertical: lightTheme.space.xxs,
     borderRadius: lightTheme.layout.badgeRadius,

@@ -61,13 +61,16 @@ export function InfoDialog({
       accessibilityRole="alert"
       accessibilityLabel={`${title}. ${body}`}
     >
-      <View style={styles.badge}>
-        <Image
-          source={MONEY_GLYPH}
-          style={styles.badgeGlyph}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
+      {/* `47:6621` — a 36 × 40 icon block; the disc itself is 35. */}
+      <View style={styles.badgeBlock}>
+        <View style={styles.badge}>
+          <Image
+            source={MONEY_GLYPH}
+            style={styles.badgeGlyph}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </View>
       </View>
 
       <Text variant="title" color="textPrimary" accessibilityRole="header">
@@ -124,8 +127,12 @@ const styles = StyleSheet.create({
     padding: DESIGN.padding,
     /** Reserve the close control's lane so a long title cannot run under it. */
     paddingRight: DESIGN.padding + DESIGN.close,
+    /** `47:6617` fixes the card at 152: 16 + 40 + 6 + 20 + 6 + 45 leaves **19** below the body. */
+    paddingBottom: 19,
     gap: DESIGN.iconToTitle,
   },
+  /** `47:6621` — the icon block is 36 wide and **40** tall, which sets the title's baseline. */
+  badgeBlock: { width: 36, height: 40 },
   badge: {
     width: DESIGN.badge,
     height: DESIGN.badge,

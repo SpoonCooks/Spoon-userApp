@@ -1,7 +1,14 @@
-import { fromStatus, normalizeError, toTimeoutError } from '@core/errors';
+import {
+  fromStatus,
+  isAppError,
+  normalizeError,
+  toNetworkError,
+  toTimeoutError,
+} from '@core/errors';
 import type { Logger } from '@core/logging';
 
 import { CORRELATION_HEADER, createCorrelationId } from './correlation';
+import { readErrorEnvelope, unwrapData } from './envelope';
 import type { ApiClient, AuthTokenProvider, RequestOptions } from './types';
 
 /**
@@ -12,6 +19,8 @@ import type { ApiClient, AuthTokenProvider, RequestOptions } from './types';
  *  - base URL + timeout via AbortController
  *  - request interceptor: Authorization, platform/version headers, correlation id
  *  - response interceptor: normalize EVERY failure into the error taxonomy
+ *  - unwrap the `{ data }` envelope once, centrally, so no feature module sees it
+ *  - preserve the backend's `error.code` / `requestId` on every failure
  *  - 401 -> single-flight refresh -> retry once -> terminate session on failure
  */
 
@@ -85,12 +94,17 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       headers.Authorization = `Bearer ${accessToken}`;
     }
 
+    // Serialized BEFORE the try so a body that cannot be encoded is a programming error here
+    // rather than something the catch below would misreport as a network failure.
+    const encodedBody =
+      requestOptions.body === undefined ? undefined : JSON.stringify(requestOptions.body);
+
     try {
       const response = await doFetch(buildUrl(baseUrl, path), {
         method: requestOptions.method ?? 'GET',
         headers,
         signal: controller.signal,
-        ...(requestOptions.body === undefined ? {} : { body: JSON.stringify(requestOptions.body) }),
+        ...(encodedBody === undefined ? {} : { body: encodedBody }),
       });
 
       return { status: response.status, ok: response.ok, data: await readBody(response) };
@@ -98,7 +112,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       if (controller.signal.aborted && externalSignal?.aborted !== true) {
         throw toTimeoutError(effectiveTimeout, correlationId);
       }
-      throw normalizeError(cause, correlationId);
+      // Anything already carrying the taxonomy passes through unchanged.
+      if (isAppError(cause)) throw cause;
+      // `fetch` rejected and nothing aborted it, so the request produced NO response. That is
+      // the network kind by definition, and classifying it structurally is what keeps React
+      // Native's `Error` from being misread as `unknown` — see `toNetworkError`.
+      throw toNetworkError(cause, correlationId);
     } finally {
       clearTimeout(timer);
       externalSignal?.removeEventListener('abort', onExternalAbort);
@@ -118,25 +137,52 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
 
       if (refreshed === null) {
         auth.onSessionExpired();
-        throw fromStatus(401, { message: 'Session expired', correlationId });
+        throw fromStatus(401, {
+          message: 'Session expired',
+          correlationId,
+          code: 'UNAUTHENTICATED',
+        });
       }
 
       result = await send(path, requestOptions, refreshed, correlationId);
 
       if (result.status === 401) {
         auth.onSessionExpired();
-        throw fromStatus(401, { message: 'Session expired after refresh', correlationId });
+        throw fromStatus(401, {
+          message: 'Session expired after refresh',
+          correlationId,
+          code: 'UNAUTHENTICATED',
+        });
       }
     }
 
     if (!result.ok) {
-      const error = fromStatus(result.status, { correlationId });
-      logger.warn('Request failed', { path, status: result.status, correlationId });
+      // The backend answers every failure with `{ error: { code, message, requestId } }`.
+      // Carrying the code through is what lets a screen distinguish
+      // ADDRESS_NOT_SERVICEABLE from SLOT_UNAVAILABLE — both plain 4xx to the transport.
+      const envelope = readErrorEnvelope(result.data);
+      const error = fromStatus(result.status, {
+        correlationId,
+        ...(envelope === null
+          ? {}
+          : {
+              code: envelope.code,
+              ...(envelope.message === undefined ? {} : { message: envelope.message }),
+              ...(envelope.requestId === undefined ? {} : { requestId: envelope.requestId }),
+            }),
+      });
+      logger.warn('Request failed', {
+        path,
+        status: result.status,
+        correlationId,
+        ...(envelope === null ? {} : { code: envelope.code, requestId: envelope.requestId }),
+      });
       throw error;
     }
 
     try {
-      return requestOptions.parse(result.data);
+      // 204 and other empty bodies never carry an envelope; `expectNoContent` handles them.
+      return requestOptions.parse(result.data === undefined ? undefined : unwrapData(result.data));
     } catch (cause) {
       logger.error('Response failed boundary validation', { path, correlationId });
       throw normalizeError(cause, correlationId);

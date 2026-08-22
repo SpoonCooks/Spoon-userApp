@@ -70,15 +70,18 @@ export interface AddressEditViewModel {
  * The client still evaluates no coverage: every string, including the headline, is server copy.
  */
 export interface AddressOutOfServiceViewModel {
-  /** `218:1537` / `218:1538` — the banner shows the address that was found to be unserviceable. */
-  readonly addressLabel: string;
-  readonly addressLine: string;
+  /**
+   * `275:5179` — the shared `63:783` header's title ("Choose another location").
+   *
+   * The superseded file drew a 45pt banner here carrying the rejected address and the account
+   * avatar. `sbIXeBfaMzUFUz2NYJIJTm` replaces it with a plain titled header, so `addressLabel`,
+   * `addressLine` and `avatarUrl` no longer have anything to render into.
+   */
+  readonly headerTitle: string;
   /** `221:1554` — "Coming soon to your area!" */
   readonly title: string;
   /** `221:1555` — the apology line. */
   readonly message: string;
-  /** The account avatar in the banner. Remote, never bundled. */
-  readonly avatarUrl?: string;
 }
 
 export interface AddressLabelOption {

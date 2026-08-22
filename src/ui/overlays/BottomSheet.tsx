@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Animated,
+  Keyboard,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DirectionalDisc } from '@ui/primitives/DirectionalDisc';
 import { IconButton } from '@ui/primitives/IconButton';
 import { Text } from '@ui/primitives/Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
@@ -39,6 +48,8 @@ import { Overlay } from './Overlay';
 const SHEET_OFFSET = 600;
 const ANIMATION_MS = 220;
 const DRAG_DISMISS_THRESHOLD = 80;
+/** `6:3` — the ground below the CTA block before the frame's own edge. */
+const SHEET_BOTTOM_PAD = 18;
 
 export interface BottomSheetProps {
   readonly visible: boolean;
@@ -55,8 +66,13 @@ export interface BottomSheetProps {
    * `screen`  — `143:317`: the Extension sheet reuses the SCREEN header instead. A 45pt band,
    *             pt 16 / pb 6 / px 16, a 32pt back control 15pt clear of a Livvic Black 20/28
    *             title, the Help pill on the right and NO hairline.
+   * `banner`  — `289:6866` / `289:6848` in `sbIXeBfaMzUFUz2NYJIJTm`: the finalized Instant and
+   *             Cancellation sheets adopted the SHARED screen header `63:783` — a **338 x 38**
+   *             bar, px 4, 12pt gap, Livvic Black 20/28, no hairline. Added as its own variant
+   *             rather than by re-valuing `screen`, whose other three consumers (Extension,
+   *             Booking details, address edit) are outside this pass's scope.
    */
-  readonly headerVariant?: 'compact' | 'screen';
+  readonly headerVariant?: 'compact' | 'screen' | 'banner';
   /**
    * The back control's own treatment. Sheets disagree: `1:735` and `143:317` draw a bare arrow,
    * while `230:1927` on the address-edit sheet draws the OUTLINED disc the screen headers use.
@@ -104,6 +120,7 @@ export function BottomSheet({
   children,
 }: PropsWithChildren<BottomSheetProps>) {
   const insets = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   // Lazily-created and stable for the component's lifetime, without reading a ref during render.
   const [translateY] = useState(() => new Animated.Value(SHEET_OFFSET));
   const [mounted, setMounted] = useState(visible);
@@ -114,6 +131,17 @@ export function BottomSheet({
   if (visible && !mounted) {
     setMounted(true);
   }
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const animation = Animated.timing(translateY, {
@@ -180,7 +208,27 @@ export function BottomSheet({
         testID={testID}
         style={[
           styles.sheet,
-          { paddingBottom: lightTheme.space.xl + insets.bottom },
+          /*
+           * KEYBOARD AVOIDANCE. The sheet is bottom-anchored, so with an IME up it kept its
+           * position and the keyboard simply covered it — observed on the handset with the
+           * cancellation "Others" field, where BOTH the field being typed into and the Continue
+           * CTA sat behind the keyboard and the sheet never scrolled.
+           *
+           * Lifting by the keyboard height (and taking that height out of the max) moves the whole
+           * sheet above the IME and lets its own ScrollView carry any remainder. When the keyboard
+           * is closed this is 0 and every already-verified sheet is byte-identical.
+           *
+           * `padding`-style avoidance is used rather than `KeyboardAvoidingView` because the sheet
+           * lives inside a native modal, where that component does not receive the same insets.
+           */
+          { marginBottom: keyboardHeight },
+          /*
+           * `6:3` / `104:2261` / `115:2704` / `289:6865` all measure the sheet at a fixed height
+           * with the header starting at y = 16 and ~18 of ground below the CTA. The frames model
+           * no gesture inset, so `insets.bottom` is ADDED rather than folded in — dropping it
+           * would put the CTA under the home indicator on this handset.
+           */
+          { paddingBottom: SHEET_BOTTOM_PAD + (keyboardHeight > 0 ? 0 : insets.bottom) },
           { transform: [{ translateY }] },
         ]}
         accessibilityViewIsModal={!dialogOpen}
@@ -197,17 +245,30 @@ export function BottomSheet({
             />
           ) : (
             <View
-              style={[styles.header, headerVariant === 'screen' ? styles.headerScreen : null]}
+              style={[
+                styles.header,
+                headerVariant === 'screen' ? styles.headerScreen : null,
+                headerVariant === 'banner' ? styles.headerBanner : null,
+              ]}
               {...panResponder.panHandlers}
               testID={`${testID}-handle`}
             >
-              {onBack === undefined ? null : (
-                <IconButton
-                  name={backVariant === 'outlined' ? 'back' : 'backArrow'}
+              {onBack === undefined ? null : backVariant === 'outlined' ? (
+                /* `111:2640` — the disc control, from the exported asset. */
+                <DirectionalDisc
+                  direction="back"
                   label="Back"
                   onPress={onBack}
-                  variant={backVariant}
-                  color={backVariant === 'outlined' ? 'textSecondary' : 'textSecondaryStrong'}
+                  testID={`${testID}-back`}
+                />
+              ) : (
+                /* `1:739` — the Instant sheet's bare 20pt arrow on no fill. A different control. */
+                <IconButton
+                  name="backArrow"
+                  label="Back"
+                  onPress={onBack}
+                  variant="plain"
+                  color="textSecondaryStrong"
                   testID={`${testID}-back`}
                 />
               )}
@@ -217,7 +278,7 @@ export function BottomSheet({
                   line is only ever used when the title does not fit; at the 370pt reference and
                   above it renders on one, exactly as drawn. */}
               <Text
-                variant={headerVariant === 'screen' ? 'headingScreen' : 'headingSheet'}
+                variant={headerVariant === 'compact' ? 'headingSheet' : 'headingScreen'}
                 color="textStrong"
                 accessibilityRole="header"
                 numberOfLines={2}
@@ -243,6 +304,9 @@ export function BottomSheet({
         </View>
 
         {footer === undefined ? null : <View style={[styles.footer, footerStyle]}>{footer}</View>}
+
+        {/* `29:1858` — the 50% black wash the sheet takes under an open dialog. */}
+        {dialogOpen ? <View style={styles.sheetDim} pointerEvents="none" /> : null}
       </Animated.View>
 
       {dialogOpen ? (
@@ -277,7 +341,7 @@ const styles = StyleSheet.create({
     backgroundColor: lightTheme.colors.surface,
     borderTopLeftRadius: lightTheme.layout.sheetRadius,
     borderTopRightRadius: lightTheme.layout.sheetRadius,
-    paddingTop: lightTheme.space.md,
+    paddingTop: lightTheme.space.lg,
     maxHeight: '92%',
   },
   /** Drag target on a sheet that draws no header. Transparent — the frames draw no handle. */
@@ -295,6 +359,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: lightTheme.stroke.hairline,
     borderBottomColor: lightTheme.colors.surface,
   },
+  /**
+   * `289:6944` / `115:2786` — the shared `63:783` bar: 38 tall, its own px 4, 12pt gap, no
+   * hairline.
+   *
+   * The frames nest that bar inside the sheet's own `p 16` (`289:6943` / `104:2337`), so the back
+   * disc lands at x 20, not x 4. `body` already carries that 16 for the scroll region; the header
+   * sits outside it and therefore adds the gutter itself.
+   */
+  headerBanner: {
+    height: 38,
+    gap: lightTheme.space.md,
+    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal + lightTheme.space.xs,
+    paddingVertical: 0,
+    borderBottomWidth: 0,
+    minHeight: 0,
+  },
   /** `143:317` — a 45pt band: pt 16 / pb 6, 15pt clear of the back control, no hairline. */
   headerScreen: {
     gap: 15,
@@ -304,7 +384,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     minHeight: 61,
   },
-  title: { flexShrink: 1 },
+  /**
+   * `289:6817` — the title takes the slack so a `headerAction` lands flush against the banner's
+   * right padding, as the Help pill does (`289:6823` ends at 333 of a 334pt inner width). With
+   * only `flexShrink` it sat 12pt after the title and left 70pt dead on a 393dp screen.
+   */
+  title: { flex: 1 },
   /** Header + body share one positioning context so `overlay` can cover both, but not the CTA. */
   main: { flexShrink: 1 },
   scroll: { flexGrow: 0, flexShrink: 1 },
@@ -327,13 +412,32 @@ const styles = StyleSheet.create({
     left: 0,
     justifyContent: 'center',
   },
+  /**
+   * `47:6615` / `29:1858` — the sheet dims ITSELF rather than taking a second full-screen scrim.
+   *
+   * The frame expresses this as a 50% black wash under a 50% layer opacity. Reproduced literally
+   * that makes the sheet translucent, and on a real device the Home screen behind it reads
+   * straight through — the artboard hides this only because its background is blank. The flattened
+   * `black65` wash lands the same measured colour (~#595959 on white) with the sheet still opaque.
+   */
+  sheetDim: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: lightTheme.colors.scrimSheet,
+  },
+  /**
+   * Transparent: `25:1745` is the ONE scrim in the frame and `Overlay` already draws it. Painting
+   * `scrim` here again stacked 0.8 on 0.8 and took the screen behind the sheet to 96% black.
+   */
   dialogScrim: {
     position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: lightTheme.colors.scrim,
   },
   dialogContent: { paddingHorizontal: lightTheme.space.xl },
 });

@@ -1,30 +1,112 @@
+import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { ScheduleView, useScheduleData } from '@features/scheduled';
+import { useRescheduleBooking } from '@features/booking';
+import { ScheduleView, devScheduleSelection, useScheduleData } from '@features/scheduled';
+import { getUserMessage, isAppError } from '@core/errors';
+import { useSafeBack } from '@core/navigation';
+import { InfoDialog } from '@ui';
 
 /**
- * Reschedule - Figma `47:*`. The same screen as Schedule with `mode: reschedule` (C-2), and no
- * Duration section (C-3).
+ * Reschedule — Figma `sbIXeBfaMzUFUz2NYJIJTm`, finalized "Rescheduled flow" section `275:5217`.
  *
- * Submit is intentionally inert. Blocker B-4: the Reschedule bar shows `Pay ->` with no price,
- * which after ruling R-1 would open Razorpay for an unspecified amount. No submit or payment path
- * is wired until that is answered. Ruling R-3 additionally means eligibility comes from the
- * server - the client never infers it.
+ * This became its OWN finalized section in v4. In the previous file the same frames sat under a
+ * second section also called "Scheduled flow", which is why they were byte-identical to Schedule
+ * and were recorded as a duplicate; the rename resolves that — they were always the reschedule
+ * variant.
+ *
+ * The section holds **three** states, not Schedule's four:
+ *   `275:5442`  Day
+ *   `275:5490`  + Time
+ *   `275:5218`  + Start time, CTA "Reschedule"
+ *
+ * The missing step is DURATION, and that matches the locked product rule: a reschedule moves
+ * *when*, never *how long*. The screen already produces exactly this shape from `mode:
+ * 'reschedule'` + an absent `durations` — no reschedule-specific layout exists or is needed.
+ *
+ * The v4 CTA reads "Reschedule" and there is NO payment line, which is also the locked rule
+ * (reschedule is free, max once, no Razorpay).
+ *
+ * ## Submit is live, and ruling R-3 is intact
+ *
+ * It used to be inert "until blocker B-4 resolves reschedule eligibility server-side", which left
+ * the one CTA on the screen doing nothing at all — the dead control §11 forbids. B-4 is about who
+ * DECIDES eligibility, and the answer has not changed: the server does.
+ * `POST /v1/bookings/:id/reschedule` is that decision. This screen sends the slot the server
+ * itself offered and renders whatever comes back, including a refusal. It infers nothing — which
+ * is exactly what R-3 requires, and is not the same thing as refusing to ask.
+ *
+ * DEV reachability (task §16): `?step=1..3` seeds the selection so each finalized state opens
+ * directly. `__DEV__`-only.
  */
 export default function RescheduleRoute() {
   const router = useRouter();
-  useLocalSearchParams<{ id: string }>();
+  const { id, step } = useLocalSearchParams<{ id: string; step?: string }>();
+  const bookingId = typeof id === 'string' ? id : '';
   const { state, refetch } = useScheduleData('reschedule');
+  const reschedule = useRescheduleBooking();
+  const [error, setError] = useState<string | null>(null);
+
+  const seed = __DEV__ ? devScheduleSelection(state, step) : undefined;
+
+  /**
+   * The BOOKING being rescheduled — the only screen this one can be about. A notification that
+   * deep-links here (or a `spoon://reschedule/:id`) therefore backs out to that booking rather
+   * than to Home, which is where the customer expects to be when they abandon the change.
+   */
+  const goBack = useSafeBack(bookingId === '' ? '/home' : `/booking/${bookingId}`);
 
   return (
-    <ScheduleView
-      state={state}
-      onRetry={refetch}
-      onBack={() => router.back()}
-      onSubmit={() => {
-        // Intentionally inert until blocker B-4 resolves whether rescheduling can charge.
-      }}
-      onOpenMealBrief={() => router.push('/meal-brief')}
-    />
+    <>
+      <ScheduleView
+        state={state}
+        onRetry={refetch}
+        onBack={goBack}
+        {...(seed === undefined ? {} : { initialSelection: seed })}
+        /* Reschedule is free, so there is no quote to wait on — but the call in flight still has
+           to hold the CTA, or a second tap moves the booking twice. */
+        submitting={reschedule.isPending}
+        onSubmit={(selection) => {
+          // The slot id IS the server's ISO start, so what is sent back is exactly what was
+          // offered. No slot is constructed here, and an unselected grid cannot submit.
+          if (bookingId === '' || selection.slotId === null || reschedule.isPending) return;
+
+          reschedule
+            .mutateAsync({
+              bookingId,
+              scheduledStart: selection.slotId,
+              // Scoped to the booking and the target instant, so a retry after an ambiguous
+              // failure replays the same move instead of booking a second one.
+              scope: `booking.reschedule:${bookingId}:${selection.slotId}`,
+            })
+            .then(() => {
+              /**
+               * REPLACE, not push. The booking has moved, so returning to a grid still showing
+               * the old slots would offer the customer a choice that no longer describes their
+               * booking. The detail screen re-reads the authoritative state.
+               */
+              router.replace(`/booking/${bookingId}`);
+            })
+            .catch((thrown: unknown) => {
+              // Includes the server's own refusal — "already rescheduled once", "too close to
+              // the start". Its message is shown; this screen decides nothing about eligibility.
+              setError(
+                isAppError(thrown)
+                  ? getUserMessage(thrown)
+                  : 'We could not reschedule this booking.',
+              );
+            });
+        }}
+      />
+
+      {/* FIGMA_PENDING — `275:5218` draws no failure state for the reschedule. */}
+      <InfoDialog
+        visible={error !== null}
+        onClose={() => setError(null)}
+        title="Couldn’t reschedule"
+        body={error ?? ''}
+        testID="reschedule-error"
+      />
+    </>
   );
 }

@@ -15,8 +15,14 @@ import { Skeleton } from './Skeleton';
  *
  * The DESIGNED full-screen states (`73:1036` splash, `71:747` interstitial) live in
  * `@features/loading` — they carry brand photography and belong to a feature, not to the token
- * layer. A screen whose boundary owns the whole surface renders `IntroLoading` instead of
- * `screen` (task §13).
+ * layer.
+ *
+ * LOADING RULE (task §13 / §25): those branded surfaces belong to the app OPENING and nowhere
+ * else. `73:1036` is held by the boot gate at `src/app/index.tsx` while the session, the profile
+ * gate and the address gate resolve; `71:747` is no longer rendered by any production screen.
+ * Every other wait — Home -> Profile, Profile -> Addresses, an address transition, a form
+ * submission — uses one of the SCOPED variants below, so a normal navigation never looks like a
+ * second app launch.
  *
  * Announced politely so a screen reader says something is happening rather than going silent.
  */

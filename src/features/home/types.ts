@@ -1,4 +1,4 @@
-import type { BookingCardViewModel } from '@ui';
+import type { HomeBannerViewModel } from './state/homeBannerView';
 
 /**
  * Home view models — UI shape only.
@@ -13,8 +13,20 @@ import type { BookingCardViewModel } from '@ui';
 export interface HomeHeaderViewModel {
   /** e.g. "Spoon in 18 mins" — a server-provided headline, never a client ETA calculation. */
   readonly etaHeadline: string;
-  readonly addressLabel: string;
-  readonly addressLine: string;
+  /**
+   * The customer's default address, or `null` when they have none saved yet.
+   *
+   * Nullable deliberately. When these were required strings, "no address" was
+   * indistinguishable from "not supplied", so the composer left the STATIC screen definition's
+   * value in place and a brand-new account rendered the demo fixture's address as if it were
+   * their own (FE-6, observed on a real device). A null that the type system forces the banner
+   * to handle is the only shape in which that defect cannot reappear.
+   *
+   * FIGMA_PENDING: the design has no "no address yet" frame. The banner draws the prompt copy
+   * in `HomeTopBanner` in the same lockup, which is a placeholder for a designed empty state.
+   */
+  readonly addressLabel: string | null;
+  readonly addressLine: string | null;
 }
 
 export interface HomePromoViewModel {
@@ -79,6 +91,8 @@ export interface HomeMarketingViewModel {
   readonly exclusionsTitle: string;
   readonly exclusions: readonly HomeMediaTileViewModel[];
   readonly promiseTitle: string;
+  /** `319:3340` — the line beside the Spoon mark that closes the page. */
+  readonly promise?: string;
 }
 
 export interface HomeViewModel {
@@ -87,8 +101,11 @@ export interface HomeViewModel {
   readonly tiles: readonly HomeBookingTileViewModel[];
   /** @deprecated Not present in Page 3a. See `HomeTrustItemViewModel`. */
   readonly trust?: readonly HomeTrustItemViewModel[];
-  /** Present → active-booking variant. Absent → pre-booking variant. */
-  readonly activeBooking?: BookingCardViewModel;
+  /**
+   * Present → the booking-banner variant of Home (`381:511`). Absent → the pre-booking Home
+   * (`1:455`). ONE screen either way; see `state/homeBannerView.ts` for how the variant is chosen.
+   */
+  readonly activeBooking?: HomeBannerViewModel;
   /** Present on the pre-booking variant only. */
   readonly marketing?: HomeMarketingViewModel;
 }

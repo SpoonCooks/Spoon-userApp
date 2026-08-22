@@ -14,8 +14,18 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
  * block with a tall glyph. These are different frames with different fills, radii and glyph sizes.
  *
  * All three are the same object: a white card outlined 1pt in `#FFD600` at a 16pt radius with
- * 11.889pt padding, a 32pt exported glyph, a 10pt gap, and a two-line text column 2.315pt apart —
- * Livvic Medium 10/13.33 in `#1D293D` over Livvic Regular 9/13.5 in `rgba(0,0,0,0.7)`.
+ * 11.889pt horizontal padding and 6pt vertical, a 32pt exported glyph, a 10pt gap, and a two-line
+ * text column 2.315pt apart.
+ *
+ * TYPE RAMP — the current file moved BOTH lines up a step, which is the whole of the "14 → 17"
+ * growth seen across `201:100`, `3:2002` and `6:663`:
+ *
+ *   title  Livvic Medium 10/13.33  →  Livvic Medium **11/16.5**  (`#1D293D`, box 14 → 17)
+ *   body   Livvic Regular 9/13.5   →  Livvic Regular **10/15**   (70 % black, 2 lines 27 → 30)
+ *
+ * This is a change to THIS card, not to the tokens: `labelMedium` and `caption` already carry the
+ * new values and are used by other screens the file did not touch, so nothing is re-valued. The
+ * card simply now points at the correct two styles.
  *
  * BOUNDARY: this renders a message the SERVER has already decided to show. Nothing here knows
  * why a booking was reassigned or cancelled, and nothing here can cause either
@@ -28,6 +38,15 @@ export interface NoticeCardProps {
   readonly art: ImageSourcePropType;
   /** `201:550` — the refund figures, appended below the notice inside the same card. */
   readonly children?: ReactNode;
+  /**
+   * The same card is drawn at two heights and both are real measurements:
+   *
+   *   `default` — 66: `208:553` reassignment / `201:458` auto-cancel, whose copy runs longer.
+   *   `tight`   — 45: `107:2587` / `107:2613`, the two cancellation-policy notices.
+   *
+   * Passed rather than changed globally, because the two are different frames (§16).
+   */
+  readonly density?: 'default' | 'tight';
   readonly testID?: string;
 }
 
@@ -36,11 +55,16 @@ export function NoticeCard({
   body,
   art,
   children,
+  density = 'default',
   testID = 'notice-card',
 }: NoticeCardProps) {
   return (
     <View
-      style={[styles.card, children === undefined ? styles.compact : styles.tall]}
+      style={[
+        styles.card,
+        children === undefined ? styles.compact : styles.tall,
+        children === undefined && density === 'tight' ? styles.tight : null,
+      ]}
       testID={testID}
       accessible={children === undefined}
       {...(children === undefined ? { accessibilityLabel: `${title}. ${body}` } : {})}
@@ -53,10 +77,12 @@ export function NoticeCard({
           accessibilityIgnoresInvertColors
         />
         <View style={styles.text}>
-          <Text variant="captionStrong" color="textField">
+          {/* `208:558` — Livvic Medium 11/16.5. */}
+          <Text variant="labelMedium" color="textField">
             {title}
           </Text>
-          <Text variant="micro" color="textSecondary">
+          {/* `208:559` — Livvic Regular 10/15. */}
+          <Text variant="caption" color="textSecondary">
             {body}
           </Text>
         </View>
@@ -76,8 +102,18 @@ const styles = StyleSheet.create({
     borderColor: lightTheme.colors.borderNotice,
     backgroundColor: lightTheme.colors.surface,
   },
-  /** `208:553` — 11.889pt all round, vertically centred on its 57pt height. */
-  compact: { justifyContent: 'center', padding: 11.889, minHeight: 57 },
+  /**
+   * `208:553` — px 11.889 / py 6, vertically centred. The card grew 57 → **66** with the type
+   * ramp; the height is left to the content so a longer title cannot clip.
+   */
+  compact: {
+    justifyContent: 'center',
+    paddingHorizontal: 11.889,
+    paddingVertical: lightTheme.space.s6,
+    minHeight: 66,
+  },
+  /** `107:2587` / `107:2613` — the cancellation notices measure **45**, not 66. */
+  tight: { minHeight: 45 },
   /** `201:467` — 12pt vertical, 11.889pt horizontal, 9pt between the notice and the figures. */
   tall: {
     justifyContent: 'center',

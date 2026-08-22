@@ -2,16 +2,19 @@ import { useState } from 'react';
 
 import type { DataState } from '@core/data';
 import { getLogger } from '@core/logging';
-import { EmptyState, QueryBoundary, Screen } from '@ui';
-import type { RatingValue } from '@ui';
+import { EmptyState, InfoDialog, QueryBoundary, Screen } from '@ui';
+import type { RatingSelection } from '@ui';
 
 import { AutoCancelledBody } from '../components/AutoCancelledBody';
+import { BookingDetailsSheet } from '../components/BookingDetailsSheet';
 import { BookingHeader } from '../components/BookingHeader';
 import { CompletionBody } from '../components/CompletionBody';
 import { ConfirmationBody } from '../components/ConfirmationBody';
 import { ExtensionSheet } from '../components/ExtensionSheet';
 import { InServiceBody } from '../components/InServiceBody';
+import { TipSheet } from '../components/TipSheet';
 import { TrackingBody } from '../components/TrackingBody';
+import { extensionMinutesFrom } from '../adapters';
 import { useBookingDetailData, useExtensionData } from '../data';
 import type { BookingDetailViewModel } from '../types';
 
@@ -28,12 +31,50 @@ export interface BookingDetailActions {
   readonly onBack: () => void;
   readonly onHelp?: () => void;
   readonly onCallCook?: () => void;
+  /**
+   * A Call Cook failure, already turned into customer copy by `useCallCook`.
+   *
+   * Surfaced as a dialog rather than swallowed: the customer pressed a button and a call did not
+   * happen, so silence would read as the app being broken. FIGMA_PENDING — no frame draws this
+   * state, so it reuses the `InfoDialog` the taxes explainers already use.
+   */
+  readonly callCookError?: string | null;
+  readonly onDismissCallCookError?: () => void;
   readonly onReschedule?: () => void;
   readonly onCancel?: () => void;
+  /** `250:2966` — opens `250:2861` Booking details. A seam; this screen decides nothing there. */
+  readonly onViewDetails?: () => void;
+  /** `383:748` — the WhatsApp disc on "Share recipe/ special requests" (`8a` / `8b`, task §15). */
+  readonly onShareRecipe?: () => void;
   readonly onStartService?: () => void;
   readonly onEndService?: () => void;
-  readonly onSubmitFeedback?: (feedback: string) => void;
-  readonly onSelectTip?: (tipId: string) => void;
+  /**
+   * `275:4265` — "Extend • ₹16". Carries the chosen option's MINUTES, which the catalogue
+   * published and the option id encodes; the new end time comes from the server's response and is
+   * never computed here.
+   *
+   * Optional, and the sheet's CTA follows it: a host with no extension action does not draw a
+   * button that closes the sheet and changes nothing.
+   */
+  readonly onExtendBooking?: (minutes: number) => Promise<unknown>;
+  /** True while `POST /v1/bookings/:id/extensions` is in flight. LOCAL to the sheet's CTA. */
+  readonly extending?: boolean;
+  /** True while `POST /v1/bookings/:id/tips` is in flight. LOCAL to the tip sheet's CTA. */
+  readonly tipping?: boolean;
+  /**
+   * `143:292` — Completion's Submit chip. Carries the RATING as well as the words, because
+   * `299:1424` draws one Submit for both and `319:3191` is the state after that one press.
+   *
+   * The rating is a `RatingSelection`, so `5+` reaches the caller INTACT. What the caller may do
+   * with it is a contract question, answered where the request is built — never by narrowing it
+   * to a number here, which would lose the distinction before anyone could act on it.
+   */
+  readonly onSubmitFeedback?: (feedback: string, rating: RatingSelection | null) => void;
+  /**
+   * `306:2885` — the tip sheet's CTA. Resolves when the SERVER has taken the tip; the sheet closes
+   * on that, never on the press, because a sheet that dismisses itself is a receipt.
+   */
+  readonly onSelectTip?: (tipId: string) => Promise<unknown>;
   /** `201:96` / `201:93` — PRODUCT_PENDING: neither answer names a destination in the design. */
   readonly onRebook?: () => void;
   readonly onDeclineRebook?: () => void;
@@ -42,13 +83,34 @@ export interface BookingDetailActions {
 export interface BookingDetailViewProps extends BookingDetailActions {
   readonly state: DataState<BookingDetailViewModel>;
   readonly onRetry: () => void;
+  /**
+   * The booking the extension sheet is priced against.
+   *
+   * `GET /v1/bookings/:id/extension-options` is what knows this service's totals, its tax and the
+   * new end each option would produce; the catalogue only publishes SKUs. Optional so the review
+   * route, which has no booking, still opens the sheet on published prices.
+   */
+  readonly bookingId?: string;
 }
 
-export function BookingDetailView({ state, onRetry, ...actions }: BookingDetailViewProps) {
-  const [rating, setRating] = useState<RatingValue | null>(null);
+export function BookingDetailView({
+  state,
+  onRetry,
+  bookingId,
+  ...actions
+}: BookingDetailViewProps) {
+  const [rating, setRating] = useState<RatingSelection | null>(null);
   const [extensionOpen, setExtensionOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [tipOpen, setTipOpen] = useState(false);
   const [extensionOptionId, setExtensionOptionId] = useState<string | null>(null);
-  const extension = useExtensionData();
+  const [tipOptionId, setTipOptionId] = useState<string | null>(null);
+  // The chosen option is what the CTA's amount is ABOUT, so it is an input to the read rather
+  // than something applied to its result — the same shape `useInstantData` already uses.
+  const extension = useExtensionData({
+    ...(bookingId === undefined ? {} : { bookingId }),
+    optionId: extensionOptionId,
+  });
 
   return (
     <Screen scroll tone="plain" testID="booking-detail-screen">
@@ -69,23 +131,162 @@ export function BookingDetailView({ state, onRetry, ...actions }: BookingDetailV
               <ExtensionSheet
                 visible={extensionOpen}
                 extension={extension.state.data}
-                selectedOptionId={extensionOptionId}
+                /* The sheet opens on the server's default until the user picks another. */
+                selectedOptionId={extensionOptionId ?? extension.state.data.defaultOptionId ?? null}
                 onSelectOption={setExtensionOptionId}
                 onClose={() => setExtensionOpen(false)}
-                onExtend={() => {
-                  // TODO(backend-contract): submit the extension and re-read the booking. The new
-                  // end time comes from the response — never from client arithmetic.
-                  setExtensionOpen(false);
-                  onRetry();
-                }}
+                helpLabel={booking.helpLabel}
+                {...(actions.onHelp === undefined ? {} : { onHelp: actions.onHelp })}
+                {...(actions.extending === undefined ? {} : { submitting: actions.extending })}
+                {...extendSeam(extension.state.data.defaultOptionId ?? null)}
                 onBookAnother={() => setExtensionOpen(false)}
               />
             ) : null}
+
+            {/* `250:2861` — opened from the `250:2966` row, over the same screen. */}
+            {booking.details === undefined ? null : (
+              <BookingDetailsSheet
+                visible={detailsOpen}
+                details={booking.details}
+                onClose={() => setDetailsOpen(false)}
+              />
+            )}
+
+            {/* `306:2885` — opened from Completion's `308:3121` row. */}
+            {booking.tip === undefined ? null : (
+              <TipSheet
+                visible={tipOpen}
+                tip={booking.tip}
+                /* The sheet opens on the server's default until the user picks another. */
+                selectedOptionId={tipOptionId ?? booking.tip.defaultOptionId ?? null}
+                onSelectOption={setTipOptionId}
+                onClose={() => setTipOpen(false)}
+                helpLabel={booking.helpLabel}
+                {...(actions.onHelp === undefined ? {} : { onHelp: actions.onHelp })}
+                {...(actions.tipping === undefined ? {} : { submitting: actions.tipping })}
+                {...tipSeam(booking.tip.defaultOptionId ?? null)}
+              />
+            )}
+
+            {/* FIGMA_PENDING — a Call Cook failure has no designed frame. */}
+            <InfoDialog
+              visible={actions.callCookError !== null && actions.callCookError !== undefined}
+              onClose={() => actions.onDismissCallCookError?.()}
+              title="Can’t call right now"
+              body={actions.callCookError ?? ''}
+              testID="call-cook-error"
+            />
           </>
         )}
       </QueryBoundary>
     </Screen>
   );
+
+  /**
+   * `275:4265` — Extend.
+   *
+   * The sheet stays OPEN until the SERVER answers: the booking has not been extended until it
+   * does, and closing on press would tell the customer it had. A refusal therefore leaves them on
+   * the same choice, able to retry against the same idempotency scope.
+   *
+   * Absent when the host wires no extension action, which disables the CTA rather than drawing a
+   * live button over nothing.
+   */
+  function extendSeam(serverDefaultOptionId: string | null) {
+    const submit = actions.onExtendBooking;
+    if (submit === undefined) return {};
+
+    return {
+      onExtend: () => {
+        const minutes = extensionMinutesFrom(extensionOptionId ?? serverDefaultOptionId);
+        if (minutes === null) return;
+        void submit(minutes)
+          .then(() => setExtensionOpen(false))
+          .catch(() => {
+            // Surfaced by the mutation. Nothing here claims the service was extended.
+          });
+      },
+    };
+  }
+
+  /**
+   * `306:2885` — Tip. Same rule as the extension: the sheet closes when the SERVER has taken the
+   * tip, and an unwired host disables the CTA rather than drawing one that dismisses a sheet and
+   * charges nothing (ruling R-1: no amount is computed here either — the id carries it).
+   */
+  function tipSeam(serverDefaultOptionId: string | null) {
+    const submit = actions.onSelectTip;
+    if (submit === undefined) return {};
+
+    return {
+      onConfirm: () => {
+        const chosen = tipOptionId ?? serverDefaultOptionId;
+        if (chosen === null) return;
+        void submit(chosen)
+          .then(() => setTipOpen(false))
+          .catch(() => {
+            // Surfaced by the mutation. Nothing here claims a tip was paid.
+          });
+      },
+    };
+  }
+
+  /**
+   * `292:233` / `292:1188` / `308:3121` — the details row is a SEAM. It renders only when the
+   * payload carries the sheet it opens, so an unwired host never draws a dead control.
+   */
+  function detailsSeam(booking: BookingDetailViewModel) {
+    if (booking.details === undefined) return {};
+    return {
+      onViewDetails: () => {
+        setDetailsOpen(true);
+        actions.onViewDetails?.();
+      },
+    };
+  }
+
+  /**
+   * Call Cook — offered only where the SERVER says it may be.
+   *
+   * `callCookAllowed` is `allowedActions.canCallCook`, and the endpoint that supplies the number
+   * enforces the same rule, so a control drawn against the server's answer could only ever
+   * produce a failed call. Absent (an older payload, or a view with no such action) hides it,
+   * which is the fail-closed direction for a control that reveals a personal phone number.
+   */
+  function callCookSeam(booking: BookingDetailViewModel) {
+    if (actions.onCallCook === undefined || booking.callCookAllowed !== true) return {};
+    return { onCallCook: actions.onCallCook };
+  }
+
+  /**
+   * Cancel — offered only where the SERVER says it may be.
+   *
+   * Same shape as `callCookSeam`, and for the same reason: a cancellation has a fee and a refund
+   * attached, both of which the backend decides, so offering the control on any basis other than
+   * its answer would put the customer in a flow it will refuse.
+   */
+  /**
+   * §11 — an INSTANT booking offers neither control, on any lifecycle view.
+   *
+   * Expressed once, here, rather than at each of the four call sites, so a view added later
+   * cannot quietly reintroduce them. `slotType` absent is treated as NOT instant: the safe
+   * direction is to keep obeying `allowedActions`, which is what a scheduled booking needs.
+   */
+  function instantBooking(booking: BookingDetailViewModel): boolean {
+    return booking.slotType === 'instant';
+  }
+
+  function cancelSeam(booking: BookingDetailViewModel) {
+    if (actions.onCancel === undefined || booking.cancelAllowed !== true) return {};
+    if (instantBooking(booking)) return {};
+    return { onCancel: actions.onCancel };
+  }
+
+  /** Reschedule is likewise removed for instant, and otherwise left to the server's verdict. */
+  function rescheduleSeam(booking: BookingDetailViewModel) {
+    if (actions.onReschedule === undefined || instantBooking(booking)) return {};
+    return { onReschedule: actions.onReschedule };
+  }
 
   function renderBody() {
     if (state.status !== 'ready') return null;
@@ -99,9 +300,20 @@ export function BookingDetailView({ state, onRetry, ...actions }: BookingDetailV
           <ConfirmationBody
             summary={booking.summary}
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
-            {...(actions.onCallCook === undefined ? {} : { onCallCook: actions.onCallCook })}
-            {...(actions.onReschedule === undefined ? {} : { onReschedule: actions.onReschedule })}
-            {...(actions.onCancel === undefined ? {} : { onCancel: actions.onCancel })}
+            {...callCookSeam(booking)}
+            {...(booking.details === undefined
+              ? {}
+              : {
+                  onViewDetails: () => {
+                    setDetailsOpen(true);
+                    actions.onViewDetails?.();
+                  },
+                })}
+            {...(actions.onShareRecipe === undefined
+              ? {}
+              : { onShareRecipe: actions.onShareRecipe })}
+            {...rescheduleSeam(booking)}
+            {...cancelSeam(booking)}
           />
         );
 
@@ -112,7 +324,10 @@ export function BookingDetailView({ state, onRetry, ...actions }: BookingDetailV
           <TrackingBody
             tracking={booking.tracking}
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
-            {...(actions.onCallCook === undefined ? {} : { onCallCook: actions.onCallCook })}
+            {...callCookSeam(booking)}
+            {...detailsSeam(booking)}
+            {...rescheduleSeam(booking)}
+            {...cancelSeam(booking)}
           />
         );
 
@@ -125,7 +340,10 @@ export function BookingDetailView({ state, onRetry, ...actions }: BookingDetailV
           <TrackingBody
             tracking={booking.reassigned}
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
-            {...(actions.onCallCook === undefined ? {} : { onCallCook: actions.onCallCook })}
+            {...callCookSeam(booking)}
+            {...detailsSeam(booking)}
+            {...rescheduleSeam(booking)}
+            {...cancelSeam(booking)}
           />
         );
 
@@ -136,10 +354,11 @@ export function BookingDetailView({ state, onRetry, ...actions }: BookingDetailV
           <TrackingBody
             tracking={booking.arrived}
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
-            {...(actions.onCallCook === undefined ? {} : { onCallCook: actions.onCallCook })}
+            {...callCookSeam(booking)}
             {...(actions.onStartService === undefined
               ? {}
               : { onStartService: actions.onStartService })}
+            {...detailsSeam(booking)}
           />
         );
 
@@ -150,9 +369,10 @@ export function BookingDetailView({ state, onRetry, ...actions }: BookingDetailV
           <InServiceBody
             inService={booking.inService}
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
-            {...(actions.onCallCook === undefined ? {} : { onCallCook: actions.onCallCook })}
+            {...callCookSeam(booking)}
             onExtend={() => setExtensionOpen(true)}
             onEndService={actions.onEndService ?? noop}
+            {...detailsSeam(booking)}
             // Reaching zero asks the server what happens next; it never ends the session.
             onElapsed={onRetry}
           />
@@ -167,8 +387,10 @@ export function BookingDetailView({ state, onRetry, ...actions }: BookingDetailV
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
             rating={rating}
             onChangeRating={setRating}
-            onSubmitFeedback={actions.onSubmitFeedback ?? noopFeedback}
-            onSelectTip={actions.onSelectTip ?? noopFeedback}
+            onSubmitFeedback={(feedback) =>
+              (actions.onSubmitFeedback ?? noopFeedback)(feedback, rating)
+            }
+            {...(booking.tip === undefined ? {} : { onOpenTip: () => setTipOpen(true) })}
           />
         );
 
@@ -210,8 +432,8 @@ function noop() {
   // Intentionally inert until the corresponding backend action exists.
 }
 
-function noopFeedback(_value: string) {
-  // Intentionally inert until the corresponding backend action exists.
+function noopFeedback(_value: string, _rating: RatingSelection | null) {
+  // Intentionally inert when the host supplies no submit action.
 }
 
 export function BookingDetailScreen({
@@ -219,5 +441,19 @@ export function BookingDetailScreen({
   ...actions
 }: BookingDetailActions & { readonly bookingId: string }) {
   const { state, refetch } = useBookingDetailData(bookingId);
-  return <BookingDetailView state={state} onRetry={refetch} {...actions} />;
+  /**
+   * KEYED BY BOOKING. Expo Router keeps this route mounted and swaps the param, so without a key
+   * the view's local state — the rating in progress, an open sheet, a chosen extension option —
+   * would survive a move to a DIFFERENT booking. Observed on device: a `5+` chosen on one booking
+   * was still drawn selected on the next one, which is a rating the customer never gave.
+   */
+  return (
+    <BookingDetailView
+      key={bookingId}
+      bookingId={bookingId}
+      state={state}
+      onRetry={refetch}
+      {...actions}
+    />
+  );
 }

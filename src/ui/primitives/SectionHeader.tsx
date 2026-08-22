@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Icon } from './Icon';
 import { Text } from './Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
@@ -51,10 +50,14 @@ export function SectionHeader({
           hitSlop={lightTheme.space.sm}
           style={styles.action}
         >
-          <Text variant="label" color="textPrimary">
+          {/*
+            TEXT ALONE. `333:3622` — the one label row in the file that carries an action — holds
+            exactly two text nodes, "Duration" at x 0 and "Help me pick" right-aligned at x 232.
+            There is no chevron beside it, so none is drawn.
+          */}
+          <Text variant="label" color="textFree" style={styles.actionLabel}>
             {actionLabel}
           </Text>
-          <Icon name="forward" size={14} color="textPrimary" />
         </Pressable>
       )}
     </View>
@@ -71,4 +74,10 @@ const styles = StyleSheet.create({
   },
   text: { flexShrink: 1, gap: lightTheme.space.xxs },
   action: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.xxs },
+  /**
+   * `348:4804` / `333:3624` — the action is drawn as a LINK, not as a second label: `#01CF8F`
+   * and underlined. Sampled off the node, which renders it in exactly that emerald the file
+   * already uses for "Free" on the cancellation policy.
+   */
+  actionLabel: { textDecorationLine: 'underline' },
 });

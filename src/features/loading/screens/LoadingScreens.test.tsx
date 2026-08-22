@@ -8,7 +8,7 @@ import { IntroLoading, SplashLoading } from './LoadingScreens';
 
 describe('Designed loading states (73:1036, 71:747)', () => {
   it('renders the splash with the brand logo, not a spinner', () => {
-    render(<SplashLoading animate={false} />);
+    render(<SplashLoading />);
 
     expect(screen.getByTestId('splash-loading')).toBeTruthy();
     expect(screen.queryByLabelText('Loading')).toBeNull();
@@ -30,18 +30,16 @@ describe('Designed loading states (73:1036, 71:747)', () => {
     beforeEach(() => jest.useFakeTimers());
     afterEach(() => jest.useRealTimers());
 
-    it('reports the zoom finishing as a VISUAL event only', () => {
-      const onFinished = jest.fn();
-      render(<SplashLoading onFinished={onFinished} />);
+    it('runs no timer at all — `313:3159` is a static frame', () => {
+      render(<SplashLoading />);
 
-      // Before the animation completes, nothing has been reported.
-      expect(onFinished).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
 
       act(() => {
-        jest.advanceTimersByTime(2500);
+        jest.advanceTimersByTime(5000);
       });
 
-      // The callback is the ONLY thing it does; readiness stays with `src/app/_layout.tsx`.
+      // Readiness stays with `src/app/_layout.tsx`; the surface just sits there.
       expect(screen.getByTestId('splash-loading')).toBeTruthy();
     });
   });
@@ -51,20 +49,30 @@ describe('Loading → ready switching', () => {
   const actions = {
     onBack: jest.fn(),
     onSelectTile: jest.fn(),
+    onOpenProfileDetails: jest.fn(),
     onOpenLink: jest.fn(),
     onLogout: jest.fn(),
     onRetry: jest.fn(),
   };
 
-  it('swaps the designed loading surface for the screen when the payload lands', () => {
+  /**
+   * THE LOADING RULE (task §13 / §25).
+   *
+   * `71:747` is a BRANDED full-screen interstitial — logo, headline, hero photograph. Profile used
+   * to render it while `GET /v1/me` was in flight, which made every Home -> Profile tap look like
+   * a second app launch. The founder's rule is that the one global loading screen belongs to the
+   * app OPENING and to nothing else, so this boundary now falls through to the token layer's
+   * scoped state.
+   */
+  it('shows no branded interstitial while a normal screen is loading', () => {
     const { rerender } = render(<ProfileView state={{ status: 'loading' }} {...actions} />);
 
-    expect(screen.getByTestId('intro-loading')).toBeTruthy();
+    expect(screen.queryByTestId('intro-loading')).toBeNull();
+    expect(screen.queryByTestId('splash-loading')).toBeNull();
     expect(screen.queryByTestId('profile-identity')).toBeNull();
 
     rerender(<ProfileView state={ready(DEMO_PROFILE)} {...actions} />);
 
-    expect(screen.queryByTestId('intro-loading')).toBeNull();
     expect(screen.getByTestId('profile-identity')).toBeTruthy();
     expect(screen.getByText('Aarav Mehta')).toBeTruthy();
   });

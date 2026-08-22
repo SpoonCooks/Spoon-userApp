@@ -1,6 +1,6 @@
 import type { BookingCardViewModel } from '@ui/types/viewModels';
 
-import { REKHA_SAMPLE_PHOTO } from './cooks';
+import { COOK_SAMPLE_PHOTO } from './cooks';
 
 /**
  * DEMO / TEST FIXTURES — NOT PRODUCTION DATA. See `./cooks.ts`.
@@ -16,7 +16,7 @@ export const DEMO_BOOKING_COMPLETED: BookingCardViewModel = {
   statusLabel: 'Completed',
   statusTone: 'positive',
   cookName: 'Cook Rekha',
-  cookPhotoUrl: REKHA_SAMPLE_PHOTO,
+  cookPhotoUrl: COOK_SAMPLE_PHOTO,
   amount: '₹188',
   rating: 4.5,
 };
@@ -28,7 +28,7 @@ export const DEMO_BOOKING_UNFULFILLED: BookingCardViewModel = {
   statusLabel: 'Unfulfilled',
   statusTone: 'warning',
   cookName: 'Cook Rekha',
-  cookPhotoUrl: REKHA_SAMPLE_PHOTO,
+  cookPhotoUrl: COOK_SAMPLE_PHOTO,
   amount: '₹188',
 };
 
@@ -39,7 +39,7 @@ export const DEMO_REFUND_PROCESSING: BookingCardViewModel = {
   statusLabel: 'Processing',
   statusTone: 'warning',
   cookName: 'Cook Rekha',
-  cookPhotoUrl: REKHA_SAMPLE_PHOTO,
+  cookPhotoUrl: COOK_SAMPLE_PHOTO,
   amount: '₹188',
 };
 
@@ -50,20 +50,8 @@ export const DEMO_REFUND_COMPLETED: BookingCardViewModel = {
   statusLabel: 'Refunded',
   statusTone: 'positive',
   cookName: 'Cook Rekha',
-  cookPhotoUrl: REKHA_SAMPLE_PHOTO,
+  cookPhotoUrl: COOK_SAMPLE_PHOTO,
   amount: '₹188',
-};
-
-/**
- * The Home active-booking card as Page 3b `59:587` draws it: a server-formatted date on the
- * right and a duration beside the timer chip. The new frame shows no cook name and no ETA pill
- * on Home, so neither is supplied here.
- */
-export const DEMO_BOOKING_ACTIVE: BookingCardViewModel = {
-  id: 'demo-booking-active',
-  headline: 'Upcoming booking',
-  subtitle: 'Tomorrow, Aug 5',
-  durationLabel: '60 mins',
 };
 
 /** Duration options as the Scheduled screen would receive them — opaque ids, server prices. */

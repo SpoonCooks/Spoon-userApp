@@ -1,0 +1,1 @@
+export { formatPaise } from './money';

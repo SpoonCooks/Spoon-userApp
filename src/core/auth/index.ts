@@ -1,5 +1,6 @@
 export { createSessionController } from './sessionController';
 export type { SessionController, SessionControllerOptions } from './sessionController';
+export { getDeviceId, resetDeviceIdCache } from './deviceId';
 export { unimplementedSessionGateway } from './sessionGateway';
 export type { SessionGateway } from './sessionGateway';
 export {

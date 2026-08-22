@@ -4,11 +4,11 @@ import { createKeyFactory } from '@core/query';
  * Feature: home.
  *
  * Ruling R-2 — ONE route with booking-state variants:
- *   `1:455`    (390×2014) = the canonical complete Home
- *   `209:1207` (390×830)  = the SAME Home with `UpcomingBookingCard` (`59:587`) inserted between
- *                           the promo carousel and the booking tiles
+ *   `1:455`    (390×1975) = the canonical complete Home
+ *   `333:3834` (390×1975) = the SAME Home with `ActiveBookingCard` (`59:587`) inserted BELOW the
+ *                           booking tiles, as its own section (`336:4260`)
  * These are NOT two routes and NOT two designs. Which variant renders is decided by authoritative
- * server state (is there an upcoming booking?), never by a client guess.
+ * server state (is there an active booking?), never by a client guess.
  *
  * Ruling R-5 — upcoming/active booking information appears here; there is no separate
  * Upcoming Bookings screen.
@@ -21,9 +21,17 @@ import { createKeyFactory } from '@core/query';
  */
 export const homeKeys = createKeyFactory('home');
 
+export { BANNER_DESTINATION_PAGE, homeBannerFor } from './state/homeBannerView';
+export type {
+  HomeBannerDestination,
+  HomeBannerInput,
+  HomeBannerRating,
+  HomeBannerVariant,
+  HomeBannerViewModel,
+} from './state/homeBannerView';
 export { useHomeData } from './data';
-export { UpcomingBookingCard } from './components/UpcomingBookingCard';
-export type { UpcomingBookingCardProps } from './components/UpcomingBookingCard';
+export { HomeBookingBanner } from './components/HomeBookingBanner';
+export type { HomeBookingBannerProps } from './components/HomeBookingBanner';
 export { HomeScreen, HomeView } from './screens/HomeScreen';
 export type { HomeActions, HomeViewProps } from './screens/HomeScreen';
 export type * from './types';
