@@ -1,32 +1,34 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
-import { Text, lightTheme } from '@ui';
+import { AddressLines, DirectionalDisc, Text, lightTheme } from '@ui';
 
-import {
-  HOME_ICON_AVATAR_RING,
-  HOME_ICON_BOLT,
-  HOME_ICON_CHEVRON,
-  HOME_ICON_CUSTOMER,
-} from '../assets';
+import { HOME_ICON_BOLT, HOME_ICON_CUSTOMER } from '../assets';
 import { HOME_DESIGN } from '../layout';
 import type { HomeHeaderViewModel } from '../types';
 
 const { banner: DESIGN } = HOME_DESIGN;
-/** The absolute avatar's lane, reserved so the headline and address never run under it. */
-const PROFILE_LANE = DESIGN.profile.right + DESIGN.profile.box;
 
 /**
- * Home top banner — Figma Page 3a `1:458`, re-read on Page 3b `209:1213`.
+ * Home top banner — Figma `1:458`, re-read this pass on the current file and on Page 3b
+ * (`333:3969`, an identical instance).
  *
  * Verbatim from the node: fill `rgba(236,255,155,0.5)`, BOTTOM corners only at 15pt, shadow
- * `0 1 4 rgba(0,0,0,0.15)`, padding 16/16/10, 4pt gap.
+ * `0 1 4 rgba(0,0,0,0.15)`, padding 22 / 16 / 12, 4pt gap, 115 tall.
  *
- *   headline `209:1214`  23pt row — a 20 × 23 bolt, 4pt gap, Livvic Black 14/20 in `#0F172B`
- *   address  `209:1218`  34pt block — "Home" SemiBold 11/16.5 centred at y 10.5 with an 8.35pt
- *                        caret beside it, and the address line Regular 9/13.5 centred at y 26
- *   profile  `209:1223`  a 41pt box at top 14 / right 14, holding a 32pt ring and a 25pt glyph
+ *   headline `1:459`     a 33pt row inset a further 4pt — a **24 × 33** bolt, **6pt** gap, then
+ *                        Livvic Black 14/20 in `#0F172B`
+ *   profile  `59:400`    a **32pt `#FFE666` disc** pinned to the row's right edge and centred on
+ *                        it, holding the 25 × 26 glyph. The separate ring the superseded revision
+ *                        drew (`209:1224`) does not exist here.
+ *   address  `319:3341`  a 44pt block at px 4 / py 6 — a 140 × 32 stack ("Home" SemiBold 11/16.5
+ *                        centred at y 8.5, the line Regular 9/13.5 centred at y 25) and, **12pt
+ *                        after it**, the 32pt chevron disc `319:3343`
  *
- * The address line truncates in the design too — `209:1222` is a separate "…" node — so it is
+ * The address control moved from an 8.35pt caret sitting next to the label to the shared 32pt
+ * disc following the whole stack, so the label no longer needs its fixed 48pt measure — the disc
+ * is positioned by the stack's width, not by the glyphs.
+ *
+ * The address line truncates in the design too — `319:3349` is a separate "…" node — so it is
  * rendered single-line with the platform ellipsis rather than allowed to wrap.
  *
  * The ETA headline and the address are server copy. Nothing here computes a time or a distance.
@@ -37,7 +39,23 @@ export interface HomeTopBannerProps {
   readonly onPressProfile: () => void;
 }
 
+/**
+ * FIGMA_PENDING — the "no address yet" prompt.
+ *
+ * Every Home frame draws a saved address, so the design has no state for an account that has
+ * none. Drawing the lockup empty would look broken and drawing a fixture address would be a
+ * lie about the customer's data (FE-6), so the same two lines carry a prompt into the same
+ * geometry. The control still opens the address flow, which is what a customer with no address
+ * needs. Replace both strings when the empty state is designed.
+ */
+const NO_ADDRESS_LABEL = 'Add address';
+const NO_ADDRESS_LINE = 'Set your delivery location';
+
 export function HomeTopBanner({ header, onPressAddress, onPressProfile }: HomeTopBannerProps) {
+  const hasAddress = header.addressLabel !== null && header.addressLine !== null;
+  const addressLabel = header.addressLabel ?? NO_ADDRESS_LABEL;
+  const addressLine = header.addressLine ?? NO_ADDRESS_LINE;
+
   return (
     <View style={styles.container} testID="home-header">
       <View style={styles.headline}>
@@ -50,52 +68,43 @@ export function HomeTopBanner({ header, onPressAddress, onPressProfile }: HomeTo
         <Text variant="titleBlack" color="textStrong" numberOfLines={1} style={styles.flexible}>
           {header.etaHeadline}
         </Text>
+
+        <Pressable
+          onPress={onPressProfile}
+          accessibilityRole="button"
+          accessibilityLabel="Profile"
+          hitSlop={(lightTheme.layout.minTouchTarget - DESIGN.profile.size) / 2}
+          style={styles.profile}
+          testID="home-profile"
+        >
+          <Image
+            source={HOME_ICON_CUSTOMER}
+            style={styles.profileGlyph}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </Pressable>
       </View>
 
       <Pressable
         onPress={onPressAddress}
         accessibilityRole="button"
-        accessibilityLabel={`Delivery address: ${header.addressLabel}, ${header.addressLine}. Change`}
-        hitSlop={8}
+        accessibilityLabel={
+          hasAddress
+            ? `Delivery address: ${addressLabel}, ${addressLine}. Change`
+            : `${NO_ADDRESS_LABEL}. ${NO_ADDRESS_LINE}`
+        }
         style={styles.address}
         testID="home-address"
       >
-        <View style={styles.addressLabel}>
-          <Text variant="label" color="textPrimary" numberOfLines={1} style={styles.addressName}>
-            {header.addressLabel}
-          </Text>
-          <Image
-            source={HOME_ICON_CHEVRON}
-            style={styles.chevron}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
-        </View>
-        <Text variant="micro" color="textPrimary" numberOfLines={1} style={styles.addressLine}>
-          {header.addressLine}
-        </Text>
-      </Pressable>
+        <AddressLines
+          label={addressLabel}
+          line={addressLine}
+          width={DESIGN.address.width}
+          height={DESIGN.address.height}
+        />
 
-      <Pressable
-        onPress={onPressProfile}
-        accessibilityRole="button"
-        accessibilityLabel="Profile"
-        hitSlop={12}
-        style={styles.profile}
-        testID="home-profile"
-      >
-        <Image
-          source={HOME_ICON_AVATAR_RING}
-          style={styles.avatarRing}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
-        <Image
-          source={HOME_ICON_CUSTOMER}
-          style={styles.avatarGlyph}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
+        <DirectionalDisc direction="down" size={DESIGN.address.disc} />
       </Pressable>
     </View>
   );
@@ -113,52 +122,33 @@ const styles = StyleSheet.create({
     ...lightTheme.elevation.banner,
     zIndex: 2,
   },
-  /** The avatar is absolute, so the headline must reserve its lane on a narrow phone. */
   headline: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: DESIGN.bolt.gap,
-    paddingRight: PROFILE_LANE,
+    height: DESIGN.headline.height,
+    paddingHorizontal: DESIGN.headline.paddingHorizontal,
+    gap: DESIGN.headline.gap,
   },
-  flexible: { flexShrink: 1 },
+  /** Takes the slack between the bolt and the profile disc, so the disc stays flush right. */
+  flexible: { flex: 1, minWidth: 0 },
   bolt: { width: DESIGN.bolt.width, height: DESIGN.bolt.height },
-  address: {
-    alignSelf: 'stretch',
-    paddingRight: PROFILE_LANE,
-  },
-  addressLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: DESIGN.address.chevronGap,
-    height: DESIGN.address.labelCentreY * 2,
-  },
-  /** `59:376` — a fixed 48pt text box; the caret is positioned off IT, not off the glyphs. */
-  addressName: { minWidth: DESIGN.address.labelWidth },
-  /** Pulls the 13.5pt line up so its centre lands on the design's y = 26. */
-  addressLine: {
-    marginTop: DESIGN.address.lineCentreY - 13.5 / 2 - DESIGN.address.labelCentreY * 2,
-  },
-  /** Drops the caret onto the label's baseline, where `59:386` puts it. */
-  chevron: {
-    width: DESIGN.address.chevron.width,
-    height: DESIGN.address.chevron.height,
-    marginTop: DESIGN.address.chevronCentreY - DESIGN.address.labelCentreY,
-  },
+  /** `59:400` — a solid `#FFE666` circle, clipped; the glyph is drawn on it, not on a ring. */
   profile: {
-    position: 'absolute',
-    top: DESIGN.profile.top,
-    right: DESIGN.profile.right,
-    width: DESIGN.profile.box,
-    height: DESIGN.profile.box,
+    width: DESIGN.profile.size,
+    height: DESIGN.profile.size,
+    borderRadius: DESIGN.profile.size / 2,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    backgroundColor: lightTheme.colors.surfaceAccentBold,
   },
-  avatarRing: {
-    position: 'absolute',
-    top: (DESIGN.profile.box - DESIGN.profile.ring) / 2,
-    left: (DESIGN.profile.box - DESIGN.profile.ring) / 2,
-    width: DESIGN.profile.ring,
-    height: DESIGN.profile.ring,
+  profileGlyph: { width: DESIGN.profile.glyphWidth, height: DESIGN.profile.glyphHeight },
+  address: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: DESIGN.address.gap,
+    paddingHorizontal: DESIGN.address.paddingHorizontal,
+    paddingVertical: DESIGN.address.paddingVertical,
   },
-  avatarGlyph: { width: DESIGN.profile.glyph, height: DESIGN.profile.glyph },
 });

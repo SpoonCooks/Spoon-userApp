@@ -17,17 +17,20 @@ export const COOK_ATTRIBUTE_ART: Record<string, ImageSourcePropType> = {
   languages: require('../../../assets/figma/cook/attr-languages.png') as ImageSourcePropType,
 };
 
-/** `94:1018` / `94:1026` / `94:1034` — the 18pt trust-row glyphs. */
+/**
+ * `289:7623` / `289:7631` / `289:7639` — the trust-row glyphs, each drawn on an 18pt
+ * `rgba(0,0,0,0.8)` disc (`289:7622`, an `Ellipse 5`).
+ *
+ * The third badge CHANGED in the current file: the clock ("On-time") is gone and the row now
+ * reads Spoon Trained · Background Verified · **Hygienic**, drawn with the Clean Hands mark. The
+ * glyphs are also drawn at three DIFFERENT sizes inside the shared disc — 16 / 15 / 13.
+ */
 export const COOK_BADGE_ART: Record<string, ImageSourcePropType> = {
   spoonTrained: require('../../../assets/figma/cook/badge-trained.png') as ImageSourcePropType,
   backgroundVerified:
     require('../../../assets/figma/cook/badge-verified.png') as ImageSourcePropType,
-  onTime: require('../../../assets/figma/cook/badge-ontime.png') as ImageSourcePropType,
+  hygienic: require('../../../assets/figma/cook/badge-hygienic.png') as ImageSourcePropType,
 };
-
-/** `94:945` — the 16pt frying pan beside "What {name} cooks best?". */
-export const COOK_SPECIALTIES_GLYPH =
-  require('../../../assets/figma/cook/specialties-header.png') as ImageSourcePropType;
 
 /** `94:938` — the 14pt handset inside the Call Cook pill. */
 export const COOK_CALL_GLYPH =
@@ -68,6 +71,19 @@ export const ADDRESS_ADD_GLYPH =
 /** `63:782` / `63:805` — the 46 x 43 map pin, reused at 22pt inside the Change thumbnail. */
 export const ADDRESS_MAP_PIN =
   require('../../../assets/figma/address/map-pin.png') as ImageSourcePropType;
+
+/** `275:5710` — the 13pt `#FFD600` star beside a booking card's rating (`275:5708`). */
+export const BOOKING_RATING_STAR =
+  require('../../../assets/figma/history/rating-star.png') as ImageSourcePropType;
+
+/**
+ * `230:1969` — the 20 x 32 "Menu Vertical" kebab on every saved-address row (`230:1960`).
+ *
+ * `sbIXeBfaMzUFUz2NYJIJTm` exports this as an asset. The superseded file drew it as three flat
+ * 3.35pt dots, which is why it used to be reconstructed in the screen rather than rendered.
+ */
+export const ADDRESS_ROW_MENU =
+  require('../../../assets/figma/address/menu-vertical.png') as ImageSourcePropType;
 
 /** `63:769` — the 37 x 45 location mark beside the resolved address (`63:771`). */
 export const ADDRESS_LOCATION_GLYPH =
@@ -117,6 +133,18 @@ export const BANNER_AVATAR_GLYPH =
 export const LOADING_SPLASH_LOGO =
   require('../../../assets/figma/loading/splash-logo.png') as ImageSourcePropType;
 
+/**
+ * `433:2400` — the 72pt "In Progress" mark on `433:2290` (Page 21, confirmation loading).
+ *
+ * A lime ring whose solid arc trails off into detached dots, with a check at its centre. The dots
+ * are a MOTION TRAIL: they are what a rotating arc leaves behind, and they are the only reason the
+ * ring is drawn asymmetrically. `get_motion_context` returns no animated nodes for the frame — the
+ * still cannot carry the motion — so the rotation is read off the mark's own construction and
+ * recorded as a deviation on `ConfirmationLoading`.
+ */
+export const LOADING_CONFIRMATION_PROGRESS =
+  require('../../../assets/figma/loading/confirmation-progress.png') as ImageSourcePropType;
+
 /** `73:1035` — the 130pt logo on the loading interstitial (`71:747`). */
 export const LOADING_INTRO_LOGO =
   require('../../../assets/figma/loading/intro-logo.png') as ImageSourcePropType;
@@ -140,14 +168,6 @@ export const AUTH_TRUST_GLYPH =
 export const PROFILE_AVATAR_GLYPH =
   require('../../../assets/figma/profile/avatar.png') as ImageSourcePropType;
 
-/**
- * `222:1582` — the 15 x 32 exclamation mark on the "profile is incomplete" prompt (`222:1570`).
- * The node clips a wider source (`w 213.33% / left -56.67%`), so that crop is baked into the
- * export rather than re-derived here.
- */
-export const PROFILE_INCOMPLETE_BADGE =
-  require('../../../assets/figma/profile/incomplete-badge.png') as ImageSourcePropType;
-
 /** `69:419` — the 32pt chevron on each Profile tile. */
 export const PROFILE_CHEVRON_GLYPH =
   require('../../../assets/figma/profile/chevron.png') as ImageSourcePropType;
@@ -170,10 +190,17 @@ export const CANCEL_RADIO_ON =
 export const CANCEL_NOTE_FALLBACK_ART =
   require('../../../assets/figma/cancel/note-cash.png') as ImageSourcePropType;
 
-/** `111:2622` / `110:2621` — the 32pt marks on the two cancellation-policy notices. */
+/**
+ * `111:2622` / `110:2621` — the 32pt marks on the two cancellation-policy notices.
+ *
+ * The keys MUST match the note ids the payload supplies (`6:2` draws "Receive Cash" on the first
+ * notice and "Synchronize" on the second). They previously read `fee` / `reschedule`, which match
+ * nothing: both notices therefore fell through to the fallback and the sheet rendered the cash
+ * mark twice, losing the `110:2621` synchronize glyph entirely.
+ */
 export const CANCEL_NOTE_ART: Record<string, ImageSourcePropType> = {
-  fee: CANCEL_NOTE_FALLBACK_ART,
-  reschedule: require('../../../assets/figma/cancel/note-sync.png') as ImageSourcePropType,
+  compensation: CANCEL_NOTE_FALLBACK_ART,
+  'reschedule-once': require('../../../assets/figma/cancel/note-sync.png') as ImageSourcePropType,
 };
 
 /** `143:234` — the 65pt check mark over "Booking Complete!" (`143:233`). */

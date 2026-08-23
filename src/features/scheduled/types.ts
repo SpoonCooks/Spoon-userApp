@@ -1,3 +1,5 @@
+import type { DurationHelpContent } from '@ui';
+
 import type { DurationOptionViewModel } from '@features/booking';
 
 /**
@@ -57,16 +59,26 @@ export interface ScheduleViewModel {
   readonly slotsByPeriod: Readonly<Record<string, readonly ScheduleSlotOption[]>>;
   readonly primaryCtaLabel: string;
   /**
-   * The inset `Pay →` control. Book mode only.
-   * TODO(product B-4): the Reschedule bar shows `Pay →` with no price, which after ruling R-1
-   * would open Razorpay for an unspecified amount. Until that is answered, reschedule supplies no
-   * pay label and the submit path is inert.
+   * `275:4180` — the underlined line beneath the CTA ("Check payment details"), exactly as the
+   * Instant sheet draws it. Book mode only; reschedule takes no payment so it supplies none.
+   *
+   * This replaced the superseded `37:3912` inset `Pay →` pill and the `#F1F5F9` "Share your
+   * requests" bar, neither of which appears in the finalized "Scheduled flow" section
+   * `267:3521`. See the audit for the Meal Brief entry-point consequence.
    */
-  readonly payLabel?: string;
-  readonly secondaryCtaLabel: string;
+  readonly paymentDetailsLabel?: string;
   /** Set when the server says this booking may no longer be rescheduled (ruling R-3). */
   readonly blockedMessage?: string;
+  /**
+   * `333:3624` / `333:3643` - the "Help me pick" link on the Duration label row and the sheet it
+   * raises. Design CONTENT, not availability: it explains how to choose a duration, it does not
+   * decide which durations exist. Absent in reschedule mode, which offers no duration at all.
+   */
+  readonly durationHelp?: ScheduleDurationHelp;
 }
+
+/** The shared `@ui` shape — Scheduled and Instant raise the same sheet. */
+export type ScheduleDurationHelp = DurationHelpContent;
 
 export interface ScheduleSelection {
   readonly dayId: string | null;

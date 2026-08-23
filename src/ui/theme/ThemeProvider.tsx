@@ -13,6 +13,7 @@ import {
 import {
   darkColors,
   elevation,
+  gradients,
   layout,
   lightColors,
   toneColors,
@@ -35,6 +36,7 @@ export interface Theme {
   readonly elevations: typeof elevations;
   readonly elevation: typeof elevation;
   readonly typography: typeof typography;
+  readonly gradients: typeof gradients;
   readonly layout: typeof layout;
 }
 
@@ -52,6 +54,7 @@ function buildTheme(name: ThemeName): Theme {
     elevations,
     elevation,
     typography,
+    gradients,
     layout,
   };
 }

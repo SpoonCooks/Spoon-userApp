@@ -5,6 +5,7 @@ import { Text, lightTheme } from '@ui';
 import { HOME_ICON_BOLT, HOME_ICON_CALENDAR } from '../assets';
 import { HOME_DESIGN } from '../layout';
 import type { HomeBookingTileViewModel } from '../types';
+import { sectionStyles } from './SectionTitle';
 
 /**
  * Instant / Schedule tiles — Figma Page 3a `1:576` / `129:29` (re-read on Page 3b `209:1236`
@@ -12,15 +13,14 @@ import type { HomeBookingTileViewModel } from '../types';
  *
  * This is the component the designer called out. Geometry, verbatim from the frame:
  *
- *   row      `209:1234`  flex, justify-between, 4.5pt vertical padding
- *   grid     `209:1235`  flex row, 18pt gap
- *   tile     `209:1236`  160 × 142, px 10, py 22, radius 24, shadow 0 0 4 rgba(0,0,0,0.15)
- *   stack    `209:1237`  6pt gap: 40pt icon → title → subtitle
+ *   grid     `1:575`   two EQUAL tracks at an 18pt gutter, filling the section's 330pt column
+ *   tile     `1:576`   156 × 142, px 10, py 22, radius 24, shadow 0 0 4 rgba(0,0,0,0.15)
+ *   stack    `1:578`   6pt gap: 40pt icon → title → subtitle
  *
- * RESPONSIVENESS (task §8): the tile WIDTH is NOT fixed at 160 and is NOT a scaled 390pt canvas
+ * RESPONSIVENESS (task §9): the tile WIDTH is NOT fixed at 156 and is NOT a scaled 390pt canvas
  * value. It is `flex: 1` inside a row with the real 18pt Figma gutter, so at the reference column
- * (340pt) each tile resolves to 161pt — converging on the measured Figma size — and it narrows
- * gracefully on a 320dp phone instead of overflowing.
+ * (330pt) each tile resolves to exactly the measured 156 — and it narrows gracefully on a 320dp
+ * phone instead of overflowing.
  *
  * The HEIGHT is fixed at 142 and does NOT follow the width. It previously used
  * `aspectRatio: 160/142`, which measured **152.5dp** on a 393dp handset — the tile grew by 10dp
@@ -32,6 +32,9 @@ import type { HomeBookingTileViewModel } from '../types';
  * that stack — Instant 20 (100pt stack), Schedule 28 (92pt stack) — so the padding is stated as a
  * top inset and the remainder simply falls out of the fixed height, exactly as the frame draws it.
  *
+ * The 4.5pt row padding the superseded `209:1234` carried does not exist here: `1:575` is the
+ * section's content and the section already pads 6 vertically.
+ *
  * The two tiles are deliberately NOT symmetric — the frame sets "Instant" at Black 18/28 and
  * "Schedule" at Black 16/24 with −0.4 tracking, and the Instant subtitle carries a second, larger
  * emphasised run. Equalising them was part of the reported mismatch.
@@ -42,13 +45,7 @@ export interface HomeBookingTilesProps {
   readonly onPressSchedule: () => void;
 }
 
-const {
-  tile: TILE,
-  gap: TILE_GAP,
-  icon: ICON,
-  rowPaddingVertical,
-  iconGlyphWidth,
-} = HOME_DESIGN.tiles;
+const { tile: TILE, gap: TILE_GAP, icon: ICON, iconGlyphWidth } = HOME_DESIGN.tiles;
 
 export function HomeBookingTiles({
   tiles,
@@ -56,7 +53,7 @@ export function HomeBookingTiles({
   onPressSchedule,
 }: HomeBookingTilesProps) {
   return (
-    <View style={styles.row} testID="home-tiles">
+    <View style={[sectionStyles.section, styles.row]} testID="home-tiles">
       {tiles.map((tile) => {
         const instant = tile.id === 'instant';
         return (
@@ -94,7 +91,7 @@ export function HomeBookingTiles({
               </Text>
 
               {/* `1:585` — one paragraph, two runs. */}
-              <Text variant="bodyStrong" color="textSecondary">
+              <Text variant={instant ? 'bodyStrong' : 'bodyBoldTight'} color="textSecondary">
                 {tile.subtitle}
                 {tile.subtitleEmphasis === undefined ? null : (
                   <Text
@@ -115,14 +112,8 @@ export function HomeBookingTiles({
 }
 
 const styles = StyleSheet.create({
-  /** `209:1234` — 4.5pt of vertical padding sits between the section gap and the tiles. */
-  row: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    alignSelf: 'stretch',
-    gap: TILE_GAP,
-    paddingVertical: rowPaddingVertical,
-  },
+  /** `59:654` is a section like any other — px 4 / py 6 — holding `1:575`'s 18pt two-track grid. */
+  row: { flexDirection: 'row', alignItems: 'stretch', gap: TILE_GAP },
   tile: {
     flex: 1,
     minWidth: 0,
@@ -142,7 +133,7 @@ const styles = StyleSheet.create({
     ...lightTheme.elevation.tile,
   },
   stack: { alignSelf: 'stretch', gap: TILE.gap },
-  /** `209:1238` — a 40pt white disc; the glyph inside is 30 × 40, inset 5pt. */
+  /** `59:517` — a 40pt white disc; the glyph inside is 30 × 40, inset 5pt. */
   iconWrap: {
     width: ICON,
     height: ICON,

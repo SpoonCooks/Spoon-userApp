@@ -55,9 +55,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: lightTheme.space.s10,
   },
-  /** `104:2370` — white, 1pt `#E2E8F0`, 16pt radius, 11.889pt padding. */
+  /**
+   * `104:2370` — white, 1pt `#E2E8F0`, 16pt radius, px 11.889, drawn **52** tall.
+   *
+   * The node's own padding contradicts its height: 11.889 around a 31.6pt two-line block measures
+   * 57.4, and Figma simply lets the content overflow. The frame's drawn height wins (the ruling
+   * `ScreenHeader` already established), so the vertical padding is taken to 9.2 to reach 52
+   * without clipping the "Takes …" line — which pinning 52 at 11.889 would have done.
+   */
   boxed: {
-    padding: 11.889,
+    height: 52,
+    paddingHorizontal: 11.889,
+    paddingVertical: 9.2,
     borderRadius: lightTheme.radius.md,
     borderWidth: lightTheme.stroke.thin,
     borderColor: lightTheme.colors.borderField,

@@ -12,45 +12,55 @@ import { SectionTitle, sectionStyles } from './SectionTitle';
 const { cuisines: DESIGN } = HOME_DESIGN;
 
 /**
- * "Cooks for every family and every need" — Figma Page 3a `1:595`, re-read on `209:1254`.
+ * "Cooks for every family and every need" — Figma `1:595`, mosaic `132:48`.
  *
- * A deliberately ASYMMETRIC mosaic: a tall 162×194 "daily" card at the left, two 162×89/90 cards
- * stacked at the right (16pt column gutter, 15pt row gutter), and a full-width 340×90 band
- * beneath. Each card carries the real Figma photography, a vertical scrim and a Livvic Bold 9/13.5
- * white caption pinned near the bottom-left.
+ * A deliberately ASYMMETRIC mosaic inside a 330 × 283 box: a tall 158 × 183 "daily" card at the
+ * left, two 158 × 89 cards stacked at the right (**14pt** column gutter, **5pt** row gutter), and
+ * a full-width 330 × 89 band **11pt** beneath. Each card carries the real Figma photography at a
+ * 20pt radius, its own vertical scrim, and a Livvic Bold 9/13.5 white caption pinned bottom-left
+ * at px 10 / pb 6.
  *
- * RESPONSIVENESS: the mosaic was previously four ABSOLUTELY-positioned boxes whose every
- * coordinate was multiplied by `contentWidth / 340`. It is now two flex columns whose widths come
- * from the available column, with each card's designed proportion held by `aspectRatio`. The tall
- * card's height (aspect 162:194) equals the stacked pair's (89 + 15 + 90) at ANY column width, so
- * the mosaic stays square-edged on every phone without arithmetic.
+ * RESPONSIVENESS: the mosaic is two flex columns whose widths come from the available column,
+ * with each card's designed proportion held by `aspectRatio`. The tall card's height
+ * (158 : 183) equals the stacked pair's (89 + 5 + 89) at ANY column width, so the mosaic stays
+ * square-edged on every phone without arithmetic.
  */
 export interface HomeCuisinesProps {
   readonly title: string;
   readonly cuisines: readonly HomeMediaTileViewModel[];
 }
 
-/** `144:472` / `144:463` — lime over the cool photographs, yellow over the warm ones. */
-const SCRIM_LIME = ['rgba(236,255,155,0.35)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.5)'] as const;
-const SCRIM_YELLOW = ['rgba(255,214,0,0.1)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.5)'] as const;
-const SCRIM_STOPS = [0.004, 0.786, 0.996] as const;
+/**
+ * `140:186` … `140:189` — FOUR distinct scrims, not the two the superseded revision drew. Each is
+ * a founder colour at a stated opacity fading into black, read verbatim off its node:
+ *
+ *   daily    `#FFD600` 7 %  → black 50 %   (`bg-gradient-to-b`, i.e. exactly 180°)
+ *   north    `#FFD600` 7 %  → black 70 %   at 179.716°
+ *   south    `#FFD600` 7 %  → black 70 %   (180°)
+ *   chinese  `#FFD600` 10 % → black 40 %   at 179.703°, from 4.486 % to 99.057 %
+ *
+ * The two measured angles are within 0.3° of vertical — across the widest card the file draws
+ * (330pt) that displaces the band by 1.7pt, below the width of the softest stop transition — so
+ * the vertical axis is used and the measurement is recorded rather than silently rounded away.
+ */
+const SCRIMS = lightTheme.gradients;
 
-/** `209:1264` — the caption's vertical CENTRE is measured from the card's bottom edge. */
-const CAPTION_LINE_HEIGHT = 13.5;
+type Scrim = {
+  readonly colors: readonly [string, string, ...string[]];
+  readonly locations?: readonly [number, number, ...number[]];
+};
 
 interface Slot {
   readonly id: string;
   readonly aspectRatio: number;
-  readonly captionLeft: number;
-  readonly captionCentreFromBottom: number;
-  readonly scrim: readonly [string, string, string];
+  readonly scrim: Scrim;
 }
 
 const SLOTS: Record<'daily' | 'north' | 'south' | 'asian', Slot> = {
-  daily: { id: 'daily', ...DESIGN.daily, scrim: SCRIM_LIME },
-  north: { id: 'north', ...DESIGN.north, scrim: SCRIM_YELLOW },
-  south: { id: 'south', ...DESIGN.south, scrim: SCRIM_YELLOW },
-  asian: { id: 'asian', ...DESIGN.asian, scrim: SCRIM_LIME },
+  daily: { id: 'daily', aspectRatio: DESIGN.daily.aspectRatio, scrim: SCRIMS.cuisineDaily },
+  north: { id: 'north', aspectRatio: DESIGN.north.aspectRatio, scrim: SCRIMS.cuisineIndian },
+  south: { id: 'south', aspectRatio: DESIGN.south.aspectRatio, scrim: SCRIMS.cuisineIndian },
+  asian: { id: 'asian', aspectRatio: DESIGN.asian.aspectRatio, scrim: SCRIMS.cuisineAsian },
 };
 
 function CuisineCard({
@@ -80,23 +90,15 @@ function CuisineCard({
         />
       )}
       <LinearGradient
-        colors={[slot.scrim[0], slot.scrim[1], slot.scrim[2]]}
-        locations={[SCRIM_STOPS[0], SCRIM_STOPS[1], SCRIM_STOPS[2]]}
+        colors={slot.scrim.colors}
+        {...(slot.scrim.locations === undefined ? {} : { locations: slot.scrim.locations })}
         style={styles.fill}
       />
-      <Text
-        variant="microStrong"
-        color="textInverse"
-        numberOfLines={1}
-        style={{
-          position: 'absolute',
-          left: slot.captionLeft,
-          right: slot.captionLeft,
-          bottom: slot.captionCentreFromBottom - CAPTION_LINE_HEIGHT / 2,
-        }}
-      >
-        {tile.label}
-      </Text>
+      <View style={styles.caption}>
+        <Text variant="microStrong" color="textInverse" numberOfLines={1}>
+          {tile.label}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -109,7 +111,7 @@ export function HomeCuisines({ title, cuisines }: HomeCuisinesProps) {
   const asian = byId('asian');
 
   return (
-    <View style={sectionStyles.section} testID="home-cuisines">
+    <View style={[sectionStyles.section, sectionStyles.gapWide]} testID="home-cuisines">
       <SectionTitle>{title}</SectionTitle>
 
       <View style={styles.mosaic}>
@@ -143,15 +145,33 @@ const styles = StyleSheet.create({
    */
   fill: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
 
-  mosaic: { alignSelf: 'stretch', gap: DESIGN.rowGap },
+  mosaic: { alignSelf: 'stretch', gap: DESIGN.bandGap },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: DESIGN.columnGap },
   stack: { flex: 1, minWidth: 0, gap: DESIGN.rowGap },
   column: { flex: 1, minWidth: 0 },
   band: { alignSelf: 'stretch' },
 
+  /**
+   * The card is the PHOTOGRAPH's box, and carries no padding of its own.
+   *
+   * It used to hold the caption's px 10 / pb 6 directly. That padding is what `styles.fill`
+   * resolves its `100%` against — Yoga sizes a percentage against the parent's CONTENT box — so
+   * the artwork and its scrim came out 20pt narrower and 12pt shorter than the card and sat
+   * anchored top-left, leaving the yellow `surfaceAccentStrong` backing visible as a strip down
+   * the right edge and along the bottom of every tile. The inset belongs to the caption, not to
+   * the picture, so it now lives on `styles.caption` and the photograph covers the whole card.
+   */
   card: {
     borderRadius: lightTheme.layout.photoRadius,
     overflow: 'hidden',
+    justifyContent: 'flex-end',
     backgroundColor: lightTheme.colors.surfaceAccentStrong,
+  },
+
+  /** `140:188` — the caption sits bottom-left, px 10 / pb 6, over the photograph. */
+  caption: {
+    alignItems: 'flex-start',
+    paddingHorizontal: DESIGN.captionPaddingHorizontal,
+    paddingBottom: DESIGN.captionPaddingBottom,
   },
 });

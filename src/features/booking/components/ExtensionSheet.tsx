@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import {
@@ -7,6 +8,7 @@ import {
   BottomSheet,
   Button,
   HelpPill,
+  InfoDialog,
   NoticeCard,
   PriceTile,
   Text,
@@ -45,7 +47,13 @@ export interface ExtensionSheetProps {
   readonly selectedOptionId: string | null;
   readonly onSelectOption: (id: string) => void;
   readonly onClose: () => void;
-  readonly onExtend: () => void;
+  /**
+   * Optional, and the CTA is DISABLED without it rather than drawn live over nothing: a press that
+   * closes the sheet and changes no booking is the silent no-op §11 forbids.
+   */
+  readonly onExtend?: () => void;
+  /** `POST /extensions` is in flight. The CTA's OWN state — the sheet keeps its content (§7). */
+  readonly submitting?: boolean;
   readonly onBookAnother: () => void;
   /** `143:322` — the sheet draws the Help pill too. Unwired until B-10 names a destination. */
   readonly onHelp?: () => void;
@@ -68,10 +76,14 @@ export function ExtensionSheet({
   onSelectOption,
   onClose,
   onExtend,
+  submitting = false,
   onBookAnother,
   onHelp,
   helpLabel = 'Help',
 }: ExtensionSheetProps) {
+  const [taxesOpen, setTaxesOpen] = useState(false);
+  const taxes = extension.taxesInfo;
+
   return (
     <BottomSheet
       visible={visible}
@@ -79,12 +91,30 @@ export function ExtensionSheet({
       onBack={onClose}
       title={extension.title}
       headerVariant="screen"
+      // `143:319` — a 32pt disc, the same control `306:2986` draws on the Tip sheet.
+      backVariant="outlined"
       bodyStyle={styles.body}
       {...(onHelp === undefined
         ? {}
         : {
             headerAction: <HelpPill label={helpLabel} onPress={onHelp} testID="extension-help" />,
           })}
+      {...(taxesOpen && taxes !== undefined
+        ? {
+            /* `275:4189` "Page 13b- Extension taxes" — layered over this sheet, as `25:1585` is
+               over the Instant sheet. The copy is this frame's own, not Instant's. */
+            dialog: (
+              <InfoDialog
+                visible
+                presentation="inline"
+                onClose={() => setTaxesOpen(false)}
+                title={taxes.title}
+                body={taxes.body}
+              />
+            ),
+            onDialogClose: () => setTaxesOpen(false),
+          }
+        : {})}
       testID="extension-sheet"
     >
       {/* `144:432` — label + grid, 12pt apart. */}
@@ -123,7 +153,9 @@ export function ExtensionSheet({
       {/* `143:358` — the "can't extend" fallback. */}
       <View style={styles.fallback} testID="extension-fallback">
         <View style={styles.fallbackText}>
-          <Text variant="bodyBold" color="textPrimary" align="center">
+          {/* `143:361` — Livvic Bold **14/20**, up a step from the superseded 12/16. This is the
+              "16 → 20" box growth the delta showed on this frame. */}
+          <Text variant="title" color="textPrimary" align="center">
             {extension.fallbackTitle}
           </Text>
           <Text variant="bodySmall" color="textSeparator" align="center">
@@ -142,12 +174,29 @@ export function ExtensionSheet({
 
       <Button
         label={extension.ctaLabel}
-        onPress={onExtend}
+        onPress={() => onExtend?.()}
         variant="primary"
         size="bar"
-        disabled={selectedOptionId === null}
+        disabled={selectedOptionId === null || onExtend === undefined}
+        loading={submitting}
         testID="extension-submit"
       />
+
+      {/* `275:4267` — Livvic Regular 9/13.5, underlined, centred. Not a button in the frame. */}
+      {extension.paymentDetailsLabel === undefined || taxes === undefined ? null : (
+        <Pressable
+          onPress={() => setTaxesOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={extension.paymentDetailsLabel}
+          hitSlop={16}
+          style={styles.paymentDetails}
+          testID="extension-payment-details"
+        >
+          <Text variant="micro" color="textPrimary" align="center" style={styles.underline}>
+            {extension.paymentDetailsLabel}
+          </Text>
+        </Pressable>
+      )}
     </BottomSheet>
   );
 }
@@ -165,14 +214,26 @@ const styles = StyleSheet.create({
   duration: { gap: lightTheme.space.md },
   options: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -HALF_GAP },
   option: { width: '33.33%', paddingHorizontal: HALF_GAP },
-  /** `143:358` — `#ECFF9B`, 24pt radius, 15.889pt padding, 12pt gap. */
+  /**
+   * `143:358` — `#ECFF9B`, 24pt radius, 15.889pt padding, **6pt** gap.
+   *
+   * The panel closed 119.78 → **114** in the current file, and the arithmetic pins where: the
+   * 15.889 padding, the 44pt text block and the 32pt CTA are all unchanged, so
+   * 31.78 + 44 + gap + 32 = 114 gives gap = 6, down from 12.
+   */
   fallback: {
     alignSelf: 'stretch',
-    gap: lightTheme.space.md,
+    gap: lightTheme.space.s6,
     padding: 15.889,
     borderRadius: lightTheme.radius.r24,
     backgroundColor: lightTheme.colors.surfacePositive,
   },
-  /** `143:359` — a 44pt block; the two lines sit 22pt apart. */
-  fallbackText: { alignSelf: 'stretch', gap: lightTheme.space.s6 },
+  /**
+   * `143:359` — a 44pt block. `143:360` sits at 0 and is 20 tall; `143:362` starts at 22, so the
+   * two lines are **2** apart, not 6. The title growing 16 → 20 absorbed the old gap.
+   */
+  fallbackText: { alignSelf: 'stretch', gap: lightTheme.space.xxs },
+  /** `275:4267` — centred under the bar, the same treatment as Instant's `25:1325`. */
+  paymentDetails: { alignSelf: 'center' },
+  underline: { textDecorationLine: 'underline' },
 });

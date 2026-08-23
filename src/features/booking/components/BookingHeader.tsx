@@ -1,20 +1,25 @@
 import { StyleSheet, View } from 'react-native';
 
-import { HelpPill, IconButton, Text, lightTheme } from '@ui';
+import { AddressLines, DirectionalDisc, HelpPill, lightTheme } from '@ui';
 
 /**
- * The shared lifecycle header — Figma `39:5324` (Confirmation), repeated on En route, Arrived,
- * In service and all four cancellation surfaces.
+ * The shared lifecycle header — Figma `289:9205` ("top banner"), repeated verbatim on Confirm
+ * reassign (`308:3082`), Auto cancelled (`308:3095`), both En route frames, both Reassigned
+ * frames, Arrived, In service and Cooking extended.
  *
- * Geometry, verbatim: a 45pt white strip. The 32pt BACK control sits at left 4 / top 7 — and it is
- * a white disc with a hairline ring around a CHEVRON (`37:5266`), not the bare arrow the bottom
- * sheet uses. Drawing the sheet's arrow here left the disc off entirely. The address label
- * (Livvic SemiBold 11/16.5) is centred on y 14.5 and the address line (Livvic Regular 9/13.5) on
- * y 26; the Help pill (`39:5331`) is a 73 × 25.3 `#FFD600` box at a 16pt radius carrying a Livvic
- * Bold 12/15.2 label and the 22 × 25 WhatsApp mark, lifted by `0 0 2 rgba(0,0,0,0.15)`.
+ * It is NOT the `63:783` screen header the seven banked sections use, and it is not a title bar:
+ * it is the HOME banner's address lockup with a back control in front of it and the Help pill
+ * behind it.
  *
- * The Help control is a WhatsApp handoff in the design, which is why the mark is the real exported
- * asset and not Feather's `headphones`.
+ * Geometry, verbatim from `289:9205`:
+ *   row      338 × 38, px 4 / py 6, items centred, **24pt** between the address group and Help
+ *   group    `289:9206` — the 32pt back disc (`54:289`, the SAME exported control), 12pt clear of
+ *   address  `289:9215` — a fixed **188 × 28** lockup; label centred on y 8.5, line on y 25
+ *   help     `289:9211` — the 73 × 25.335 `#FFD600` pill
+ *
+ * The back control was drawn as `IconButton variant="outlined"` — a reconstructed disc — where the
+ * frame instances the one exported chevron disc. `DirectionalDisc` is the single place that
+ * drawing lives.
  *
  * TODO(product B-10): `Help` has no destination anywhere in the Figma file. The control renders
  * because it is designed; the callback is optional and unwired until the destination is decided.
@@ -27,26 +32,22 @@ export interface BookingHeaderProps {
   readonly onHelp?: () => void;
 }
 
+/** `289:9215` — the fixed lockup the Help pill is positioned against. */
+const ADDRESS_WIDTH = 188;
+const ADDRESS_HEIGHT = 28;
+
 export function BookingHeader({ title, subtitle, helpLabel, onBack, onHelp }: BookingHeaderProps) {
   return (
     <View style={styles.row} testID="booking-header">
-      <IconButton
-        name="back"
-        label="Back"
-        onPress={onBack}
-        variant="outlined"
-        // `37:5266`'s chevron measures (77,77,77) at full coverage — `rgba(0,0,0,0.7)`, not black.
-        color="textSecondary"
-        testID="booking-back"
-      />
-
-      <View style={styles.text}>
-        <Text variant="label" color="textPrimary" numberOfLines={1}>
-          {title}
-        </Text>
-        <Text variant="micro" color="textPrimary" numberOfLines={1}>
-          {subtitle}
-        </Text>
+      <View style={styles.lead}>
+        <DirectionalDisc direction="back" label="Back" onPress={onBack} testID="booking-back" />
+        <AddressLines
+          label={title}
+          line={subtitle}
+          width={ADDRESS_WIDTH}
+          height={ADDRESS_HEIGHT}
+          testID="booking-header-address"
+        />
       </View>
 
       {onHelp === undefined ? null : (
@@ -60,10 +61,13 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    /** `39:5311` starts at x 47 with the 32pt control ending at 36 — an 11pt gap, not 10. */
-    gap: 11,
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+    gap: 24,
+    paddingHorizontal: lightTheme.space.xs,
     paddingVertical: lightTheme.space.s6,
     backgroundColor: lightTheme.colors.surface,
   },
-  text: { flex: 1, minWidth: 0, gap: lightTheme.space.xxs },
+  /** `289:9206` — the disc 12pt clear of the address lockup. */
+  lead: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.md, flexShrink: 1 },
 });

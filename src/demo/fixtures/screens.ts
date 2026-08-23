@@ -88,20 +88,32 @@ export const DEMO_ADDRESS_EDIT: AddressEditViewModel = {
  * here is a rule about where Spoon operates.
  */
 export const DEMO_ADDRESS_OUT_OF_SERVICE: AddressOutOfServiceViewModel = {
-  addressLabel: 'Home',
-  addressLine: 'E102, Purva Skydale, Silver Count…',
+  headerTitle: 'Choose another location',
   title: 'Coming soon to your area!',
   message: 'We are not operational in your area at the moment, , but we are working towards it!',
 };
 
+/**
+ * `60:655` in the FINAL file (`8F7GqT4hEG2pEhtUGBYw7p`, "Page 18b- Address full").
+ *
+ * Three strings moved against the superseded copy and each is read off a node, not paraphrased:
+ *   title      `275:4477` -> "Complete address"  (was "Add address details")
+ *   labelTitle `339:4599` -> "Label as"          (was "Add label")
+ *   ctaLabel   `275:4486` -> "Confirm"           (was "Check Availability & Save")
+ *
+ * The CTA matters beyond wording (V7 founder comment, task §7). "Check Availability" described a
+ * screen that ran the serviceability check itself; it does not. `53:31` Confirm runs the ONE
+ * check, and by the time `60:655` is on screen the point has already been approved. This CTA
+ * completes and SAVES the address, which is what "Confirm" now says.
+ */
 export const DEMO_ADDRESS_DETAILS: AddressDetailsViewModel = {
-  title: 'Add address details',
+  title: 'Complete address',
   flatPlaceholder: 'Flat no./ House no.',
   buildingPlaceholder: 'Building/ Tower name or Plot no.',
   areaTitle: 'Area',
   areaValue: 'Street name, Area 124, subarea xyz, city',
   changeLabel: 'Change',
-  labelTitle: 'Add label',
+  labelTitle: 'Label as',
   labelOptions: [
     { id: 'home', label: 'Home' },
     { id: 'parents', label: 'Parents' },
@@ -113,7 +125,7 @@ export const DEMO_ADDRESS_DETAILS: AddressDetailsViewModel = {
   receiverOptionalLabel: '(Optional)',
   receiverNamePlaceholder: 'Name',
   receiverPhonePlaceholder: 'Phone no.',
-  ctaLabel: 'Check Availability & Save',
+  ctaLabel: 'Confirm',
 };
 
 /**
@@ -122,7 +134,6 @@ export const DEMO_ADDRESS_DETAILS: AddressDetailsViewModel = {
  */
 export const DEMO_ADDRESS_DETAILS_EDIT: AddressDetailsViewModel = {
   ...DEMO_ADDRESS_DETAILS,
-  title: 'Edit address details',
   flatValue: 'B-402',
   buildingValue: 'Green Meadows',
   selectedLabelId: 'parents',
@@ -177,32 +188,26 @@ export const DEMO_PROFILE: ProfileViewModel = {
   title: 'Profile',
   user: { name: 'Aarav Mehta', contactLine: '+91 98765 00000' },
   /**
-   * `222:1570`. Present only because the sample payload says so — the client never works out
-   * that a profile is incomplete. The message keeps the frame's own wording, which reads
-   * "Share how your meal preferences…" (recorded as D-33).
+   * Placeholder only. `profileFromMe` ALWAYS overwrites this with `GET /v1/me`'s verdict, so no
+   * screen ever renders the fixture's answer — the completion card is server-driven (task §9).
    */
-  incomplete: {
-    title: 'Your profile is incomplete',
-    message: 'Share how your meal preferences, so that we can serve you better',
-    ctaLabel: 'Complete profile',
-  },
+  profileComplete: false,
   tiles: [
-    { id: 'orders', title: 'My orders', subtitle: 'View order history', icon: 'clock' },
+    // `69:418` / `69:414`. The id stays `orders` — it is the route key, not display copy.
+    { id: 'orders', title: 'My bookings', subtitle: 'View booking history', icon: 'clock' },
     { id: 'addresses', title: 'Addresses', subtitle: 'View or add addresses', icon: 'pin' },
     { id: 'refunds', title: 'My refunds', subtitle: 'View refund status', icon: 'refresh' },
     { id: 'help', title: 'Help', subtitle: 'Get immediate help', icon: 'help' },
   ],
   links: [
-    {
-      id: 'website',
-      title: 'Visit Live Website (spoonhelp.com)',
-      icon: 'file',
-      trailingIcon: 'externalLink',
-    },
-    // `6:779` has no leading mark; the shield is its TRAILING one.
-    { id: 'legal', title: 'Terms of Service & Privacy Policy', trailingIcon: 'shield' },
+    // The "Visit Live Website (spoonhelp.com)" row (`6:766`) was REMOVED in the current file —
+    // the footer panel dropped 154.43 → 110.43 with it. Nothing replaced it.
+    // `6:779` in v4 carries the text ALONE — no leading mark and no trailing shield. The row is
+    // a 28pt bar whose only child is the underlined label.
+    { id: 'legal', title: 'Terms of Service & Privacy Policy' },
   ],
-  logoutLabel: 'Log Out of Account',
+  // `6:789` reads exactly "Log Out".
+  logoutLabel: 'Log Out',
 };
 
 /* -------------------------------------------------------------------------- login */
@@ -230,37 +235,53 @@ export const DEMO_LOGIN: LoginViewModel = {
 };
 
 /**
- * NEW Figma `227:1649` "Page 17b- Login OTP" — a screen that did not exist before (blocker B-7).
+ * Figma `fsgGIC4c6DJulb64TTt9yg` "Login flow" `275:4472` — the three finalized OTP frames:
+ *
+ *   `275:4289`  countdown        — "Resend OTP in **25s**", trailing token Bold, not underlined
+ *   `250:2439`  resend offered   — "Resend OTP **via SMS**", underlined, boxes empty
+ *   `275:4349`  rejected code    — "Incorrect OTP. Please try again" inside the digits panel, the
+ *                                  boxes on the red tint, and resend OFFERED (not counting down)
+ *
+ * Both the resend and the error frame set "via SMS" in Bold against a SemiBold lead, so all three
+ * states carry a lead + accent pair; only the countdown differs in what the accent says.
  *
  * `resendLabel` is PRE-FORMATTED and `digitCount` is read from the frame's six boxes. The client
- * runs no timer: the "26s" here is the frame's sample copy, and a host that owns the countdown
+ * runs no timer: the "25s" here is the frame's sample copy, and a host that owns the countdown
  * simply supplies a different string.
  */
-export const DEMO_OTP: OtpViewModel = {
+const OTP_BASE = {
   title: 'OTP verification',
   sentToLabel: 'OTP has been sent to +91 9876543210',
   taglineLead: 'Trained cooks in ',
   taglineAccent: 'minutes',
   taglineSub: 'Cooking dishes catered to your mood & taste',
   digitCount: 6,
-  resendLabel: 'Resend OTP in 26s',
+} as const satisfies Partial<OtpViewModel>;
+
+/** `275:4289` — the countdown, whose trailing token the frame sets in Bold. */
+export const DEMO_OTP: OtpViewModel = {
+  ...OTP_BASE,
+  resendLabel: 'Resend OTP in ',
+  resendLabelAccent: '25s',
   resendEnabled: false,
-  ctaLabel: 'Verify & Proceed',
 };
 
-/** The states the frames imply but do not separately draw. Reachable from the DEV menu. */
+/** `250:2439` — "Resend OTP " SemiBold + "via SMS" Bold, the whole line underlined. */
 export const DEMO_OTP_RESEND_READY: OtpViewModel = {
-  ...DEMO_OTP,
-  resendLabel: 'Resend OTP',
+  ...OTP_BASE,
+  resendLabel: 'Resend OTP ',
+  resendLabelAccent: 'via SMS',
   resendEnabled: true,
 };
 
+/**
+ * `275:4349` — the error frame draws the resend link OFFERED, not a running countdown, so this
+ * builds on `DEMO_OTP_RESEND_READY` rather than on the countdown state.
+ */
 export const DEMO_OTP_ERROR: OtpViewModel = {
-  ...DEMO_OTP,
-  resendLabel: 'Resend OTP',
-  resendEnabled: true,
-  // Server copy. Nothing here decides what makes a code invalid.
-  errorMessage: 'That code did not match. Please try again.',
+  ...DEMO_OTP_RESEND_READY,
+  // `275:4467`. Server copy — nothing here decides what makes a code invalid.
+  errorMessage: 'Incorrect OTP. Please try again',
 };
 
 export const DEMO_LOGIN_ERROR: LoginViewModel = {

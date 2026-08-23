@@ -50,7 +50,9 @@ export default function DevCancellationRoute() {
               // TODO(product B-10): `Help` still has no destination anywhere in the file.
             }}
             onConfirmCancel={() => {
-              // TODO(backend-contract): no cancellation endpoint exists. Review-only.
+              // Review-only: no request is made, so the step is advanced here to keep `115:2703`
+              // reachable from the dev menu. The REAL host advances only on the server's answer.
+              setStep('confirmed');
             }}
             onBookAgain={() => router.back()}
           />

@@ -20,6 +20,8 @@ export const palette = {
   black70: 'rgba(0,0,0,0.7)',
   /** Photo scrim over the "what's not included" thumbnails (`156:38`). */
   black40: 'rgba(0,0,0,0.4)',
+  /** `44:5632` — the Instant unavailable veil. Plain white at 45 %, NOT a blur. */
+  white45: 'rgba(255,255,255,0.45)',
   /**
    * `3:2002` — the ground behind a bottom sheet. Read off the node: plain black at 80%, which is
    * also `color/black/-80%`. The previous `rgba(15,23,43,0.55)` was authored, not measured.
@@ -164,8 +166,33 @@ export const palette = {
    */
   tileSelected: '#ECFF9B',
   tileDisabled: 'rgba(0,0,0,0.07)',
+  /**
+   * `275:4690` — the drained CTA bar's fill, `tileDisabled` over white, PRE-COMPOSITED for the
+   * same reason as `limeBanner` and `tileIdle`.
+   *
+   * The disabled bar KEEPS its variant's lift (`250:2421` elevation 2 on Login, `1:821` elevation
+   * 3 on the Instant/Scheduled bar), and on Android an elevation shadow renders THROUGH a
+   * translucent background. Measured on the emulator: Login's disabled Continue and Scheduled's
+   * disabled "Book Now" both read (187…193) at their edges against a correct (237,237,237) in the
+   * middle — a dark grey bar with a lighter core, which is not a state the file draws. The two
+   * CTAs that pass `flat` (`60:655` Confirm, `338:4558` Confirm) measured (237,237,237) exactly,
+   * which is what isolated the lift as the cause rather than the token.
+   *
+   * 0.07 × #000000 + 0.93 × #FFFFFF = (237.15, 237.15, 237.15).
+   *
+   * The translucent `tileDisabled` is kept for the disabled TILES (`1:815`), which carry no lift
+   * and sit on surfaces that are not always white.
+   */
+  ctaDisabled: '#EDEDED',
   /** `1:815` / `1:820` — disabled tile ink. */
   black50: 'rgba(0,0,0,0.5)',
+  /**
+   * `47:6615` + `29:1858` flattened. The frame dims the sheet by stacking a 50% wash under a 50%
+   * layer opacity over the `25:1745` scrim, which lands a white sheet area on ~#595959. Expressed
+   * as ONE opaque wash because the layer-opacity form would let the screen behind show THROUGH
+   * the sheet — harmless on a blank artboard, unreadable over the real Home.
+   */
+  black65: 'rgba(0,0,0,0.65)',
   /** `1:818` — a disabled struck-through price. */
   black30: 'rgba(0,0,0,0.3)',
 
@@ -176,8 +203,16 @@ export const palette = {
   /** `6:22` — the "Free" fee value on the cancellation policy, NEW in the current Figma file. */
   emerald: '#01CF8F',
 
-  danger: '#D92D20',
-  dangerSurface: '#FEE4E2',
+  /**
+   * `239:2312` — "Incorrect OTP. Please try again" on the OTP error frame. The FIRST genuine error
+   * state the design has ever contained.
+   *
+   * The previous `#D92D20` / `#FEE4E2` pair was authored, not measured — the only two colour
+   * tokens in this file that cited no node. Both are now read off `239:2261`.
+   */
+  danger: '#FF0404',
+  /** `239:2294` — the digit boxes on the error frame swap `#FFEF99` for this red tint. */
+  dangerSurface: 'rgba(255,4,4,0.07)',
 } as const;
 
 /**
@@ -250,22 +285,52 @@ export const radius = {
   r6: 6,
   /** `1:788` — the Instant duration tiles themselves. */
   r12: 12,
+  /** `53:110` / `275:4485` — the address CTAs, which the finalized file rounds to 30. */
+  r30: 30,
 } as const;
+
+/**
+ * Builds an `rgba()` from one of the founder hexes and an alpha.
+ *
+ * Used where a fill is a brand colour at a stated opacity — gradient stops, washes — so the value
+ * stays PROVABLY derived from the approved palette instead of being written out as a fresh
+ * literal that nobody can trace back.
+ */
+export function withAlpha(hex: string, alpha: number): string {
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 /** Figma stroke weights. */
 export const stroke = {
   hairline: 0.8,
   thin: 1,
-  base: 1.67,
+  /**
+   * `250:2416` — the rule closing the `+91` cell on Login. The current file gives this as
+   * `stroke-weight/1_78` = **1.778**; the superseded `53:227` gave 1.67. Sole consumer is
+   * `LoginScreen`, so the token is re-valued rather than forked.
+   */
+  base: 1.778,
   thick: 2,
 } as const;
 
 /**
- * Livvic, bundled via `@expo-google-fonts/livvic` and loaded in `src/app/_layout.tsx`.
+ * Livvic — the founder-approved family. The five required weights ship as project assets in
+ * `assets/fonts/` and are registered under these exact names by `expo-font` in
+ * `src/app/_layout.tsx`. Nothing resolves a face out of `node_modules` at runtime.
+ *
+ *   Livvic-Regular.ttf  → `Livvic_400Regular`  (400)
+ *   Livvic-Medium.ttf   → `Livvic_500Medium`   (500)
+ *   Livvic-SemiBold.ttf → `Livvic_600SemiBold` (600)
+ *   Livvic-Bold.ttf     → `Livvic_700Bold`     (700)
+ *   Livvic-Black.ttf    → `Livvic_900Black`    (900)
  *
  * React Native does NOT synthesise weights: on Android `fontFamily` + `fontWeight` do not
  * combine, so each weight MUST be addressed as its own family. Typography tokens therefore emit
- * `fontFamily`, never `fontWeight`.
+ * `fontFamily`, never `fontWeight`. Registering by explicit key rather than letting the platform
+ * infer a PostScript name is what keeps the mapping identical on Android and iOS.
  */
 export const fontFamily = {
   regular: 'Livvic_400Regular',
@@ -308,6 +373,8 @@ export const letterSpacing = {
   tight: -0.4,
   none: 0,
   wide: 0.5,
+  /** `letter spacing/1_6` — the Login phone field's dial code and value (`250:2417` / `250:2420`). */
+  wider: 1.6,
 } as const;
 
 /**
@@ -356,6 +423,12 @@ export const elevations = {
   raised: elevation(0, 0, 4, 0.25, 6),
   /** `1:798` Instant badge — the lightest lift in the file. */
   badge: elevation(0, 1, 1, 0.05, 1),
+  /** `63:779` — the map helper pill: a 4pt blur at 10%, softer than `tile`'s 15%. */
+  pill: elevation(0, 0, 4, 0.1, 3),
+  /** `222:1558` — the out-of-service disc: `0 0 2 rgba(0,0,0,0.07)`. */
+  disc: elevation(0, 0, 2, 0.07, 2),
+  /** `69:514` — the "Add a new address" bar: the same 1pt blur as `hairline` but at 10%. */
+  hairlineSoft: elevation(0, 0, 1, 0.1, 1),
   /**
    * `53:111` / `60:729` — the address CTA's YELLOW glow: `0 4 6 -1 #FEE685`. Figma layers two
    * shadows; React Native supports one per view, so the larger is kept.
@@ -378,6 +451,39 @@ export const elevations = {
 } as const;
 
 export type ElevationToken = keyof typeof elevations;
+
+/**
+ * INNER shadows. Figma draws exactly one, and `shadow*` cannot express it: `shadowOffset` and
+ * friends only ever cast outward.
+ *
+ * React Native models this through `boxShadow`'s `inset` flag, which is a typed field on
+ * `BoxShadowValue` (`StyleSheetTypes.d.ts`) and is implemented on BOTH platforms under the New
+ * Architecture — which this app runs (`android/gradle.properties: newArchEnabled=true`,
+ * React Native 0.86.2). The ARRAY form is used rather than the CSS string so the value is
+ * type-checked instead of parsed at runtime.
+ */
+export const innerShadows = {
+  /** `69:406` — the Profile tiles: `0 0 2 rgba(0,0,0,0.1)`, inset. */
+  profileTile: [
+    {
+      offsetX: 0,
+      offsetY: 0,
+      blurRadius: 2,
+      color: 'rgba(0,0,0,0.1)',
+      inset: true,
+    },
+  ],
+  /** `97:1231` — the en-route ETA panel: `0 0 4 rgba(0,0,0,0.15)`, inset. */
+  etaPanel: [
+    {
+      offsetX: 0,
+      offsetY: 0,
+      blurRadius: 4,
+      color: 'rgba(0,0,0,0.15)',
+      inset: true,
+    },
+  ],
+} as const;
 
 /**
  * Every frame in the file is 390pt wide. Layout that is expressed in Figma as a fixed pt value

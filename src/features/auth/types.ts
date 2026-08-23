@@ -57,13 +57,24 @@ export interface OtpViewModel {
   readonly taglineSub: string;
   /** `227:1681` draws six boxes. Read, never assumed. */
   readonly digitCount: number;
-  /** `230:2086` — pre-formatted ("Resend OTP in 26s" / "Resend OTP"). */
+  /** `230:2086` — pre-formatted ("Resend OTP in 26s" / "Resend OTP via SMS"). */
   readonly resendLabel: string;
-  /** Whether the resend action is currently offered. A server/runtime decision. */
+  /**
+   * `250:2437` — the countdown frames set the TRAILING token in Livvic Bold against the Medium
+   * lead ("Resend OTP in " + **"26s"**). Split for the same reason as `taglineAccent`: it is one
+   * text node with two runs, and the client must not parse a duration out of a formatted string
+   * to find the boundary. Omitted on `250:2439`, whose "Resend OTP via SMS" is a single run.
+   */
+  readonly resendLabelAccent?: string;
+  /**
+   * Whether the resend action is currently offered. A server/runtime decision. Also drives the
+   * underline: `250:2439` / `275:4349` draw the offered link underlined, `275:4289` does not.
+   */
   readonly resendEnabled: boolean;
-  /** `227:1688` — "Verify & Proceed". */
-  readonly ctaLabel: string;
-  /** Supplied when the server rejects the code. */
+  /**
+   * `275:4467` — supplied when the server rejects the code. Presence also switches the digit
+   * boxes to their error fill (`275:4449`), exactly as the error frame draws them.
+   */
   readonly errorMessage?: string;
   readonly submitting?: boolean;
 }

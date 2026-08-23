@@ -38,9 +38,17 @@ import type { CancellationViewModel } from '../types';
  *   confirm  `115:2703` the cancelled hero (`115:2716`), a card carrying the refund amount and
  *                       destination (`115:2737`), then "make another booking?" with No / Yes
  *
- * ⚠ NOT WIRED. Blocker B-11: no live-booking screen has a verified Cancel entry point, so this
- * component is implemented visually and exercised from the showcase only. Do not attach it to a
- * screen until the entry point is confirmed. **The entry point is not invented here.**
+ * Blocker B-11 is CLOSED — `3:1041` and `292:241` draw the Cancel control, and
+ * `app/(app)/booking/[id].tsx` is the entry point.
+ *
+ * ## The confirmed step is the SERVER's, not this sheet's
+ *
+ * `refund` -> `confirmed` used to be a local `onStepChange('confirmed')` fired alongside
+ * `onConfirmCancel`. That drew `115:2703` — "Your booking has been cancelled" — the instant the
+ * button was pressed, so a cancellation the backend REFUSED still told the customer their booking
+ * was gone, on the app's most legally consequential surface. The step now advances only when the
+ * host's mutation resolves; until then the CTA carries its own pending state and refuses a second
+ * press (task §12, §30).
  *
  * Boundary — this is the most legally consequential surface in the app:
  *  - the fee schedule renders as CONTENT; the applicable fee is a server value;
@@ -69,6 +77,14 @@ export interface CancelBookingSheetProps {
   readonly onConfirmCancel: (reasonId: string, detail: string) => void;
   readonly onBookAgain: (again: boolean) => void;
   readonly onHelp?: () => void;
+  /**
+   * The cancellation request is in flight.
+   *
+   * The sheet does NOT advance itself to `confirmed` — the host does, and only once the server
+   * has answered. This is what the CTA shows in the meantime, and what stops a second press from
+   * sending a second cancellation.
+   */
+  readonly cancelling?: boolean;
 }
 
 export function CancelBookingSheet({
@@ -81,6 +97,7 @@ export function CancelBookingSheet({
   onConfirmCancel,
   onBookAgain,
   onHelp,
+  cancelling = false,
 }: CancelBookingSheetProps) {
   const [reasonId, setReasonId] = useState<string | null>(null);
   const [detail, setDetail] = useState('');
@@ -111,7 +128,9 @@ export function CancelBookingSheet({
       visible={visible}
       onClose={onClose}
       title={cancellation.title}
-      headerVariant="screen"
+      headerVariant="banner"
+      // `111:2640` — this sheet draws the 32pt disc, not the Instant sheet's bare arrow.
+      backVariant="outlined"
       bodyStyle={styles.body}
       onBack={step === 'policy' ? onClose : () => onStepChange(previousStep(step))}
       {...(onHelp === undefined
@@ -132,21 +151,26 @@ export function CancelBookingSheet({
       case 'policy':
         return (
           <View style={styles.step} testID="cancel-step-policy">
-            <FeeSchedule
-              columns={cancellation.feeColumns}
-              rows={cancellation.feeSchedule}
-              testID="cancel-fees"
-            />
-
-            {cancellation.notes.map((note) => (
-              <NoticeCard
-                key={note.id}
-                title={note.title}
-                body={note.body}
-                art={CANCEL_NOTE_ART[note.id] ?? CANCEL_NOTE_FALLBACK_ART}
-                testID={`cancel-note-${note.id}`}
+            {/* `6:16` — the fee table and the two notices are ONE block at a 12pt rhythm; the
+                16pt step gap only applies between that block, the prompt and the CTA. */}
+            <View style={styles.policyGroup}>
+              <FeeSchedule
+                columns={cancellation.feeColumns}
+                rows={cancellation.feeSchedule}
+                testID="cancel-fees"
               />
-            ))}
+
+              {cancellation.notes.map((note) => (
+                <NoticeCard
+                  key={note.id}
+                  title={note.title}
+                  body={note.body}
+                  art={CANCEL_NOTE_ART[note.id] ?? CANCEL_NOTE_FALLBACK_ART}
+                  density="tight"
+                  testID={`cancel-note-${note.id}`}
+                />
+              ))}
+            </View>
 
             {reschedulePrompt}
 
@@ -194,7 +218,8 @@ export function CancelBookingSheet({
                         resizeMode="contain"
                         accessibilityIgnoresInvertColors
                       />
-                      <Text variant="body" color="textSecondary" style={styles.reasonLabel}>
+                      {/* `104:2284` — Livvic Medium 13/16, not the Regular 12/16 body ramp. */}
+                      <Text variant="optionLabel" color="textSecondary" style={styles.reasonLabel}>
                         {reason.label}
                       </Text>
                     </Pressable>
@@ -258,11 +283,13 @@ export function CancelBookingSheet({
             <Button
               label={cancellation.cancelCtaLabel}
               onPress={() => {
+                if (cancelling) return;
                 onConfirmCancel(reasonId ?? '', detail);
-                onStepChange('confirmed');
               }}
               variant="primary"
               size="bar"
+              disabled={cancelling}
+              loading={cancelling}
               style={styles.softCancel}
               testID="cancel-confirm"
             />
@@ -270,53 +297,50 @@ export function CancelBookingSheet({
         );
 
       case 'confirmed': {
-        const total = cancellation.refundRows.find((row) => row.emphasis === 'total');
         return (
           <View style={styles.stepConfirmed} testID="cancel-step-confirmed">
-            <CancelledHero title={cancellation.confirmedTitle} testID="cancel-confirmed-hero" />
+            {/* `115:2715` — the hero 12pt clear of the destination box. `115:2704` draws NO
+                refund-amount row on this step; the amount belongs to `104:2336`, which is the
+                step that itemises it. */}
+            <View style={styles.confirmedTop}>
+              <CancelledHero title={cancellation.confirmedTitle} testID="cancel-confirmed-hero" />
 
-            <View style={styles.refundCard} testID="cancel-confirmed-refund">
-              {total === undefined ? null : (
-                <View style={styles.refundTotalRow}>
-                  <Text variant="bodyStrong" color="textPrimary">
-                    {total.label}
-                  </Text>
-                  <Text variant="headingCta" color="textPrimary" align="right">
-                    {total.value}
-                  </Text>
-                </View>
-              )}
               <RefundDestinationRow
                 destination={cancellation.refundMethodTitle}
                 timeframe={cancellation.refundMethodBody}
+                boxed
+                testID="cancel-confirmed-refund"
               />
             </View>
 
-            <PromptBlock
-              title={cancellation.bookAgainTitle}
-              titleVariant="titleRebook"
-              testID="cancel-book-again"
-            />
+            {/* `289:6838` — the prompt sits 10pt above its two buttons. */}
+            <View style={styles.confirmedBottom}>
+              <PromptBlock
+                title={cancellation.bookAgainTitle}
+                titleVariant="titleRebook"
+                testID="cancel-book-again"
+              />
 
-            <View style={styles.bookAgain}>
-              <Button
-                label={cancellation.bookAgainNoLabel}
-                onPress={() => onBookAgain(false)}
-                variant="secondary"
-                size="bar"
-                fullWidth={false}
-                style={[styles.bookAgainButton, styles.declineOutline]}
-                testID="cancel-book-again-no"
-              />
-              <Button
-                label={cancellation.bookAgainYesLabel}
-                onPress={() => onBookAgain(true)}
-                variant="bright"
-                size="bar"
-                fullWidth={false}
-                style={styles.bookAgainButton}
-                testID="cancel-book-again-yes"
-              />
+              <View style={styles.bookAgain}>
+                <Button
+                  label={cancellation.bookAgainNoLabel}
+                  onPress={() => onBookAgain(false)}
+                  variant="secondary"
+                  size="bar"
+                  fullWidth={false}
+                  style={[styles.bookAgainButton, styles.declineOutline]}
+                  testID="cancel-book-again-no"
+                />
+                <Button
+                  label={cancellation.bookAgainYesLabel}
+                  onPress={() => onBookAgain(true)}
+                  variant="bright"
+                  size="bar"
+                  fullWidth={false}
+                  style={styles.bookAgainButton}
+                  testID="cancel-book-again-yes"
+                />
+              </View>
             </View>
           </View>
         );
@@ -347,8 +371,18 @@ const styles = StyleSheet.create({
   },
   /** `6:15` — 16pt between blocks. */
   step: { gap: lightTheme.space.lg },
+  /** `6:16` in v4 — the table and the two notices sit **8pt** apart, not 12. */
+  policyGroup: { gap: lightTheme.space.sm },
   /** `115:2715` — the confirmation step stacks 23pt apart. */
-  stepConfirmed: { gap: 23 },
+  /**
+   * `115:2704` — two blocks: `115:2715` at the top and `289:6838` near the bottom, with the
+   * sheet's spare height between them rather than a drawn gap.
+   */
+  stepConfirmed: { flex: 1, justifyContent: 'space-between', gap: 23 },
+  /** `115:2715` — hero, then the destination box, 12pt apart. */
+  confirmedTop: { gap: lightTheme.space.md },
+  /** `289:6838` — the prompt 10pt above the Yes / No pair. */
+  confirmedBottom: { gap: lightTheme.space.s10 },
   /** `104:2273` — white, 24pt radius, 15.889pt padding, `0 0 1 rgba(0,0,0,0.15)`. */
   card: {
     alignSelf: 'stretch',
@@ -389,28 +423,20 @@ const styles = StyleSheet.create({
   },
   /** `104:2386` — `#FFDE33` rather than the policy step's `#FFD600`. */
   softCancel: { backgroundColor: lightTheme.colors.borderCtaSoft },
-  /** `115:2737` — white, 1pt `#E2E8F0`, 16pt radius, 11.889pt padding, 11pt gap. */
-  refundCard: {
-    alignSelf: 'stretch',
-    justifyContent: 'center',
-    gap: 11,
-    padding: 11.889,
-    borderRadius: lightTheme.radius.md,
-    borderWidth: lightTheme.stroke.thin,
-    borderColor: lightTheme.colors.borderField,
-    backgroundColor: lightTheme.colors.surface,
-  },
-  /** `115:2731` — 6pt of lead-in above the amount. */
-  refundTotalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: lightTheme.space.md,
-    paddingTop: lightTheme.space.s6,
-  },
+  /*
+   * `refundCard` / `refundTotalRow` are GONE. They wrapped a refund-amount row on the confirmed
+   * step, but `115:2704` draws only the hero and `289:6827`'s destination box there — the amount
+   * is itemised on `104:2336`, which is the step that exists to show it. The destination row now
+   * carries its own `boxed` geometry (`RefundDestinationRow`), so no wrapper is needed.
+   */
   /** `115:2814` — two 162 × 34 buttons, 10pt apart. */
   bookAgain: { flexDirection: 'row', gap: lightTheme.space.s10 },
-  bookAgainButton: { flex: 1, maxWidth: 162 },
+  /**
+   * `115:2810` / `115:2805` — the pair SPLITS the block evenly (158 + 10 + 158 = its 326 track),
+   * so they stretch with the column. The old `maxWidth: 162` was the reference width read as a
+   * cap, and left 27pt of dead space on the right at 393dp.
+   */
+  bookAgainButton: { flex: 1 },
   /** `115:2810` — outlined in `#FFDE33`. */
   declineOutline: { borderColor: lightTheme.colors.borderCtaSoft },
 });

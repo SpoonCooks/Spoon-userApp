@@ -34,14 +34,18 @@ export interface DishViewModel {
 
 /**
  * Trust indicators. Optional and independently rendered: the audit warns that every sample card
- * happens to show all three, which is NOT evidence that every cook has all three. `onTime` in
- * particular must never be hardcoded true.
+ * happens to show all three, which is NOT evidence that every cook has all three. None of them
+ * may be hardcoded true.
+ *
+ * `289:7616` REPLACED the third badge: the clock ("On-time") is gone and the row now reads
+ * Spoon Trained · Background Verified · **Hygienic**.
+ *
  * TODO(backend-contract): field names and whether these are booleans or qualitative grades.
  */
 export interface CookBadgesViewModel {
   readonly spoonTrained?: boolean;
   readonly backgroundVerified?: boolean;
-  readonly onTime?: boolean;
+  readonly hygienic?: boolean;
 }
 
 export interface CookViewModel {

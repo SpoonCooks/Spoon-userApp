@@ -36,13 +36,34 @@ describe('Instant sheet — available (1:728)', () => {
     render(
       <InstantSheet
         visible
+        instant={{ ...DEMO_INSTANT_AVAILABLE, ctaLabel: 'Book NOW • ₹198' }}
+        selectedDurationId="dur-30"
+        {...actions}
+      />,
+    );
+
+    expect(screen.getByText('Book NOW • ₹198')).toBeTruthy();
+  });
+
+  /**
+   * The unpriced state. `1:728` draws a selection, so the frame has an amount; the app opens with
+   * none, and until a quote exists the CTA must not state one. The superseded build rendered the
+   * fixture's "₹198" to every customer before they had chosen anything.
+   */
+  it('states no amount before a duration has been priced', () => {
+    render(
+      <InstantSheet
+        visible
         instant={DEMO_INSTANT_AVAILABLE}
         selectedDurationId={null}
         {...actions}
       />,
     );
 
-    expect(screen.getByText('Book Now • ₹198')).toBeTruthy();
+    // Scoped to the CTA: the duration TILES legitimately carry prices, and those are the
+    // server's per-option amounts. What must not appear is a total for a selection nobody made.
+    expect(screen.getByTestId('instant-sheet-book').props.accessibilityLabel).toBe('Book NOW');
+    expect(screen.queryByText(/Book NOW • /)).toBeNull();
   });
 
   it('selects a duration and books through the callbacks', () => {
@@ -95,7 +116,7 @@ describe('Instant sheet — taxes dialog above the sheet (25:1585)', () => {
     expect(screen.getByText('What is Taxes?')).toBeTruthy();
     expect(screen.getByTestId('instant-sheet-dialog-layer')).toBeTruthy();
     // The sheet stays mounted behind it, hidden from assistive tech.
-    expect(screen.getByText('Book Now • ₹198', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByText('Book NOW', { includeHiddenElements: true })).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('info-dialog-close'));
     expect(screen.queryByText('What is Taxes?')).toBeNull();
@@ -131,7 +152,9 @@ describe('Instant sheet — blocked states (25:1327 / 44:5378)', () => {
       />,
     );
 
-    expect(screen.getByText('Sorry, all sold out!')).toBeTruthy();
+    // `44:5378` — the finalized frame's own copy, and the same yellow CTA the moon state carries.
+    expect(screen.getByText('Instant slots are unavailable, but schedule ones are!')).toBeTruthy();
+    expect(screen.getByText('Schedule NOW')).toBeTruthy();
   });
 
   it('makes the duration grid inert and hides it from assistive tech while blocked', () => {
@@ -167,5 +190,129 @@ describe('Instant sheet — blocked states (25:1327 / 44:5378)', () => {
     );
 
     expect(screen.queryByTestId('instant-sheet-payment-details')).toBeNull();
+  });
+});
+
+/**
+ * `1:728` draws the sheet with a duration already selected, so the frame never shows the state
+ * the app opens in. The CTA must not be live there — the host refuses a booking with no duration,
+ * and a control that reacts to touch and does nothing is the defect this closes. `275:4488` draws
+ * the same case on Scheduled as a greyed-out "Book Now".
+ */
+describe('Book NOW is gated on a chosen duration', () => {
+  it('is disabled until a duration is selected', () => {
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_AVAILABLE}
+        selectedDurationId={null}
+        onSelectDuration={jest.fn()}
+        onClose={jest.fn()}
+        onBook={jest.fn()}
+        onSchedule={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('instant-sheet-book').props.accessibilityState.disabled).toBe(true);
+  });
+
+  it('becomes live once one is', () => {
+    const onBook = jest.fn();
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_AVAILABLE}
+        selectedDurationId={DEMO_INSTANT_AVAILABLE.durations[0]?.id ?? null}
+        onSelectDuration={jest.fn()}
+        onClose={jest.fn()}
+        onBook={onBook}
+        onSchedule={jest.fn()}
+      />,
+    );
+
+    const cta = screen.getByTestId('instant-sheet-book');
+    expect(cta.props.accessibilityState.disabled).toBe(false);
+    fireEvent.press(cta);
+    expect(onBook).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * A tapped tile is not a bookable booking (task section E). The route answers for the account's
+   * address and for the server QUOTE that puts the amount on the bar; until it does, the CTA
+   * stays in `275:4690`'s grey - which is also what stops "Book NOW" from ever being live while
+   * it carries no price.
+   */
+  it('stays disabled on a chosen duration the host has no server authority for', () => {
+    const onBook = jest.fn();
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_AVAILABLE}
+        selectedDurationId={DEMO_INSTANT_AVAILABLE.durations[0]?.id ?? null}
+        {...actions}
+        onBook={onBook}
+        canBook={false}
+      />,
+    );
+
+    const cta = screen.getByTestId('instant-sheet-book');
+    expect(cta.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(cta);
+    expect(onBook).not.toHaveBeenCalled();
+  });
+
+  it('presses through to nothing while no duration is selected', () => {
+    const onBook = jest.fn();
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_AVAILABLE}
+        selectedDurationId={null}
+        {...actions}
+        onBook={onBook}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('instant-sheet-book'));
+    expect(onBook).not.toHaveBeenCalled();
+  });
+
+  /** One tap, one chargeable booking (task section K). */
+  it('refuses a second press while the booking call is in flight', () => {
+    const onBook = jest.fn();
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_AVAILABLE}
+        selectedDurationId={DEMO_INSTANT_AVAILABLE.durations[0]?.id ?? null}
+        {...actions}
+        onBook={onBook}
+        submitting
+      />,
+    );
+
+    const cta = screen.getByTestId('instant-sheet-book');
+    expect(cta.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(cta);
+    fireEvent.press(cta);
+    expect(onBook).not.toHaveBeenCalled();
+  });
+
+  /** `44:5378` swaps the bar for "Schedule NOW", which is a navigation CTA and stays live. */
+  it('leaves the Schedule fallback live while Instant itself is unavailable', () => {
+    const onSchedule = jest.fn();
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_NO_SLOTS}
+        selectedDurationId={null}
+        {...actions}
+        onSchedule={onSchedule}
+        canBook={false}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('instant-sheet-schedule'));
+    expect(onSchedule).toHaveBeenCalledTimes(1);
   });
 });

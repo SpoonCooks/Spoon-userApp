@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react-native
 import { ready } from '@core/data';
 
 import { DEMO_HOME_ACTIVE_BOOKING, DEMO_HOME_PRE_BOOKING } from '@/demo/fixtures/home';
+import { homeFrom } from '../adapters';
 import { HomeView } from './HomeScreen';
 
 /** Collects `testID`s in render order so section ORDER can be asserted without a snapshot. */
@@ -64,21 +65,26 @@ describe('Home — pre-booking variant (Page 3a, 1:455)', () => {
   });
 });
 
-describe('Home — upcoming-booking variant (Page 3b, 209:1207)', () => {
-  it('renders the upcoming-booking card with the server date and duration', () => {
+describe('Home — active-booking variant (`381:511`, Home WITH a banner)', () => {
+  it('renders the active-booking card with the server copy', () => {
     render(<HomeView state={ready(DEMO_HOME_ACTIVE_BOOKING)} {...actions} />);
 
-    expect(screen.getByTestId('home-upcoming-booking')).toBeTruthy();
-    expect(screen.getByText('Upcoming booking')).toBeTruthy();
-    expect(screen.getByText('Tomorrow, Aug 5')).toBeTruthy();
-    // "60 mins" also appears as a duration-matrix row, so scope to the card.
-    expect(within(screen.getByTestId('home-upcoming-booking')).getByText('60 mins')).toBeTruthy();
+    const card = within(screen.getByTestId('home-upcoming-booking'));
+    // `337:4284` — the title and the caption come from ONE variant. The fixture is `arriving`,
+    // so the title is "Arriving"; asserting "Live booking" here alongside "Arriving in" asked
+    // for a card `homeBannerFor` can never build, since `live` draws the "Time left" caption.
+    expect(card.getByText('Arriving')).toBeTruthy();
+    expect(card.getByText('Tomorrow, Aug 5')).toBeTruthy();
+    expect(card.getByText('1:15 PM • 1 hr')).toBeTruthy();
+    expect(card.getByText('Cook Rekha')).toBeTruthy();
+    expect(card.getByText('Arriving in')).toBeTruthy();
+    expect(card.getByText('12 mins')).toBeTruthy();
   });
 
   it('KEEPS every Page 3a section — Page 3b is Page 3a PLUS the card, never instead of it', () => {
     render(<HomeView state={ready(DEMO_HOME_ACTIVE_BOOKING)} {...actions} />);
 
-    // The ruling: inserting the card must not remove any normal Home content.
+    // `381:511` is `1:455` PLUS the banner: inserting the card removes no Home content.
     for (const id of [
       'home-header',
       'home-promo',
@@ -95,14 +101,14 @@ describe('Home — upcoming-booking variant (Page 3b, 209:1207)', () => {
     }
   });
 
-  it('inserts the card BETWEEN the promo carousel and the booking tiles', () => {
+  it('inserts the card BELOW the booking tiles, where `333:3835` puts it', () => {
     const tree = render(<HomeView state={ready(DEMO_HOME_ACTIVE_BOOKING)} {...actions} />);
 
-    // `209:1226` orders the body: promo (y 22) → upcoming (y 287) → tiles (y 431.59).
+    // `333:3835` orders the body: tiles (y 16) → active banner (y 186) → mosaic (y 356).
     const order = testIdOrder(tree.toJSON());
-    expect(order.indexOf('home-promo')).toBeLessThan(order.indexOf('home-upcoming-booking'));
-    expect(order.indexOf('home-upcoming-booking')).toBeLessThan(order.indexOf('home-tiles'));
-    expect(order.indexOf('home-tiles')).toBeLessThan(order.indexOf('home-cuisines'));
+    expect(order.indexOf('home-promo')).toBeLessThan(order.indexOf('home-tiles'));
+    expect(order.indexOf('home-tiles')).toBeLessThan(order.indexOf('home-upcoming-booking'));
+    expect(order.indexOf('home-upcoming-booking')).toBeLessThan(order.indexOf('home-cuisines'));
   });
 
   it('opens the active booking by pressing the card itself', () => {
@@ -151,5 +157,79 @@ describe('Home — navigation and states', () => {
 
     fireEvent.press(screen.getByTestId('error-state-retry'));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * FE-6 — a customer with no saved address must never be shown the fixture's address.
+ *
+ * Observed on a real device: a freshly created account with ZERO addresses in the database
+ * rendered "Home / E102, Purva Skydale, Silver Count…" — the demo fixture's address — because
+ * the composer only wrote the real values when it had them, leaving the STATIC screen
+ * definition's value in place otherwise. These pin the fix at both ends: the composer emits
+ * null, and the banner draws a prompt rather than someone else's address.
+ */
+describe('Home — no saved address (FE-6)', () => {
+  it('composes a null address rather than inheriting the static definition', () => {
+    const composed = homeFrom({
+      base: DEMO_HOME_ACTIVE_BOOKING,
+      addressLabel: null,
+      addressLine: null,
+    });
+
+    expect(composed.header.addressLabel).toBeNull();
+    expect(composed.header.addressLine).toBeNull();
+  });
+
+  it('never renders the fixture address for an account that has none', () => {
+    render(
+      <HomeView
+        state={ready(
+          homeFrom({ base: DEMO_HOME_ACTIVE_BOOKING, addressLabel: null, addressLine: null }),
+        )}
+        {...actions}
+      />,
+    );
+
+    // Read off the fixture so the assertion tracks it: the point is that whatever the STATIC
+    // screen definition carries must not reach a customer who has no address of their own.
+    expect(screen.queryByText(String(DEMO_HOME_ACTIVE_BOOKING.header.addressLine))).toBeNull();
+    expect(screen.queryByText(String(DEMO_HOME_ACTIVE_BOOKING.header.addressLabel))).toBeNull();
+  });
+
+  it('draws the address prompt in the same lockup, still opening the address flow', () => {
+    render(
+      <HomeView
+        state={ready(
+          homeFrom({ base: DEMO_HOME_ACTIVE_BOOKING, addressLabel: null, addressLine: null }),
+        )}
+        {...actions}
+      />,
+    );
+
+    expect(screen.getByText('Add address')).toBeTruthy();
+    expect(screen.getByText('Set your delivery location')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('home-address'));
+    expect(actions.onPressAddress).toHaveBeenCalled();
+  });
+
+  it('still renders the real address when the customer has one', () => {
+    render(
+      <HomeView
+        state={ready(
+          homeFrom({
+            base: DEMO_HOME_ACTIVE_BOOKING,
+            addressLabel: 'Work',
+            addressLine: '4th Floor, Prestige Tech Park',
+          }),
+        )}
+        {...actions}
+      />,
+    );
+
+    expect(screen.getByText('Work')).toBeTruthy();
+    expect(screen.getByText('4th Floor, Prestige Tech Park')).toBeTruthy();
+    expect(screen.queryByText('Add address')).toBeNull();
   });
 });

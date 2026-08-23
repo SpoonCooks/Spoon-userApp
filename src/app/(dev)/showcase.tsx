@@ -28,10 +28,9 @@ import {
   Text,
   lightTheme,
 } from '@ui';
-import type { RatingValue } from '@ui';
-import { UpcomingBookingCard } from '@features/home';
+import type { RatingSelection } from '@ui';
+import { HomeBookingBanner } from '@features/home';
 import {
-  DEMO_BOOKING_ACTIVE,
   DEMO_BOOKING_COMPLETED,
   DEMO_BOOKING_UNFULFILLED,
   DEMO_DURATION_OPTIONS,
@@ -39,9 +38,18 @@ import {
   DEMO_SLOT_OPTIONS,
 } from '@/demo/fixtures/bookings';
 import {
+  DEMO_ACTIVE_BOOKING_ARRIVED,
+  DEMO_ACTIVE_BOOKING_ARRIVING,
+  DEMO_ACTIVE_BOOKING_CANCELLED,
+  DEMO_ACTIVE_BOOKING_CONFIRMED,
+  DEMO_ACTIVE_BOOKING_RATE,
+  DEMO_ACTIVE_BOOKING_REASSIGNED,
+  DEMO_ACTIVE_BOOKING_TIME_LEFT,
+} from '@/demo/fixtures/home';
+import {
   DEMO_COOK_MINIMAL,
   DEMO_COOK_PARTIAL_BADGES,
-  DEMO_COOK_REKHA,
+  DEMO_COOK_PROFILES,
 } from '@/demo/fixtures/cooks';
 
 /**
@@ -55,7 +63,7 @@ import {
  * which is the Instant-sheet + taxes-popup requirement from the audit.
  */
 export default function ShowcaseRoute() {
-  const [rating, setRating] = useState<RatingValue | null>(4.5);
+  const [rating, setRating] = useState<RatingSelection | null>(4.5);
   const [duration, setDuration] = useState<string | null>('dur-90');
   const [slot, setSlot] = useState<string | null>('slot-0630');
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -147,14 +155,20 @@ export default function ShowcaseRoute() {
         </View>
       </Section>
 
-      <Section title="Cook card">
-        <CookCard cook={DEMO_COOK_REKHA} onCallCook={noop} testID="showcase-cook-standard" />
-        <CookCard
-          cook={DEMO_COOK_REKHA}
-          variant="pureVeg"
-          onCallCook={noop}
-          testID="showcase-cook-pureveg"
-        />
+      {/* All eight frames of the finalized "Cook profiles" section (`289:8515`), in its order. */}
+      <Section title="Cook profiles">
+        {DEMO_COOK_PROFILES.map((profile) => (
+          <CookCard
+            key={`${profile.cook.id}-${profile.variant}`}
+            cook={profile.cook}
+            variant={profile.variant}
+            onCallCook={noop}
+            testID={`showcase-cook-${profile.cook.firstName.toLowerCase()}-${profile.variant}`}
+          />
+        ))}
+      </Section>
+
+      <Section title="Cook card — degraded payloads">
         <CookCard cook={DEMO_COOK_PARTIAL_BADGES} testID="showcase-cook-partial" />
         <CookCard cook={DEMO_COOK_MINIMAL} testID="showcase-cook-minimal" />
       </Section>
@@ -163,7 +177,20 @@ export default function ShowcaseRoute() {
         <BookingCard booking={DEMO_BOOKING_COMPLETED} onPress={noop} />
         <BookingCard booking={DEMO_BOOKING_UNFULFILLED} />
         <BookingCard booking={DEMO_REFUND_PROCESSING} variant="refund" />
-        <UpcomingBookingCard booking={DEMO_BOOKING_ACTIVE} onOpen={noop} />
+      </Section>
+
+      <Section title="Home active booking">
+        <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_CONFIRMED} onOpen={noop} />
+        <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_REASSIGNED} onOpen={noop} />
+        <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_ARRIVING} onOpen={noop} />
+        <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_ARRIVED} onOpen={noop} />
+        <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_TIME_LEFT} onOpen={noop} />
+        <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_CANCELLED} onOpen={noop} />
+        <HomeBookingBanner
+          booking={DEMO_ACTIVE_BOOKING_RATE}
+          onOpen={noop}
+          onRate={(value: RatingSelection) => setRating(value)}
+        />
       </Section>
 
       <Section title="Rating">
@@ -194,7 +221,12 @@ export default function ShowcaseRoute() {
 
       <Section title="Navigation">
         <View style={styles.row}>
-          <NavTile title="My orders" subtitle="View order history" icon="clock" onPress={noop} />
+          <NavTile
+            title="My bookings"
+            subtitle="View booking history"
+            icon="clock"
+            onPress={noop}
+          />
           <NavTile title="Addresses" subtitle="View or add addresses" icon="pin" onPress={noop} />
         </View>
         <Card tone="surface">
@@ -228,7 +260,7 @@ export default function ShowcaseRoute() {
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
         title="Instant"
-        footer={<Button label="Book Now • ₹198" onPress={noop} />}
+        footer={<Button label="Book NOW • ₹198" onPress={noop} />}
         {...(dialogOpen
           ? {
               dialog: (

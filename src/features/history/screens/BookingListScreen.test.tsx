@@ -26,11 +26,21 @@ describe('Booking history (6:227)', () => {
     expect(screen.getByTestId('booking-list-screen-empty')).toBeTruthy();
   });
 
-  it('renders the DESIGNED loading state (71:747), not a generic skeleton (task §13)', () => {
+  /**
+   * LOADING RULE, reversed for V8 (task §13 / §25).
+   *
+   * This used to assert the opposite — that the branded `71:747` interstitial was rendered here.
+   * The founder's rule is now that the ONE global loading screen belongs to the app opening, and
+   * Profile -> My bookings is exactly the "normal navigation" it must not appear on. A list that
+   * is loading gets the SKELETON of the list, which is scoped, silent and shaped like what is
+   * coming.
+   */
+  it('renders a scoped skeleton, never the branded interstitial (task §13)', () => {
     render(<BookingListView state={{ status: 'loading' }} {...props} />);
 
-    expect(screen.getByTestId('intro-loading')).toBeTruthy();
-    expect(screen.getByText('Best cooks in town!')).toBeTruthy();
+    expect(screen.queryByTestId('intro-loading')).toBeNull();
+    expect(screen.queryByText('Best cooks in town!')).toBeNull();
+    expect(screen.getByTestId('loading-card-0')).toBeTruthy();
     // The list and its header only exist once the payload does.
     expect(screen.queryByText('Past bookings')).toBeNull();
   });

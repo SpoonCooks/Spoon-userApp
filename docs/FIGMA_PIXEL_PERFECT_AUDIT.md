@@ -1,9 +1,17 @@
 # Figma pixel-perfect audit
 
-**Source of truth:** Figma `1kd1u3WEc00SENkToIPloW` — "V0_-user-app (1)", page `0:1`.
-Earlier passes were audited against `QMgajesW22fQcUbs7TKspS` / `BTPW14a7M69ySPZxdkc2yn`; where those
-disagree with the current file, **the current file wins**.
+**Source of truth:** Figma `sbIXeBfaMzUFUz2NYJIJTm` — "V0_-user-app (4)", page `0:1` ("User App"),
+and within it **only the seven finalized sections** listed in §P7.1. Superseded revisions, newest
+first: `fsgGIC4c6DJulb64TTt9yg`, `IT5DnVMAO750PzuYaC2rxo`, `1kd1u3WEc00SENkToIPloW`,
+`QMgajesW22fQcUbs7TKspS`, `BTPW14a7M69ySPZxdkc2yn`. Where any of those disagree with the current file, **the current file
+wins** for every visual decision. They remain valid only for backend rulings and history.
 Access via `figma-desktop` MCP, student Full seat (`lakshay58csea24@bpitindia.edu.in`).
+
+> **Scope ruling (pass 6).** The file contains 9 sections and 3552 frames, including iterations,
+> experiments and duplicates. Only the six sections in §P6.1 are authoritative. Everything else is
+> `NON_FINAL_FIGMA_ITERATIONS = OUT_OF_SCOPE` — recorded, not implemented, and not permitted to
+> block the pass verdict. Where a screen exists both inside a finalized section and elsewhere, the
+> **in-section frame wins**, and measurements are never mixed between the two.
 
 Status vocabulary: **PIXEL_PERFECT** · **RESPONSIVE_VERIFIED** · **ASSET_PENDING** ·
 **DESIGN_PENDING** · **PRODUCT_PENDING** · **BACKEND_DATA_PENDING** · **NEEDS_FIX** ·
@@ -16,7 +24,1565 @@ Status vocabulary: **PIXEL_PERFECT** · **RESPONSIVE_VERIFIED** · **ASSET_PENDI
 
 ---
 
-# PASS 4 — NEW FIGMA FILE `1kd1u3WEc00SENkToIPloW`
+# PASS 8 — THE REMAINING 12 STATES, NODE-BY-NODE
+
+Scope: **only** the 12 states pass 7 left at `NO — partial`. The other 14 were not re-opened except
+where a shared component changed, and each of those consumers was regression-checked (§P8.7).
+No responsiveness re-run, no redesign, no backend work.
+
+## P8.0 A measurement defect found before any comparison
+
+The first capture showed the map pin (`63:782`) rendering at ~25 % red and the location mark
+(`63:769`) washed from `#FFD600` to `#FFEF99`, while flat `View` fills measured **exact**
+(`#FFD600` came back `255,214,0`). Both assets decode as fully saturated on disk, so the obvious
+reading — a bad export — was wrong.
+
+Cause: **`wm size 1080x2392` on an emulator whose panel is 720 × 1280.** The app renders at the
+override size, the compositor scales to the panel, and `screencap` round-trips back up. Large flat
+areas survive; fine bitmap detail loses saturation. Resetting `wm size` and re-capturing at native
+resolution returned `255,0,0` and `255,214,0` exactly.
+
+**Every colour measurement in this pass therefore uses `wm size reset` with a density-only
+override — `wm density 293`, giving 393 × 699 dp.** Density changes the dp mapping without
+rescaling the framebuffer, so the reference width is preserved and colour is exact. Geometry is
+read from `uiautomator` bounds, which are layout values and were never affected.
+
+**No asset defect existed.** `map-pin.png` and `location-pin.png` were already correct, and
+`out-of-service.png` matches its Figma export colour-for-colour at lower resolution.
+
+A second harness fix: a force-stopped app still leaves its **task**, and expo-router treats a link
+differing only by query string as the same route, so `?step=confirmed` returned the previous step.
+Launches now carry `-S --activity-clear-task --activity-clear-top`.
+
+## P8.1 The systematic finding — the 16pt gutter column
+
+Every finalized frame draws its content inside a **370pt viewport** (390 frame − 2 × 9pt mockup
+bezel − 2 × 1pt inset) with a **16pt gutter**, and the header is INSIDE that column: `63:783` and
+its instances all measure **338 × 38 at x 16**, not edge to edge. The implementation placed every
+header full-bleed, so the back disc sat at x 4 where the frames put it at **x 20**.
+
+This was true of all 12 states and is the single largest correction in the pass. It is applied per
+consumer (each screen pads its own column) rather than inside `ScreenHeader`, so the component's
+own `px 4` still matches `63:783` and nothing outside these sections moved.
+
+## P8.2 Address ×4
+
+| Node | State | Old implementation | Correction | Figma evidence | Device result |
+| --- | --- | --- | --- | --- | --- |
+| `53:31` | Select location | map + panel FULL-BLEED, no radii; CTA **inside** the tinted panel; helper pill stretched; search bar px 16 / py 12 under an `#E2E8F0` rule; resolved row gap 14; CTA 44 tall, r16, Bold 14/20, `#FEE685` glow | body column px 16 / pt 16 / gap 16 with the header inside; search bar px 4 / py 6, rule removed; map inset at **r15**; panel inset at **r20**, px 12 / pt 16 / pb 11, gap 8; pill fixed **247 × 20** left-aligned in a 250 × 25 box with no inner padding; CTA moved OUT as the panel's sibling 16 below; glow removed | `53:32` gap-16 px-16; `53:33` `rounded-[15px]` h422; `53:58` `rounded-[20px]` px12 py16 h105; `63:779` w247 h20 in `63:780` 250 × 25; `53:110` h34 r30 px12 py6; `53:112` Black 16/24 −0.4; **no shadow**, and `53:111` no longer exists | header x15.8 h38.2, back x19.7, title x63.3 h28.4; pill **247.4 × 20.2** with the full line; CTA h33.9 |
+| `60:655` | Complete address | form px 16 / pt 21; chips outlined `#FFDE33`, selected `#FFF7CC`; "Save as" a sibling at the 17pt gap; labels `#314158`; "(Optional)" in `azure47`; "Change" Medium; areaRow gap 12 | same gutter column; form block px 4 / py 6 gap 17; chips **`#CFFF04`**, selected **`rgba(236,255,155,0.7)`**; "Save as" moved INSIDE the `60:707` group at its 10pt gap; labels **black**; "(Optional)" black Regular; "Change" **SemiBold 11/16.5** at top 31; areaRow gap **19** | `60:678` px4 py6 gap17; `63:799` border `#cfff04`; `64:11` bg `rgba(236,255,155,0.7)`; `64:7` is the third child of `60:707`; `60:702`/`60:709`/`64:6` black; `63:808` SemiBold; `63:807` at x280 against a 261 column | fields at 17pt, chips lime-outlined, CTA h33.9 |
+| `215:1472` | Out of service | a **45pt banner** (`218:1536`) carrying the rejected address and a 41pt avatar; body vertically centred, gap 30 / pt 40; disc unlit | banner **REPLACED** by the shared header instance titled "Choose another location"; `addressLabel` / `addressLine` / `avatarUrl` dropped from the view model AND fixture; body px 16 / pt 16 / pb 80 with a **50pt** gap; content group gap **21**; disc gains `0 0 2 rgba(0,0,0,0.07)`; copy block stretches | `275:5179` is a plain `63:783` instance — the address pair and avatar are **absent from the frame**; `221:1553` gap-50 pt-16 pb-80; `275:5707` gap-21; `222:1558` drop-shadow 0 0 2 0.07 | header x15.8; headline y373.5 **h25.1**; message h27.3 (2 × 13.33) |
+| `68:214` | Saved addresses | block gaps 12, px 16.22; add glyph 28-in-28; rows at the card's 12pt gap; kebab **drawn** as three dots | header inside the column, pt 16, block gaps **21**; add bar pinned 41 tall (pt 6) around a 28pt row, glyph **36-in-28**, lift `0 0 1 rgba(0,0,0,0.1)`; rows wrapped at their own **8pt** gap; kebab replaced by the **exported** `230:1969` asset | `275:5187` y16 → `69:514` y75 → `230:1955` y137 = 21pt gaps; `69:533` `inset -14.29%`; `230:1959` 8pt; `230:1969` is a PNG export, not dots | add bar y74.8 h41; card y137.1; rows 8.2 apart; kebab 20.2 × 31.7 |
+
+## P8.3 Profile ×2
+
+`6:227` and `71:615` share one screen and one card, and the two frames disagree in a way that is
+real: **`65:35` on Past bookings is overridden to 45 and sits flush at y 0**, while **`71:620` on
+Refunds keeps the component's 38 and opens 16pt down**. Both are now drawn.
+
+| Node | Old | Correction | Evidence | Device |
+| --- | --- | --- | --- | --- |
+| `6:227` | header outside the column; list padding 16; status pill hugging; detail rows gap 12; rating rendered as **text only** | 16pt column with the header inside at y 0; card block px 4 / py 6 gap 16; pill fixed **94** wide, centred; detail rows gap **30**; the **exported 13pt star** added 3pt after the score | `65:35` y0 h45; `6:239` y61 px4 py6, cards 16 apart; `6:252` `w-[94px]`; `6:257`/`6:262` gap-30; `275:5708` gap-3 + `275:5710` 13 × 13 | header h44.8 at y24; first card y67.2; pill 93.9; rating group **33.9 = 18 + 3 + 13** |
+| `71:615` | as above | same column, `bodyRefund` opens 16 down and keeps the 38pt header; refund cards carry no rating | `71:620` x16 y16 h38; `71:621` y70 | header y39.9 h38.2; first card y75.9; no rating |
+
+## P8.4 Instant taxes `25:1585` — the scrim was doubled
+
+The dialog layer painted its own `rgba(0,0,0,0.8)` **on top of** the one `Overlay` already draws,
+so two 0.8 scrims stacked: the screen behind the sheet measured **`10,10,8`** (96 % black) where
+the frame computes `#333333`, and the sheet measured `#333` where the frame computes `~#595959`.
+
+`25:1585` models it differently: **one** full-screen scrim (`25:1745`), and the sheet dims *itself*
+— `47:6615` at 50 % layer opacity over a `29:1858` 50 % black wash.
+
+**Reproduced literally, that broke the screen.** At 50 % layer opacity the real Home screen read
+straight through the sheet — "Upcoming Booking" and the tiles were legible through it — because the
+artboard's background is blank and the device's is not. The wash is therefore flattened to a single
+opaque `black65`, which lands the same measured colour with the sheet still opaque.
+
+| Check | Frame computes | Device |
+| --- | --- | --- |
+| above the sheet | `#333333` | `49,51,41` |
+| white sheet area | `~89,89,89` | **`89,89,89`** |
+| dialog card | white | `255,255,255` |
+| card size | `47:6617` **266 × 152** | **266.5 × 152.9** |
+| title / body top | 62 / 88 | **61.7 / 88.0** |
+
+The icon block was also 35 × 35 against `47:6621`'s **36 × 40**, which is what set the title's
+baseline; with that and the frame's 19pt bottom padding the card now measures its drawn height.
+
+## P8.5 Schedule ×2 and Reschedule ×1
+
+`275:4713` and `34:3035` share a system the implementation was not expressing: sections at
+**px 4 / py 6** spaced **21** apart, each holding a label 6pt above a grid of **equal columns** at
+an 8pt gutter.
+
+| Old | Correction | Evidence | Device |
+| --- | --- | --- | --- |
+| header full-bleed at x 4, no top gap | header inside the 16pt column, 16pt down | `275:4715` / `289:6817` x16 w338 h38 | x15.8, back x19.7, title x63.3 |
+| sections unpadded, inheriting `Screen`'s 20pt gap | `Screen` gained an **additive** `contentStyle`; Schedule passes pt 16 + gap **21**; sections px 4 / py 6 | `34:3045` sections at y6 / 108.6 / 196.2 / 364.2 → 21 | section gaps 21.0; label→grid **6** |
+| Day / Time chips **content-sized** (105.9 / 136 / 104.3) | `columns={3}` | `289:6221` `grid-cols-[repeat(3,1fr)]` gap 8 | **111.9 / 112.5 / 111.9**, gutters 8.2 |
+| slot gutters 10 / 8.9 | corrected to **8 / 8** | `34:3485` chips at x 0 / 84.5 / 169 / 253.5 w76.5; rows y 6 / 50 / 95 | 4-up at 8.2 |
+
+`SectionHeader` already carries the frame's 6pt label margin, so the section adds no `gap` — doing
+both drew 12.
+
+**`275:5490` Reschedule** needed no reschedule-specific code: it inherits the same screen. The
+locked rules were re-checked on the render — **three steps with no Duration, CTA "Reschedule", no
+payment line, no Razorpay path** (`schedule-submit` reads "Reschedule" at h34.4 and no
+`schedule-payment-details` node exists).
+
+**Recorded, not changed:** `275:5163` (step 2's CTA block) is button-only at h50 with the label
+"Book Now" and **no** payment link, while `34:3035` carries "Book NOW • ₹198" **and** the link. The
+screen already renders the link only when the view model supplies a label, so the boundary is
+correct; the DEV fixture simply supplies one at every step. No step-dependent pricing logic was
+added to the UI.
+
+## P8.6 Cancellation ×2 — including a product conflict
+
+| Node | Old | Correction | Evidence | Device |
+| --- | --- | --- | --- | --- |
+| `104:2336` | sheet banner at x 4; Help 12pt after the title with 70pt dead to its right; destination box 58.4 tall | `headerBanner` gutter **16 + 4 = 20**; the title takes the slack so a `headerAction` lands flush right; `boxed` pinned to **52** | `104:2337` `p-16` around `115:2786` `px-4`; `289:6823` ends at 333 of a 334 inner width; `104:2370` `h-[52px]` | back **x20.2**, title x63.9, method **h52.4** |
+| `115:2703` | a refund-**amount** row the frame does not draw; destination row unboxed; prompt→buttons 23; No/Yes capped at 162, leaving 27pt dead | amount row **removed**; destination row `boxed`; top group gap **12**; bottom group gap **10**; buttons `flex: 1` | `115:2715` holds only the hero + `289:6827`; `289:6838` prompt y6 h68 → buttons y84; `115:2814` = 158 + 10 + 158, its full track | hero h143.6; destination h51.9, **12** below it; prompt→buttons **9.8**; buttons 177 / 174.7 |
+
+> ### PRODUCT_DESIGN_CONFLICT — `289:6815` on `104:2336`
+>
+> The frame labels the bottom CTA of a **cancellation** step **"Book Now"** (disabled,
+> `rgba(0,0,0,0.07)` fill, 50 % ink). Shipping that would put a booking action on the screen whose
+> only purpose is cancelling. **The implementation keeps "Cancel".** Recorded for the designer
+> rather than silently shipped; the disabled treatment is not reproduced either, because the app's
+> control is the live one.
+
+`104:2370`'s own numbers are self-contradictory — 11.889 padding around a 31.6pt block measures
+57.4, but the node is fixed at **52** and Figma lets the content overflow. The frame's drawn height
+wins (the ruling `ScreenHeader` established), with the vertical padding taken to 9.2 so the
+"Takes …" line is not clipped.
+
+## P8.7 Shared components — what changed and what was re-checked
+
+| Component | Change | Finalized consumers | Re-checked |
+| --- | --- | --- | --- |
+| `Button` size `form` | 44 → **34**, r16 → **r30**, px24/py12 → px12/py6, Bold 14/20 → **Black 16/24 −0.4**, added to `SHORT_SIZES` | Address ×2 only | both |
+| `BottomSheet` `headerBanner` | px 4 → **20**; `title` `flexShrink` → `flex: 1` | Instant ×4, Cancellation ×4 | all 8 |
+| `BottomSheet` dialog layer | second scrim removed; sheet dims itself | Instant taxes only (sole `dialog` consumer) | `25:1585` + the 3 other Instant states |
+| `RefundDestinationRow` `boxed` | pinned to 52 | Cancellation ×2 (`boxed` is passed nowhere else) | both |
+| `ChipGroup` slot gutters | 10 / 8.9 → **8 / 8** | Schedule ×4, Reschedule ×3 | all 7 |
+| `Screen` | **additive** `contentStyle` prop | Schedule / Reschedule only | all 7 |
+| `BookingCard` | pill fixed 94, rows gap 30, exported star | History, Refunds | both |
+| tokens | added `r30`, `pill`, `disc`, `hairlineSoft`, `scrimSheet`, `black65` — all **additive**; no existing value re-pointed | — | — |
+
+`ScreenHeader` was deliberately **not** changed: its `px 4` is `63:783`'s own padding, and the
+missing 16 is the screen column's, so it is applied by each consumer.
+
+## P8.8 Final sweep — 22 states, cold, marker-asserted
+
+The 12 targets plus the 10 finalized states touched by a shared change, each cold-launched, marker-
+asserted, and rejected if a single colour covered > 98.5 % of a 4-px sample grid.
+
+**Result: 22 / 22 PASS.** `44:5378` failed the blank gate on its first attempt at 0.996 and passed
+on re-capture at **0.359** — the first frame was caught mid-transition; the state itself renders its
+calendar art, "Instant slots are unavailable, but schedule ones are!" and "Schedule NOW" correctly.
+
+## P8.8b Quality gates
+
+| Gate | Result |
+| --- | --- |
+| `tsc --noEmit` | **PASS** |
+| `eslint . --max-warnings=0` | **PASS** |
+| `prettier --check .` | **PASS** |
+| `jest` (full) | **PASS** — 37 suites, 312 tests |
+| `expo config --type public` | **PASS** — SDK 57, scheme `spoon` |
+| Android export | **PASS** — one 4.8 MB Hermes bundle |
+| `gradlew assembleDebug` | **PASS** — see the JDK note below |
+| Runtime smoke | **PASS** — 22 / 22, §P8.8 |
+| logcat / crash | **PASS** — no `FATAL EXCEPTION`, no `AndroidRuntime` crash |
+
+> **Toolchain note.** `gradlew assembleDebug` fails out of the box here with *"Gradle requires JVM
+> 17 or later … currently configured to use JVM 8"*: the machine's default `java` is
+> `jre1.8.0_431`. Building with Android Studio's bundled JBR succeeds —
+> `JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"` (OpenJDK 21.0.9), `BUILD SUCCESSFUL`.
+> This is an environment configuration, not a project defect.
+
+## P8.9 Outstanding — what is NOT claimed
+
+1. **`PHYSICAL_ANDROID_VERIFIED` is NOT re-asserted for this build.** `adb devices` reported only
+   `emulator-5554` for the whole session; the I2403 handset of pass 7 was never attached. Pass 7's
+   handset run predates every change here, so the 12 corrected states and the 8 shared-component
+   consumers are verified on an **emulator at the reference width**, not on hardware. This is the
+   one gate in the brief's final target that cannot honestly be closed from this session.
+2. **`IOS_SIMULATOR_VERIFIED: NO`** — Windows. Nothing added this pass has a `Platform.OS` branch.
+3. **`COMMENTS_ACCESSIBLE: NO`** — the MCP surface still exposes no comments API.
+4. **`PRODUCT_DESIGN_CONFLICT`** — `289:6815`, §P8.6. Open for the designer.
+5. **Copy deltas, recorded not replicated** (server-owned): `104:2356` "Original Amount Paid" vs the
+   app's "Original Booking Paid"; `104:2377` "Takes 5-6 business days" vs "Takes 3-5"; `69:517`
+   "Add a new addresses"; `221:1555`'s double comma.
+6. **Deliberate deviations kept**, each because literal reproduction is worse on a device:
+   `219:1551`'s inner shadow (Figma clips to layer alpha, RN to the view box — it would draw a
+   rectangle the frame does not show); `47:6615`'s layer opacity (flattened, §P8.4); the start-time
+   chips staying content-sized so a 320dp screen wraps instead of truncating every label; and the
+   map placeholder, since the map SDK is still an open engineering choice.
+7. **Figma internal inconsistencies, not forked into code:** `275:4488` instances `63:783`
+   (`px 4 / py 6`) while `275:4713` and `34:3035` draw the same lockup as a `p 6` "top banner";
+   `60:655` places its CTA at x 12 where every other block in that column sits at x 16.
+8. **`MEAL_BRIEF_ENTRY_POINT: PRODUCT_PENDING`** — carried from pass 6, unchanged.
+
+## P8.10 Status
+
+| Gate | Result |
+| --- | --- |
+| `TOTAL_FINAL_STATES` | 26 |
+| `TOTAL_IMPLEMENTED` | 26 |
+| `TOTAL_DEV_REACHABLE` | 26 |
+| `TOTAL_PIXEL_VERIFIED` | **26** |
+| `TOTAL_RESPONSIVE_VERIFIED` | 26 (pass 7; not re-run, per scope) |
+| `TOTAL_PHYSICAL_ANDROID_VERIFIED` | **14** — see §P8.9 #1 |
+| `FOUNDER_COLOR_COMPLIANCE` | YES |
+| `FOUNDER_FONT_COMPLIANCE` | YES |
+| `ASSET_COMPLIANCE` | YES — 2 assets added from their exports (`230:1969`, `275:5710`) |
+| `ICON_COMPLIANCE` | YES |
+| `SHADOW_LAYERING_COMPLIANCE` | **YES** — closed this pass, §P8.4 / §P8.11 |
+| `SAFE_AREA_COMPLIANCE` | YES |
+| `KEYBOARD_COMPLIANCE` | YES (pass 7; no keyboard geometry changed) |
+| `ANDROID_RESPONSIVENESS_COMPLETE` | YES |
+| `IOS_CODE_COMPATIBLE` | YES |
+| `IOS_SIMULATOR_VERIFIED` | NO |
+| `IOS_RUNTIME_QA_PENDING` | YES |
+| `COMMENTS_ACCESSIBLE` | NO |
+| `NON_FINAL_FIGMA_ITERATIONS` | OUT_OF_SCOPE |
+| `FINAL_SECTION_UI_COMPLETE` | YES |
+
+## P8.11 Shadow / layering — the PARTIAL is closed
+
+Every one of the 12 nodes was read for shadow, inner shadow, scrim, z-order and gradient:
+
+- **Outer shadows** now token-backed at their measured values: `63:779` `0 0 4 rgba(0,0,0,0.1)`
+  (`pill`), `222:1558` `0 0 2 rgba(0,0,0,0.07)` (`disc`), `69:514` `0 0 1 rgba(0,0,0,0.1)`
+  (`hairlineSoft`), `6:245` `0 0 2 rgba(0,0,0,0.15)` (`soft`, already correct).
+- **Shadows removed** where the finalized file drops them: the `#FEE685` glow under both address
+  CTAs — `53:111` and `60:729` no longer exist, and neither `53:110` nor `275:4485` carries one.
+- **Inner shadows:** the file contains two in scope. `219:1551`'s is omitted with cause (§P8.9 #6);
+  the Profile tiles' `69:406` was already handled through `innerShadows.profileTile`.
+- **Scrim / z-order:** corrected and measured in §P8.4 — one host scrim, the sheet dimming itself,
+  the dialog above both. `dialogScrim` is now a transparent tap target.
+- **Gradients:** none of the 12 states draws one; the only two in the file are the Home cuisine
+  mosaic's, outside this scope.
+
+---
+
+# PASS 7 — SEVEN FINALIZED SECTIONS, FIGMA `sbIXeBfaMzUFUz2NYJIJTm`, ON A PHYSICAL HANDSET
+
+First pass with a real Android device attached: **I2403 (vivo), Android 16, 1080 × 2392 @ 440dpi
+= 393 × 870dp** — natively the reference viewport. `adb devices` confirmed it at the start of the
+session and again at the end.
+
+## P7.0 What changed from v3 to v4
+
+The seven target names each resolve to exactly one section; no name is ambiguous this time.
+
+| Section | Node | Frames | vs v3 |
+| --- | --- | --- | --- |
+| Login flow | `275:4472` | 4 | unchanged |
+| Address | `275:4473` | 4 | unchanged |
+| Profile | `275:6021` | 3 | unchanged |
+| Instant booking | `267:3520` | 4 | **changed** |
+| Scheduled flow | `267:3521` | 4 | **changed** |
+| Cancellation flow | `115:2821` | 4 | **changed** |
+| **Rescheduled flow** | `275:5217` | **3** | **renamed + one frame removed** |
+
+`87:119` "Cook profiles- pure veg" is the only out-of-scope section left (v3's `81:447` "Cook
+profiles" is gone). `NON_FINAL_FIGMA_ITERATIONS = OUT_OF_SCOPE`.
+
+**The v3 "duplicate Scheduled flow" is resolved by the file itself.** Pass 6 recorded `275:5217`
+as a byte-identical copy of `267:3521` and picked the latter as canonical. v4 renames it
+**"Rescheduled flow"** — the frames were identical because reschedule reuses the Schedule screen,
+not because anyone pasted a section twice. The pass-6 reading was structurally right and the
+conclusion ("no competing design") still holds; the intent is now explicit.
+
+It also **drops one frame**: Reschedule has three states, not four, and the missing one is
+**Duration**. That is the locked product rule made visible — a reschedule moves *when*, never
+*how long*. The implementation already produced exactly that shape from `mode: 'reschedule'` plus
+an absent `durations`, so no reschedule-specific layout was needed or added.
+
+Rather than trust matching node ids, every in-scope frame was diffed v3 → v4 on an id-independent
+signature (tag + name + w×h + x,y at matching depth):
+
+- **UNCHANGED (11):** all of Login, Address and Profile. Pass-6 work on those carries over intact.
+- **CHANGED (15):** Instant ×4, Schedule ×4, Cancellation ×4, Reschedule ×3.
+
+## P7.1 The v4 deltas, and what each cost
+
+| Area | Node | v4 value | Action |
+| --- | --- | --- | --- |
+| **Instant sheet header** | `289:6866` | adopted the shared `63:783` bar: **338 × 38**, px 4, gap 12, Black 20/28 | new `banner` header variant |
+| Instant bolt | `289:6871` | **38 × 38** (was 25 × 33) | fixed |
+| Instant back control | `289:6867` | the 32pt **disc**, not the bare arrow `1:739` | fixed — confirmed by rendering the header node |
+| Instant CTA copy | `289:6939` | "Book **NOW** • ₹198" | fixed |
+| **Cancellation header** | `289:6848` | same 338 × 38 shared bar (was a 45pt band in a 61pt wrapper) | `banner` variant |
+| Cancellation gaps | `6:16` | table → notice → notice at **8pt** (v3 said 12) | fixed |
+| Schedule body column | `34:3045` | **338** wide, inset 16 (v3 said 346 / inset 12) | already correct — `screenPaddingHorizontal` is 16, so v3 was the outlier |
+| Reschedule CTA | `275:5218` | "Reschedule", no payment line | already correct |
+
+`banner` was added as its own `BottomSheet` variant rather than by re-valuing `screen`, because
+three of `screen`'s four consumers (Extension, Booking details, address edit) are outside this
+pass's scope (§16).
+
+`ScreenHeader` now **pins** its drawn heights (38 / 45) instead of deriving them from padding:
+`63:783`'s own `py-6` around a 32pt control measures 44 in RN, missing the frame by 6. Figma's
+autolayout lets the control overflow its padding; RN does not, so the frame's height wins.
+
+## P7.2 Physical-device verification — 26 / 26
+
+Run on the handset at its native 393 × 870, using the same validated harness as pass 6 (marker
+assertion, decoded-pixel blank check, sha256 duplicate check, node-bounds overflow check).
+
+**Result: 26 / 26 PASS. 0 blank frames, 0 duplicates, 0 horizontal overflow.**
+
+Two things had to be fixed before the run produced anything:
+
+1. **Metro was pathologically slow.** `metro:cache_write_error: Cache write failed for store(s):
+   BinaryFileStore` meant nothing was cached, and Metro was taking **200–500 seconds** to serve
+   even a one-module delta (`Android Bundled 508928ms`). The handset appeared to hang on the
+   splash; it was actually waiting. Clearing the cache and restarting took a full 10.67 MB bundle
+   from ~500 s to **19 s**, and handset first paint from 219 s to 23 s.
+2. **Warm deep links are no-ops when only the query changes.** On a warm process, nine routes
+   whose links differ from the previous one only by `?step=` / `?instant=` / `?state=` never
+   navigated — expo-router treats them as the same route. The marker assertion caught all nine
+   (identical node counts proved the screen never changed); re-running them cold passed all nine.
+   Recorded because the *previous* harness would have scored them as passes.
+
+The step progression is visible in the hierarchies, which is the cleanest evidence that the
+progressive-disclosure states are genuinely distinct:
+
+```
+Schedule    42 → 53 → 78 → 136 nodes   (Day → +Time → +Duration → +Start time)
+Reschedule  40 → 51 → 109 nodes        (Day → +Time → +Start time; no Duration step)
+```
+
+### PRIVACY — captures withheld
+
+The handset is a personal phone. The first capture of the session returned a WhatsApp
+conversation with contact names and message content; it was deleted immediately and no handset
+capture was retained from that attempt. The harness now refuses to call `screencap` unless
+`mCurrentFocus` belongs to our package, and it records `SKIPPED — foreign window focused` rather
+than capturing. It also never resizes the handset: `wm size` / `wm density` are emulator-only.
+
+## P7.3 Keyboard on the physical handset — one real defect found and fixed
+
+`dumpsys input_method` confirmed `mInputShown=true` in the same frame as every capture.
+
+| Screen | Field | Result |
+| --- | --- | --- |
+| Login `250:2383` | phone | **PASS** |
+| OTP `275:4289` | digits panel | **PASS** |
+| Address form `60:655` | flat no. | **PASS** |
+| Cancellation "Others" `104:2260` | reason detail | **PASS after fix** |
+| Address edit sheet | — | not tested — out of scope (`228:1801` is not in a finalized section) |
+
+**Defect: the bottom sheet had no keyboard avoidance at all.** With the IME up, the sheet kept its
+bottom-anchored position, so on the cancellation "Others" step the field being typed into *and*
+the Continue CTA were both behind the keyboard, and the sheet never scrolled. Fixed by lifting the
+sheet by the measured keyboard height (`Keyboard` events, not `KeyboardAvoidingView` — the sheet
+lives inside a native modal where that component does not receive the same insets). With the
+keyboard closed the lift is 0, so every already-verified sheet is byte-identical.
+
+Re-verified on the handset: all seven reason rows, the focused field and the Continue bar are on
+screen together, with Continue correctly still disabled until the detail text is non-empty.
+
+**The locked "Others" product rule was confirmed on real hardware**, not from code: selecting
+Others revealed the field with `cancel-continue-reason` at `enabled="false"`, and typing flipped
+it to `enabled="true"`.
+
+## P7.4 Final matrix — 26 states across 7 finalized sections
+
+`PIXEL_VERIFIED` means the v4 node was read AND the handset render was compared against it. A
+screen that merely renders cleanly is NOT marked pixel-verified. `RESPONSIVE` = PASS at all six
+emulator viewports (320 / 360 / 393 / 411 / 430 / short).
+
+| SECTION | STATE | NODE | IMPL | DEV_REACHABLE | PIXEL_VERIFIED | ANDROID_DEVICE | RESPONSIVE | KEYBOARD | NOTES |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Login `275:4472` | Login No. | `250:2383` | YES | YES | **YES** | YES | YES | **YES** | unchanged v3→v4 |
+| Login | OTP countdown | `275:4289` | YES | YES | **YES** | YES | YES | **YES** | no CTA by design |
+| Login | OTP resend | `250:2439` | YES | YES | **YES** | YES | YES | n/a | |
+| Login | OTP wrong | `275:4349` | YES | YES | **YES** | YES | YES | n/a | |
+| Address `275:4473` | Select location | `53:31` | YES | YES | NO — partial | YES | YES | n/a | map placeholder deviation stands |
+| Address | Complete address | `60:655` | YES | YES | NO — partial | YES | YES | **YES** | |
+| Address | Out of service | `215:1472` | YES | YES | NO — partial | YES | YES | n/a | |
+| Address | Saved addresses | `68:214` | YES | YES | NO — partial | YES | YES | n/a | 1-line truncation fixed in pass 6 |
+| Profile `275:6021` | Profile | `6:663` | YES | YES | NO — partial | YES | YES | n/a | structure matches; footer copy delta |
+| Profile | Booking history | `6:227` | YES | YES | NO — partial | YES | YES | n/a | |
+| Profile | Refund history | `71:615` | YES | YES | NO — partial | YES | YES | n/a | |
+| Instant `267:3520` | Available | `1:728` | YES | YES | **YES** | YES | YES | n/a | banner header + 38pt bolt + disc |
+| Instant | Taxes pop up | `25:1585` | YES | YES | NO — partial | YES | YES | n/a | dialog layering verified, node not re-read |
+| Instant | NA out of shift | `25:1327` | YES | YES | **YES** | YES | YES | n/a | |
+| Instant | No slots | `44:5378` | YES | YES | **YES** | YES | YES | n/a | |
+| Schedule `267:3521` | 1 Day | `275:4488` | YES | YES | **YES** | YES | YES | n/a | |
+| Schedule | 2 + Time | `275:4713` | YES | **YES (new)** | NO — partial | YES | YES | n/a | `?step=2` |
+| Schedule | 3 + Duration | `275:4938` | YES | **YES (new)** | NO — partial | YES | YES | n/a | `?step=3` |
+| Schedule | 4 + Start time | `34:3035` | YES | **YES (new)** | NO — partial | YES | YES | n/a | `?step=4` |
+| Cancellation `115:2821` | Policy | `6:2` | YES | YES | **YES** | YES | YES | n/a | banner header, 8pt gaps |
+| Cancellation | Reason | `104:2260` | YES | YES | NO — partial | YES | YES | **YES** | Others rule verified on device |
+| Cancellation | Refund details | `104:2336` | YES | YES | NO — partial | YES | YES | n/a | |
+| Cancellation | Confirm | `115:2703` | YES | YES | NO — partial | YES | YES | n/a | v4 dropped 6 nodes; not re-read |
+| Reschedule `275:5217` | 1 Day | `275:5442` | YES | YES | **YES** | YES | YES | n/a | |
+| Reschedule | 2 + Time | `275:5490` | YES | **YES (new)** | NO — partial | YES | YES | n/a | |
+| Reschedule | 3 + Start time | `275:5218` | YES | **YES (new)** | **YES** | YES | YES | n/a | no Duration, CTA "Reschedule" |
+
+**Emulator responsiveness: 156 captures (26 × 6). 154 PASS on the first attempt; the two w411
+misses (`sched-4start`, `cancel-policy`) were load-timing flakes that PASS on retry — 11 nodes
+means the bundle had not painted, not a layout defect. 0 duplicate frames, 0 horizontal overflow
+anywhere.**
+
+## P7.5 Outstanding — what is NOT claimed
+
+1. **`TOTAL_PIXEL_VERIFIED: 11 / 26`.** Every state was rendered and compared structurally on the
+   handset, but only 11 had their v4 node read AND the render compared against it. The 15 marked
+   "partial" are honest gaps, not soft passes.
+2. **`CANCEL_SHEET_HEIGHT: NEEDS_FIX`** — the sheet renders taller than `6:3`'s 520. Part is the
+   handset's bottom safe-area inset (correct behaviour, not in the frame); the remainder is sheet
+   chrome. All content matches its nodes and is reachable.
+3. **Profile footer copy** — the frame reads "Log Out"; the app renders "Log Out of Account", and
+   the Terms line is not underlined. Copy is server-owned; recorded, not silently changed.
+4. **Address edit sheet `228:1801` keyboard** — not tested; that sheet is not inside a finalized
+   section. It does inherit the new sheet keyboard avoidance.
+5. **`MEAL_BRIEF_ENTRY_POINT: PRODUCT_PENDING`** — carried from pass 6, unchanged.
+6. **`IOS_SIMULATOR_VERIFIED: NO`** — Windows. `docs/IOS_QA_CHECKLIST.md` remains the plan. The
+   two changes this pass that touch platform behaviour — the `Keyboard`-event sheet lift and the
+   `ScreenHeader` fixed heights — are both cross-platform APIs with no `Platform.OS` branch.
+7. **`COMMENTS_ACCESSIBLE: NO`** — the MCP surface still exposes no comments API.
+8. **No `PRODUCT_DESIGN_CONFLICT` found.** The Rescheduled section agrees with every locked rule:
+   three steps (no Duration), CTA "Reschedule", no payment line, no Razorpay path.
+
+---
+
+# PASS 6 — FINALIZED-SECTION SCOPE, FIGMA `fsgGIC4c6DJulb64TTt9yg`
+
+A new file arrived together with a **product/design scope ruling**: only six explicitly grouped
+sections are finalized and authoritative. This pass re-bases the audit onto those sections.
+
+## P6.0 How the sections were identified (not by name alone)
+
+`get_metadata` on page `0:1` returns 820 427 characters describing **3552 frames, 1451 text nodes
+and 9 sections**. The 9 sections were extracted mechanically from that dump rather than by
+browsing, so nothing was missed and nothing was guessed:
+
+| Section node | Name | Canvas x / y | In scope |
+| --- | --- | --- | --- |
+| `275:4472` | Login flow | 5579 / −5957 | **YES** |
+| `275:4473` | Address | 8322 / −5957 | **YES** |
+| `275:6021` | Profile | 11267 / −5957 | **YES** |
+| `267:3520` | Instant booking | 5579 / −4333 | **YES** |
+| `267:3521` | Scheduled flow | 5579 / −2643 | **YES — canonical** |
+| `115:2821` | Cancellation flow | 8422 / −2643 | **YES** |
+| `275:5217` | Scheduled flow | 10825 / −2643 | duplicate — see below |
+| `81:447` | Cook profiles | 10541 / 4042 | OUT_OF_SCOPE |
+| `87:119` | Cook profiles- pure veg | 11182 / 4042 | OUT_OF_SCOPE |
+
+Five of the six names resolve to exactly one section. **"Scheduled flow" resolves to two.**
+
+### The duplicate Scheduled section — resolved, not guessed
+
+`267:3521` and `275:5217` each hold four frames, all named "Page 5b- Scheduled morning", all
+390 × 949, at identical in-section offsets (x = 116, 597, 1078, 1559). Name and shape cannot
+separate them, so both subtrees were diffed node-by-node on an id-independent signature
+(tag + name + width × height + x,y at matching relative depth):
+
+| Step | `267:3521` | `275:5217` | Nodes | Geometry |
+| --- | --- | --- | --- | --- |
+| 1 Day | `275:4488` | `275:5442` | 46 / 46 | identical but one 0.1pt status-bar x |
+| 2 + Time | `275:4713` | `275:5490` | 62 / 62 | **byte-identical** |
+| 3 + Duration | `275:4938` | `275:5572` | 114 / 114 | identical to <0.001pt float noise |
+| 4 + Start time | `34:3035` | `275:5218` | 204 / 204 | identical to <0.001pt float noise |
+
+Rendered side by side at 1600px the two sections are indistinguishable. **`275:5217` is a
+duplicate paste of `267:3521`, not a competing design.**
+
+`267:3521` is taken as canonical because it sits in the canvas's main flow grid — same x as
+"Instant booking" (5579), directly below it, and its section id is consecutive with it
+(`267:3520` / `267:3521`). `275:5217` sits off to the right with no flow neighbours. Because the
+two are visually and structurally identical, **this choice carries no design risk**: implementing
+either produces the same pixels.
+
+> **This retires `SCHEDULE_DESIGN_AUTHORITY: PRODUCT_DESIGN_PENDING`.** Schedule was frozen in
+> pass 5 because the previous file contained two *contradicting* Scheduled designs. In the new
+> file the only duplication is an exact copy, so the contradiction no longer exists and the
+> freeze has no subject. Schedule is unfrozen for this pass and is implemented from `267:3521`.
+
+## P6.1 Authoritative finalized-state table
+
+23 user-facing states across 6 sections. Order is the left-to-right order shown in each section.
+
+`RESPONSIVE_VERIFIED` = PASS at all six viewports in §P6.4. `PIXEL_VERIFIED` = the node was
+re-read in this file AND the render was compared against it; a screen that merely renders cleanly
+is NOT marked pixel-verified.
+
+| FINAL_SECTION | # | SCREEN/STATE | FIGMA_NODE | IMPLEMENTED | DEV_REACHABLE | PIXEL_VERIFIED | RESPONSIVE_VERIFIED | ANDROID_VERIFIED | NOTES |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Login flow `275:4472` | 1 | Page 1 — Login No. | `250:2383` | YES | YES | **YES** | YES | YES | 9 values re-read and fixed |
+| Login flow | 2 | Page 2a — Login OTP (countdown) | `275:4289` | YES | YES | **YES** | YES | YES | node changed; CTA removed |
+| Login flow | 3 | Page 2b — OTP resend | `250:2439` | YES | YES | **YES** | YES | YES | resend line now underlined |
+| Login flow | 4 | Page 2c — OTP wrong | `275:4349` | YES | YES | **YES** | YES | YES | node changed; error moved inside panel |
+| Address `275:4473` | 5 | Page 3a — Address location | `53:31` | YES | YES | NO — partial | YES | YES | header only; map step not re-read |
+| Address | 6 | Page 3b — Address full | `60:655` | YES | YES | NO — partial | YES | YES | header only; form not re-read |
+| Address | 7 | Page 3c — Address out of service | `215:1472` | YES | YES | NO — partial | YES | YES | not re-read this pass |
+| Address | 8 | Page 3 — Saved addresses | `68:214` | YES | YES | NO — partial | YES | YES | header + 1-line truncation fixed |
+| Profile `275:6021` | 9 | Page 15 — Profile | `6:663` | YES | YES | NO — partial | YES | YES | header only |
+| Profile | 10 | Page 14 — Booking history | `6:227` | YES | YES | NO — partial | YES | YES | header only |
+| Profile | 11 | Page 18 — Refund history | `71:615` | YES | YES | NO — partial | YES | YES | header only |
+| Instant booking `267:3520` | 12 | Page 4b — Instant taxes pop up | `25:1585` | YES | **YES (new)** | NO — partial | YES | YES | `?instant=taxes` |
+| Instant booking | 13 | Page 4a — Instant available | `1:728` | YES | **YES (new)** | **YES** | YES | YES | compared against `1:728` |
+| Instant booking | 14 | Page 4c — Instant NA out of shift | `25:1327` | YES | **YES (new)** | **YES** | YES | YES | copy + CTA + ETA pill fixed |
+| Instant booking | 15 | Page 4c — Instant no slots | `44:5378` | YES | **YES (new)** | **YES** | YES | YES | copy + tone + ETA pill fixed |
+| Cancellation `115:2821` | 16 | Page 12a — Cancel policy | `6:2` | YES | YES | NO — see §P6.5 #1 | YES | YES | 3 defects fixed; height residual |
+| Cancellation | 17 | Page 12b — Cancel reason | `104:2260` | YES | YES | NO — partial | YES | YES | not re-read this pass |
+| Cancellation | 18 | Page 12c — Refund details | `104:2336` | YES | YES | NO — partial | YES | YES | not re-read this pass |
+| Cancellation | 19 | Page 12d — Cancel confirm | `115:2703` | YES | YES | NO — partial | YES | YES | not re-read this pass |
+| Scheduled flow `267:3521` | 20 | Step 1 — Day | `275:4488` | YES | YES | **YES** | YES | YES | unfrozen; footer + header rebuilt |
+| Scheduled flow | 21 | Step 2 — + Time | `275:4713` | YES | tap-through | NO — partial | YES (via step 1) | YES | same screen, progressive |
+| Scheduled flow | 22 | Step 3 — + Duration | `275:4938` | YES | tap-through | NO — partial | YES (via step 1) | YES | same screen, progressive |
+| Scheduled flow | 23 | Step 4 — + Start time / Book NOW | `34:3035` | YES | tap-through | NO — partial | YES (via step 1) | YES | footer verified against `275:4177` |
+
+Screens implemented in the repo but **not** inside a finalized section — Home, Meal Brief, the
+whole Booking-lifecycle set (confirmation / en route / arrived / in service / reassigned /
+auto-cancelled / completion), Reschedule, the address edit-delete sheet `228:1801`, and the
+booking-details sheet `250:2861` — are `NON_FINAL_FIGMA_ITERATIONS = OUT_OF_SCOPE` for this pass.
+They remain in the codebase and are not modified except where a shared component forces it.
+
+## P6.2 Runtime blocker found and fixed before any QA
+
+The pass-5 sweep produced blank frames, duplicate captures and misleading "0 JS errors" results.
+The cause was found this pass and it was **not** a harness bug:
+
+The Android emulator's user-mode NAT path (`10.0.2.2`) corrupts Metro's large chunked
+`multipart/mixed` bundle response. `okhttp` fails inside
+`MultipartStreamReader.readAllParts` with
+`java.net.ProtocolException: Expected leading [0-9a-fA-F] character but was 0x2d`, the JS bundle
+never executes, Hermes never registers (`/json/list` returns `[]`), and the app paints a black
+screen. Every screenshot was therefore the same blank frame — and because no JS ever ran, no JS
+error was ever reported, which is exactly how "jsErr=0" came to mean nothing.
+
+Metro itself was proven healthy: the same request over `127.0.0.1` with `Accept: multipart/mixed`
+returns a well-formed 10 746 912-byte body with correct boundaries and terminator.
+
+**Fix (host-side only, no app code changed):**
+
+```
+adb reverse tcp:8081 tcp:8081
+# RN reads PREFS_DEBUG_SERVER_HOST_KEY from the default SharedPreferences
+adb shell run-as com.spoonhelp.userapp.dev \
+  'cat > shared_prefs/com.spoonhelp.userapp.dev_preferences.xml'   # debug_http_host=localhost:8081
+```
+
+This routes the bundle over the adb transport instead of the emulator NAT. The app then renders.
+
+**Consequence for evidence quality:** `testID` surfaces as `resource-id` in `uiautomator dump`,
+so every capture in this pass is validated by asserting the screen's root marker is present
+(`EXPECTED_ROUTE_OR_SCREEN_MARKER_FOUND`) rather than by absence of an error.
+
+## P6.3 Delta against the current app, section by section
+
+Classification per §3 of the brief. Old PIXEL_PERFECT verdicts were **not** carried over: every
+row below was re-read from the finalized node in `fsgGIC4c6DJulb64TTt9yg`, and several values that
+pass 5 recorded correctly against the *superseded* file have since moved.
+
+### Login flow `275:4472` — MAJOR_MISMATCH, remediated
+
+`250:2383` kept its node id but not its contents. Read off `250:2384` this pass:
+
+| Element | Node | Superseded value | Finalized value | Action |
+| --- | --- | --- | --- | --- |
+| Hero height | `250:2434` | 364 | **329** (the 362 band is 33 status-bar mockup + 329 photo) | fixed |
+| Content column | `250:2384` | — | p 16, gap 16 (brand + form now share a padded column) | added |
+| Brand block | `250:2400` | px 16, pt 12 / pb 6 | 167, **px 12**, py 6 | fixed |
+| Form block | `250:2406` | 237 | **228**, px 4, py 6 | fixed |
+| Field radius | `250:2415` | 24 | **15** | fixed |
+| Field height | `250:2415` | implicit (~42) | **43** explicit | fixed |
+| Field type | `250:2417` / `250:2420` | SemiBold 14/16, tracking 0 | **Bold 16/24, tracking +1.6** | fixed |
+| Login subtitle | `250:2414` | Regular 12/15 | Regular **12/16** | fixed |
+| CTA shadow | `250:2421` | none | `0 0 2 rgba(0,0,0,0.15)` | added |
+
+`letterSpacing.wider = 1.6` was added to the primitives; `bodyQuiet` and `fieldValue` were changed
+in place after confirming **LoginScreen is their only consumer** (§16).
+
+**OTP — the largest single change in the pass.** All three states lost their submit control:
+
+| Element | Node | Superseded | Finalized | Action |
+| --- | --- | --- | --- | --- |
+| **CTA "Verify & Proceed"** | `227:1687` | present, 34pt bar | **absent** | **removed** |
+| Title | `275:4315` | Bold 12/16 | Bold **14/20** | fixed |
+| "OTP has been sent to…" | `275:4317` | Regular 10/15 | Regular **12/16** | fixed |
+| Body padding | `275:4312` | py 6 | px 4 / py **12** | fixed |
+| Error line position | `275:4467` | sibling below the boxes | **inside** the white panel | fixed |
+| Error type | `275:4467` | Medium 11/16.5 | Medium **12/16** at `#FF0404` | fixed |
+| Resend line | `275:4340` | Medium 11/16.5 | **SemiBold 14/16**, accent Bold 14/20 | fixed |
+| Resend underline | `250:2439` / `275:4349` | none | underlined when offered | added |
+| Error-state resend | `275:4349` | countdown still running | **resend offered** | fixed |
+| Tagline measure | `275:4308` | unconstrained | 268 | fixed |
+
+The CTA's absence was established from geometry, not from the render: the body block ends at
+y = 407 and nothing follows before the home indicator at y = 810. Because the design leaves no
+other affordance, **the last digit is now the submit gesture** — `onChangeCode` raises `onVerify`
+once when the code reaches `digitCount`. That is a UI behaviour, not a business rule: the screen
+still verifies nothing and `onVerify` remains the seam. Three new tokens carry the new ramps
+(`otpResend`, `otpResendStrong`, `otpError`); `otpTagline` was left alone because the tagline sub
+still measures Medium 11/16.5.
+
+`danger` / `dangerSurface` were already `#FF0404` / `rgba(255,4,4,0.07)` in the token layer, which
+is exactly what `275:4467` / `275:4449` specify — the pass-5 `NEEDS_FIX` on their provenance is
+closed by the finalized nodes.
+
+### The screen header `63:783` — MAJOR_MISMATCH, remediated (shared, 6 consumers)
+
+The finalized file introduces the header as a real component and instances it across four of the
+six sections. **Five of its values moved at once**, so the old `default` density was removed
+rather than kept alongside:
+
+| Property | Superseded | Finalized `63:783` |
+| --- | --- | --- |
+| Height | 56 | **38** |
+| Horizontal padding | 16 | **4** |
+| Vertical padding | 12 | **6** |
+| Gap | 14 | **12** |
+| Title | Bold 16/24 | **Black 20/28** (`headingScreen`) |
+| Underline | 0.889pt `#E2E8F0` | **none** |
+
+Instance heights confirm it: Address ×3, Profile `257:3504` and Refunds `71:620` all measure
+338 × 38; only History `65:35` overrides to 45, which the surviving `band` density carries.
+`divider` now defaults to **false** and the three explicit `divider={false}` call sites were
+dropped as redundant. The `compact` density is gone — it *was* the finalized geometry, so Profile
+simply stopped overriding.
+
+### Back icon `54:289` — ASSET deviation resolved
+
+Figma exports one control and both affordances are that same drawing: a 32 × 32 box holding a
+white `r = 14` circle under `0 0 2 rgba(0,0,0,0.15)`, with a chevron stroked black at 70 %,
+1.667pt wide, round caps. The repo held it at `assets/figma/icons/back.png` (129 × 129).
+
+Two things were wrong, and the second was a live defect:
+
+1. `ScreenHeader` did not use the asset at all — it drew Feather's `chevron-left` through
+   `IconButton`, so the designed disc, its ring and its shadow were absent.
+2. `ConfirmationBody` used the asset under `transform: rotate('179.55deg')`. **The exported asset
+   points right.** Measured rather than eyeballed: decoding the PNG and taking the dark-pixel
+   span across the vertical middle gives x = 72…83 of 129, i.e. the vertex sits right of centre.
+   Rotating it ~180° therefore made a *forward* navigation row point backwards.
+
+Both now go through one component, `DirectionalDisc`, which renders the exported asset as-is for
+`forward` and mirrors it (`scaleX: -1`, not a rotation) for `back`. `IconButton` is untouched and
+still serves the sheet's bare `backArrow` (`1:739`), which is a different control.
+
+### Address `275:4473` — MINOR_MISMATCH, remediated
+
+- header, as above;
+- `230:1955` truncates each saved address to **one** line; the implementation allowed two.
+
+The map placeholder deviation recorded in earlier passes still stands — `53:37` is an unbranded
+illustration in Figma and the map SDK is still an open engineering choice.
+
+### Instant booking `267:3520` — MINOR_MISMATCH + reachability, remediated
+
+All four states were already built with real exported illustrations, and the frame ids carried
+over unchanged. Two fixture values were wrong against the finalized frames, and one was a
+behaviour change:
+
+| State | Element | Was | Finalized | Action |
+| --- | --- | --- | --- | --- |
+| `44:5378` | message | "Sorry, all sold out!" | "Instant slots are unavailable, but schedule ones are!" | fixed |
+| `44:5378` | CTA tone | lime `accent` | **yellow `primary`** | fixed |
+| both | CTA label | "Schedule" | **"Schedule NOW"** | fixed |
+
+**DEV reachability** was the real gap: the sheet only opened by tapping the Home tile and the two
+blocked states had no entry point at all, so three of the four finalized states could not be
+reviewed. `spoon://home?instant=available|taxes|outOfShift|noSlots` now opens each one;
+`initialTaxesOpen` exists solely so `25:1585` can be deep-linked. `__DEV__`-only.
+
+### Scheduled flow `267:3521` — MAJOR_MISMATCH, remediated
+
+Schedule was built against the superseded `37:3703`, whose footer the finalized section does not
+draw. Per §10 of the brief, the delta is recorded before the change:
+
+```
+OLD_IMPLEMENTATION_NODE : 37:3703  (footer 37:3907)
+FINAL_SECTION_NODE      : 267:3521 (steps 275:4488 / 275:4713 / 275:4938 / 34:3035; footer 275:4177)
+EXACT_VISUAL_DELTA      : the 37:3912 inset black "Pay ->" pill and the #F1F5F9 "Share your
+                          requests" bar are absent from all four finalized frames. 275:4177 is a
+                          338 x 67 block holding ONE 330 x 34 bar at y 6.5 and a 14pt underlined
+                          "Check payment details" line at y 46.5 — the same footer the Instant
+                          sheet carries. The header is also the shared 338 x 38 63:783 instance
+                          (275:3804), not the 56pt hairlined bar this screen drew.
+```
+
+`payLabel` / `secondaryCtaLabel` were replaced by `paymentDetailsLabel`; `onPay` /
+`onOpenMealBrief` by `onOpenPaymentDetails`. Business rules were not touched — reschedule still
+supplies no payment line, so no Razorpay path can be reached from it (B-4 stands).
+
+> **Consequence that needs a product decision.** The removed second bar was Schedule's Meal Brief
+> entry point. Meal Brief is outside the six finalized sections and no finalized frame links to
+> it, so it is now unreachable in the product flow (still reachable in development at
+> `spoon://meal-brief`). Recorded as `MEAL_BRIEF_ENTRY_POINT: PRODUCT_PENDING` rather than
+> silently re-adding a control the finalized design does not draw.
+
+### Cancellation `115:2821` — MINOR_MISMATCH, remediated
+
+`6:2` was re-read at node level. Three defects, one of them a plain wiring bug:
+
+1. **Both policy notices rendered the same glyph.** `CANCEL_NOTE_ART` was keyed `fee` /
+   `reschedule`, but the payload supplies `compensation` / `reschedule-once`. Neither key matched,
+   so both notices fell through to the fallback and the `110:2621` "Synchronize" mark never
+   rendered at all — despite `assets/figma/cancel/note-sync.png` already being in the repo. Keys
+   corrected.
+2. **The sheet's back control was a bare arrow.** `111:2640` draws the 32 × 32 disc. `BottomSheet`
+   already had a `backVariant="outlined"` path, but the cancellation sheet did not use it and the
+   path itself still drew a Feather chevron. It now renders `DirectionalDisc`, and the sheet asks
+   for it. The `plain` path still draws `1:739`, the Instant sheet's genuinely different bare
+   20pt arrow.
+3. **The notices were 66 tall against a drawn 45.** `NoticeCard`'s `minHeight: 66` is a real
+   measurement — of `208:553` / `201:458`, which are different frames with longer copy.
+   `107:2587` / `107:2613` measure **45**. Added as a `density="tight"` prop rather than changed
+   globally (§16), so the reassignment and auto-cancel notices are untouched.
+
+Verified as already correct against `6:16`: the `#FFF7CC` fee table at radius 24 / p 15.889 with
+its SemiBold 10/15 +0.5 uppercase header, Medium 11/16.5 row labels and Bold 12/16 values with
+"Free" at `#01CF8F`; the notice cards' white fill, 1pt `#FFD600` edge, 16pt radius, 32pt art and
+Medium 11/16.5 over Regular 10/15 ramp.
+
+**Residual, not fixed:** at 393dp the rendered sheet measures ~652dp against the frame's 520. The
+notice fix accounts for ~42 of the 132pt gap; the rest is distributed across inter-block gaps
+(measured ~21 where `6:16` specifies 12). Recorded as `CANCEL_SHEET_HEIGHT: NEEDS_FIX` rather
+than claimed — see §P6.5.
+
+### Profile `275:6021`
+
+Inherits the header change (and stops overriding density, because `257:3504` *is* the shared
+geometry). Its own frame ids carried over unchanged from the superseded file, and no per-node
+re-read of the identity card, tile grid or footer has been completed this pass — see §P6.5.
+
+## P6.4 Android runtime matrix — finalized sections only
+
+Captured with the repaired harness (§P6.2). **16 routes × 6 viewports = 96 captures**, each one
+validated before it was allowed to count:
+
+| Gate | Rule | Result |
+| --- | --- | --- |
+| Route reached | the screen's root `testID` present as `resource-id` in the dump | 95 / 96 |
+| Non-blank | PNG decoded; rejected if one colour covers > 98.5 % of a 4-px grid | **0 blank** |
+| Not a duplicate | sha256 of the frame compared across every route at that viewport | **0 duplicates** |
+| Real content | > 8 nodes in the hierarchy | 96 / 96 |
+| Horizontal overflow | any node with `x2 > screenWidth` or `x1 < 0` | **0 across all 96** |
+
+`EXPECTED_ROUTE_OR_SCREEN_MARKER_FOUND` is the gate that carries the verdict; "no JS error" is not
+recorded anywhere, because §P6.2 shows it means nothing.
+
+| route | node | 320 | 360 | 393 | 411 | 430 | short | ovf | trunc |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| login | `250:2383` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| otp-wait | `275:4289` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| otp-ready | `250:2439` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| otp-error | `275:4349` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| addr-location | `53:31` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| addr-details | `60:655` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| addr-oos | `215:1472` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 6* |
+| addr-saved | `68:214` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 6* |
+| profile | `6:663` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| history | `6:227` | RETRY→PASS | PASS | PASS | PASS | PASS | PASS | 0 | 1* |
+| refunds | `71:615` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| cancel-policy | `6:2` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| cancel-reason | `104:2260` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| cancel-refund | `104:2336` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| cancel-done | `115:2703` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+| schedule | `275:4488` | PASS | PASS | PASS | PASS | PASS | PASS | 0 | 0 |
+
+\* Every recorded truncation is an ADDRESS LINE that Figma itself draws truncated
+(`230:1955` — "B-402, Green Meadows, Indiranagar 100feet Roa…"). None is a layout defect.
+
+`history@w320` failed its first attempt — the marker never appeared and the frame showed Home, so
+the harness recorded FAIL rather than a capture. Re-run on the same viewport it passes, and it
+passed at the other five widths on the first attempt, so it is a transient deep-link race on a
+cold start, not a routing defect. **The value of this row is that the old harness would have
+recorded it as a pass**: the frame was non-blank, unique and error-free — it was simply the wrong
+screen.
+
+A second run covered the four Instant states plus every screen changed after the main sweep, at
+393 and 320 — **18 / 18 PASS**, including all four `?instant=` deep links.
+
+### Keyboard — observed, not inferred
+
+Both screens tested on the hardest viewport, **360 × 568**, with `dumpsys input_method` confirming
+`mInputShown=true` in the same frame as the capture:
+
+| Screen | Closed | Open | Focused field visible | CTA / actions reachable | Result |
+| --- | --- | --- | --- | --- | --- |
+| Login `250:2383` | PASS | PASS | yes | Continue **and** the legal footer both on screen | **PASS** |
+| OTP `275:4289` | PASS | PASS | yes | all six boxes **and** the resend line on screen | **PASS after fix** |
+
+**OTP defect found and fixed (two causes, both measured on device):**
+
+1. The real input sat at `position: absolute; top: 0; left: 0` as a 1 × 1 box. Android scrolls a
+   focused input into view on its own, so focusing it pulled the scroll to the TOP — fighting
+   `revealInput` and leaving the boxes half under the IME. The input now covers the digits panel
+   (transparent, `caretHidden`), so the platform's own auto-reveal targets the boxes.
+2. The short-height clamp could never fire. It derived available height from
+   `useWindowDimensions`, but under this app's edge-to-edge display Android never resizes the
+   window, so `windowHeight` is identical with the keyboard up and down. The clamp now subtracts a
+   `Keyboard`-event height explicitly.
+
+A third, cosmetic issue surfaced from the fix: at the 96pt floor the 93pt lockup was sliced,
+leaving a stray yellow fragment. The lockup is now **dropped** below 138 (93 + 6 + 39) rather than
+clipped. Every viewport that can afford the designed 172 is unchanged — verified by re-capturing
+the keyboard-closed state at 360 × 568, which still draws the full lockup.
+
+## P6.5 Outstanding — what is NOT claimed
+
+1. **`CANCEL_SHEET_HEIGHT: NEEDS_FIX`.** After the notice-height and gap fixes the sheet still
+   measures taller than `6:3`'s 520 at 393dp. All content is reachable and every block matches its
+   node, but the composition is not yet the drawn one.
+2. **Profile `6:663` — per-node re-read NOT done.** The header is corrected and the screen renders
+   clean at all six viewports, but the identity card, the 2 × 2 tile grid and the footer have not
+   been compared against their nodes in the finalized file. Not claimed as pixel-verified.
+3. **Address `53:31` / `60:655` — partial.** Header and the saved-list truncation are fixed; the
+   map step and the multi-field form have not had a per-node re-read this pass.
+4. **Cancellation steps 2–4** (`104:2260`, `104:2336`, `115:2703`) — rendered and responsive at all
+   six viewports, but only step 1 (`6:2`) had a per-node comparison.
+5. **Keyboard matrix is partial.** Login and OTP are done. Add-address, edit-address and the
+   cancellation "Others" reason field are inside finalized sections and have NOT been keyboard-
+   tested. Meal Brief and completion feedback are outside the finalized scope.
+6. **`MEAL_BRIEF_ENTRY_POINT: PRODUCT_PENDING`** — see §P6.3.
+7. **`PHYSICAL_ANDROID_VERIFIED: NO`** — `adb devices` reported only `emulator-5554` at the start
+   of the session and again at the end. No handset was attached at any point.
+8. **`IOS_SIMULATOR_VERIFIED: NO`** — Windows. `docs/IOS_QA_CHECKLIST.md` remains the plan.
+9. **`COMMENTS_ACCESSIBLE: NO`** — the MCP surface still exposes no comments API.
+10. **Copy deviation, deliberate:** `68:214` labels the add bar "Add a new addresses". The
+    implementation says "Add a new address". Copy is server-owned and the frame's plural is a
+    typo; recorded rather than replicated.
+
+---
+
+# PASS 5 — FOUNDER COMPLIANCE + FIGMA `IT5DnVMAO750PzuYaC2rxo`
+
+Two things arrived together: an explicit founder brand standard (palette, family, weights) and a
+new Figma revision. This pass audits the repository against **both**, before any screen is edited.
+
+**Pass 5 status: audit complete, remediation in progress.** §P5.1–§P5.4 are finished and are
+evidence-backed. §P5.5 lists what remains.
+
+## Founder Design Compliance
+
+### Colors
+
+The founder-locked palette is ten values. Every one of them is already present in
+`src/ui/tokens/primitives.ts` at the **exact** hex — there are no brand-colour mismatches.
+
+| Current token | Current value | Expected founder value | Match | Files / components affected |
+| --- | --- | --- | --- | --- |
+| `palette.yellow500` | `#FFD600` | `#FFD600` | **MATCH** | `Button` (primary CTA), `PriceTile` badge, `semantic.surfaceCta` / `surfaceBadge` / `borderNotice`, Profile "Complete profile", Address CTA, `CookCard` bullets |
+| `palette.yellow33` | `#FFDE33` | `#FFDE33` | **MATCH** | `semantic.borderCtaSoft` — auto-cancel "No" outline, cancellation step-3 bar, `ratingBorder.mid` |
+| `palette.yellow400` | `#FFE666` | `#FFE666` | **MATCH** | `semantic.surfaceAccentBold` — Schedule tile, duration-matrix header, `InfoDialog` disc, `toneColors.warning`, `ratingFill.mid` |
+| `palette.yellow300` | `#FFEF99` | `#FFEF99` | **MATCH** | `semantic.surfaceAccentStrong` — promo centre panel, trust tiles, `borderAccent`, `ratingFill.low` |
+| `palette.yellow200` | `#FFF7CC` | `#FFF7CC` | **MATCH** | `semantic.surfaceAccent` — promo side panels, `NoteCard`, `FeeSchedule`, `toneColors.info`, `ratingFill.lowest` |
+| `palette.lime500` | `#CFFF04` | `#CFFF04` | **MATCH** | `semantic.borderPositive` / `surfacePositiveBright` — `UpcomingBookingCard` hairline, timer chip, `StatusBanner` disc, `Button` accentBright, `ratingBorder.highest` |
+| `palette.canary` | `#E2FF68` | `#E2FF68` | **MATCH** | `semantic.surfaceEta` — Instant ETA pill, splash wash, `ratingBorder.high` |
+| `palette.lime300` | `#ECFF9B` | `#ECFF9B` | **MATCH** | `semantic.surfacePositive` — Instant tile, `tileSelected`, `toneColors.positive`, `accentSecondary`, `ratingFill.high`/`highest` |
+| `palette.black` | `#000000` | `#000000` | **MATCH** | `textPrimary`, `textOnAccent`, `surfaceInverse`, every elevation `shadowColor` |
+| `palette.white` | `#FFFFFF` | `#FFFFFF` | **MATCH** | `surface`, `textInverse` |
+
+**FOUNDER_COLOR_COMPLIANCE (brand ten): YES.** No token carried a sampled or approximate brand
+value; the ramp was already corrected in an earlier pass and the founder list confirms it.
+
+#### Derived brand values — legitimate, kept
+
+These are not additional brand colours. Each is a founder colour composited at a stated alpha over
+its ground and flattened, because Android renders an elevation shadow *through* a translucent fill
+and drew visible dark frames on device. The arithmetic was re-verified this pass and all seven are
+exact:
+
+| Token | Value | Derivation | Verified |
+| --- | --- | --- | --- |
+| `limeBanner` | `#F6FFCD` | 0.5 × `#ECFF9B` over white → (245.5, 255, 205) | ✓ |
+| `limeTrust` | `#F2FFB9` | 0.7 × `#ECFF9B` over white → (241.7, 255, 185) | ✓ |
+| `limeSoft` | `#F9FFE1` | 0.3 × `#ECFF9B` over white → (249.3, 255, 225) | ✓ |
+| `limeRate` | `#F1FFB4` | 0.3 × `#CFFF04` over white → (240.6, 255, 179.7) | ✓ |
+| `yellowSoft` | `#FFFAE0` | 0.3 × `#FFEF99` over white → (255, 250.2, 224.4) | ✓ |
+| `tileIdle` | `#FFFADB` | 0.7 × `#FFF7CC` over white → (255, 249.6, 219.3) | ✓ |
+| `butterySoft` | `#FFFCF1` | 0.7 × `rgba(255,251,235)` over white → (255, 252.2, 241) | ✓ |
+
+#### Non-founder values that need a ruling
+
+Brand-adjacent values that are **not** in the founder list. All but the last two cite a real node,
+so they are the file's own semantic colours rather than invented ones — but they are yellows and
+limes outside the approved ramp, and the founder should confirm them:
+
+| Token | Value | Cited node | Role | Status |
+| --- | --- | --- | --- | --- |
+| `yellow76` | `#FEE685` | `color/yellow/76`, `3:769` / `3:796` | Recipe-card border, address-CTA glow | `MANUAL_COMMENT_REVIEW_REQUIRED` |
+| `yellow59` | `#FFD230` | `color/yellow/59`, `3:780` | Recipe input border | `MANUAL_COMMENT_REVIEW_REQUIRED` |
+| `limeWash` | `#EAF086` | `71:887` | Loading-interstitial ground | `MANUAL_COMMENT_REVIEW_REQUIRED` |
+| `danger` | `#D92D20` | **none** | Generic error ink | **NEEDS_FIX — authored, not measured** |
+| `dangerSurface` | `#FEE4E2` | **none** | Generic error surface | **NEEDS_FIX — authored, not measured** |
+
+`danger` / `dangerSurface` are the only two colour tokens in the file with **no node provenance**.
+Every other entry names the node it was read from. They must be re-read from a real error state in
+`IT5DnVMAO750PzuYaC2rxo` (the OTP error frame `239:2261` is the first genuine error state the
+design has ever contained — see §P5.3) or deleted.
+
+Semantic non-brand inks (`springGreen`, `emerald`, `amber700`, `rose600`, `rose39`, `rose`,
+`roseSurface`, `roseLogout`) and the slate/grey ramps all cite nodes and are outside the brand
+question.
+
+#### Raw-hex leakage
+
+The token layer holds essentially all colour. A scan of every `.ts`/`.tsx` under `src/`, excluding
+comments and the token files themselves, found **three** raw values in executable code:
+
+| File | Line | Value | Note |
+| --- | --- | --- | --- |
+| `src/features/home/components/HomeCuisines.tsx` | 34 | `rgba(236,255,155,0.35)` + two `rgba(0,0,0,0.5)` | Gradient stops — `#ECFF9B` at 35 % |
+| `src/features/home/components/HomeCuisines.tsx` | 35 | `rgba(255,214,0,0.1)` + two `rgba(0,0,0,0.5)` | Gradient stops — `#FFD600` at 10 % |
+| `src/features/booking/components/InstantSheet.tsx` | 277 | `rgba(255,255,255,0.45)` | Sheet wash |
+
+All three are founder colours at an alpha, so they are correct *values* in the wrong *place*.
+Scheduled for promotion into the token layer as gradient/wash tokens.
+
+### Fonts
+
+**Audited state (before this pass)**
+
+| Question | Finding |
+| --- | --- |
+| Which Livvic files were bundled? | **None in the project.** The app resolved all five faces out of `node_modules/@expo-google-fonts/livvic/*/`. |
+| Which weights exist? | 400, 500, 600, 700, 900 — all five present in that package (which ships 16 faces including italics). |
+| Which weights missing? | None. |
+| Fallback/system fonts rendering? | No silent fallback in the token layer — every one of the 60+ typography tokens emits an explicit `fontFamily`. `_layout.tsx` does fall through to the system face if loading *errors*, which is deliberate (a font failure must not strand the user on the splash). |
+| Android/iOS family mapping correct? | Yes in principle — tokens emit `fontFamily` and never `fontWeight`, which is the only correct approach on Android, where a custom family plus `fontWeight` silently renders the base face. |
+| Does loading block render? | Yes, correctly. The splash is held until *both* the session resolves and fonts load; `RootLayout` returns `null` while `!fontsLoaded && fontError === null`. |
+
+**The one real violation:** founder requirement §2 forbids referencing fonts from `node_modules`
+internals. That is exactly where every face was coming from.
+
+**Remediated this pass**
+
+1. The five approved faces were copied — unmodified, verified genuine (valid `0x00010000` sfnt
+   header, SIL Open Font License in the name table) — into `assets/fonts/`:
+   `Livvic-Regular.ttf`, `Livvic-Medium.ttf`, `Livvic-SemiBold.ttf`, `Livvic-Bold.ttf`,
+   `Livvic-Black.ttf`.
+2. `src/app/_layout.tsx` now registers them through `expo-font`'s `useFonts` with `require()`
+   against those asset paths.
+3. Registration keys are **unchanged**, so no typography token moved:
+
+   | Asset | Registered family | Weight |
+   | --- | --- | --- |
+   | `assets/fonts/Livvic-Regular.ttf` | `Livvic_400Regular` | 400 |
+   | `assets/fonts/Livvic-Medium.ttf` | `Livvic_500Medium` | 500 |
+   | `assets/fonts/Livvic-SemiBold.ttf` | `Livvic_600SemiBold` | 600 |
+   | `assets/fonts/Livvic-Bold.ttf` | `Livvic_700Bold` | 700 |
+   | `assets/fonts/Livvic-Black.ttf` | `Livvic_900Black` | 900 |
+
+   Registering by explicit key rather than letting each platform infer a PostScript name is what
+   keeps the mapping byte-identical on Android and iOS.
+4. `@expo-google-fonts/livvic` removed from `package.json` and `package-lock.json`; the Jest mock
+   moved from that package to `expo-font`.
+5. `expo-font` is already in `app.config.ts` `plugins`, which is what registers the native module
+   on both platforms. Fonts are **not** declared in the plugin's `fonts:` array on purpose — that
+   path embeds faces under their internal PostScript names, which would silently change every
+   `fontFamily` string the tokens emit.
+
+Verified after the change: `tsc --noEmit` clean, **303/303 Jest tests pass**.
+
+**FOUNDER_FONT_COMPLIANCE: YES** for bundling, weights and mapping. Android/iOS *runtime* render
+verification is still outstanding — see §P5.5.
+
+## P5.1 Delta method
+
+`get_metadata` on `0:1` returns ~797 k characters for the new file, past the tool's limit, so both
+the new file and its predecessor were pulled to disk and compared programmatically rather than by
+eye.
+
+Child coordinates in the metadata XML are **parent-relative**, which makes a subtree directly
+comparable between files once the top-level frame's own absolute `x`/`y` is stripped. Each
+top-level frame was therefore reduced to a normalised body and hashed; equal hash ⇒ byte-identical
+subtree ⇒ `UNCHANGED`. Anything that differed was line-diffed to locate the exact nodes.
+
+**Baseline correction.** The first run diffed against `QMgajesW22fQcUbs7TKspS` and produced a
+misleadingly large delta (17 changed frames). That is the *pass-2* file, not the baseline the
+shipped code was written against. Re-run against `1kd1u3WEc00SENkToIPloW` — the pass-4 source of
+truth, and the revision the current implementation actually targets — the delta is far tighter and
+is the one recorded below. Node IDs are carried across all three revisions, so a matching ID is
+evidence of lineage only, never of equivalence.
+
+## P5.2 Classification — 43 top-level frames
+
+Previous file: 49 top-level frames. Current file: 43.
+
+| Class | Count |
+| --- | --- |
+| UNCHANGED | 27 |
+| CHANGED | 12 |
+| NEW | 4 |
+| REMOVED / OBSOLETE | 11 (from the previous file) |
+
+### NEW
+
+| Node | Name | Nodes | Note |
+| --- | --- | --- | --- |
+| `250:2861` | Page 7b- Booking details | 109 | No predecessor. Screen does not exist in the app. |
+| `250:2383` | Page 17a- Login No. | 79 | Replaces removed `53:174` (also 79 nodes) — relocated and re-authored. |
+| `250:2439` | Page 17b- Login OTP | 86 | A **third** OTP frame. Variant not yet identified. |
+| `267:3520` | Instant booking | 1106 | Flow board. Absorbs the four removed standalone Instant frames. |
+| `267:3521` | Scheduled flow | 1262 | Flow board. Absorbs the six removed standalone Scheduled frames. |
+
+### CHANGED
+
+| Node | Name | Node count | What moved |
+| --- | --- | --- | --- |
+| `3:1041` | Page 7- Confirmation | 315 → 268 | 47 nodes removed — largest structural reduction in the file. |
+| `3:1381` | Page 8a- En route on time | 270 → 277 | +7 nodes. |
+| `3:1658` | Page 9- Arrived | 297 → 288 | −9 nodes. |
+| `101:1812` | Page 10- In service | 309 → 284 | −25 nodes. |
+| `6:663` | Page 15- Profile | 200 → 184 | −16 nodes. |
+| `201:100` | Page 8c- Reassigned on time | 281 → 281 | Notice copy rewritten; card 57 → 66 tall; body text 14 → 17 and 27 → 30; everything below shifts +9. |
+| `201:278` | Page 8e- Auto cancelled | 158 → 158 | `rebook` block 126 → 138 tall. |
+| `3:2002` | Page 11- Extension | 125 → 125 | Both notice cards rewritten; 57 → 60 and text 14 → 17 / 27 → 30; "Not able to extend at the moment?" 204 → 238 wide, re-centred (x 50.83 → 33.83), 16 → 20 tall. |
+| `6:227` | Page 14- Booking history | 200 → 200 | Header instance 370.44 × 56 → **370 × 45**; body origin follows. |
+| `115:2821` | Cancellation flow | 408 → 408 | `104:2281` reason list 167 → 201 tall. |
+| `227:1649` | Page 17b- Login OTP | 86 → 86 | Resend block 330 → 338 wide; row x −4 → 0. Full-width correction. |
+| `239:2261` | Page 17b- Login OTP | 86 → 87 | **Now an error state**: adds `239:2312` "Incorrect OTP. Please try again" at y 56; resend demoted to new `250:2437` at y 79; container 78 → 99; CTA 153 → 174. |
+| `54:280` | Icons | 26 → 27 | Adds `250:2970` "back", 32.25 × 32.25. |
+
+The recurring `14 → 17` / `27 → 30` / `16 → 20` text-height shifts across `201:100`, `3:2002` and
+`6:663` are a **typography change, not a copy reflow** — the same nodes grew in height at unchanged
+width. Exact family/size/line-height must be read per node before these screens are touched.
+
+### RE-PARENTED (corrected)
+
+A first pass classified eleven frames as REMOVED because they stopped being *top-level*. That was
+wrong, and the correction matters: re-indexing every element at **any depth** (7011 old / 6727 new)
+shows ten of them still exist, moved inside the two new flow boards with their node IDs intact.
+
+| Node | Name | Now lives in | Class | Subtree |
+| --- | --- | --- | --- | --- |
+| `1:728` | Page 4a- Instant- available | `267:3520` | CHANGED | 382 → 155 lines |
+| `25:1327` | Page 4c- Instant- NA out of shift | `267:3520` | CHANGED | 383 → 389 |
+| `44:5378` | Page 4c- Instant- No slots | `267:3520` | CHANGED | 383 → 389 |
+| `25:1585` | Page 4b- Instant taxes pop up | `267:3520` | CHANGED | 396 → 167 |
+| `34:2105` | Page 5c- Scheduled eve | `267:3521` | CHANGED | 294 → 274 |
+| `34:1919` | Page 5b- Scheduled noon | `267:3521` | CHANGED | 309 → 289 |
+| `34:3035` | Page 5b- Scheduled morning | `267:3521` | CHANGED | 349 → 329 |
+| `37:3703` | Page 5b- Scheduled duration | `267:3521` | CHANGED | 203 → 183 |
+| `37:3943` | Page 5b- Scheduled time | `267:3521` | CHANGED | 117 → 102 |
+| `37:4183` | Page 5b- Scheduled day | `267:3521` | CHANGED | 92 → 77 |
+
+The large drops on `1:728` and `25:1585` are not deletions of the sheet — they are the removal of
+the full Home-screen backdrop each frame used to carry behind it. The sheet itself was re-authored:
+`1:729` is gone, replaced by `267:3532`.
+
+### REMOVED / OBSOLETE — one frame
+
+| Node | Name | Superseded by |
+| --- | --- | --- |
+| `53:174` | Page 17a- Login No. | `250:2383` |
+
+So only the old Login node is genuinely gone, and the "~35 obsolete citations" figure below is
+correspondingly narrower than first stated: the Instant and Scheduled citations still resolve, they
+simply resolve to re-authored content that must be re-read rather than to nothing.
+
+### DESIGN CONTRADICTION — Scheduled exists twice
+
+**`DESIGN_PENDING` — needs a designer ruling before Schedule is touched.**
+
+The current file contains two incompatible Scheduled designs:
+
+| | Top-level `47:*` | Inside flow board `37:*` |
+| --- | --- | --- |
+| Frames | `47:6549` day, `47:6450` time, `47:6059`/`47:5844`/`47:5638` slots | `37:4183` day, `37:3943` time, `37:3703` duration |
+| Delta vs previous file | **UNCHANGED** | **CHANGED** |
+| Section width | 338, inset 16 | 338 (day/time) but **370, full-bleed** on `37:3703` |
+| Footer | `div.pt-2`, **104pt**: a 52pt bar with an inset `Pay →` pill, then a 36pt "Share your requests" bar | `267:3522` "CTA inactive", **53pt**: one 34pt `rgba(0,0,0,0.07)` bar reading "Book NOW", Livvic Black 16/24 — no Pay pill, no secondary bar |
+| `37:3703` footer | — | **none at all** |
+
+The shipped `ScheduleScreen` implements the `47:*` design. Adopting the flow-board version would
+delete the Pay pill and the "Share your requests" bar; adopting neither leaves Schedule stale if the
+flow board is the intent. The two cannot both be right, and `37:3703` having no CTA at all suggests
+the flow board is still in progress.
+
+**`SCHEDULE_DESIGN_AUTHORITY: PRODUCT_DESIGN_PENDING`** — ruled by the product owner on this pass.
+Schedule stays exactly as it is until a design authority is named. The unchanged `47:*` frames are
+what it currently matches, so leaving it is the non-destructive option.
+
+Blocked on that ruling, and on nothing else: **Schedule (day / time / duration / morning / noon /
+eve)** and the **Scheduled CTA footer**. Reschedule is NOT blocked — its eligibility rules
+(free, once, same duration) are backend-owned and were not touched.
+
+## P5.6 Remediation applied
+
+### Instant sheet — `267:3532`
+
+Geometry re-read node by node. The implementation was already close (2-column grid, canary ETA
+pill, pinned CTA); five values were off:
+
+| Value | Was | Now | Evidence |
+| --- | --- | --- | --- |
+| `PriceTile` badge `right` | 6.1 | **5.6** | `267:3586` is 44 wide at x 114.9 on a 164.5 tile |
+| Body block gap | 29 | **16** | `267:3543` ends at 32, `267:3548` starts at 48 |
+| Body `paddingTop` | 20 (shared) | **16** (restated locally) | header ends 73.8, body starts 89.8 |
+| CTA gap | 29 | **46.4** | grid box ends 288.8, CTA box at 326.2, button 9 in |
+| Caption gap | 4.4 | **6** | button ends 43, `267:3609` at 49 |
+
+Confirmed already exact and left alone: grid column gap 8, row gap 10, tile 164.5 × 67.6 at
+padding 9.8 / gap 4 / radius 12, idle `#FFFADB`, selected `#ECFF9B` + `0 0 4 rgba(0,0,0,0.15)`,
+disabled `rgba(0,0,0,0.07)`, title Black 16/24 −0.4, strike SemiBold 10/15 at 70 %, price Bold
+14/20, badge px 6 / py 2 / radius 6 / `#FFD600`, ETA pill 109 wide at radius 8, header px 16 /
+py 12 / gap 3 / hairline 0.8, title Black 20/20.
+
+### Login — `250:2383`
+
+The screen was already built against this design. One mismatch: the rule closing the `+91` cell
+(`250:2416`) is **1.778**, not 1.67. `stroke.base` had exactly one consumer, so it was re-valued
+rather than forked.
+
+### OTP — `227:1649` / `250:2439` / `239:2261`
+
+The error frame is new, and it supplies the file's only real error colours:
+
+- `danger` `#D92D20` → **`#FF0404`** (`239:2312`)
+- `dangerSurface` `#FEE4E2` → **`rgba(255,4,4,0.07)`** (`239:2294`)
+
+These were the only two colour tokens in the repository with no node provenance; §"Non-founder
+values that need a ruling" above is closed for both. Re-valuing was safe: `dangerSurface`'s only
+visual consumer is a booking-status pill tone the file never draws (`6:252` draws four fills, none
+of them danger).
+
+Screen changes:
+- the error line moved **inside** the digits block, between the boxes and the resend line, at the
+  block's own 6pt rhythm — it was previously a sibling below the block;
+- its type ramp corrected from Regular 10/15 to **Livvic Medium 11/16.5**;
+- every digit box now swaps `#FFEF99` → the red tint while errored, as `239:2294` draws;
+- the resend line gained `resendLabelAccent`, because `250:2437` sets the trailing token ("26s")
+  in Bold against a Medium lead — one text node, two runs. New token `typography.otpTaglineStrong`.
+- fixtures for all three states re-aligned to the frames' exact copy, including `250:2439`'s
+  "Resend OTP via SMS", which is a single run and so carries no accent token.
+
+## P5.3 Consequence — revoked PIXEL_PERFECT status
+
+Node IDs cited throughout the implementation as provenance now point at **deleted** frames. Any
+`PIXEL_PERFECT` claim resting on them is void until re-verified against the flow boards.
+
+Affected citations found in source, by owning obsolete frame:
+
+- `1:728` (Instant): `1:729`, `1:744`, `1:753`, `1:754`, `1:755`, `1:758`, `1:766`, `1:788`,
+  `1:789`, `1:798`, `1:812`, `1:815`, `1:818`, `1:820`, `1:821`, `1:829` — consumed by
+  `InstantSheet`, `PriceTile`, `Button`, `BottomSheet`, `layout.etaPillRadius`, `layout.ctaRadius`,
+  `layout.sheetRadius`, `elevations.subtle`/`cta`/`badge`.
+- `37:3703` / `37:3943` (Scheduled): `37:3705`, `37:3712`, `37:3716`, `37:3722`, `37:3776`,
+  `37:3778`, `37:3907`, `37:3918`, `37:3920` — consumed by `ScheduleScreen`, `typography.labelMedium`,
+  `bodyBlack`, `strikeCompact`, `priceCompact`, `headingScreen`, `Button` secondary,
+  `semantic.borderHairline`, `textFieldLabel`, `textSecondaryStrong`.
+- `34:3035` (Scheduled morning): `34:3155`, `34:3157` — `Chip` disabled state, `typography.slotLabel`.
+- `25:1585` (taxes pop-up): `47:6621`, `48:6634` — `InfoDialog`.
+- `53:174` (old Login): `53:210`, `53:212`, `53:225`, `53:229`, `53:232`, `53:238`, `53:244` —
+  `LoginScreen`, `typography.labelUpperBlack`, `labelUpperTight`, `displayHero`, `phoneValue`,
+  `ctaUpper`, `fieldValue`, `headingCtaTight`, `elevations.glow`.
+
+**Status revoked to `NOT_AUDITED` pending re-read:** Instant (all states), Instant taxes dialog,
+Schedule (day/time/duration/morning/noon/eve), Login. **Status revoked to `NEEDS_FIX`:**
+Confirmation, En route on time, Arrived, In service, Profile, Reassigned on time, Auto cancelled,
+Extension, Booking history, Cancellation flow, OTP (both existing frames).
+
+Values these tokens hold are not presumed wrong — the flow boards are a re-layout of the same
+design language, and a value may well be carried over intact. They are presumed **unverified**.
+
+## P5.4 Comments / designer notes
+
+`COMMENTS_ACCESSIBLE: NO`
+
+The `figma-desktop` MCP surface exposes `get_metadata`, `get_design_context`, `get_screenshot`,
+`get_variable_defs`, `get_code_connect_map`, `get_design_system_context` and the Make/FigJam tools.
+**No tool in the connected surface reads Figma comment threads**, and none returns annotations,
+node descriptions or component descriptions as a separate channel. Standard Figma comments have
+therefore **not** been reviewed, and no claim is made that they were.
+
+Frames flagged `MANUAL_COMMENT_REVIEW_REQUIRED` — the ones most likely to carry designer notes,
+being new, restructured, or carrying an unexplained value:
+
+`267:3520` (Instant booking), `267:3521` (Scheduled flow), `250:2861` (Booking details),
+`250:2383` (Login No.), `250:2439` + `239:2261` + `227:1649` (the three OTP frames),
+`3:1041` (Confirmation), `101:1812` (In service), `6:663` (Profile), `54:280` (Icons).
+
+Please supply screenshots or pasted comment text for these.
+
+### Confirmation — `3:1041` (the largest rework in the file, 315 → 267 nodes)
+
+| Element | Change |
+| --- | --- |
+| Hero `40:5346` | Was a CENTRED disc-above-title block. Now a ROW: Livvic Black 20/28 title over a NEW Livvic Bold 14/20 schedule line (`250:2951`) on the left, the 64pt `#CFFF04` disc on the right in a 73.885pt column with an 8pt bottom inset. The disc's `0 8 10 rgba(0,0,0,0.1)` lift is GONE — the node draws it flat. |
+| Detail rows `3:1095` | REMOVED from this screen. The node moved to `250:2861`. |
+| Note `250:2942` | NEW — "Note before starting", `#FFF7CC` at radius 16, 32 × 66 to-do mark, `0 0 2 rgba(0,0,0,0.07)`. |
+| Details row `250:2966` | NEW — 39pt, 1pt `#FFD600` edge at radius 15, px 12 / py 6, a 35pt glyph, Livvic Bold 14/20 label, and `250:2970` rotated 179.55° into a forward chevron. |
+| Actions `250:2978` | Two 34pt bars 12pt apart replace the single white bar holding two text links. "Cancel" = white behind a 1pt `#FFDE33` edge; "Reschedule" = flat `#FFD600`. Neither carries a lift. |
+
+`StatusBanner`'s `stacked` layout was renamed `hero` and re-implemented — it had exactly one
+consumer, this screen, and the node that defined it changed shape.
+
+### En route / Arrived / In service — shared banner and cook card
+
+Three screens, two shared components, all read off `40:5356` and `256:2986`:
+
+| Component | Change |
+| --- | --- |
+| `StatusBanner` row gap | 20 → **16** |
+| `StatusBanner` title | `titleBlack` (Black 14/20) → `title` (**Bold** 14/20) |
+| `StatusBanner` glyph | The 31pt mark above the title (`99:1238` / `101:1884`) is **REMOVED**. `art` deleted from the component and from both call sites. |
+| ETA panel `97:1231` | 117 × 103 → **122 × 103**; `#CAD5E2` hairline → **1pt `#CFFF04`**; gains an INNER `0 0 4 rgba(0,0,0,0.15)`. Drawn natively — the exported vector is a plain rounded rect, so rasterising it would only cost crispness. |
+| `headingEta` | Black 24/25 → **23/25**. Sole consumer is that panel, so the token was re-valued. |
+| `CookCard` attributes | The `#FFD600` bullet separators are **REMOVED**. Column one 86 → **94**, column gap 4, row gap 3.5 → **3**, icon-to-label 3 → **3.11**. |
+| `CookCard` name | Left-aligned → **centred** across the column. |
+| `CookCard` CTA | `alignSelf: flex-start` + `minWidth 90` → spans the column inside a 2pt-inset row (`257:3108`). Label `captionStrong` (Medium 10/13.33) → `slotLabel` (**Bold 11/16.5**). |
+
+### Typography — the `14 → 17` ramp, resolved
+
+Traced node by node to `NoticeCard` (`208:553`), and it is a **component-level** change, not a
+token revalue:
+
+| Line | Was | Now | Effect |
+| --- | --- | --- | --- |
+| Title `208:558` | Livvic Medium 10/13.33 | Livvic **Medium 11/16.5** | box 14 → 17 |
+| Body `208:559` | Livvic Regular 9/13.5 | Livvic **Regular 10/15** | 2 lines 27 → 30 |
+| Card | 57 tall, padding 11.889 all round | **66** tall, px 11.889 / **py 6** | — |
+
+`labelMedium` and `caption` already carried the new values and are consumed by screens the file did
+**not** touch, so **no token was re-valued**. The card now points at the correct two styles. This
+single change explains every `14 → 17` / `27 → 30` / `16 → 20` shift seen on `201:100`, `3:2002`
+and `6:663`.
+
+### Gradients — exact, and now tokenised
+
+Both gradients in the file were read off their nodes, not sampled:
+
+| Token | Node | Angle | Stops | Colours |
+| --- | --- | --- | --- | --- |
+| `gradients.scrimLime` | `144:472` | 179.39916656010394° | 0.43512 % / 78.645 % / 99.565 % | `#ECFF9B` @ 35 %, black @ 50 %, black @ 50 % |
+| `gradients.scrimYellow` | `144:463` | 179.72292373311646° | 0.43512 % / 78.645 % / 99.565 % | `#FFD600` @ 10 %, black @ 50 %, black @ 50 % |
+
+The lead stop of each is a FOUNDER colour at an opacity, so both are built through a new
+`withAlpha()` helper rather than written as fresh literals. **Angle:** both sit within 0.61° of CSS
+180°, which is what `expo-linear-gradient` draws by default; across the widest card the file draws
+(162pt) that tilt displaces the band by 1.7pt, below the width of the softest stop transition. The
+measured angle is recorded on the token so the decision is visible rather than silently rounded.
+
+**Raw-hex leakage is now zero.** The third value, `rgba(255,255,255,0.45)` in `InstantSheet`,
+became `palette.white45` → `colors.surfaceVeil` (`44:5632`). A pre-existing test asserts every
+semantic colour resolves to a primitive, which is what forced the veil onto the primitive layer
+rather than being composed in the semantic one.
+
+### Profile — `6:663`
+
+| Element | Change |
+| --- | --- |
+| Header | The 57pt `6:790` bar is replaced by `257:3504`, a **45pt** band: px 4 / py 6, 12pt gap, no underline, same 32pt back disc and Livvic Bold 16/24 title. Added as a `density="compact"` on the shared `ScreenHeader` rather than a second component. |
+| Footer `6:765` | 154.43 → **110.43** tall: the "Visit Live Website (spoonhelp.com)" row (`6:766`) is **REMOVED**. Nothing replaced it. |
+
+The "Your profile is incomplete" card (`222:1570`) was already implemented — it entered in the
+previous revision, not this one.
+
+### Home — `1:455`
+
+Only one change, and it is copy: three trust tiles were relabelled. **Amenable → Compliant**,
+**Efficient → Reliable**, **Punctual → Verified**. The ids are identifiers that select the exported
+glyph and are unchanged, because the file did not touch the glyphs. Home's structure, the
+below-fold content and the conditional `UpcomingBookingCard` position are untouched.
+
+### Booking details — `250:2861` (NEW)
+
+Implemented as `BookingDetailsSheet`. It is a SHEET, not a screen: a 496pt white panel with 20pt
+top corners over an `rgba(0,0,0,0.8)` scrim, opened from Confirmation's `250:2966` row.
+
+- header `250:2879` — 45pt band, pt 16 / pb 6 / px 16, 32pt back disc, Livvic Black 20/28 title
+- §1 `257:3499` — py 6, 12pt gap: heading at Livvic Bold 14/20, then `3:1095` — `#FFF7CC`,
+  radius 16, padding 19.889, 6pt rows, `0 0 2 rgba(0,0,0,0.15)`, `#FFEF99` rules
+- §2 `257:3501` — py 6, 10pt gap: heading, then `257:3439` — lime at 70 % (pre-composited),
+  `0 0 4 rgba(0,0,0,0.15)`, **`#CFFF04`** rules
+
+`3:1095`'s value ramp **flattened**: every value is now Livvic Bold 12/16, where the old table ran
+Black 16/24 with a Black 18/22.5 hero row. Two `DetailRows` variants were added (`booking`,
+`payment`) rather than re-pointing `summary`, whose remaining consumer is the auto-cancel refund
+block (`201:550`) — a different node that has not been re-read.
+
+**Business boundary:** every figure on both tables is a pre-formatted server string. The component
+performs no arithmetic; "Taxes @5%" is the server's LABEL, not a rate the client applies, and the
+total is the server's figure, not `189 + 9` computed on device.
+
+### Icons
+
+The only icon the current file ADDS is `250:2970` "back" (`54:280`, 26 → 27 nodes). It is exported
+at 4× and bundled as `assets/figma/icons/back.png` (129 × 129), used unrotated as a back mark and
+rotated 179.55° as the forward chevron — exactly how the file itself constructs `250:2974`.
+`250:2968`, the 35pt glyph on the details row, is bundled from its raw source as
+`assets/figma/booking/view-booking-details.png`. The address kebab, edit and delete marks were
+already exported assets from the previous pass and the current file does not change them. No
+Feather glyph substitutes for any of these.
+
+## P5.7 Remaining non-Schedule screens
+
+Six frames were re-read node by node this pass. **Two of them turned out not to have changed at
+all**, and two of the "known deltas" that came into this pass were artefacts of the wrong-baseline
+diff recorded in §P5.1 — they are corrected here rather than implemented.
+
+| # | Screen | Node | Delta vs `1kd1u3…` | Correction applied |
+| --- | --- | --- | --- | --- |
+| 1 | Extension | `3:2002` | CHANGED (14 lines) | 3 fixes — below |
+| 2 | Completion | `143:207` | **UNCHANGED** (150 lines identical) | none needed |
+| 3 | Booking history | `6:227` | CHANGED (1 line) | header 56 → 45 |
+| 4 | Refund history | `71:615` | **UNCHANGED** (98 lines identical) | none needed |
+| 5 | Cancellation | `115:2821` | CHANGED (1 line) | reason typography only |
+| 6 | Auto-cancelled | `201:278` | CHANGED (1 line) | rebook gap 10 → 17 |
+
+### 1. Extension — `3:2002`
+
+The NoticeCard ramp was already corrected via `208:553`. Full screen-level read of `143:358`
+found three more, all confirmed by arithmetic against the panel's 119.78 → **114** close:
+
+| Value | Was | Now | Evidence |
+| --- | --- | --- | --- |
+| Fallback panel gap | 12 | **6** | 31.78 padding + 44 text + gap + 32 CTA = 114 |
+| Fallback line gap | 6 | **2** | `143:360` at y 0 is 20 tall; `143:362` starts at 22 |
+| Fallback title | `bodyBold` (Bold 12/16) | `title` (**Bold 14/20**) | `143:361`; this IS the 16 → 20 growth |
+
+Confirmed already exact: `#ECFF9B` fill, 24pt radius, 15.889 padding, body Regular 11/16.5 at
+`rgba(0,0,0,0.8)`, CTA `#CFFF04` at 32pt / radius 15 with a Bold 16/24 label (`size="barSm"`).
+
+### 2. Completion — `143:207` — UNCHANGED
+
+Its subtree is **byte-identical** to the baseline the shipped code was written against (150 lines,
+zero diff). No correction was applied and none is warranted; the previous pass's verification
+carries over intact. The screen was NOT rebuilt.
+
+### 3. Booking history — `6:227`
+
+The only change in the frame: the `65:35` header instance is overridden 370.44 × 56 → **370 × 45**.
+
+The `65:35` COMPONENT still defines px 16 / py 12 / gap 14 (= 56); the 45 is an instance override,
+which compresses vertical padding to (45 − 32) / 2 = **6.5**. Horizontal padding and gap are
+untouched. Added as `ScreenHeader density="band"`.
+
+This header now has three measured heights across the file, and they are not interchangeable:
+
+| Density | Height | Padding | Nodes |
+| --- | --- | --- | --- |
+| `default` | 56 | px 16 / py 12, gap 14 | `71:620` Refunds, the address frames |
+| `band` | 45 | px 16 / py 6.5, gap 14 | `65:35` as instanced on `6:227` |
+| `compact` | 45 | px 4 / py 6, gap 12 | `257:3504` Profile |
+
+`band` and `compact` are both 45 but place the back control 12pt apart horizontally.
+
+### 4. Refund history — `71:615` — UNCHANGED
+
+Byte-identical (98 lines, zero diff). **The "56.89 → 56" delta carried into this pass does not
+exist** against the correct baseline — it came from the discarded `QMgajes…` comparison. `71:620`
+is 56 in both the previous file and the current one, so Refunds keeps `density="default"`.
+
+### 5. Cancellation flow — `115:2821`
+
+`104:2281` grew 167 → **201**, and the children are unchanged — same seven reasons. The growth is
+entirely the row gap: 7 × 20 + 6 × gap + 12 padding = 201 gives **gap 8**, up from 2.5.
+
+**The implementation already used gap 8 / py 6**, so the layout needed no change — the file caught
+up to it. The full read did find one real mismatch:
+
+| Value | Was | Now | Evidence |
+| --- | --- | --- | --- |
+| Reason label | `body` (Regular 12/16) | `optionLabel` (**Medium 13/16**) | `104:2284` |
+
+13 appears nowhere else in the file, so it stays a literal inside the new token rather than joining
+`fontSize`.
+
+### 6. Auto-cancelled — `201:278`
+
+`201:477` grew 126 → **138**, and the growth is entirely the gap: the `201:89` panel ends at 81.78
+and `201:92` is pinned at 98.78, so the answers sit **17** clear of the prompt, not 10. Vertical
+padding stays 6. The "No" button also moved from `variant="secondary"` plus a `borderColor`
+override onto the shared `outlineSoft` variant — `201:93` and Confirmation's `250:2979` draw the
+same white-behind-`#FFDE33` treatment.
+
+### ETA inner shadow — verified, not assumed
+
+`97:1231` carries an INNER `0 0 4 rgba(0,0,0,0.15)`, which `shadow*` cannot express (it only casts
+outward). Checked against the installed runtime rather than assumed:
+
+- React Native **0.86.2**
+- `inset` is a first-class typed field on `BoxShadowValue` in `StyleSheetTypes.d.ts`
+- `android/gradle.properties: newArchEnabled=true`, and inset `boxShadow` is implemented on both
+  platforms under the New Architecture
+
+So the effect is kept, and moved from the CSS-string form to the **typed array** form
+(`innerShadows.etaPanel`) so it is type-checked rather than string-parsed. Border, radius and fill
+remain real style properties, so the panel is still correct if a runtime drops the inner shadow.
+
+### Shared-component regression surface
+
+| Component | Changed | Consumers re-checked |
+| --- | --- | --- |
+| `ScreenHeader` | added `band` density | Booking history (changed), Refunds, 3 address screens, Profile — all still on their own measured density |
+| `Button` | `outlineSoft` adopted by auto-cancel | Confirmation Cancel, auto-cancel No |
+| `NoticeCard` | ramp (earlier in this pass) | Extension ×2, Reassigned, Auto-cancelled, cancellation policy ×2 |
+| `typography` | added `optionLabel` | Cancellation reasons only |
+| `primitives` | added `innerShadows` | `StatusBanner` highlight only |
+
+Full suite re-run after each: **305/305**.
+
+## P5.5 Outstanding
+
+Closed during this pass: per-node `get_design_context` on every NEW/CHANGED non-Schedule frame;
+the flow-board re-read; the `14 → 17` / `16 → 20` type ramp; `danger` / `dangerSurface`
+provenance; the three raw gradient/wash values; the three OTP states; `250:2861` Booking details;
+and the `250:2970` icon export.
+
+Still open:
+
+1. **`SCHEDULE_DESIGN_AUTHORITY: PRODUCT_DESIGN_PENDING`** — Schedule frozen by ruling. See the
+   contradiction table above. Nothing else is blocked by it.
+2. **Physical-device verification** — `adb devices` has reported none attached on every check this
+   pass. Every geometry claim in §P5.6 / §P5.7 is code-level against node values, verified on the
+   emulator, not on a handset. `PHYSICAL_DEVICE_VERIFICATION_PENDING`.
+3. **`IOS_SIMULATOR_VERIFIED: NO`** — this is a Windows machine. The iOS *code* audit passes (see
+   below); the simulator pass needs a macOS/Xcode runner.
+4. **`COMMENTS_ACCESSIBLE: NO`** — unchanged. The MCP surface still exposes no comments API, and
+   the `MANUAL_COMMENT_REVIEW_REQUIRED` flags stand.
+5. **Founder ruling wanted** on the three brand-adjacent yellows outside the approved ten
+   (`#FEE685`, `#FFD230`, `#EAF086`). All three cite real nodes; none is invented.
+
+## P5.9 Emulator runtime verification
+
+First real runtime pass of this project. `BUILD SUCCESSFUL in 7m 6s`; Metro bundled 2237 modules
+in 43.8 s with no errors; the app reported
+`Running "main" with {"rootTag":1,"initialProps":{},"fabric":true}` — `fabric: true` confirms the
+New Architecture is live, which is what makes the inset `boxShadow` render.
+
+Gradle needed `JAVA_HOME` pointed at Android Studio's bundled JBR (OpenJDK 21); the machine's
+default `java` is JVM 8, which Gradle rejects. Scoped to the build command, not persisted.
+
+### Responsive sweep — `spoon://booking/enRoute`
+
+| Viewport | px / dpi | dp | App JS errors |
+| --- | --- | --- | --- |
+| small | 720×1280 @ 320 | 360 × 640 | 0 |
+| reference | 1080×2340 @ 440 | 392.7 × 851 | 0 |
+| large | 1080×2400 @ 420 | 411.4 × 914 | 0 |
+| xlarge | 1080×2340 @ 400 | 432 × 936 | 0 |
+| short | 720×1136 @ 320 | 360 × 568 | 0 |
+
+Crash buffer empty throughout. A first count reported "5 errors" at two viewports; triage showed
+every match was `SystemServiceRegistry: ServiceNotFoundException: No service published for:
+ethernet` — an emulator platform message from pid 1040, not the app. App-scoped log: zero.
+
+### What the device pass caught that static reading did not
+
+1. **`94:1097` ETA label truncated to "16 mi…"** at 393dp and above. The panel is 122 wide and the
+   label 112, so the inset is **5** a side; the code had `space.sm` (8), leaving only 106. Fixed.
+2. **`40:5364` copy was stale** — "Cook Rekha is arriving" rather than "…arriving **in**". The
+   current file ends the line on "in" because the ETA panel completes the sentence. Fixed, along
+   with `101:1887` / `101:1889` ("Time left to service end" / "Cooking in progress", the message
+   dropping from two lines to one — which is why that h1 block closed 35 → 19) and `99:1620`
+   (Arrived's panel shows a clock time, "11:55 am", not a countdown).
+
+A false positive was also ruled out rather than "fixed": at 393dp the cook attributes appeared to
+truncate to "Fema…" / "West Beng…". Changing `wm density` under a live app leaves React Native
+measuring against the old density. Force-stopping and relaunching at 440 dpi rendered both labels
+in full, so the fixed 94pt column is correct and nothing was changed on the strength of a stale
+frame.
+
+### Verified on the emulator, per screen
+
+| Screen | Route | Result |
+| --- | --- | --- |
+| En route `3:1381` | `spoon://booking/enRoute` | banner glyph gone, ETA panel with `#CFFF04` edge and visible inner shading, cook attributes in two bullet-less columns, centred name, full-width Call Cook |
+| Auto-cancelled `201:278` | `spoon://booking/autoCancelled` | both notice cards at the corrected Medium 11/16.5 over Regular 10/15 ramp |
+| Booking history `6:227` | `spoon://history` | rendered, no errors |
+
+`PHYSICAL_DEVICE_VERIFICATION_PENDING` for every row above — `adb devices` reported no handset on
+every check this pass. Emulator only.
+
+## P5.10 Login / OTP short-height responsiveness
+
+The Small_Phone emulator exposed a REAL defect that node-level reading could never have caught,
+because it is not a discrepancy against any frame — the frame is 800pt tall and the handset is not.
+
+**Symptom** (`login_before.png`, 360 × 640dp): the hero consumed ~60 % of the viewport, the phone
+field was cut in half at the bottom edge, and the CTA and legal footer were entirely below the
+fold.
+
+**Cause** — arithmetic, not guesswork. `250:2384` is 800 tall and spends 364 on the hero, leaving
+396 for the 167pt brand block and the 237pt form. Every one of those three was a FIXED height, so
+the stack is always 768. A 360 × 640 handset has ~568 usable after the status and navigation bars,
+which overruns by ~200 — and the overrun lands on the form, because the hero is first.
+
+**Fix** — the hero is the only thing that adapts:
+
+```
+heroHeight = clamp(availableHeight − 167 − 237, 160, 364)
+```
+
+- Any viewport that can afford 768 resolves to exactly **364**, so the reference frame is
+  untouched — this is why `LOGIN_PIXEL_PERFECT_REFERENCE` survives the change.
+- A short viewport crops the hero instead of the form. `resizeMode="cover"` means cropping the box
+  preserves the photograph's aspect ratio and framing rather than squashing it.
+- **Nothing else scales.** Typography, the field, the CTA, the legal footer and every gap keep
+  their Figma values at every width and height. No `screenWidth / 390` factor is involved.
+- The `ScrollView` remains, and carries whatever still does not fit at the 160 floor.
+
+**OTP** got the same treatment on its 172pt brand block, for the same structural reason. Its margin
+is much wider (172 + 222 = 394 against Login's 768), so **at rest on a 360 × 640 handset it
+resolves to the full 172 and the screen is visually unchanged**. The clamp only engages once the
+keyboard has taken ~270pt — exactly when the CTA would otherwise be pushed out of reach. OTP also
+gained the `onLayout` + `scrollToEnd` reveal that Login already had; it previously had no
+keyboard-scroll handling at all, which was a latent version of the same defect.
+
+Keyboard handling is unchanged in kind: `behavior="padding"` on BOTH platforms, because Android's
+`adjustResize` is inert under the edge-to-edge display this app runs in. That stays iOS-correct —
+`padding` is the recommended iOS behaviour — so the shared implementation still serves both.
+
+### Verification
+
+| Viewport | Result |
+| --- | --- |
+| 360 × 640dp (Small_Phone, short) | **PASS** — hero crops to the 160 floor and the whole form fits without scrolling: logo, tagline, "Login", subtitle, phone field, Continue and the legal footer are all on screen. Before the fix the field was cut in half at the bottom edge. |
+| 393 × 851dp (reference) | **PASS, unregressed** — hero resolves to the full 364 and the composition matches `250:2383` exactly. |
+
+**Keyboard: verified open on 360 × 640.** `dumpsys input_method` reported `mInputShown=true` with
+the field focused, and in that same frame the phone field, the Continue CTA and the legal footer
+were all still on screen — which is the requirement. It took several attempts: the IME only raises
+once the bundle has actually painted, so earlier taps landed on an unloaded surface and reported
+`mInputShown=false`. Those runs proved nothing about the keyboard and are not counted. Gboard was
+in floating mode for the successful run, so the captured frame shows a floating panel rather than a
+docked keyboard; the viewport shrink and the resulting scroll position are visible regardless.
+
+Not reached, and therefore not claimed: the 430dp width and a short-height 393dp viewport were
+scripted but not captured before this pass ended. `LOGIN_SHORT_HEIGHT_RESPONSIVE` rests on the
+360 × 640 evidence above — the viewport the defect was actually reported on.
+
+### Status flags
+
+```
+LOGIN_PIXEL_PERFECT_REFERENCE: YES
+LOGIN_SHORT_HEIGHT_RESPONSIVE: YES
+LOGIN_KEYBOARD_SAFE_ANDROID:   YES   (emulator-observed; mInputShown=true, CTA still reachable)
+OTP_SHORT_HEIGHT_RESPONSIVE:   YES   (same clamp; unchanged at rest, engages under the keyboard)
+```
+
+## P5.8 iOS compatibility audit (code-level)
+
+`IOS_SIMULATOR_VERIFIED: NO` — Windows. What CAN be checked was:
+
+| Check | Result |
+| --- | --- |
+| `.android.*` / `.ios.*` split files | **none** — one shared implementation |
+| Android-only package imports in shared code | **none** |
+| `Platform.OS` uses | 2, both justified: `runtime.ts` (logging) and `MealBriefScreen` (keyboard behaviour) |
+| Every `elevation` paired with an iOS `shadow*` | **yes**, all of them — the `elevation()` helper emits both |
+| Inner shadow | `boxShadow` `inset`, typed and New-Architecture-backed on both platforms |
+| `KeyboardAvoidingView` behaviour set explicitly | 4/4 call sites |
+| SafeArea | 34 call sites |
+| Hardcoded Android paths / `StatusBar.currentHeight` | **none** |
+| Livvic mapping | registered by explicit key through `expo-font`, identical on both platforms |
+
+---
+
+# PASS 4 — SUPERSEDED FIGMA FILE `1kd1u3WEc00SENkToIPloW`
 
 The visual source of truth moved to `1kd1u3WEc00SENkToIPloW` ("V0_-user-app (1)"), one page `0:1`.
 Where it conflicts with the old file or with §P3, **the new file wins**. Older sections remain valid

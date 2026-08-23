@@ -2,9 +2,11 @@ import type { QueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+import { createSessionGateway } from '@/features/auth';
+
 import { createApiClient } from './api';
 import type { ApiClient } from './api';
-import { createSessionController, secureTokenStore, unimplementedSessionGateway } from './auth';
+import { createSessionController, secureTokenStore } from './auth';
 import type { SessionController } from './auth';
 import { getConfig } from './config';
 import type { AppConfig } from './config';
@@ -17,6 +19,14 @@ import { sessionStore } from './store';
  * Composition root. Built once at app start and handed to the providers.
  *
  * Wiring only — no endpoints, no backend shapes, no business rules.
+ *
+ * ## Two clients, on purpose
+ *
+ * `authClient` carries no `AuthTokenProvider`. It exists to break a construction cycle that is
+ * also a runtime cycle: the session controller needs a gateway to refresh with, the gateway needs
+ * an API client, and an API client that knew about the session would answer a 401 on
+ * `/auth/refresh` by... refreshing. The unauthenticated client cannot do that, so the loop is
+ * impossible rather than merely guarded against.
  */
 
 export interface AppRuntime {
@@ -24,6 +34,8 @@ export interface AppRuntime {
   readonly logger: Logger;
   readonly queryClient: QueryClient;
   readonly api: ApiClient;
+  /** Unauthenticated client for the auth endpoints. Never use it for product reads. */
+  readonly authApi: ApiClient;
   readonly session: SessionController;
 }
 
@@ -32,10 +44,23 @@ export function createAppRuntime(): AppRuntime {
   const logger = getLogger('app');
   const queryClient = createQueryClient();
 
+  // Auth endpoints only. No token provider, so it can never trigger the 401 -> refresh path.
+  const authClient = createApiClient({
+    baseUrl: config.apiBaseUrl,
+    timeoutMs: config.apiTimeoutMs,
+    logger: logger.child('api.auth'),
+    auth: {
+      getAccessToken: async () => null,
+      refreshAccessToken: async () => null,
+      onSessionExpired: () => undefined,
+    },
+    appVersion: Constants.expoConfig?.version ?? '0.0.0',
+    platform: Platform.OS,
+  });
+
   const session = createSessionController({
     tokenStore: secureTokenStore,
-    // TODO(backend-contract): swap for a real gateway once auth endpoints exist.
-    gateway: unimplementedSessionGateway,
+    gateway: createSessionGateway({ api: authClient, logger: logger.child('auth.gateway') }),
     logger: logger.child('session'),
     dispatch: sessionStore.dispatch,
     onSessionCleared: () => {
@@ -55,5 +80,5 @@ export function createAppRuntime(): AppRuntime {
     platform: Platform.OS,
   });
 
-  return { config, logger, queryClient, api, session };
+  return { config, logger, queryClient, api, authApi: authClient, session };
 }

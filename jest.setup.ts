@@ -44,18 +44,14 @@ jest.mock('@expo/vector-icons/Feather', () => {
 });
 
 /**
- * Livvic is loaded natively at runtime. Under Jest there is no font loader, so `useFonts`
- * reports loaded immediately and the TTF modules resolve to inert handles — the typography
- * tokens under test carry a `fontFamily` string, which is asserted directly.
+ * Livvic ships as five TTFs under `assets/fonts/` and is registered through `expo-font` in
+ * `src/app/_layout.tsx`. Under Jest there is no native font loader, so `useFonts` reports loaded
+ * immediately — the typography tokens under test carry a `fontFamily` string, which is asserted
+ * directly. Only `useFonts` is replaced; the rest of `expo-font` stays real.
  */
-jest.mock('@expo-google-fonts/livvic', () => ({
-  __esModule: true,
+jest.mock('expo-font', () => ({
+  ...(jest.requireActual('expo-font') as Record<string, unknown>),
   useFonts: () => [true, null],
-  Livvic_400Regular: 'Livvic_400Regular',
-  Livvic_500Medium: 'Livvic_500Medium',
-  Livvic_600SemiBold: 'Livvic_600SemiBold',
-  Livvic_700Bold: 'Livvic_700Bold',
-  Livvic_900Black: 'Livvic_900Black',
 }));
 
 /**
@@ -85,7 +81,89 @@ jest.mock('expo-constants', () => ({
         apiBaseUrl: 'https://api.test.invalid',
         apiTimeoutMs: 15000,
         logLevel: 'silent',
+        // No Maps key in tests: search reports `unconfigured`, which is a real, designed state
+        // and the one a build without a key genuinely has.
+        androidPackage: 'com.spoonhelp.userapp.test',
+        iosBundleIdentifier: 'com.spoonhelp.userapp.test',
       },
     },
   },
+}));
+
+/**
+ * Location and notifications are NATIVE modules with no headless implementation.
+ *
+ * Both are mocked to their "not available" answer rather than to a working one. That is the
+ * state a test runner is genuinely in, and it means every screen that depends on them is
+ * exercised on the path a real device also takes when permission is refused or the module is
+ * missing — which is the path most likely to be wrong.
+ */
+jest.mock('expo-location', () => ({
+  Accuracy: { Balanced: 3 },
+  requestForegroundPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: true })),
+  hasServicesEnabledAsync: jest.fn(async () => true),
+  getCurrentPositionAsync: jest.fn(async () => {
+    throw new Error('No location provider in the test environment');
+  }),
+  // The OS's cached fix. `null` by default, so the fallback path is the one tests take unless
+  // a test opts into a cached position explicitly.
+  getLastKnownPositionAsync: jest.fn(async () => null),
+  reverseGeocodeAsync: jest.fn(async () => []),
+}));
+
+/**
+ * `react-native-maps` is a native view with no headless implementation.
+ *
+ * Mocked to plain hosts that RENDER but do nothing, so a test can assert that the map is present
+ * (and absent before a point exists) without a Google Maps surface. Props pass straight through
+ * untouched, so a test can drive `onRegionChangeStart` / `onRegionChangeComplete` and prove the
+ * screen reads the coordinate the map settled on.
+ *
+ * The REF carries the imperative camera API, because the screen recentres through it. A ref that
+ * resolved to a bare `View` would make `animateToRegion` a missing method, and every recentre a
+ * crash that only the test environment sees.
+ */
+jest.mock('react-native-maps', () => {
+  const ReactNative = jest.requireActual('react-native') as typeof ReactNativeTypes;
+  const React = jest.requireActual('react') as typeof ReactTypes;
+
+  // Props pass straight through, so `testID` still finds the node and every callback the screen
+  // hands the map remains callable from a test.
+  const passthrough = (props: Record<string, unknown>) =>
+    React.createElement(ReactNative.View, props, props['children'] as ReactTypes.ReactNode);
+
+  /**
+   * Shared across renders and across the whole file, so a test can assert that a recentre was
+   * asked for. `clearMocks` empties the recorded calls between tests; the identity is stable.
+   */
+  const animateToRegion = jest.fn();
+  const animateCamera = jest.fn();
+
+  function MapViewMock(props: Record<string, unknown>, ref: ReactTypes.Ref<unknown>) {
+    React.useImperativeHandle(ref, () => ({ animateToRegion, animateCamera }), []);
+    return React.createElement(ReactNative.View, props, props['children'] as ReactTypes.ReactNode);
+  }
+  const MapView = React.forwardRef(MapViewMock);
+
+  return {
+    __esModule: true,
+    default: MapView,
+    Marker: passthrough,
+    PROVIDER_GOOGLE: 'google',
+    /** Exposed for tests that need to prove the camera moved (or did not). */
+    __animateToRegion: animateToRegion,
+  };
+});
+
+jest.mock('expo-notifications', () => ({
+  AndroidImportance: { DEFAULT: 3 },
+  setNotificationHandler: jest.fn(),
+  setNotificationChannelAsync: jest.fn(async () => undefined),
+  getPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: false })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: false })),
+  getDevicePushTokenAsync: jest.fn(async () => {
+    throw new Error('No push token in the test environment');
+  }),
+  addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
 }));

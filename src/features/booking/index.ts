@@ -1,5 +1,3 @@
-import { createKeyFactory } from '@core/query';
-
 /**
  * Feature: booking (instant + the lifecycle host).
  *
@@ -11,15 +9,13 @@ import { createKeyFactory } from '@core/query';
  * REFETCHES authoritative booking state. It never infers that a payment succeeded and never
  * computes an amount.
  *
- * The lifecycle mapping table lives in `./state/bookingStatusView.ts` and is intentionally empty
- * until the status enum exists.
- *
- * TODO(backend-contract): no booking endpoints, payloads or status values exist.
+ * The lifecycle mapping table lives in `./state/bookingStatusView.ts` and is keyed by the
+ * backend's own seven-value status enum.
  */
-export const bookingKeys = createKeyFactory('booking');
 
 export {
   BOOKING_STATUS_VIEWS,
+  isAwaitingConfirmation,
   resolveBookingView,
   UNKNOWN_BOOKING_VIEW,
 } from './state/bookingStatusView';
@@ -29,7 +25,23 @@ export { InstantSheet } from './components/InstantSheet';
 export type { InstantSheetProps } from './components/InstantSheet';
 export { ExtensionSheet } from './components/ExtensionSheet';
 export type { ExtensionSheetProps } from './components/ExtensionSheet';
-export { useBookingDetailData, useExtensionData, useInstantData } from './data';
+export { BookingDetailsSheet } from './components/BookingDetailsSheet';
+export type {
+  BookingDetailsSheetProps,
+  BookingDetailsViewModel,
+} from './components/BookingDetailsSheet';
+export {
+  durationLabelFor,
+  useBookingDetailData,
+  useBookingSubmission,
+  useExtensionCheckout,
+  useExtensionData,
+  useInstantData,
+  useTipCheckout,
+} from './data';
+export type { BookingSelection, BookingSubmission } from './data';
+export { extensionMinutesFrom, tipAmountPaiseFrom, tipIdFor } from './adapters';
 export { BookingDetailScreen, BookingDetailView } from './screens/BookingDetailScreen';
 export type { BookingDetailActions, BookingDetailViewProps } from './screens/BookingDetailScreen';
 export type * from './types';
+export * from './api';

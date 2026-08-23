@@ -1,0 +1,480 @@
+import { z } from 'zod';
+
+/**
+ * Booking DTOs — quote, create, detail, active, history, and the lifecycle reads.
+ *
+ * Verified against a live instance on 2026-08-18.
+ *
+ * ## Statuses are the backend's, exactly
+ *
+ * `created | assigned | cook_en_route | cook_arrived | cooking | completed | cancelled`. The app
+ * adds none. Reassignment is an EVENT reflected in the payload, not an eighth status, and
+ * auto-cancellation is `cancelled` plus cancellation metadata — the UI distinguishes them by
+ * reading those fields, never by inventing a status.
+ *
+ * ## `allowedActions` is authority, not a hint
+ *
+ * The server says whether this booking may be cancelled, rescheduled, extended, rated, tipped or
+ * called about. The client does NOT re-derive any of them from status and time. That is the
+ * single most important line in this file: every one of those rules has a policy behind it
+ * (bands, reschedule counts, extension windows) that lives on the server and moves without a
+ * release.
+ */
+
+export const bookingStatusSchema = z.enum([
+  'created',
+  'assigned',
+  'cook_en_route',
+  'cook_arrived',
+  'cooking',
+  'completed',
+  'cancelled',
+]);
+
+export type BookingStatus = z.infer<typeof bookingStatusSchema>;
+
+export const slotTypeSchema = z.enum(['scheduled', 'instant']);
+
+/** The immutable price snapshot. Integer paise; the client never recomputes any of it. */
+export const priceSchema = z.object({
+  amountPaise: z.number().int().nonnegative(),
+  durationMinutes: z.number().int().positive(),
+  serviceAmountPaise: z.number().int().nonnegative(),
+  taxRateBps: z.number().int().nonnegative(),
+  taxAmountPaise: z.number().int().nonnegative(),
+  totalAmountPaise: z.number().int().nonnegative(),
+  currency: z.literal('INR'),
+  pricingVersion: z.string(),
+});
+
+export type PriceDto = z.infer<typeof priceSchema>;
+
+/** `POST /v1/bookings/quote` — the quote carries its own expiry. */
+export const quoteResponseSchema = z.object({
+  quote: priceSchema.extend({ validUntil: z.string().datetime() }),
+  slotType: slotTypeSchema,
+  scheduledStart: z.string().datetime().nullable(),
+  durationMinutes: z.number().int().positive(),
+});
+
+export type QuoteResponse = z.infer<typeof quoteResponseSchema>;
+
+export const bookingAddressSchema = z.object({
+  label: z.string(),
+  /** Immutable customer-selected booking target, captured by the backend. */
+  latitude: z.number(),
+  longitude: z.number(),
+  flat: z.string().nullable(),
+  tower: z.string().nullable(),
+  society: z.string().nullable(),
+  street: z.string(),
+  pincode: z.string(),
+  city: z.string().nullable(),
+  state: z.string().nullable(),
+  hubName: z.string().nullable(),
+  receiverName: z.string().nullable(),
+  receiverPhone: z.string().nullable(),
+});
+
+export const bookingCookSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  phone: z.string().nullish(),
+  rating: z.number().nullish(),
+  photoUrl: z.string().nullish(),
+});
+
+/**
+ * Service timing.
+ *
+ * `actualStart` and `expectedEnd` are the ONLY authority for the in-service countdown.
+ * `scheduledStart + durationMinutes` is explicitly NOT the service end: an extension moves
+ * `expectedEnd`, and a late start moves it too.
+ */
+export const bookingTimingSchema = z.object({
+  /** Persisted cook arrival time, distinct from service start. */
+  arrivedAt: z.string().datetime().nullish(),
+  actualStart: z.string().datetime().nullable(),
+  expectedEnd: z.string().datetime().nullable(),
+  actualEnd: z.string().datetime().nullable(),
+});
+
+/**
+ * `POST /v1/bookings/:id/tips` - 201 (`created`) or 202 (`processing`).
+ *
+ * The SAME shape `POST /bookings/:id/payments/order` returns, which is the point: one client
+ * pipeline - order, open checkout, verify, refetch - serves both, and a tip is not a second,
+ * looser way to take money.
+ *
+ * `providerOrderId` is `null` while the provider order is not yet confirmed (the 202), never
+ * absent. `keyId` is Razorpay's PUBLIC key, attached per order so rotating it or moving between
+ * the test and live merchant accounts needs no app release; `null` only where none is
+ * configured, which is reachable in development alone. The secret never leaves the backend.
+ */
+export const tipOrderSchema = z.object({
+  tipId: z.string(),
+  paymentId: z.string(),
+  bookingId: z.string(),
+  cookId: z.string(),
+  provider: z.literal('razorpay'),
+  amountPaise: z.number().int().nonnegative(),
+  currency: z.literal('INR'),
+  status: z.enum(['created', 'processing', 'captured', 'failed']),
+  providerOrderId: z.string().nullable(),
+  keyId: z.string().nullable(),
+});
+
+export type TipOrderDto = z.infer<typeof tipOrderSchema>;
+
+/**
+ * `POST /v1/bookings/:id/tips/verify` - the tip after verification.
+ *
+ * Identical to the order without `keyId`: a settled tip has no checkout left to open. What the
+ * client reads from it is `status`; what it TRUSTS is the booking it then refetches.
+ */
+export const tipStatusSchema = tipOrderSchema.omit({ keyId: true });
+
+export type TipStatusDto = z.infer<typeof tipStatusSchema>;
+
+/**
+ * `POST /v1/bookings/:id/extensions` - 201, the payment-pending quote.
+ *
+ * Capacity is reserved first and the checkout order attached after that transaction commits, so
+ * a provider outage cannot hold the hub lock open. The quote therefore always names an
+ * `extensionId` - which the verify route needs - and may still carry a null `providerOrderId`.
+ *
+ * ## `keyId` is OPTIONAL here, and that is a contract gap rather than a preference
+ *
+ * `POST /payments/order` and `POST /tips` both attach the public Razorpay key to their reply.
+ * This one does not: `ExtensionQuote` declares no `keyId` and the route sends the service result
+ * unchanged. Checkout cannot be opened without a key, so the extension flow FAILS CLOSED at that
+ * point rather than opening Razorpay against a guessed or embedded one - see
+ * `usePayForExtension`. The field is modelled as optional so that the day the backend attaches
+ * it, exactly as it already does for a tip, the flow completes with no further frontend change.
+ *
+ * `pricePaise` is deprecated in the contract and deliberately not read: `totalAmountPaise` is
+ * what the customer is charged.
+ */
+export const extensionQuoteSchema = z.object({
+  extensionId: z.string(),
+  state: z.literal('payment_pending'),
+  paymentId: z.string(),
+  minutes: z.number().int().positive(),
+  taxAmountPaise: z.number().int().nonnegative(),
+  totalAmountPaise: z.number().int().nonnegative(),
+  currency: z.literal('INR'),
+  pricingVersion: z.string(),
+  newExpectedEnd: z.string(),
+  calculatedAt: z.string(),
+  providerOrderId: z.string().nullable(),
+  keyId: z.string().nullable().optional(),
+});
+
+export type ExtensionQuoteDto = z.infer<typeof extensionQuoteSchema>;
+
+/**
+ * `PUT /v1/bookings/:id/rating` - 200/201.
+ *
+ * Parsed rather than discarded because two of its fields answer questions the client cannot:
+ * `created` is false when the call REPLAYED an existing rating (there is one rating per booking,
+ * so a retry is not a second one), and `exceptional` is the STORED answer, which on a replay is
+ * the first submission's rather than this request's.
+ *
+ * `isFivePlus` is the EARNINGS term - exactly `stars === 5`, unaffected by `exceptional` - and is
+ * carried through unchanged. Nothing in this app pays anybody, so it is read and not acted on.
+ */
+export const ratingResultSchema = z.object({
+  ratingId: z.string(),
+  bookingId: z.string(),
+  cookId: z.string(),
+  stars: z.number(),
+  isFivePlus: z.boolean(),
+  exceptional: z.boolean(),
+  created: z.boolean(),
+});
+
+export type RatingResultDto = z.infer<typeof ratingResultSchema>;
+
+export const bookingReassignmentSchema = z.object({
+  /** True when the current assignment replaced an earlier cook assignment. */
+  occurred: z.boolean(),
+  sequence: z.number().int().nonnegative(),
+  reassignedAt: z.string().datetime().nullable(),
+});
+
+export const allowedActionsSchema = z.object({
+  canCancel: z.boolean(),
+  canReschedule: z.boolean(),
+  canExtend: z.boolean(),
+  canRate: z.boolean(),
+  canTip: z.boolean(),
+  canCallCook: z.boolean(),
+});
+
+export type AllowedActions = z.infer<typeof allowedActionsSchema>;
+
+export const bookingCancellationSchema = z.object({
+  reasonCode: z.string().nullish(),
+  reasonDetail: z.string().nullish(),
+  cancelledAt: z.string().datetime().nullish(),
+  cancelledBy: z.string().nullish(),
+  band: z.string().nullish(),
+  refundAmountPaise: z.number().int().nonnegative().nullish(),
+  chargeAmountPaise: z.number().int().nonnegative().nullish(),
+});
+
+export const bookingDetailSchema = z.object({
+  id: z.string(),
+  status: bookingStatusSchema,
+  slotType: slotTypeSchema,
+  scheduledStart: z.string().datetime().nullable(),
+  durationMinutes: z.number().int().positive(),
+  price: priceSchema,
+  /** The payment hold. Past it, an unpaid booking is released by the worker. */
+  holdExpiresAt: z.string().datetime().nullish(),
+  address: bookingAddressSchema,
+  mealNotes: z.string().nullable(),
+  referenceUrl: z.string().nullable(),
+  mealBrief: z.unknown().nullable(),
+  cook: bookingCookSchema.nullable(),
+  timing: bookingTimingSchema,
+  reassignment: bookingReassignmentSchema.nullish(),
+  cancellation: bookingCancellationSchema.nullable(),
+  allowedActions: allowedActionsSchema,
+});
+
+export type BookingDetailDto = z.infer<typeof bookingDetailSchema>;
+
+/**
+ * `GET /v1/bookings/:id`.
+ *
+ * `serverTime` is the server's clock at the moment it built the response, and it sits BESIDE the
+ * booking rather than inside it because it describes the response, not the booking. It is what
+ * lets the in-service countdown correct for device clock drift: a handset whose clock is minutes
+ * out would otherwise count down to the wrong moment against a correct `expectedEnd`.
+ *
+ * Optional, so a deployment that predates it parses rather than failing — the countdown then
+ * falls back to the device clock, which is what it did before this field existed.
+ */
+export const bookingDetailResponseSchema = z.object({
+  booking: bookingDetailSchema,
+  serverTime: z.string().datetime().nullish(),
+});
+
+export type BookingDetailResponse = z.infer<typeof bookingDetailResponseSchema>;
+/**
+ * `POST /v1/bookings` — 201.
+ *
+ * The create response is a SUMMARY, not the full detail: it carries the identity, the price
+ * snapshot and the payment hold, but no cook, timing or allowed actions, because none exist yet.
+ * The caller refetches the detail rather than treating this as one.
+ */
+export const bookingCreateResponseSchema = z.object({
+  booking: z.object({
+    id: z.string(),
+    status: bookingStatusSchema,
+    slotType: slotTypeSchema,
+    scheduledStart: z.string().datetime().nullable(),
+    durationMinutes: z.number().int().positive(),
+    price: priceSchema,
+    holdExpiresAt: z.string().datetime().nullish(),
+  }),
+});
+
+export type BookingCreateResponse = z.infer<typeof bookingCreateResponseSchema>;
+
+/** A row of `GET /v1/me/bookings` and `/me/bookings/active` — a summary, not the full detail. */
+export const bookingSummarySchema = z.object({
+  id: z.string(),
+  status: bookingStatusSchema,
+  slotType: slotTypeSchema,
+  scheduledStart: z.string().datetime().nullable(),
+  durationMinutes: z.number().int().positive(),
+  price: priceSchema,
+  addressLabel: z.string().nullish(),
+  reassignment: bookingReassignmentSchema.nullish(),
+});
+
+export type BookingSummaryDto = z.infer<typeof bookingSummarySchema>;
+
+export const bookingListResponseSchema = z.object({ bookings: z.array(bookingSummarySchema) });
+
+/** `GET /v1/bookings/:id/cancellation-preview`. Every number is the server's. */
+export const cancellationPreviewSchema = z.object({
+  bookingId: z.string(),
+  cancellable: z.boolean(),
+  band: z.string().nullish(),
+  refundPercent: z.number().nullish(),
+  minutesToStart: z.number().nullish(),
+  serviceAmountPaise: z.number().int().nonnegative(),
+  capturedAmountPaise: z.number().int().nonnegative(),
+  refundAmountPaise: z.number().int().nonnegative(),
+  chargeAmountPaise: z.number().int().nonnegative(),
+  policyVersion: z.string(),
+});
+
+export type CancellationPreviewDto = z.infer<typeof cancellationPreviewSchema>;
+
+/** `GET /v1/bookings/:id/reschedule-options`. Customer-initiated reschedule IS implemented. */
+export const rescheduleOptionsSchema = z.object({
+  bookingId: z.string(),
+  durationMinutes: z.number().int().positive(),
+  currentServiceStart: z.string().datetime(),
+  rescheduleCount: z.number().int().nonnegative(),
+  maxReschedules: z.number().int().nonnegative(),
+  reschedulable: z.boolean(),
+});
+
+export type RescheduleOptionsDto = z.infer<typeof rescheduleOptionsSchema>;
+
+/**
+ * `GET /v1/me/refunds` and `GET /v1/bookings/:id/refunds` — the CUSTOMER refund projection.
+ *
+ * Both routes return the same `RefundRecord`, from the same mapper, so one schema parses both.
+ *
+ * ## The field names are the backend's, and they were wrong here
+ *
+ * This schema previously read `id`, `status` and `createdAt` — none of which the backend sends.
+ * It sends `refundId`, `state` and `requestedAt`. Every field was ALSO optional, so the mismatch
+ * could not fail: a perfectly valid refund parsed into an object of `undefined`s, and the screen
+ * drew a row with no identity and no status pill. That is the exact failure mode a loose boundary
+ * schema is supposed to be examined for — it does not throw, it quietly empties the record.
+ *
+ * ## `state` is not simplified
+ *
+ * `reconcile_required` and `failed_terminal` are real durable outcomes (DEC-067). Collapsing them
+ * into "pending" would tell a customer their money is on the way when nobody knows that yet, so
+ * the value is carried through and the screen renders what the server said.
+ *
+ * `reason` and `state` stay `z.string()` rather than enums for the same reason the profile option
+ * ids do: this parses a list the customer opens, and a category added server-side must not make
+ * the screen throw. The vocabularies are documented in the contract and asserted in tests.
+ */
+export const refundSchema = z.object({
+  refundId: z.string(),
+  bookingId: z.string(),
+  /** Why Spoon owes this refund. A bounded, customer-safe category. */
+  reason: z.string(),
+  amountPaise: z.number().int().nonnegative(),
+  currency: z.string(),
+  /** `requested | provider_pending | succeeded | failed_retryable | failed_terminal | reconcile_required` */
+  state: z.string(),
+  requestedAt: z.string(),
+  /** Set once the provider settled it; null while the refund is still in flight. */
+  completedAt: z.string().nullable(),
+});
+
+export type RefundDto = z.infer<typeof refundSchema>;
+
+export const refundListResponseSchema = z.object({ refunds: z.array(refundSchema) });
+
+/**
+ * `GET /v1/bookings/:id/extension-options`.
+ *
+ * Read from the backend source (`ExtensionOption`) rather than from a live response: the
+ * endpoint 404s until a booking is actually in service, which local seeding did not reach.
+ * Marked as contract-read, not runtime-verified, in `docs/BACKEND_INTEGRATION_MAP.md`.
+ *
+ * `newExpectedEnd` is the server's — the client never adds minutes to a current end time.
+ */
+export const extensionOptionSchema = z.object({
+  minutes: z.number().int().positive(),
+  pricePaise: z.number().int().nonnegative(),
+  taxAmountPaise: z.number().int().nonnegative(),
+  taxRateBps: z.number().int().nonnegative(),
+  totalAmountPaise: z.number().int().nonnegative(),
+  currency: z.literal('INR'),
+  pricingVersion: z.string(),
+  newExpectedEnd: z.string().datetime(),
+});
+
+export type ExtensionOptionDto = z.infer<typeof extensionOptionSchema>;
+
+export const extensionOptionsResponseSchema = z.object({
+  options: z.array(extensionOptionSchema),
+});
+
+/**
+ * `GET /v1/bookings/:id/tracking`.
+ *
+ * Deliberately permissive beyond the fields the UI reads: tracking carries operational movement
+ * and confidence data that the customer app has no designed surface for, and enumerating it here
+ * would create a boundary that breaks whenever operations adds a field.
+ *
+ * `eta.estimatedArrivalAt` is the ONLY ETA. It is nullable, and a null ETA renders the designed
+ * "no ETA yet" presentation rather than a computed guess.
+ *
+ * ## `serviceOtp` — the code the customer reads out
+ *
+ * The 4-digit start/end codes are served HERE, not on the booking read (the customer app's
+ * long-standing BE-1 gap, closed backend-side by exposing them on tracking). The server derives
+ * them from state and returns `null` once a code is consumed or the booking is not in a state
+ * where that code applies, so the client shows exactly what it is given and never remembers a
+ * code past its window.
+ *
+ * `refreshAfterSeconds` is the server's own polling instruction — the client does not pick a
+ * tracking interval.
+ */
+export const trackingSchema = z.object({
+  bookingId: z.string(),
+  status: bookingStatusSchema,
+  eta: z.object({
+    estimatedArrivalAt: z.string().datetime().nullable(),
+    updatedAt: z.string().datetime().nullable(),
+  }),
+  /** Operational evidence is backend-owned and preserved even though V0 has no movement UI. */
+  movement: z
+    .object({
+      status: z.enum([
+        'awaiting_departure',
+        'progress_observed',
+        'position_stale',
+        'arrived',
+        'not_tracking',
+      ]),
+      lastEvidenceAt: z.string().datetime().nullable(),
+      etaConfidence: z.enum(['usable', 'degraded', 'unavailable']),
+    })
+    .optional(),
+  arrivedAt: z.string().datetime().nullable().optional(),
+  reassignment: bookingReassignmentSchema.nullish(),
+  timingVerdict: z.string().nullish(),
+  serviceOtp: z
+    .object({
+      start: z.string().nullish(),
+      end: z.string().nullish(),
+    })
+    .nullish(),
+  destination: z
+    .object({
+      gateName: z.string().nullish(),
+      societyName: z.string().nullish(),
+    })
+    .nullish(),
+  refreshAfterSeconds: z.number().int().positive().nullish(),
+  message: z.string().optional(),
+});
+
+export type TrackingDto = z.infer<typeof trackingSchema>;
+
+/**
+ * `GET /v1/bookings/:id/cook-contact` — the assigned cook's number, for a direct dial.
+ *
+ * A SEPARATE read, deliberately. V0's Call Cook hands the customer a cook's personal number
+ * (owner decision 2026-08-18: no masking layer, no VoIP, no WhatsApp), so the number crosses the
+ * wire only when Call is pressed — never on the booking detail that every service screen polls.
+ *
+ * The server refuses with `RESOURCE_NOT_FOUND` for every ineligible case — someone else's
+ * booking, an unassigned cook, a terminal status — and deliberately does not say which, because
+ * distinguishing them would confirm a booking exists. The client must therefore treat a 404 as
+ * "contact currently unavailable" and NOT as "no such booking".
+ */
+export const cookContactSchema = z.object({
+  cook: z.object({
+    cookId: z.string(),
+    displayName: z.string(),
+    phone: z.string(),
+  }),
+});
+
+export type CookContactDto = z.infer<typeof cookContactSchema>;

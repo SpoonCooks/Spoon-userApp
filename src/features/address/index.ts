@@ -1,5 +1,3 @@
-import { createKeyFactory } from '@core/query';
-
 /**
  * Feature: address.
  *
@@ -14,14 +12,18 @@ import { createKeyFactory } from '@core/query';
  * disagree — flagged PRODUCT_DESIGN_CONFLICT. Both surfaces exist in code and neither is chosen
  * by the client.
  *
- * TODO(backend-contract): no address endpoints, payloads or the serviceability response exist.
+ * The address endpoints, their payloads and the serviceability response all exist and are wired:
+ * `GET/POST /v1/me/addresses`, `PUT/DELETE /v1/me/addresses/:id` and `POST /v1/serviceability/check`,
+ * plus the per-address `serviceability` verdict every saved row now carries.
  * TODO(product B-13): whether `receiver { name, phone }` is per-address (as drawn) or
  * overridable per booking is unanswered.
  */
-export const addressKeys = createKeyFactory('address');
 
 export {
+  isAddressUsable,
+  useAddressGate,
   useAddressDetailsData,
+  useAddressEditData,
   useAddressLocationData,
   useAddressOutOfServiceData,
   useSavedAddressesData,
@@ -33,4 +35,33 @@ export {
   AddressOutOfServiceView,
   SavedAddressesView,
 } from './screens/AddressScreens';
+export type {
+  AddressDetailsViewProps,
+  AddressDraft as AddressFormDraft,
+  AddressLocationViewProps,
+} from './screens/AddressScreens';
+export type { AddressGate, AddressDetailsData } from './data';
+export {
+  canSubmitAddress,
+  isAddressFormComplete,
+  isOthersSelected,
+  missingAddressFields,
+  othersLabelIdOf,
+} from './validation';
+export type {
+  AddressFormShape,
+  AddressFormValues,
+  AddressRequiredField,
+  AddressSubmitGate,
+} from './validation';
 export type * from './types';
+export * from './api';
+export { useAddressLocation } from './location/useAddressLocation';
+export type { AddressLocationState } from './location/useAddressLocation';
+export { getCurrentCoordinates, reverseGeocode } from './location/deviceLocation';
+export type {
+  DeviceCoordinates,
+  DeviceLocationFailure,
+  DeviceLocationResult,
+  ReverseGeocodedAddress,
+} from './location/deviceLocation';

@@ -19,3 +19,9 @@
 *.ico binary
 *.jks binary
 *.keystore binary
+
+# patch-package diffs. A unified diff encodes a BLANK context line as a single space, so
+# `git diff --check` reports every one as trailing whitespace. Stripping them corrupts the
+# patch and breaks `postinstall`. Exempt them from the whitespace check rather than let a
+# well-meaning cleanup silently take the Android build down.
+*.patch -whitespace

@@ -1,17 +1,98 @@
-import { useDevFixture } from '@core/data';
+import { useMemo } from 'react';
+
+import { useBookingHistory, useRefunds } from '@features/booking';
+import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 
+import { formatPaise } from '@core/format';
+import type { StatusTone } from '@ui';
+
+import { bookingListFrom } from './adapters';
 import { DEMO_BOOKING_HISTORY, DEMO_REFUND_HISTORY } from '@/demo/fixtures/screens';
 import type { BookingListViewModel } from './types';
 
 /**
- * TODO(backend-contract): no history or refund endpoints exist, and the drawn status sets are
- * incomplete — no `Cancelled` (B-15) and no `Failed` refund state (D-15).
+ * Past bookings and refunds.
+ *
+ * `GET /v1/me/bookings` and `GET /v1/me/refunds`. The refund list is a CUSTOMER-level endpoint,
+ * so the Refunds screen does not fan out one request per booking — §22's N+1 warning does not
+ * apply here because the backend closed that gap.
+ *
+ * The two fixtures supply the screen's static copy only: the title and the empty-state text. A
+ * real account with no history returns `[]` and the designed empty state renders as drawn.
+ *
+ * The drawn status vocabulary is still incomplete against the real enum — there is no `Cancelled`
+ * pill (B-15) and no `Failed` refund state (D-15). The adapter maps what exists and leaves the
+ * gaps recorded rather than inventing pills the design never drew.
  */
 export function useBookingHistoryData(): ScreenQuery<BookingListViewModel> {
-  return useDevFixture(DEMO_BOOKING_HISTORY);
+  const history = useBookingHistory();
+
+  const state = useMemo(() => {
+    if (history.state.status !== 'ready') return history.state;
+    return ready(bookingListFrom({ base: DEMO_BOOKING_HISTORY, bookings: history.state.data }));
+  }, [history.state]);
+
+  return { state, refetch: history.refetch };
 }
 
+/**
+ * Refund `state` -> the pill the frames draw.
+ *
+ * `RefundState` is `requested | provider_pending | succeeded | failed_retryable |
+ * failed_terminal | reconcile_required` (DEC-067). The drawn vocabulary on `71:615` covers two of
+ * those ideas — settled, and still moving — so:
+ *
+ *   succeeded                                   -> "Refunded", the money has landed
+ *   requested / provider_pending / failed_retryable -> "Processing", it is still on its way
+ *                                                  (a retryable failure IS retried automatically)
+ *   reconcile_required / failed_terminal        -> NO pill
+ *
+ * The last line is deliberate and it is the one the contract argues for out loud: those two are
+ * real durable outcomes where nobody yet knows the money is coming, and labelling them
+ * "Processing" would tell a customer it is. No frame draws a "Failed" or "Needs review" pill
+ * (defect D-15), so none is invented here — the row shows the refund and its amount, and the pill
+ * is simply absent, exactly as a cancelled booking's is under B-15.
+ *
+ * The raw `state` string was previously rendered straight into the pill. It never appeared,
+ * because the schema read `status` and the backend sends `state`, so the field parsed as
+ * `undefined` and every refund drew an unlabelled row. Had it worked it would have printed
+ * `provider_pending` at the customer.
+ */
+const REFUND_PRESENTATION: Record<string, { readonly label: string; readonly tone: StatusTone }> = {
+  succeeded: { label: 'Refunded', tone: 'positive' },
+  requested: { label: 'Processing', tone: 'info' },
+  provider_pending: { label: 'Processing', tone: 'info' },
+  failed_retryable: { label: 'Processing', tone: 'info' },
+};
+
+/**
+ * Refunds — `GET /v1/me/refunds`.
+ *
+ * Every field on the row is the backend's `RefundRecord`: `refundId` identifies it, `amountPaise`
+ * is the money, `state` chooses the pill. Nothing is summed and no refund is derived from a
+ * booking total.
+ */
 export function useRefundHistoryData(): ScreenQuery<BookingListViewModel> {
-  return useDevFixture(DEMO_REFUND_HISTORY);
+  const refunds = useRefunds();
+
+  const state = useMemo(() => {
+    if (refunds.state.status !== 'ready') return refunds.state;
+
+    return ready<BookingListViewModel>({
+      ...DEMO_REFUND_HISTORY,
+      bookings: refunds.state.data.map((refund) => {
+        const presentation = REFUND_PRESENTATION[refund.state];
+        return {
+          id: refund.refundId,
+          headline: `Refund • ${formatPaise(refund.amountPaise)}`,
+          ...(presentation === undefined
+            ? {}
+            : { statusLabel: presentation.label, statusTone: presentation.tone }),
+        };
+      }),
+    });
+  }, [refunds.state]);
+
+  return { state, refetch: refunds.refetch };
 }

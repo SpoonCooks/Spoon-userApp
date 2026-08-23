@@ -1,7 +1,8 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
-import type { PropsWithChildren, ReactNode } from 'react';
-import type { ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Keyboard, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import type { PropsWithChildren, ReactNode, RefObject } from 'react';
+import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
@@ -30,7 +31,142 @@ export interface ScreenProps {
   /** Sticky region above the scroll area (`37:3705`). Draws its own padding. */
   readonly header?: ReactNode;
   readonly footer?: ReactNode;
+  /**
+   * Appended to the scroll content so a screen whose frame disagrees with the shared 20pt gap /
+   * 22pt lead can state its own. `34:3045` opens 16 below the header and spaces sections at 21.
+   */
+  readonly contentStyle?: ViewStyle;
   readonly testID?: string;
+}
+
+/**
+ * The IME's height while it is open, 0 otherwise.
+ *
+ * On Android 15+ the window is edge-to-edge and `adjustResize` NO LONGER shrinks it, so a
+ * `ScrollView` never learns that the keyboard covered its lower half: on the handset the focused
+ * Completion feedback field (`143:289`) sat entirely behind the IME with no way to scroll to it.
+ * Shrinking the scroll viewport by the reported height restores both the reachability and RN's
+ * built-in "scroll the focused input into view" behaviour, on both platforms.
+ *
+ * It is applied to the SCROLL VIEWPORT rather than to the content, because padding the content
+ * alone would let the user scroll there but would not bring them there.
+ */
+export function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (event) =>
+      setHeight(event.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener('keyboardDidHide', () => setHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return height;
+}
+
+/**
+ * Keeps the FOCUSED field clear of the keyboard inside a scroll area that `useKeyboardHeight`
+ * has already shrunk.
+ *
+ * Shrinking the viewport makes a covered field REACHABLE. It does not make it REACHED, and on
+ * this form those are different things. Android scrolls a child into view when it TAKES focus —
+ * and at that instant the keyboard is still closed, the viewport is still full height, and a
+ * field sitting in the lower half of the screen is already visible, so nothing scrolls. The IME
+ * then opens on top of it and nothing runs again, because a viewport that shrinks does not
+ * re-scroll what is inside it. `341:4672` (the grown-up-food search) is exactly that field:
+ * sixth block down, tapped from a scrolled position, typed into behind the keyboard.
+ *
+ * So the correction is issued from the viewport's own `onLayout`, for the reason `LoginScreen`
+ * already records: on Android `keyboardDidShow` fires BEFORE the resize reaches the view, so a
+ * scroll computed there is computed against the old height and moves nothing. `onLayout` is the
+ * first moment the new geometry is real.
+ *
+ * `onInputFocus` covers the other order — moving between fields while the keyboard is ALREADY
+ * up, where no relayout happens and so `onLayout` never fires.
+ *
+ * Both measure the field and the viewport in the SAME window coordinates and scroll by whatever
+ * overlap is left. Nothing is derived from `Dimensions` or from the IME's own frame: under the
+ * edge-to-edge window those two disagree about where the bottom of the screen is, and that
+ * disagreement is what the measured approach exists to avoid.
+ */
+export interface KeyboardAwareScroll {
+  /** Attach to the `ScrollView`. */
+  readonly scrollRef: RefObject<ScrollView | null>;
+  /** Attach to the `View` that carries the `marginBottom: keyboardHeight`. */
+  readonly viewportRef: RefObject<View | null>;
+  /** Attach to that same `View`'s `onLayout`. */
+  readonly onViewportLayout: () => void;
+  /** Attach to the `ScrollView`'s `onScroll` (with `scrollEventThrottle`). */
+  readonly onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /** Attach to every `TextInput` inside the scroll area. */
+  readonly onInputFocus: () => void;
+}
+
+export function useKeyboardAwareScroll(
+  keyboardHeight: number,
+  gap: number = lightTheme.space.lg,
+): KeyboardAwareScroll {
+  const scrollRef = useRef<ScrollView>(null);
+  const viewportRef = useRef<View>(null);
+  /**
+   * `scrollTo` takes an ABSOLUTE offset while the measurement yields a RELATIVE overlap, so the
+   * current offset has to be known. It is a ref rather than state: it changes on every frame of
+   * a drag and nothing renders from it.
+   */
+  const offset = useRef(0);
+
+  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    offset.current = event.nativeEvent.contentOffset.y;
+  }, []);
+
+  const reveal = useCallback(() => {
+    // No keyboard, or nothing focused, means there is nothing to be covered by.
+    if (keyboardHeight === 0) return;
+    const input = TextInput.State.currentlyFocusedInput();
+    const viewport = viewportRef.current;
+    if (input == null || viewport == null) return;
+
+    viewport.measureInWindow((_x, viewportY, _width, viewportHeight) => {
+      input.measureInWindow((_inputX, inputY, _inputWidth, inputHeight) => {
+        // How far the field's bottom edge (plus the breathing room the frames leave under a
+        // control) falls past the bottom of what the customer can still see.
+        const covered = inputY + inputHeight + gap - (viewportY + viewportHeight);
+        if (covered <= 0) return;
+        scrollRef.current?.scrollTo({ y: offset.current + covered, animated: true });
+      });
+    });
+  }, [keyboardHeight, gap]);
+
+  return {
+    scrollRef,
+    viewportRef,
+    onViewportLayout: reveal,
+    onScroll,
+    onInputFocus: reveal,
+  };
+}
+
+/**
+ * How much room the LAST element on a screen needs below it.
+ *
+ * The frames all draw a comfortable gap between the bottom CTA and the mock home indicator —
+ * `53:110` leaves 12, `275:4485` and `37:3907` leave 16 — and that gap was being applied as a
+ * flat padding. On a device it is not enough on its own: this app runs edge to edge, so the
+ * system's gesture bar sits INSIDE the window, and a 34pt CTA with 12pt beneath it ends up under
+ * the strip that intercepts swipes. Measured on the handset: the map step's Confirm finished 12dp
+ * from the screen edge, flush against the gesture pill.
+ *
+ * `Math.max` rather than a sum: on a device with no bottom inset the frame's own gap is exactly
+ * what the design asks for, and on a device with one the inset already provides more room than
+ * the gap did. Adding them would push the CTA off the geometry the frame draws.
+ */
+export function useBottomGutter(designGap: number): number {
+  const insets = useSafeAreaInsets();
+  return Math.max(designGap, insets.bottom);
 }
 
 export function Screen({
@@ -39,10 +175,13 @@ export function Screen({
   tone = 'app',
   header,
   footer,
+  contentStyle,
   testID,
   children,
 }: PropsWithChildren<ScreenProps>) {
   const content = padded ? styles.padded : undefined;
+  const keyboardHeight = useKeyboardHeight();
+  const footerGutter = useBottomGutter(lightTheme.space.lg);
 
   return (
     <SafeAreaView
@@ -54,7 +193,8 @@ export function Screen({
 
       {scroll ? (
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, content]}
+          style={keyboardHeight === 0 ? undefined : { marginBottom: keyboardHeight }}
+          contentContainerStyle={[styles.scrollContent, content, contentStyle]}
           keyboardShouldPersistTaps="handled"
         >
           {children}
@@ -64,7 +204,9 @@ export function Screen({
       )}
 
       {footer === undefined ? null : (
-        <View style={[styles.footer, TONE_STYLE[tone]]}>{footer}</View>
+        <View style={[styles.footer, TONE_STYLE[tone], { paddingBottom: footerGutter }]}>
+          {footer}
+        </View>
       )}
     </SafeAreaView>
   );

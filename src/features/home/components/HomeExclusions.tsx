@@ -8,18 +8,22 @@ import { HOME_DESIGN, useHomeContentWidth } from '../layout';
 import type { HomeMediaTileViewModel } from '../types';
 import { SectionTitle, sectionStyles } from './SectionTitle';
 
-const { exclusions: DESIGN } = HOME_DESIGN;
+const { exclusions: DESIGN, section: SECTION } = HOME_DESIGN;
 
 /**
- * "What's not included?" — Figma Page 3a `139:169`, re-read on `209:1357`.
+ * "What's not included?" — Figma `139:169`, grid `139:181`.
  *
- * A 2 × 2 grid at a 15pt gutter. Each cell is a 162-wide photograph 67.5pt tall at a 10pt radius,
- * darkened by a flat 40% black scrim (`209:1362`), with a Livvic Regular 9pt caption CENTRED
- * BENEATH the image — 6pt below it, not 8.
+ * A 2 × 2 grid, **8pt** across and 15pt down. Each cell is a 162-wide photograph 67.5pt tall at a
+ * 10pt radius, darkened by a flat 40 % black scrim (`156:38`), with a Livvic Regular 9pt caption
+ * CENTRED BENEATH the image — 6pt below it, not 8.
  *
- * RESPONSIVENESS: the track width comes from the available column (two tracks + one gutter fill
- * it exactly) and the image holds the designed 162:67.5 proportion with `aspectRatio`, so the
- * photography never stretches. Captions wrap rather than truncate — the frame's longest is
+ * The four photographs are re-exported this pass with the CURRENT node crops baked in
+ * (`155:529` draws its 4096² source at 132.11 % × 317.8 %, offset −20.81 % / −58.58 %), which
+ * moved two of them.
+ *
+ * RESPONSIVENESS: the track width comes from the section's inner column (two tracks + one gutter
+ * fill it exactly) and the image holds the designed 162 : 67.5 proportion with `aspectRatio`, so
+ * the photography never stretches. Captions wrap rather than truncate — the frame's longest is
  * "Cleaning entire kitchen" at 104pt inside a 162pt cell, so there is no headroom to ellipsise.
  */
 export interface HomeExclusionsProps {
@@ -28,9 +32,9 @@ export interface HomeExclusionsProps {
 }
 
 export function HomeExclusions({ title, exclusions }: HomeExclusionsProps) {
-  const content = useHomeContentWidth();
+  const content = useHomeContentWidth() - SECTION.paddingHorizontal * 2;
   // Two tracks plus the gutter fill the column exactly — floor so rounding cannot force a wrap.
-  const tileWidth = Math.floor((content - DESIGN.gap) / 2);
+  const tileWidth = Math.floor((content - DESIGN.columnGap) / 2);
 
   return (
     <View style={sectionStyles.section} testID="home-exclusions">
@@ -79,7 +83,13 @@ const styles = StyleSheet.create({
    */
   fill: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', alignSelf: 'stretch', gap: DESIGN.gap },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignSelf: 'stretch',
+    columnGap: DESIGN.columnGap,
+    rowGap: DESIGN.rowGap,
+  },
   media: {
     alignSelf: 'stretch',
     aspectRatio: DESIGN.imageAspectRatio,

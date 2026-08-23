@@ -6,7 +6,7 @@ import { Text } from '@ui/primitives/Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 /**
- * Navigation tile — the 2×2 grid on Profile (`6:663`): My orders · Addresses · My refunds · Help,
+ * Navigation tile — the 2×2 grid on Profile (`6:663`): My bookings · Addresses · My refunds · Help,
  * and the two booking tiles on Home (Instant Cook / Schedule Later).
  *
  * Note the Profile grid deliberately has no "Payment methods" tile: payment opens Razorpay

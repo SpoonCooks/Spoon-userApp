@@ -1,5 +1,5 @@
-export { getUserMessage } from './messages';
-export { fromStatus, normalizeError, toTimeoutError } from './normalize';
+export { getUserMessage, isRateLimited } from './messages';
+export { fromStatus, normalizeError, toNetworkError, toTimeoutError } from './normalize';
 export { isAppError, isRetryable } from './types';
 export type {
   AppError,

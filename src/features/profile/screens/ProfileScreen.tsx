@@ -2,12 +2,9 @@ import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
-import { IntroLoading } from '@features/loading';
 import {
-  BANNER_AVATAR_GLYPH,
   Icon,
   PROFILE_AVATAR_GLYPH,
-  PROFILE_INCOMPLETE_BADGE,
   PROFILE_CHEVRON_GLYPH,
   PROFILE_TILE_ART,
   QueryBoundary,
@@ -16,7 +13,10 @@ import {
   lightTheme,
 } from '@ui';
 
-import type { ProfileViewModel } from '../types';
+import { innerShadows } from '@ui/tokens/primitives';
+
+import { ProfileCompletionCard } from '../components/ProfileCompletionCard';
+import type { ProfileLinkViewModel, ProfileViewModel } from '../types';
 
 /**
  * Profile — Figma `6:663`.
@@ -42,9 +42,12 @@ import type { ProfileViewModel } from '../types';
  */
 export interface ProfileActions {
   readonly onBack: () => void;
-  /** `222:1590`. Optional: the destination for "Complete profile" is not designed anywhere. */
-  readonly onCompleteProfile?: () => void;
   readonly onSelectTile: (tileId: string) => void;
+  /**
+   * `222:1590` / `456:3479` — Complete profile / View profile. ONE destination for both, per the
+   * founder's ruling: the same `338:4508` page, blank on the first visit and prefilled after.
+   */
+  readonly onOpenProfileDetails: () => void;
   readonly onOpenLink: (linkId: string) => void;
   readonly onLogout: () => void;
 }
@@ -57,10 +60,26 @@ export interface ProfileViewProps extends ProfileActions {
 export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']} testID="profile-screen">
-      <QueryBoundary state={state} onRetry={onRetry} loadingFallback={<IntroLoading />}>
+      {/*
+        LOADING AUDIT (task §13 / §25). This boundary used to render `IntroLoading` — the branded
+        `71:747` interstitial — which made every Home -> Profile step look like a second app
+        launch. The founder's rule is that the ONE full-screen loading surface belongs to the app
+        opening and nowhere else, so the fallback is now the token layer's scoped state.
+      */}
+      <QueryBoundary state={state} onRetry={onRetry} loadingVariant="screen">
         {(profile) => (
           <>
-            <ScreenHeader title={profile.title} onBack={actions.onBack} />
+            {/* `257:3504` — 338 × 38, px 4 / py 6, no underline: the same geometry the shared
+                `63:783` header now carries, so it needs no density override.
+
+                It is drawn at x 16 / y 16 INSIDE `6:664`'s gutter column, like every other
+                instance of the component. It used to render flush against the safe area, which
+                put the back disc 20pt left of where the frame draws it and closed the 16pt lead
+                above it to nothing. The header sits outside the ScrollView (it does not scroll),
+                so the column's padding is applied here rather than on the body. */}
+            <View style={styles.headerColumn}>
+              <ScreenHeader title={profile.title} onBack={actions.onBack} />
+            </View>
 
             <ScrollView contentContainerStyle={styles.body}>
               <View style={styles.identity} testID="profile-identity">
@@ -80,55 +99,12 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
                 </View>
               </View>
 
-              {/* `222:1570` — NEW. A 145pt prompt between the identity card and the grid,
-                  rendered only when the server says the profile is incomplete. The panel is
-                  `rgba(255,247,204,0.7)` UNDER a shadow, so it uses the pre-composited token
-                  (§P3.2 class B) rather than the translucent value. */}
-              {profile.incomplete === undefined ? null : (
-                <View style={styles.incomplete} testID="profile-incomplete">
-                  <View style={styles.incompleteHead}>
-                    {/* `222:1571` — a 47 x 32 box: the 32pt disc and its 25pt glyph, then the
-                        15 x 32 exclamation mark at x 32.11. */}
-                    <View style={styles.incompleteMark}>
-                      <View style={styles.incompleteDisc} />
-                      <Image
-                        source={BANNER_AVATAR_GLYPH}
-                        style={styles.incompleteGlyph}
-                        resizeMode="contain"
-                        accessibilityIgnoresInvertColors
-                      />
-                      <Image
-                        source={PROFILE_INCOMPLETE_BADGE}
-                        style={styles.incompleteBadge}
-                        resizeMode="contain"
-                        accessibilityIgnoresInvertColors
-                      />
-                    </View>
-
-                    <View style={styles.incompleteText}>
-                      <Text variant="title" color="textStrong">
-                        {profile.incomplete.title}
-                      </Text>
-                      <Text variant="bodyLoose" color="textQuiet">
-                        {profile.incomplete.message}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* `222:1590` — 306 x 32, `#FFD600`, radius 16, Bold 16/24. */}
-                  <Pressable
-                    onPress={() => actions.onCompleteProfile?.()}
-                    accessibilityRole="button"
-                    accessibilityLabel={profile.incomplete.ctaLabel}
-                    style={({ pressed }) => [styles.incompleteCta, pressed ? styles.pressed : null]}
-                    testID="profile-incomplete-cta"
-                  >
-                    <Text variant="headingCtaTight" color="textOnAccent">
-                      {profile.incomplete.ctaLabel}
-                    </Text>
-                  </Pressable>
-                </View>
-              )}
+              {/* `222:1570` / `456:3467` — the completion card, at y 79 between the identity
+                  card and the tile grid. Reinstated for V8; see `ProfileCompletionCard`. */}
+              <ProfileCompletionCard
+                complete={profile.profileComplete}
+                onPress={actions.onOpenProfileDetails}
+              />
 
               <View style={styles.grid}>
                 {profile.tiles.map((tile) => (
@@ -151,10 +127,10 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
                             is ~136 and every label clipped ("My orde…", "View order hist…") on
                             the handset. `minHeight: 97` lets the tile grow instead. */}
                         <View style={styles.tileText}>
-                          <Text variant="title" color="textStrong" numberOfLines={2}>
+                          <Text variant="title" color="textPrimary" numberOfLines={2}>
                             {tile.title}
                           </Text>
-                          <Text variant="micro" color="textStrong" numberOfLines={2}>
+                          <Text variant="micro" color="textPrimary" numberOfLines={2}>
                             {tile.subtitle}
                           </Text>
                         </View>
@@ -175,30 +151,18 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
               <View style={styles.footerSpacer} />
 
               <View style={styles.footer} testID="profile-footer">
+                {/* A row with no `url` has nowhere to go, so it is drawn as the text it already
+                    is rather than as a button that absorbs a press and does nothing. The frame is
+                    identical either way — `6:779` is an underlined label — so this costs no
+                    pixels and removes a dead control. */}
                 {profile.links.map((link) => (
-                  <Pressable
+                  <LegalLinkRow
                     key={link.id}
-                    onPress={() => actions.onOpenLink(link.id)}
-                    accessibilityRole="link"
-                    accessibilityLabel={link.title}
-                    style={({ pressed }) => [styles.linkRow, pressed ? styles.pressed : null]}
-                    testID={`profile-link-${link.id}`}
-                  >
-                    {link.icon === undefined ? null : (
-                      <Icon name={link.icon} size={16} color="textPrimary" />
-                    )}
-                    <Text
-                      variant={link.id === 'legal' ? 'noteBody' : 'bodyMedium'}
-                      color="textPrimary"
-                      style={styles.linkLabel}
-                    >
-                      {link.title}
-                    </Text>
-                    {/* `6:775` is an external-link arrow; `6:782` is a shield. */}
-                    {link.trailingIcon === undefined ? null : (
-                      <Icon name={link.trailingIcon} size={14} color="textPrimary" />
-                    )}
-                  </Pressable>
+                    link={link}
+                    {...(link.url === undefined
+                      ? {}
+                      : { onPress: () => actions.onOpenLink(link.id) })}
+                  />
                 ))}
 
                 {/* `6:784` — the one confirmed destructive treatment in the design (defect D-9). */}
@@ -209,8 +173,8 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
                   style={({ pressed }) => [styles.logout, pressed ? styles.pressed : null]}
                   testID="profile-logout"
                 >
-                  <Icon name="logout" size={16} color="textLogout" />
-                  <Text variant="bodyBold" color="textLogout" align="center">
+                  {/* `6:789` — Livvic SemiBold 13/16 at `#FF0404`. The frame draws no glyph. */}
+                  <Text variant="profileLogout" color="textLogout" align="center">
                     {profile.logoutLabel}
                   </Text>
                 </Pressable>
@@ -223,12 +187,71 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
   );
 }
 
+/**
+ * `6:779` — one footer legal row.
+ *
+ * Two renderings of the SAME frame. With a destination it is a link; without one it is the
+ * underlined label the frame already draws, and nothing responds to a press. The alternative —
+ * a `Pressable` whose handler returns immediately — looks identical, reacts to touch, and takes
+ * the customer nowhere, which is the dead control task §11 is about.
+ */
+function LegalLinkRow({
+  link,
+  onPress,
+}: {
+  readonly link: ProfileLinkViewModel;
+  readonly onPress?: () => void;
+}) {
+  const content = (
+    <>
+      {link.icon === undefined ? null : <Icon name={link.icon} size={16} color="textPrimary" />}
+      {/* `6:781` — Livvic Bold 11/14.67, underlined. */}
+      <Text
+        variant="profileLegal"
+        color="textPrimary"
+        style={[styles.linkLabel, styles.linkUnderline]}
+      >
+        {link.title}
+      </Text>
+      {link.trailingIcon === undefined ? null : (
+        <Icon name={link.trailingIcon} size={14} color="textPrimary" />
+      )}
+    </>
+  );
+
+  if (onPress === undefined) {
+    return (
+      <View style={styles.linkRow} testID={`profile-link-${link.id}`}>
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="link"
+      accessibilityLabel={link.title}
+      style={({ pressed }) => [styles.linkRow, pressed ? styles.pressed : null]}
+      testID={`profile-link-${link.id}`}
+    >
+      {content}
+    </Pressable>
+  );
+}
+
 /** `69:423` — a 16pt gutter between the 161pt columns. */
 const HALF_GAP = lightTheme.space.sm;
 
 const styles = StyleSheet.create({
   /** `6:665` — Profile sits on `#F8FAFC`. */
   screen: { flex: 1, backgroundColor: lightTheme.colors.surfaceForm },
+  /** `6:664` — the 16pt gutter column the header is drawn inside, 16pt down from the top. */
+  headerColumn: {
+    paddingHorizontal: lightTheme.space.lg,
+    paddingTop: lightTheme.space.lg,
+    backgroundColor: lightTheme.colors.surface,
+  },
   /** `6:666` — 16pt padding, 24pt between the identity card, the grid and the footer. */
   body: {
     flexGrow: 1,
@@ -240,12 +263,13 @@ const styles = StyleSheet.create({
   /** Absorbs the slack so the footer sits at the foot of the viewport, as `71:614` draws it. */
   footerSpacer: { flexGrow: 1 },
   /** `6:667` — white, 1pt `#FFDE33`, 24pt radius, 15.889pt padding, 16pt gap. */
+  /** `6:667` — radius **20**, a 12pt gap, 1pt `#FFDE33`, `0 1 0 rgba(0,0,0,0.05)`. */
   identity: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: lightTheme.space.lg,
+    gap: lightTheme.space.md,
     padding: 15.889,
-    borderRadius: lightTheme.radius.r24,
+    borderRadius: 20,
     borderWidth: lightTheme.stroke.thin,
     borderColor: lightTheme.colors.borderCtaSoft,
     backgroundColor: lightTheme.colors.surface,
@@ -254,45 +278,6 @@ const styles = StyleSheet.create({
   avatar: { width: 32, height: 32 },
   /** `6:671` — 3pt between the name and the contact line. */
   identityText: { flex: 1, minWidth: 0, gap: 3 },
-  /* ---- `222:1570` profile-incomplete prompt ---- */
-  /** 338 x 145, radius **15**, `0 0 4 rgba(0,0,0,0.07)` over a pre-composited `#FFFADB`. */
-  incomplete: {
-    borderRadius: 15,
-    paddingTop: 15.889,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    gap: 12,
-    backgroundColor: lightTheme.colors.surfaceTileIdle,
-    ...lightTheme.elevation.tile,
-  },
-  /** `222:1571` sits 13pt in, 12pt clear of the 241pt text column at x 72. */
-  incompleteHead: { flexDirection: 'row', gap: 12 },
-  /** A 47 x 32 box: the disc occupies the first 32, the badge the last 15. */
-  incompleteMark: { width: 47, height: 32 },
-  /** `222:1572` — the same flat `#FFE666` disc the banners draw, so it is drawn, not exported. */
-  incompleteDisc: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: lightTheme.colors.surfaceAccentBold,
-  },
-  /** `222:1573` — 25pt, inset 4 / 3 inside the disc. */
-  incompleteGlyph: { position: 'absolute', left: 4, top: 3, width: 25, height: 25 },
-  /** `222:1582` — 15 x 32 at x 32.11. */
-  incompleteBadge: { position: 'absolute', left: 32.11, top: 0.34, width: 15, height: 32 },
-  /** `222:1575` — 3pt between the Bold 14/20 title and the Regular 12/16 line. */
-  incompleteText: { flex: 1, minWidth: 0, gap: 3 },
-  /** `222:1590` — 32pt tall at a 16pt radius, full width inside the panel's 16pt padding. */
-  incompleteCta: {
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: lightTheme.radius.md,
-    backgroundColor: lightTheme.colors.surfaceCta,
-  },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -HALF_GAP },
   gridCell: { width: '50%', paddingHorizontal: HALF_GAP, paddingBottom: lightTheme.space.lg },
   /** `69:406` — `#FFF7CC`, 15pt radius, px 15.89 / pt 16 / pb 15.889, 7pt gap. */
@@ -305,6 +290,8 @@ const styles = StyleSheet.create({
     paddingBottom: 15.889,
     borderRadius: lightTheme.radius.r15,
     backgroundColor: lightTheme.colors.surfaceAccent,
+    /** `69:406` — an INSET `0 0 2 rgba(0,0,0,0.1)`, which the tile was rendering without. */
+    boxShadow: innerShadows.profileTile,
   },
   tileArt: { width: 32, height: 32 },
   tileRow: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.xs },
@@ -324,22 +311,35 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   /** `6:766` — 10pt padding at a 12pt radius. */
+  /** `6:779` — a 28pt bar, px 4 / py 6, radius 12. The label is its only child. */
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 28,
     gap: lightTheme.space.sm,
-    padding: lightTheme.space.s10,
+    paddingHorizontal: lightTheme.space.xs,
+    paddingVertical: lightTheme.space.s6,
     borderRadius: lightTheme.radius.r12,
   },
+  /** `6:781` — Livvic Bold 11/14.67, underlined. */
+  linkUnderline: { textDecorationLine: 'underline' },
   linkLabel: { flex: 1, minWidth: 0 },
   /** `6:784` — `#FFF1F2`, centred, 6pt gap, 10pt padding at a 12pt radius. */
+  /** `6:784` — 306 x 25 on `#FFF1F2` at a **20pt** radius, px 12 / py 6. No glyph. */
   logout: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    height: 25,
     gap: lightTheme.space.s6,
-    padding: lightTheme.space.s10,
-    borderRadius: lightTheme.radius.r12,
+    paddingHorizontal: lightTheme.space.md,
+    /*
+     * NO vertical padding. `6:784` is 25 tall around a 16pt line; adding the node's nominal `py-6`
+     * on top leaves a 13pt box and Android clipped the descender — "Log Out" rendered "Loa Out" on
+     * the handset. Figma's autolayout lets the label overflow its padding; RN clips, so the drawn
+     * height wins and the line is centred inside it.
+     */
+    borderRadius: 20,
     backgroundColor: lightTheme.colors.surfaceLogout,
   },
   pressed: { opacity: 0.85 },

@@ -1,7 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { lightTheme } from '@ui';
-
+import { HOME_DESIGN } from '../layout';
 import type { HomeMarketingViewModel } from '../types';
 import { HomeCuisines } from './HomeCuisines';
 import { HomeDurationMatrix } from './HomeDurationMatrix';
@@ -31,11 +30,15 @@ export function HomeMarketing({ marketing }: HomeMarketingProps) {
         rows={marketing.durationGuide}
       />
       <HomeExclusions title={marketing.exclusionsTitle} exclusions={marketing.exclusions} />
-      <HomePromise title={marketing.promiseTitle} />
+      <HomePromise
+        title={marketing.promiseTitle}
+        {...(marketing.promise === undefined ? {} : { promise: marketing.promise })}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stack: { alignSelf: 'stretch', gap: lightTheme.layout.sectionGap },
+  /** The body rhythm is 16 throughout (`333:3835`), so the marketing stack carries it too. */
+  stack: { alignSelf: 'stretch', gap: HOME_DESIGN.body.gap },
 });
