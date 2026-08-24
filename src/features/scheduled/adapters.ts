@@ -3,6 +3,15 @@ import { durationLabelFor } from '@features/booking';
 import type { Catalogue } from '@features/catalogue';
 import { formatPaise } from '@core/format';
 
+import {
+  addServiceDays,
+  formatServiceDate,
+  formatServiceTime,
+  isWithinPeriod,
+  localMinuteIn,
+  serviceDateIn,
+} from './serviceTime';
+
 import type {
   ScheduleDayOption,
   SchedulePeriodOption,
@@ -28,12 +37,15 @@ import type {
  * and not on the server is a booking that fails at the last step.
  */
 
-/** Local `YYYY-MM-DD` for the availability query. Not an instant — a calendar date. */
-export function toServiceDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+/**
+ * Service `YYYY-MM-DD` for the availability query. Not an instant — a calendar date.
+ *
+ * Resolved in the SERVICE timezone, because that is the day the backend will read the string as.
+ * Taken off the device instead, a handset an hour behind India asks for the wrong day at midnight
+ * and is answered, correctly, about a day the customer did not pick.
+ */
+export function toServiceDate(date: Date, timeZone?: string): string {
+  return serviceDateIn(timeZone, date);
 }
 
 /** The day strip, sized by the published horizon. */
@@ -41,19 +53,24 @@ export function daysFrom(
   catalogue: Catalogue,
   now: Date = new Date(),
 ): readonly ScheduleDayOption[] {
+  const timeZone = catalogue.operatingWindow.timeZone;
+  const today = serviceDateIn(timeZone, now);
+
   return Array.from({ length: catalogue.scheduled.horizonDays }, (_unused, offset) => {
-    const date = new Date(now);
-    date.setDate(date.getDate() + offset);
+    // Stepped on the DATE, not on an instant: adding days to a local `Date` can be dragged across
+    // a boundary by the device's offset, and the strip would then offer a day the server does not
+    // recognise as today+n.
+    const id = addServiceDays(today, offset);
 
     return {
-      id: toServiceDate(date),
+      id,
       caption:
         offset === 0
           ? 'TODAY'
           : offset === 1
             ? 'TOMORROW'
-            : date.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase(),
-      label: date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+            : formatServiceDate(id, { weekday: 'short' }).toUpperCase(),
+      label: formatServiceDate(id, { day: 'numeric', month: 'short' }),
     };
   });
 }
@@ -75,12 +92,16 @@ export function periodsFrom(catalogue: Catalogue): readonly SchedulePeriodOption
   }));
 }
 
-/** Which published period a slot instant belongs to, by local minute-of-day. */
+/**
+ * Which published period a slot instant belongs to, by SERVICE minute-of-day.
+ *
+ * The boundaries are published in the service timezone, so the instant has to be read in it too.
+ * Reading the device clock instead filed a 12:00 IST slot under MORNING on a UTC handset — the
+ * grouping bug behind a Noon section that showed the wrong cards, or none.
+ */
 function periodIdFor(catalogue: Catalogue, start: Date): string | null {
-  const minute = start.getHours() * 60 + start.getMinutes();
-  const period = catalogue.scheduled.periods.find(
-    (candidate) => minute >= candidate.startMinute && minute < candidate.endMinute,
-  );
+  const minute = localMinuteIn(catalogue.operatingWindow.timeZone, start);
+  const period = catalogue.scheduled.periods.find((candidate) => isWithinPeriod(minute, candidate));
   return period?.id ?? null;
 }
 
@@ -108,9 +129,13 @@ export function slotsByPeriodFrom(input: {
 
     buckets[periodId]?.push({
       id: slot.start,
-      label: start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
-      // The SERVER's availability flag, never a comparison against the clock.
-      ...(slot.available ? {} : { disabled: true }),
+      // Written on the SERVICE clock: the instant is the server's, so the hand on the card has to
+      // be the server's too, or a UTC handset offers "6:30 AM" for a slot the server called noon.
+      label: formatServiceTime(input.catalogue.operatingWindow.timeZone, start),
+      // The SERVER's availability flag, never a comparison against the clock. An unavailable slot
+      // is DISABLED, never dropped: the frames draw it grey, and a card that vanishes tells the
+      // customer nothing about a time that simply cannot be booked yet.
+      ...(slot.available ? {} : { disabled: true, unavailableReason: slot.reason }),
     });
   }
 
@@ -138,9 +163,23 @@ export function scheduleFrom(input: {
   readonly base: ScheduleViewModel;
   readonly catalogue: Catalogue;
   readonly availability: ScheduledAvailabilityDto | null;
+  /**
+   * The availability read has not answered for the CURRENT day/duration yet.
+   *
+   * Distinct from "answered with nothing". An empty grid is a real answer — a period the server
+   * offers no candidate times for — and the frames draw it as an empty section. A grid that is
+   * merely not back yet is not that answer, and drawing the two the same way is what let a failed
+   * or in-flight read read as "no slots available" (task §8).
+   */
+  readonly slotsPending?: boolean;
   readonly now?: Date;
 }): ScheduleViewModel {
   const { base, catalogue } = input;
+  const pending = input.slotsPending ?? false;
+  // A day-level refusal (`SOCIETY_NOT_SUPPORTED`, `OUTSIDE_BOOKING_WINDOW`) is the server refusing
+  // the whole question, not a verdict on individual times. Carried so the state is distinguishable
+  // rather than silently identical to an empty grid.
+  const rejection = input.availability?.rejection ?? undefined;
 
   return {
     ...base,
@@ -148,6 +187,11 @@ export function scheduleFrom(input: {
     periods: periodsFrom(catalogue),
     // Reschedule moves WHEN, never HOW LONG — so it publishes no duration tiles.
     ...(base.mode === 'reschedule' ? {} : { durations: durationsFrom(catalogue) }),
-    slotsByPeriod: slotsByPeriodFrom({ catalogue, availability: input.availability }),
+    slotsByPeriod: slotsByPeriodFrom({
+      catalogue,
+      availability: pending ? null : input.availability,
+    }),
+    slotsPending: pending,
+    ...(rejection === null || rejection === undefined ? {} : { slotsRejection: rejection }),
   };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { DataState } from '@core/data';
@@ -136,12 +136,52 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
     slotId: initialSelection?.slotId ?? null,
   });
 
+  const { dayId, periodId, durationId, slotId } = selection;
+
+  /**
+   * The start times currently on offer, read off `state` here rather than inside the boundary's
+   * render prop, so the staleness rule below can be an ordinary derivation.
+   */
+  const slotsPending = state.status !== 'ready' || state.data.slotsPending;
+  const offered = useMemo(
+    () =>
+      state.status === 'ready' && periodId !== null
+        ? (state.data.slotsByPeriod[periodId] ?? [])
+        : [],
+    [state, periodId],
+  );
+
+  /**
+   * A chosen start time survives only as long as the SERVER still offers it (task §6).
+   *
+   * Availability is re-read every 15 seconds, and a slot that was free when it was tapped can come
+   * back `available: false`. Left selected, it would keep "Book Now" live over a time that is no
+   * longer bookable and push the refusal all the way to booking creation.
+   *
+   * DERIVED, never written back into state. The answer is a pure function of the latest grid, so
+   * recomputing it costs nothing and avoids the cascading render an effect would add — and the
+   * stale id stays in local state harmlessly, because nothing reads it directly.
+   *
+   * Held while the read is in flight: a selection must not be dropped merely because the grid that
+   * would confirm it has not arrived yet.
+   */
+  const selectableSlotId = useMemo(() => {
+    if (slotId === null || slotsPending) return slotId;
+    return offered.some((slot) => slot.id === slotId && slot.disabled !== true) ? slotId : null;
+  }, [slotId, slotsPending, offered]);
+
+  /** Memoised on its own fields so the host is not re-notified on every render. */
+  const effective = useMemo<ScheduleSelection>(
+    () => ({ dayId, periodId, durationId, slotId: selectableSlotId }),
+    [dayId, periodId, durationId, selectableSlotId],
+  );
+
   // Reported after commit rather than from inside the setter, so a host re-render caused by the
   // new selection cannot happen during this one's update.
   const { onSelectionChange } = actions;
   useEffect(() => {
-    onSelectionChange?.(selection);
-  }, [selection, onSelectionChange]);
+    onSelectionChange?.(effective);
+  }, [effective, onSelectionChange]);
 
   return (
     <QueryBoundary state={state} {...(onRetry === undefined ? {} : { onRetry })}>
@@ -149,19 +189,32 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
         const showTime = selection.dayId !== null;
         const hasDurations = schedule.durations !== undefined && schedule.durations.length > 0;
         const showDuration = showTime && selection.periodId !== null && hasDurations;
+        /**
+         * The grid is drawn once the server has ANSWERED for this day and duration — never while
+         * the answer is still in flight.
+         *
+         * An empty section and a section that has not loaded looked identical before this: pick a
+         * duration and the heading appeared instantly over nothing, which reads as "no start times
+         * exist" for as long as the request takes, and stayed that way forever if it failed. An
+         * answered day whose candidates are ALL unavailable still renders every card, grey — that
+         * is the state this screen must show, and it is not the same thing as having nothing.
+         */
         const showStart =
           showTime &&
           selection.periodId !== null &&
-          (!hasDurations || selection.durationId !== null);
+          (!hasDurations || selection.durationId !== null) &&
+          !schedule.slotsPending;
 
         const slots =
           selection.periodId === null ? [] : (schedule.slotsByPeriod[selection.periodId] ?? []);
 
         const complete =
-          selection.dayId !== null &&
-          selection.periodId !== null &&
-          selection.slotId !== null &&
-          (!hasDurations || selection.durationId !== null);
+          effective.dayId !== null &&
+          effective.periodId !== null &&
+          // The DERIVED id: a start time the server has stopped offering is not a selection, so a
+          // grid that changes under an untouched screen puts the CTA back to grey by itself.
+          effective.slotId !== null &&
+          (!hasDurations || effective.durationId !== null);
 
         const blocked = schedule.blockedMessage !== undefined;
 
@@ -207,7 +260,7 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                     // The style prop is not the guard: a press that races the state which
                     // disabled it must not create a booking or open checkout (task §J).
                     if (!bookable) return;
-                    actions.onSubmit(selection);
+                    actions.onSubmit(effective);
                   }}
                   variant="primary"
                   size="bar"
@@ -338,8 +391,14 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                 {/* `34:3485` — 4 columns of equal cells; see `ChipGroup` for the measured track. */}
                 <ChipGroup
                   options={toChipOptions(slots)}
-                  selectedId={selection.slotId}
-                  onSelect={(slotId) => setSelection((current) => ({ ...current, slotId }))}
+                  selectedId={effective.slotId}
+                  onSelect={(slotId) => {
+                    // `Chip` already refuses the press, and the same guard is repeated here for
+                    // the same reason the CTA carries one: the style prop is not the authority on
+                    // what may be selected. An unavailable start time can never become a selection.
+                    if (slots.some((slot) => slot.id === slotId && slot.disabled === true)) return;
+                    setSelection((current) => ({ ...current, slotId }));
+                  }}
                   columns={4}
                   density="slot"
                   accessibilityLabel={schedule.sectionTitles.startTime}

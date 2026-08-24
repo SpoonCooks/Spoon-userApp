@@ -29,8 +29,18 @@ import type { ScheduleMode, ScheduleViewModel } from './types';
  * DAY and DURATION to ask availability about; it decides nothing about what is offered.
  *
  * The address is the customer's default, because availability is a property of a specific
- * address. A screen reached before any address exists asks for nothing and renders the designed
- * day/period structure with an empty grid.
+ * address. A screen reached before any address exists asks for nothing, and renders the designed
+ * day/period/duration structure with the Start time section withheld — there is no answer about
+ * start times yet, and an empty grid would claim there is one.
+ *
+ * ## Three different "no slots"
+ *
+ * A read that FAILED, a read still IN FLIGHT and a day the server offers nothing on are three
+ * different facts, and this seam used to publish all three as the same empty grid inside a
+ * successful screen. That is the defect behind a blank Start time section: nothing distinguished
+ * a 5xx from a fully-booked afternoon, and neither offered a retry. They are now separated —
+ * error surfaces as `DataState.error`, in-flight as `slotsPending`, and an answered day carries
+ * its candidates whether or not any of them can be booked.
  */
 export function useScheduleData(
   mode: ScheduleMode,
@@ -47,8 +57,11 @@ export function useScheduleData(
 
   // Default to today and the first published duration, so the grid is populated on arrival
   // rather than empty until the customer taps something.
+  const timeZone =
+    catalogue.state.status === 'ready' ? catalogue.state.data.operatingWindow.timeZone : undefined;
   const date =
-    selection.date ?? (catalogue.state.status === 'ready' ? toServiceDate(new Date()) : null);
+    selection.date ??
+    (catalogue.state.status === 'ready' ? toServiceDate(new Date(), timeZone) : null);
   const durationMinutes =
     selection.durationMinutes ??
     (catalogue.state.status === 'ready'
@@ -60,10 +73,24 @@ export function useScheduleData(
   const state = useMemo(() => {
     if (catalogue.state.status !== 'ready') return catalogue.state;
 
+    /**
+     * A FAILED availability read is an error, not an empty grid.
+     *
+     * This seam used to hand `null` to the adapter for anything that was not `ready`, which turned
+     * a 5xx, a dropped connection and a schema mismatch into a successful screen whose Start time
+     * section was simply blank — indistinguishable from "the server offers nothing here", and with
+     * no retry offered. Surfacing the error gives the screen the designed `ErrorState` and the
+     * retry the boundary already wires (task §8).
+     */
+    if (availability.state.status === 'error') return availability.state;
+
     const schedule = scheduleFrom({
       base: mode === 'reschedule' ? DEMO_SCHEDULE_RESCHEDULE : DEMO_SCHEDULE_BOOK,
       catalogue: catalogue.state.data,
       availability: availability.state.status === 'ready' ? availability.state.data : null,
+      // Loading is its own state. The chips stay exactly where they are — a read must never blank
+      // a screen full of local choices — but the grid is withheld rather than drawn empty.
+      slotsPending: availability.state.status !== 'ready',
     });
 
     /**

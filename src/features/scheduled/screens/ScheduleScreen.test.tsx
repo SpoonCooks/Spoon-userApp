@@ -17,11 +17,19 @@ const actions = {
 };
 
 /** Day + period + duration + slot — the four the screen calls `complete`. */
+/**
+ * A complete selection whose start time is one the server actually OFFERS.
+ *
+ * It used to name `am-0500AM`, which `DEMO_SCHEDULE_BOOK` marks disabled — so these cases were
+ * asserting that "Book Now" goes live over an unavailable time. The screen now clears a selected
+ * start time the moment it is not offered, which is the point of the whole grid, so the fixture
+ * names an available one instead. `05:30 AM` carries no disabled flag in the same payload.
+ */
 const COMPLETE_SELECTION = {
   dayId: 'day-1',
   periodId: 'morning',
   durationId: 'dur-60',
-  slotId: 'am-0500AM',
+  slotId: 'am-0530AM',
 } as const;
 
 function renderBook() {

@@ -162,6 +162,30 @@ export const DEFAULT_API_STUBS: StubHandlers = {
     mealBrief: { minGuests: 1, maxGuests: 12, dietPreferences: ['veg', 'non_veg'] },
     support: {},
   }),
+  /**
+   * The Schedule and Reschedule screens BOTH read this on mount, for today and the first published
+   * duration, before the customer touches anything.
+   *
+   * It was missing, and used to go unnoticed: the data seam turned a failed availability read into
+   * a successful screen with an empty Start time grid, so "no stub for GET /v1/availability/
+   * scheduled" rendered as a perfectly normal screen. It now surfaces as the designed error state,
+   * which is what made the omission visible.
+   *
+   * The payload is deliberately MIXED — 05:00 is offered, 05:15 is not — so the default harness
+   * renders both the live and the grey card, exactly as an ordinary day does.
+   */
+  'GET /v1/availability/scheduled': () => ({
+    date: '2026-08-18',
+    durationMinutes: 30,
+    slots: [
+      // 05:00 / 05:15 IST (MORNING), 12:00 IST (NOON), 18:00 IST (EVENING).
+      { start: '2026-08-17T23:30:00.000Z', available: true, reason: 'AVAILABLE' },
+      { start: '2026-08-17T23:45:00.000Z', available: false, reason: 'NO_PRESENT_COOK' },
+      { start: '2026-08-18T06:30:00.000Z', available: true, reason: 'AVAILABLE' },
+      { start: '2026-08-18T12:30:00.000Z', available: false, reason: 'NO_SHIFT_COVERAGE' },
+    ],
+    validUntil: '2026-08-18T09:00:30.000Z',
+  }),
   'GET /v1/me': () => ({
     id: 'user-1',
     role: 'user',

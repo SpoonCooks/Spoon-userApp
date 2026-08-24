@@ -246,6 +246,9 @@ export const DEMO_SCHEDULE_BOOK: ScheduleViewModel = {
     { id: 'dur-150', label: '2.5 hr', price: '₹319', strikePrice: '₹750' },
   ],
   slotsByPeriod: SLOTS_BY_PERIOD,
+  // Sample data stands in for an answered read, so the fixture renders the grid rather than the
+  // not-yet-loaded state. The wired screen overwrites this from the availability query.
+  slotsPending: false,
   /**
    * The UNPRICED label, which is exactly what `275:4488` / `275:4713` / `275:4938` draw while the
    * selection is incomplete. `275:4177` adds the amount once it is complete, and that amount is
@@ -263,6 +266,7 @@ export const DEMO_SCHEDULE_RESCHEDULE: ScheduleViewModel = {
   days: DEMO_SCHEDULE_BOOK.days,
   periods: PERIODS,
   slotsByPeriod: SLOTS_BY_PERIOD,
+  slotsPending: false,
   primaryCtaLabel: 'Reschedule',
 };
 
