@@ -166,10 +166,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   icon: './assets/images/icon.png',
 
-  ios: {
-    bundleIdentifier: IOS_BUNDLE_IDENTIFIER,
-    supportsTablet: false,
+ ios: {
+  bundleIdentifier: IOS_BUNDLE_IDENTIFIER,
+  supportsTablet: false,
+  infoPlist: {
+    NSPhotoLibraryUsageDescription:
+      'Spoon does not access your photo library directly. This declaration is required for compatibility with a bundled system component.',
   },
+},
 
   android: {
     package: ANDROID_PACKAGE,
