@@ -1,5 +1,6 @@
 import {
   PROFILE_FIELDS,
+  PROFILE_GROWN_UP_FOOD_OPTIONS,
   PROFILE_REQUIRED_FIELDS,
   profileChoiceField,
   profilePromptField,
@@ -8,7 +9,9 @@ import {
   EMPTY_PROFILE_DETAILS,
   addGrownUpEating,
   canSubmitProfileDetails,
+  grownUpEatingSuggestions,
   isProfileDetailsComplete,
+  matchGrownUpEating,
   missingProfileFields,
   removeGrownUpEating,
   toggleSingle,
@@ -172,5 +175,71 @@ describe('single-select', () => {
    */
   it('clears the answer when the selected chip is pressed again', () => {
     expect(toggleSingle('vegan', 'vegan')).toBeNull();
+  });
+});
+
+/**
+ * `341:4655` is a CLOSED vocabulary now.
+ *
+ * The control used to be free text, so "It's okay", a half-typed "Rajasth" and "Rajasthani food"
+ * were three stored answers for at most one preference. What a customer types is now resolved
+ * against `PROFILE_GROWN_UP_FOOD_OPTIONS`, and anything that resolves to nothing is refused.
+ */
+describe('grown-up-eating is a picker, not a free-text field', () => {
+  it('adds a published cuisine', () => {
+    expect(addGrownUpEating([], 'Punjabi food')).toEqual(['Punjabi food']);
+  });
+
+  it('refuses a value the vocabulary does not contain', () => {
+    expect(addGrownUpEating([], "It's okay")).toEqual([]);
+  });
+
+  /**
+   * A PREFIX is not a choice. "Punjabi" is a reasonable thing to have typed on the way to
+   * "Punjabi food", and committing the longer name on Done would store an answer the customer was
+   * still in the middle of giving. The dropdown turns a partial word into a choice; this does not.
+   */
+  it('refuses a prefix of a published cuisine', () => {
+    expect(addGrownUpEating([], 'Punjabi')).toEqual([]);
+    expect(matchGrownUpEating('Punjabi')).toBeNull();
+  });
+
+  /** The stored value is the OPTION'S spelling, so one cuisine cannot become two rows. */
+  it('normalises to the published label whatever the customer typed', () => {
+    expect(addGrownUpEating([], '  punjabi FOOD ')).toEqual(['Punjabi food']);
+    expect(matchGrownUpEating('  punjabi FOOD ')).toBe('Punjabi food');
+  });
+
+  it('keeps the frame’s own three examples addable', () => {
+    let list: readonly string[] = [];
+    for (const value of ['Rajasthani food', 'Bihari food', 'Odiya food']) {
+      list = addGrownUpEating(list, value);
+    }
+    expect(list).toEqual(['Rajasthani food', 'Bihari food', 'Odiya food']);
+  });
+});
+
+describe('the cuisine dropdown', () => {
+  it('offers the whole list before anything is typed', () => {
+    // The vocabulary is closed, so a customer who has never seen it must be shown it.
+    expect(grownUpEatingSuggestions('', [])).toEqual(PROFILE_GROWN_UP_FOOD_OPTIONS);
+  });
+
+  /** Substring, not prefix: "punjab" and the shared " food" suffix both have to match. */
+  it('narrows on any part of the label, case-insensitively', () => {
+    expect(grownUpEatingSuggestions('PUNJAB', []).map((option) => option.label)).toEqual([
+      'Punjabi food',
+    ]);
+  });
+
+  /** Already chosen is not still on offer — the chip below the field is the selection. */
+  it('drops the cuisines already chosen', () => {
+    const offered = grownUpEatingSuggestions('', ['Punjabi food']).map((option) => option.label);
+    expect(offered).not.toContain('Punjabi food');
+    expect(offered).toContain('Bihari food');
+  });
+
+  it('offers nothing for a query the vocabulary does not answer', () => {
+    expect(grownUpEatingSuggestions('sushi', [])).toEqual([]);
   });
 });

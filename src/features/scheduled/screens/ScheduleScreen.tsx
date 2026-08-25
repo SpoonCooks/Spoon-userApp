@@ -322,14 +322,26 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                     ...(period.disabled === undefined ? {} : { disabled: period.disabled }),
                   }))}
                   selectedId={selection.periodId}
-                  onSelect={(periodId) =>
+                  onSelect={(periodId) => {
+                    // Same guard, and for the same reason, as the start-time grid below: `Chip`
+                    // already refuses the press, and the style prop is not the authority on what
+                    // may be selected. A meal period that has already elapsed today can never
+                    // become a selection, so it can never open a duration section over a grid of
+                    // start times that are all in the past.
+                    if (
+                      schedule.periods.some(
+                        (period) => period.id === periodId && period.disabled === true,
+                      )
+                    ) {
+                      return;
+                    }
                     setSelection((current) => ({
                       ...current,
                       periodId,
                       durationId: null,
                       slotId: null,
-                    }))
-                  }
+                    }));
+                  }}
                   columns={3}
                   accessibilityLabel={schedule.sectionTitles.time}
                   testID="schedule-periods"
@@ -388,22 +400,50 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
             {!showStart ? null : (
               <View style={styles.section}>
                 <SectionHeader title={schedule.sectionTitles.startTime} />
-                {/* `34:3485` — 4 columns of equal cells; see `ChipGroup` for the measured track. */}
-                <ChipGroup
-                  options={toChipOptions(slots)}
-                  selectedId={effective.slotId}
-                  onSelect={(slotId) => {
-                    // `Chip` already refuses the press, and the same guard is repeated here for
-                    // the same reason the CTA carries one: the style prop is not the authority on
-                    // what may be selected. An unavailable start time can never become a selection.
-                    if (slots.some((slot) => slot.id === slotId && slot.disabled === true)) return;
-                    setSelection((current) => ({ ...current, slotId }));
-                  }}
-                  columns={4}
-                  density="slot"
-                  accessibilityLabel={schedule.sectionTitles.startTime}
-                  testID="schedule-slots"
-                />
+                {/*
+                  An ANSWERED read that offers nothing has to say so.
+
+                  This is the "Start time heading over blank space" defect seen on device: the read
+                  had completed, the server had refused the whole day (`slots: []` plus a
+                  `rejection`), and the reason was sat on the view model unrendered. Every other
+                  state on this screen is distinguishable — in-flight withholds the section,
+                  a failure raises the boundary's `ErrorState`, an answered day with unbookable
+                  candidates draws them grey — and only this one was silent, which made a covered
+                  refusal look identical to a broken screen.
+
+                  `slotsMessage` is the server's own reason in words when it refused the day;
+                  otherwise the day WAS evaluated and simply holds no candidate for this period and
+                  duration, which is a different sentence.
+                */}
+                {slots.length === 0 ? (
+                  <NoteCard
+                    body={
+                      schedule.slotsMessage ??
+                      'No start times for this time of day. Try another duration or daypart.'
+                    }
+                    icon="alert"
+                    testID="schedule-slots-empty"
+                  />
+                ) : (
+                  /* `34:3485` — 4 columns of equal cells; see `ChipGroup` for the measured track. */
+                  <ChipGroup
+                    options={toChipOptions(slots)}
+                    selectedId={effective.slotId}
+                    onSelect={(slotId) => {
+                      // `Chip` already refuses the press, and the same guard is repeated here for
+                      // the same reason the CTA carries one: the style prop is not the authority
+                      // on what may be selected. An unavailable start time is never a selection.
+                      if (slots.some((slot) => slot.id === slotId && slot.disabled === true)) {
+                        return;
+                      }
+                      setSelection((current) => ({ ...current, slotId }));
+                    }}
+                    columns={4}
+                    density="slot"
+                    accessibilityLabel={schedule.sectionTitles.startTime}
+                    testID="schedule-slots"
+                  />
+                )}
               </View>
             )}
             {schedule.durationHelp === undefined ? null : (

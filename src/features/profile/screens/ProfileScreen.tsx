@@ -1,9 +1,9 @@
+import { Fragment } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
 import {
-  Icon,
   PROFILE_AVATAR_GLYPH,
   PROFILE_CHEVRON_GLYPH,
   PROFILE_TILE_ART,
@@ -16,7 +16,7 @@ import {
 import { innerShadows } from '@ui/tokens/primitives';
 
 import { ProfileCompletionCard } from '../components/ProfileCompletionCard';
-import type { ProfileLinkViewModel, ProfileViewModel } from '../types';
+import type { ProfileViewModel } from '../types';
 
 /**
  * Profile — Figma `6:663`.
@@ -155,15 +155,44 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
                     is rather than as a button that absorbs a press and does nothing. The frame is
                     identical either way — `6:779` is an underlined label — so this costs no
                     pixels and removes a dead control. */}
-                {profile.links.map((link) => (
-                  <LegalLinkRow
-                    key={link.id}
-                    link={link}
-                    {...(link.url === undefined
-                      ? {}
-                      : { onPress: () => actions.onOpenLink(link.id) })}
-                  />
-                ))}
+                {/*
+                  `6:779` verbatim — ONE line reading "Terms of Service & Privacy Policy", in the
+                  frame's own Livvic Bold 11/14.67, underlined.
+
+                  The line is unchanged; what changed is that each HALF is now its own control.
+                  It was previously a single label standing for two separate legal instruments,
+                  so it could only ever open one of them — and in practice opened neither,
+                  because no endpoint publishes a legal URL. "Terms of Service" now opens the
+                  Terms and "Privacy Policy" opens the Policy, with the frame's "&" sitting
+                  inert between them.
+
+                  Nested `Text` rather than two buttons, because the frame draws a sentence and a
+                  sentence is what this has to stay: two `Pressable`s side by side could not keep
+                  the "&" on the same baseline or wrap as one line on a narrow handset. It is the
+                  same construction `LoginScreen` already uses for the identical pair.
+                */}
+                <View style={styles.legalRow} testID="profile-legal">
+                  <Text variant="profileLegal" color="textPrimary" align="center">
+                    {profile.links.map((link, index) => (
+                      <Fragment key={link.id}>
+                        {index === 0 || profile.linksSeparator === undefined
+                          ? null
+                          : profile.linksSeparator}
+                        <Text
+                          variant="profileLegal"
+                          color="textPrimary"
+                          style={styles.linkUnderline}
+                          onPress={() => actions.onOpenLink(link.id)}
+                          accessibilityRole="link"
+                          accessibilityLabel={link.title}
+                          testID={`profile-link-${link.id}`}
+                        >
+                          {link.title}
+                        </Text>
+                      </Fragment>
+                    ))}
+                  </Text>
+                </View>
 
                 {/* `6:784` — the one confirmed destructive treatment in the design (defect D-9). */}
                 <Pressable
@@ -184,59 +213,6 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
         )}
       </QueryBoundary>
     </SafeAreaView>
-  );
-}
-
-/**
- * `6:779` — one footer legal row.
- *
- * Two renderings of the SAME frame. With a destination it is a link; without one it is the
- * underlined label the frame already draws, and nothing responds to a press. The alternative —
- * a `Pressable` whose handler returns immediately — looks identical, reacts to touch, and takes
- * the customer nowhere, which is the dead control task §11 is about.
- */
-function LegalLinkRow({
-  link,
-  onPress,
-}: {
-  readonly link: ProfileLinkViewModel;
-  readonly onPress?: () => void;
-}) {
-  const content = (
-    <>
-      {link.icon === undefined ? null : <Icon name={link.icon} size={16} color="textPrimary" />}
-      {/* `6:781` — Livvic Bold 11/14.67, underlined. */}
-      <Text
-        variant="profileLegal"
-        color="textPrimary"
-        style={[styles.linkLabel, styles.linkUnderline]}
-      >
-        {link.title}
-      </Text>
-      {link.trailingIcon === undefined ? null : (
-        <Icon name={link.trailingIcon} size={14} color="textPrimary" />
-      )}
-    </>
-  );
-
-  if (onPress === undefined) {
-    return (
-      <View style={styles.linkRow} testID={`profile-link-${link.id}`}>
-        {content}
-      </View>
-    );
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="link"
-      accessibilityLabel={link.title}
-      style={({ pressed }) => [styles.linkRow, pressed ? styles.pressed : null]}
-      testID={`profile-link-${link.id}`}
-    >
-      {content}
-    </Pressable>
   );
 }
 
@@ -275,7 +251,12 @@ const styles = StyleSheet.create({
     backgroundColor: lightTheme.colors.surface,
     ...lightTheme.elevation.badge,
   },
-  avatar: { width: 32, height: 32 },
+  /**
+   * Circle-clipped for the same reason `ProfileCompletionCard` clips it: the export is flattened
+   * onto WHITE, so its corners are opaque `#FFFFFF`. They are invisible here — `6:667` is a white
+   * card — but the clip means the asset no longer depends on its ground being white to look right.
+   */
+  avatar: { width: 32, height: 32, borderRadius: 16 },
   /** `6:671` — 3pt between the name and the contact line. */
   identityText: { flex: 1, minWidth: 0, gap: 3 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -HALF_GAP },
@@ -312,18 +293,15 @@ const styles = StyleSheet.create({
   },
   /** `6:766` — 10pt padding at a 12pt radius. */
   /** `6:779` — a 28pt bar, px 4 / py 6, radius 12. The label is its only child. */
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 28,
-    gap: lightTheme.space.sm,
+  /** `6:779` — the 28pt legal bar, centred on the panel's own axis like the Log Out row. */
+  legalRow: {
+    minHeight: 28,
+    justifyContent: 'center',
     paddingHorizontal: lightTheme.space.xs,
     paddingVertical: lightTheme.space.s6,
-    borderRadius: lightTheme.radius.r12,
   },
   /** `6:781` — Livvic Bold 11/14.67, underlined. */
   linkUnderline: { textDecorationLine: 'underline' },
-  linkLabel: { flex: 1, minWidth: 0 },
   /** `6:784` — `#FFF1F2`, centred, 6pt gap, 10pt padding at a 12pt radius. */
   /** `6:784` — 306 x 25 on `#FFF1F2` at a **20pt** radius, px 12 / py 6. No glyph. */
   logout: {

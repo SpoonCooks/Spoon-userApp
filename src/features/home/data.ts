@@ -123,12 +123,30 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
 
     return ready(
       homeFrom({
+        /**
+         * The arrival PROMISE appears TWICE on this screen and both readings are the catalogue's.
+         *
+         * The header headline was already patched from `instant.arrivalPromiseMinutes`; the
+         * Instant tile's emphasised run was not, so it kept rendering the fixture's transcribed
+         * " 18 mins" while the Instant sheet — which reads the same policy value — said 30. One
+         * screen stated the promise two ways, and the tile's was simply a number from a Figma
+         * frame. Both now come from the one published figure, so re-tuning the promise moves
+         * every surface at once and none of them can drift again.
+         *
+         * The tile is matched by id rather than by position: `tiles` is ordered content, and a
+         * future payload that puts Schedule first must not rewrite Schedule's subtitle.
+         */
         base:
           promiseMinutes === null
             ? base
             : {
                 ...base,
                 header: { ...base.header, etaHeadline: `Spoon in ${promiseMinutes} mins` },
+                tiles: base.tiles.map((tile) =>
+                  tile.id === 'instant' && tile.subtitleEmphasis !== undefined
+                    ? { ...tile, subtitleEmphasis: ` ${promiseMinutes} mins` }
+                    : tile,
+                ),
               },
         addressLabel: defaultAddress?.label ?? null,
         addressLine:

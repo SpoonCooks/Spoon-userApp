@@ -377,3 +377,95 @@ describe('a failure is a failure, not an empty day', () => {
     await waitFor(() => expect(cards()).toHaveLength(16));
   });
 });
+
+/**
+ * A day the SERVER refused outright is a recovery state, never a blank section.
+ *
+ * This is the case an address that stopped being serviceable produces: the read succeeds, the
+ * server declines the whole question with `slots: []` plus a bounded `rejection`, and every
+ * candidate-level assertion above is vacuously true because there are no candidates. Before this,
+ * the reason sat unread on the view model and the customer got the "Start time" heading over
+ * empty space — indistinguishable from a broken screen, and offering nothing to do about it.
+ *
+ * `slots: []` is legitimate ONLY here, paired with a rejection. An answered day with no rejection
+ * and no candidates is a different bug and is covered by the greyed-card cases above.
+ */
+function refusedDay(reason: string, date = SERVICE_DATE) {
+  return {
+    date,
+    durationMinutes: DURATION_MINUTES,
+    slots: [],
+    rejection: reason,
+    validUntil: new Date(Date.now() + 30_000).toISOString(),
+  };
+}
+
+describe('a day the server refused explains itself', () => {
+  it('tells the customer their address is not covered, instead of drawing nothing', async () => {
+    // The exact shape a previously-saved address produces once it stops resolving to a live hub.
+    renderSchedule(() => refusedDay('NOT_SERVICEABLE'));
+
+    await selectNoonTwoHours();
+
+    const note = await screen.findByTestId('schedule-slots-empty');
+    expect(note).toBeTruthy();
+    // The customer is pointed at the thing that fixes it — a different address — rather than
+    // being left to guess.
+    expect(screen.getByText(/another saved address/i)).toBeTruthy();
+    // No grid, no cards, and above all no silent empty section.
+    expect(cards()).toHaveLength(0);
+    expect(screen.queryByTestId('schedule-slots')).toBeNull();
+  });
+
+  it('keeps Book Now disabled through a refusal', async () => {
+    renderSchedule(() => refusedDay('NOT_SERVICEABLE'));
+
+    await selectNoonTwoHours();
+    await screen.findByTestId('schedule-slots-empty');
+
+    expect(ctaDisabled()).toBe(true);
+  });
+
+  it('does not present a refusal as an error, and offers no retry for it', async () => {
+    // A refusal is an ANSWER. Raising the error surface here would invite the customer to retry a
+    // question the server has already settled, and would hide the reason behind a generic failure.
+    renderSchedule(() => refusedDay('NOT_SERVICEABLE'));
+
+    await selectNoonTwoHours();
+    await screen.findByTestId('schedule-slots-empty');
+
+    expect(screen.queryByTestId('error-state')).toBeNull();
+  });
+
+  it('says something bounded for a reason it does not recognise', async () => {
+    // The backend vocabulary is closed but it can grow. An unknown code must still produce a
+    // sentence, and must not put a cause in the server's mouth.
+    renderSchedule(() => refusedDay('SOME_FUTURE_REASON'));
+
+    await selectNoonTwoHours();
+
+    expect(await screen.findByTestId('schedule-slots-empty')).toBeTruthy();
+    expect(screen.queryByText(/another saved address/i)).toBeNull();
+  });
+
+  it('recovers to a normal grid when the next answer carries candidates', async () => {
+    // Changing the day re-asks; a refusal must not be sticky.
+    // Keyed on the requested DATE, not on call order: the screen re-reads whenever the day or
+    // duration changes, so counting calls would make the case depend on how many times it did.
+    renderSchedule((params) => {
+      const date = params.get('date') ?? '';
+      return date === SERVICE_DATE ? refusedDay('NOT_SERVICEABLE') : allUnavailable(date);
+    });
+
+    await selectNoonTwoHours();
+    await screen.findByTestId('schedule-slots-empty');
+
+    const nextDay = addServiceDays(SERVICE_DATE, -1);
+    fireEvent.press(await screen.findByTestId(`schedule-days-${nextDay}`));
+    fireEvent.press(await screen.findByTestId('schedule-periods-NOON'));
+    fireEvent.press(await screen.findByTestId('schedule-duration-dur-120'));
+
+    await waitFor(() => expect(cards()).toHaveLength(16));
+    expect(screen.queryByTestId('schedule-slots-empty')).toBeNull();
+  });
+});

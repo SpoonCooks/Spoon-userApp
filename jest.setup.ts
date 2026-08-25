@@ -112,6 +112,25 @@ jest.mock('expo-location', () => ({
 }));
 
 /**
+ * `react-native-webview` is a native view with no headless implementation.
+ *
+ * Mocked to a plain host that RENDERS and passes every prop straight through, so a test can find
+ * it by `testID`, read the `source` handed to it, and — the part that matters — call
+ * `onShouldStartLoadWithRequest` directly to prove which URLs the legal viewer will and will not
+ * load. That rule is the viewer's whole security boundary, so it has to be reachable from a test
+ * rather than only from a real WebView.
+ */
+jest.mock('react-native-webview', () => {
+  const ReactNative = jest.requireActual('react-native') as typeof ReactNativeTypes;
+  const React = jest.requireActual('react') as typeof ReactTypes;
+
+  const WebView = (props: Record<string, unknown>) =>
+    React.createElement(ReactNative.View, props, props['children'] as ReactTypes.ReactNode);
+
+  return { __esModule: true, WebView, default: WebView };
+});
+
+/**
  * `react-native-maps` is a native view with no headless implementation.
  *
  * Mocked to plain hosts that RENDER but do nothing, so a test can assert that the map is present

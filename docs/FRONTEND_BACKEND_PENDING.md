@@ -46,9 +46,38 @@ is the exact inverse of `onboardingRequired` on `/auth/otp/verify`. Both are con
 the boot gate reads the former, the OTP screen routes on the latter. `BACKEND_GAP_PROFILE_COMPLETENESS`
 is retired.
 
-**Vocabulary.** `BACKEND_GAP_GROWN_UP_FOOD_CATALOGUE` stands, deliberately. No endpoint publishes a
-regional-cuisine list and the contract documents the field as an OPEN vocabulary. The control takes
-what the customer types; no list is fabricated. This is a **product decision**, not a gap to close.
+**Vocabulary.** `BACKEND_GAP_GROWN_UP_FOOD_CATALOGUE` is now a REAL gap, and the earlier reading of
+it as a settled product decision has been reversed.
+
+The position was that the field is an open vocabulary, so the control should take whatever the
+customer types. On device that produced exactly what an open vocabulary produces: "It's okay" was
+submitted as a household's regional cuisine, alongside half-typed words and free-form spellings of
+the same cuisine. None of it can be grouped, counted or matched against a cook, and all of it is
+durable customer data. Two answers meaning "Punjabi" were two different rows.
+
+`341:4655` is therefore a PICKER as of this pass. It filters a closed list, only a member of that
+list can be added, and the stored value is the list's own spelling — see
+`PROFILE_GROWN_UP_FOOD_OPTIONS` in `src/features/profile/fields.ts` and the rules in
+`validation.ts`.
+
+**The list is currently bundled with the client, which is the part that still needs the backend.**
+Re-wording or extending it costs an app release today, and two clients on different versions can
+disagree about what the vocabulary is. It belongs on `GET /v1/catalogue` beside the other published
+policy:
+
+```
+catalogue.profile.grownUpEatingOptions: { id: string; label: string }[]
+```
+
+`cook_profiles.cuisines` already stores the same kind of value on the backend, so the two lists
+should be one — a customer's "Bengali food" and a cook's `bengali` are the same fact, and matching
+them today means matching on display strings.
+
+No backend change is REQUIRED for this pass to work: `PUT /v1/me/profile` accepts any safe string
+for `grownUpEating` (`parseGrownUpEating` in `src/identity/profile-details.ts` bounds length and
+count, not vocabulary), so the picker's values submit and prefill unchanged, and answers saved
+before it existed still round-trip and can still be removed. Adding the endpoint field is what
+closes the gap; until then the client is the source of truth for this one list, and knowingly so.
 
 ## 2. Serviceability — CLOSED in contract, wired
 

@@ -39,6 +39,7 @@ import ProfileRoute from '@/app/(app)/profile';
 import RefundsRoute from '@/app/(app)/refunds';
 import RescheduleRoute from '@/app/(app)/reschedule/[id]';
 import ScheduledRoute from '@/app/(app)/scheduled';
+import LoginRoute from '@/app/(auth)/login';
 import OtpRoute from '@/app/(auth)/otp';
 import NotFoundRoute from '@/app/+not-found';
 
@@ -445,12 +446,50 @@ describe('profile children', () => {
    * underlined label it already is rather than as a control that swallows a press. See
    * `docs/FRONTEND_BACKEND_PENDING.md`.
    */
-  it('draws the legal row without making it a dead button', async () => {
+  /**
+   * The legal footer is TWO live controls that open IN THE APP.
+   *
+   * It used to be one combined "Terms of Service & Privacy Policy" row, deliberately drawn as
+   * inert text because no endpoint published a legal URL — so the control both under-described
+   * itself (one button, two documents) and went nowhere. The documents now ship with the app, so
+   * each is its own button with its own route.
+   */
+  it.each([
+    ['terms', '/legal/terms'],
+    ['privacy', '/legal/privacy'],
+  ])('opens %s in the app rather than an external browser', async (id, href) => {
     render(<ProfileRoute />);
 
-    const row = await screen.findByTestId('profile-link-legal');
-    expect(row).toBeTruthy();
-    expect(row.props.accessibilityRole).not.toBe('link');
+    const row = await screen.findByTestId(`profile-link-${id}`);
+    expect(row.props.accessibilityRole).toBe('link');
+
+    fireEvent.press(row);
+
+    // PUSHED, so Back returns to Profile — and never handed to `Linking`, which would eject the
+    // customer into Chrome to read the terms they are being asked to accept.
+    expect(mockRouter.push).toHaveBeenCalledWith(href);
+  });
+});
+
+/**
+ * Login states "By continuing, I accept the Terms of use & Privacy policy" directly above these
+ * two links, and both used to do NOTHING — `LoginScreen` takes the handlers as optional props and
+ * the route supplied neither, so each was drawn underlined, looked tappable, and absorbed the
+ * press silently.
+ *
+ * They must work with NO session, which is why `/legal/:doc` lives outside the `(app)` group:
+ * gated, the only people who could read the terms would be the people who already agreed to them.
+ */
+describe('legal documents are reachable before signing in', () => {
+  it.each([
+    ['Terms of use', '/legal/terms'],
+    ['Privacy policy', '/legal/privacy'],
+  ])('opens %s from Login', (label, href) => {
+    render(<LoginRoute />);
+
+    fireEvent.press(screen.getByText(label));
+
+    expect(mockRouter.push).toHaveBeenCalledWith(href);
   });
 });
 
@@ -475,7 +514,9 @@ describe('reschedule', () => {
  */
 describe('Home banner destinations', () => {
   it.each([
-    ['confirmed' as const, 'created' as const, '8a'],
+    // `created` is deliberately absent: an unfinalized payment draws no banner, so it has no
+    // destination to lead anywhere. See `homeBannerView`'s note on why it stopped sharing the
+    // confirmed card.
     ['confirmed' as const, 'assigned' as const, '8a'],
     ['arriving' as const, 'cook_en_route' as const, '9a/9b'],
     ['arrived' as const, 'cook_arrived' as const, '11'],

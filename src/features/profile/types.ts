@@ -67,5 +67,11 @@ export interface ProfileViewModel {
   readonly profileComplete: boolean;
   readonly tiles: readonly ProfileTileViewModel[];
   readonly links: readonly ProfileLinkViewModel[];
+  /**
+   * What joins the legal links when there is more than one — `6:779` writes them as ONE line,
+   * "Terms of Service & Privacy Policy", so the separator is drawn copy rather than a component
+   * choice. Absent for a single link, which needs nothing between it and itself.
+   */
+  readonly linksSeparator?: string;
   readonly logoutLabel: string;
 }

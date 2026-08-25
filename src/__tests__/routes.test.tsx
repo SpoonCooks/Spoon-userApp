@@ -28,6 +28,7 @@ import AddressLocationRoute from '@/app/(app)/address/location';
 import BookingRoute from '@/app/(app)/booking/[id]';
 import HistoryRoute from '@/app/(app)/history';
 import HomeRoute from '@/app/(app)/home';
+import LegalDocumentRoute from '@/app/legal/[doc]';
 import MealBriefRoute from '@/app/(app)/meal-brief';
 import ProfileRoute from '@/app/(app)/profile';
 import ProfileDetailsRoute from '@/app/(app)/profile/details';
@@ -112,6 +113,78 @@ describe('routes render', () => {
     // `find*` rather than `get*`: the wired routes resolve their reads asynchronously, so the
     // designed screen appears on the next tick rather than in the first synchronous render.
     expect(await screen.findByTestId(testID)).toBeTruthy();
+  });
+
+  /**
+   * `53:31` is the FIRST screen after OTP for a new account, so nothing on it may look like an
+   * address the app already has.
+   *
+   * The resolved row used to fall back to `DEMO_ADDRESS_LOCATION`'s transcribed sample — "Street
+   * Name" over "Area 124, subarea 2 xyz, city efg" — whenever there was no point. The global
+   * expo-location mock denies the permission, which is exactly that state, and it is the state a
+   * real first-time customer who declines the prompt lands in: they were shown a saved-looking
+   * address they had never entered.
+   */
+  it('shows no fixture address on the map step when there is no point', async () => {
+    render(<AddressLocationRoute />);
+    await screen.findByTestId('address-location-screen');
+
+    expect(screen.queryByText('Area 124, subarea 2 xyz, city efg')).toBeNull();
+    expect(screen.queryByText('Street Name')).toBeNull();
+    // It says what is true instead, and the helper pill beside it names the way forward.
+    expect(screen.getByText('No location selected')).toBeTruthy();
+  });
+
+  /** Same rule, one screen later: the Area row of the form that SAVES the address. */
+  it('shows no fixture address in the address form before a point is pinned', async () => {
+    render(<AddressDetailsRoute />);
+    await screen.findByTestId('address-details-screen');
+
+    expect(screen.queryByText('Street name, Area 124, subarea xyz, city')).toBeNull();
+  });
+
+  /**
+   * The arrival PROMISE is stated TWICE on Home and both readings are the catalogue's.
+   *
+   * The header headline was already patched from `instant.arrivalPromiseMinutes`; the Instant
+   * tile's emphasised run was not, so it rendered the fixture's transcribed " 18 mins" while the
+   * Instant sheet — reading the same policy value — said 30. One screen, two numbers, and the
+   * tile's came from a Figma frame rather than from the server.
+   *
+   * The stub catalogue publishes 30, so both surfaces have to say 30.
+   */
+  it('states the instant arrival promise from the catalogue, not from the fixture', async () => {
+    render(<HomeRoute />);
+    // `find*`, not `get*`: Home renders as soon as the ADDRESS read settles, and the catalogue —
+    // which carries the promise — lands a tick later.
+    expect(await screen.findByText('Spoon in 30 mins')).toBeTruthy();
+    expect(screen.getByText('Get a cook in 30 mins')).toBeTruthy();
+    expect(screen.getByTestId('home-tile-instant-emphasis').props.children).toBe(' 30 mins');
+    // The superseded hardcoded figure is gone from both.
+    expect(screen.queryByText(/18 mins/)).toBeNull();
+  });
+
+  /** Both legal documents open IN the app, each under its own title. */
+  it.each([
+    ['terms', 'Customer Terms of Service'],
+    ['privacy', 'Customer Privacy Policy'],
+  ])('legal/%s', async (doc, title) => {
+    mockSearchParams = { doc };
+    render(<LegalDocumentRoute />);
+
+    expect(await screen.findByTestId('legal-document-screen')).toBeTruthy();
+    expect(screen.getByText(title)).toBeTruthy();
+  });
+
+  /**
+   * Task §20 — a deep link must never dead-end. A legal document is either published or it is
+   * not, so an unknown one redirects to somewhere real rather than drawing an empty viewer.
+   */
+  it('redirects an unknown legal document instead of rendering an empty viewer', () => {
+    mockSearchParams = { doc: 'cookies' };
+    render(<LegalDocumentRoute />);
+
+    expect(screen.queryByTestId('legal-document-screen')).toBeNull();
   });
 
   it('renders the NEW Login (53:174) — hero, tagline, pill field and legal footer', () => {

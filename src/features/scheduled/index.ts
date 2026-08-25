@@ -18,6 +18,13 @@ import { createKeyFactory } from '@core/query';
 export const scheduledKeys = createKeyFactory('scheduled');
 
 export { useScheduleData } from './data';
+/**
+ * Service-clock helpers, published because the service timezone is not the Schedule screen's
+ * private concern. Any surface that prints a booking's calendar day — the history list, for one —
+ * has to read it on the same clock the backend published, or the same instant is drawn as two
+ * different dates on two devices.
+ */
+export { formatServiceDate, serviceDateIn } from './serviceTime';
 export { devScheduleSelection } from './devSteps';
 export { ScheduleView } from './screens/ScheduleScreen';
 export type { ScheduleActions, ScheduleViewProps } from './screens/ScheduleScreen';

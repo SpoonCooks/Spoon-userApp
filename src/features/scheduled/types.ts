@@ -84,6 +84,14 @@ export interface ScheduleViewModel {
    * grid; carried so the two states can be told apart in code and in tests.
    */
   readonly slotsRejection?: string;
+  /**
+   * `slotsRejection` turned into something a customer can read.
+   *
+   * The raw code is kept beside it because it is the machine fact and tests assert on it; this is
+   * what the screen draws. Resolved in the adapter rather than in the screen, like every other
+   * string on this model — a screen never reaches for copy.
+   */
+  readonly slotsMessage?: string;
   readonly primaryCtaLabel: string;
   /**
    * `275:4180` — the underlined line beneath the CTA ("Check payment details"), exactly as the

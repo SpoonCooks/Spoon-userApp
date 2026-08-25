@@ -87,19 +87,85 @@ export interface ProfileChoiceField extends ProfileFieldBase {
 }
 
 /**
- * `341:4655` — a search field that ADDS a value rather than picking one from a list.
+ * `341:4655` — a search field that FILTERS a published vocabulary and adds the match.
  *
- * BACKEND_GAP_GROWN_UP_FOOD_CATALOGUE: no endpoint publishes a cuisine list. `GET /v1/catalogue`
- * carries pricing, the operating window, cancellation bands and extension options, and nothing
- * resembling a regional-cuisine vocabulary. The frame's own values ("Rajasthani food", "Bihari
- * food", "Odiya food") are an OPEN set — India has no closed list of regional cuisines that three
- * examples could stand for — so the control takes what the customer types instead of offering an
- * invented dropdown. No vocabulary is fabricated here; see `docs/FRONTEND_BACKEND_PENDING.md`.
+ * ## It used to accept anything, and that was the defect
+ *
+ * The control was free text: whatever the customer typed became a chip. So "It's okay", a
+ * half-typed "Rajasth", a typo and "Rajasthani food" were four different stored answers for at
+ * most one real preference, and the column filled with values nothing downstream could group,
+ * count or match a cook against. The founder's rule is explicit — this field takes a cuisine, not
+ * a sentence.
+ *
+ * It is now a picker: typing narrows `options` and only a value FROM that list can be added. The
+ * closed set is the whole point, so `validation.ts` enforces it rather than the screen.
+ *
+ * ## Where the vocabulary comes from, and where it should come from
+ *
+ * BACKEND_GAP_GROWN_UP_FOOD_CATALOGUE is still open: no endpoint publishes a cuisine list.
+ * `GET /v1/catalogue` carries pricing, the operating window, cancellation bands, extension options
+ * and the meal-brief diet axis, and nothing resembling a regional-cuisine vocabulary — so the list
+ * below is bundled with the client, which means re-wording or extending it costs a release.
+ *
+ * That is a known interim position, taken because the alternative in production is worse: a free
+ * field writing ungroupable strings into durable customer data. `cook_profiles.cuisines` already
+ * exists on the backend as the same kind of value, which is where the shared vocabulary belongs —
+ * see `docs/FRONTEND_BACKEND_PENDING.md`.
+ *
+ * The three names on the frame (`341:4652`) — Rajasthani, Bihari, Odiya — are members of this list
+ * rather than its whole extent, and the " food" suffix is the frame's own wording.
  */
 export interface ProfileEntryField extends ProfileFieldBase {
   readonly kind: 'entry';
   readonly placeholder: string;
+  /**
+   * The values that may be added. Multi-select: presence in the answer IS the selection, so there
+   * is no `columns` — the chosen ones are drawn as `341:4652` removable chips, not as a grid.
+   */
+  readonly options: readonly ProfileOption[];
 }
+
+/**
+ * The cuisine vocabulary offered by `341:4655`.
+ *
+ * Ordered roughly by how commonly each is claimed as a household's own cooking, not
+ * alphabetically: the list is read top-down under a search box, and the first screenful should be
+ * the likely answers. Search reorders it anyway the moment anything is typed.
+ *
+ * `id` is kebab-case for consistency with every other option in this file, but note that what is
+ * SUBMITTED for this field is the LABEL, not the id — see `validation.ts`. The backend stores
+ * these as free strings (`MAX_GROWN_UP_EATING_LENGTH`), and a saved answer from before this list
+ * existed still round-trips and can still be removed.
+ */
+export const PROFILE_GROWN_UP_FOOD_OPTIONS: readonly ProfileOption[] = [
+  { id: 'north-indian', label: 'North Indian food' },
+  { id: 'south-indian', label: 'South Indian food' },
+  { id: 'punjabi', label: 'Punjabi food' },
+  { id: 'rajasthani', label: 'Rajasthani food' },
+  { id: 'gujarati', label: 'Gujarati food' },
+  { id: 'maharashtrian', label: 'Maharashtrian food' },
+  { id: 'bengali', label: 'Bengali food' },
+  { id: 'bihari', label: 'Bihari food' },
+  { id: 'odiya', label: 'Odiya food' },
+  { id: 'assamese', label: 'Assamese food' },
+  { id: 'tamil', label: 'Tamil food' },
+  { id: 'kerala', label: 'Kerala food' },
+  { id: 'andhra', label: 'Andhra food' },
+  { id: 'telangana', label: 'Telangana food' },
+  { id: 'karnataka', label: 'Karnataka food' },
+  { id: 'chettinad', label: 'Chettinad food' },
+  { id: 'hyderabadi', label: 'Hyderabadi food' },
+  { id: 'awadhi', label: 'Awadhi food' },
+  { id: 'mughlai', label: 'Mughlai food' },
+  { id: 'kashmiri', label: 'Kashmiri food' },
+  { id: 'goan', label: 'Goan food' },
+  { id: 'sindhi', label: 'Sindhi food' },
+  { id: 'marwari', label: 'Marwari food' },
+  { id: 'konkani', label: 'Konkani food' },
+  { id: 'jain', label: 'Jain food' },
+  { id: 'indo-chinese', label: 'Indo-Chinese food' },
+  { id: 'continental', label: 'Continental food' },
+];
 
 export type ProfileField = ProfileTextField | ProfileChoiceField | ProfileEntryField;
 
@@ -179,7 +245,9 @@ export const PROFILE_FIELDS: readonly ProfileField[] = [
     kind: 'entry',
     label: 'What food have you grown up eating?',
     required: false,
+    // `341:4678` — the frame's own placeholder, and now also the first thing the open list offers.
     placeholder: 'Rajasthani food',
+    options: PROFILE_GROWN_UP_FOOD_OPTIONS,
   },
 
   {

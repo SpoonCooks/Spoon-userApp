@@ -251,16 +251,25 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   /**
-   * `289:7521` — the portrait is drawn 89 × 133.5 from (−0.89, −12) inside the 85 × 90 panel:
-   * wider and much taller than the box, lifted so the crop lands on the face. Stated as
-   * percentages so the same crop window holds for whatever photo the server sends.
+   * The portrait FILLS the 85 × 90 panel and is centre-cropped by `resizeMode="cover"`.
+   *
+   * `289:7521` draws it 89 × 133.5 from (−0.89, −12) — a 148 % vertical blow-up lifted so the
+   * crop lands on the face — and that was transcribed literally. It only works for the ONE
+   * portrait the frame was drawn around. Every cook photo the server sends is framed differently,
+   * and applied to them the same window zooms ~1.5× into an already head-and-shoulders shot and
+   * pushes it up: the observed result on device is a face cropped through the chin with the
+   * shoulder filling the bottom corner.
+   *
+   * `cover` at 100 % is the honest generalisation of what the frame is doing — fill the panel,
+   * preserve the aspect ratio, crop the overflow — without assuming a framing the payload never
+   * promised. The panel is near-square (85 × 90), so a centred crop of a portrait keeps the face.
    */
   photoImage: {
     position: 'absolute',
-    left: '-1.047%',
-    top: '-13.333%',
-    width: '104.7%',
-    height: '148.33%',
+    left: 0,
+    top: 0,
+    width: '100%',
+    height: '100%',
   },
   /** `299:1794` — a 101pt column at an 8pt gap; the row above centres it. */
   identityText: { flex: 1, minWidth: 0, height: 101, gap: lightTheme.space.sm },

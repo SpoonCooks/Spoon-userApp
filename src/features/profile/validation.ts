@@ -1,4 +1,4 @@
-import { PROFILE_FIELDS } from './fields';
+import { PROFILE_FIELDS, PROFILE_GROWN_UP_FOOD_OPTIONS } from './fields';
 import type { ProfileFieldId } from './fields';
 
 /**
@@ -99,14 +99,63 @@ export function canSubmitProfileDetails(gate: ProfileSubmitGate): boolean {
  * Add one value to `341:4655` without disturbing the others.
  *
  * Case- and whitespace-insensitive on the way in, because "Bihari food" and "bihari food " are the
- * same answer and a duplicate chip is not a second preference. The FIRST spelling is kept — the
- * customer's own — rather than the later one overwriting it.
+ * same answer and a duplicate chip is not a second preference.
+ *
+ * ## Only a published cuisine may be added
+ *
+ * The value is resolved against `PROFILE_GROWN_UP_FOOD_OPTIONS` and REFUSED if it is not in it.
+ * Anything else — a sentence, a typo, a half-typed word — is not an answer to "what food have you
+ * grown up eating", and the free-text version of this control was writing all three into durable
+ * customer data as though they were.
+ *
+ * The stored value is the OPTION'S label, not the customer's keystrokes, so "punjabi FOOD " and
+ * "Punjabi food" cannot become two rows meaning one thing. Storing the label rather than the id
+ * keeps every answer saved before this list existed readable and removable, and keeps the chip
+ * legible in `GET /v1/me` without a lookup table the backend does not have.
  */
 export function addGrownUpEating(current: readonly string[], value: string): readonly string[] {
-  const trimmed = value.trim();
-  if (trimmed === '') return current;
-  const exists = current.some((entry) => entry.toLowerCase() === trimmed.toLowerCase());
-  return exists ? current : [...current, trimmed];
+  const option = matchGrownUpEating(value);
+  if (option === null) return current;
+  const exists = current.some((entry) => entry.toLowerCase() === option.toLowerCase());
+  return exists ? current : [...current, option];
+}
+
+/**
+ * The published label for a typed value, or `null` when it names none.
+ *
+ * An EXACT (case- and space-insensitive) match only. Resolving a prefix would let "Punjabi" — a
+ * real thing to type on the way to a longer name — silently commit "Punjabi food" the moment the
+ * customer pressed Done, which is a different answer from the one they were still typing. The
+ * dropdown is where a partial word is turned into a choice; this is where a choice is checked.
+ */
+export function matchGrownUpEating(value: string): string | null {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === '') return null;
+  return (
+    PROFILE_GROWN_UP_FOOD_OPTIONS.find((option) => option.label.toLowerCase() === trimmed)?.label ??
+    null
+  );
+}
+
+/**
+ * The options a partially-typed query should offer, minus the ones already chosen.
+ *
+ * Substring rather than prefix, so "punjab" and "food" both work and a customer who thinks of the
+ * cuisine as "Chettinad" finds it without knowing the list writes it with the " food" suffix. An
+ * empty query offers the WHOLE list — the control has to be usable by someone who does not know
+ * what is in it, which was the other half of the free-text field's problem.
+ */
+export function grownUpEatingSuggestions(
+  query: string,
+  chosen: readonly string[],
+): readonly { readonly id: string; readonly label: string }[] {
+  const needle = query.trim().toLowerCase();
+  const taken = new Set(chosen.map((entry) => entry.toLowerCase()));
+
+  return PROFILE_GROWN_UP_FOOD_OPTIONS.filter((option) => {
+    if (taken.has(option.label.toLowerCase())) return false;
+    return needle === '' || option.label.toLowerCase().includes(needle);
+  });
 }
 
 /**

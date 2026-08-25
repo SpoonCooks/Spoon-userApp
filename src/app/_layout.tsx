@@ -76,6 +76,8 @@ export default function RootLayout() {
                   <Stack.Screen name="index" />
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen name="(app)" />
+                  {/* Legal sits OUTSIDE both groups on purpose — see `app/legal/[doc].tsx`. */}
+                  <Stack.Screen name="legal/[doc]" />
                 </Stack>
               </ErrorBoundary>
             </ThemeProvider>

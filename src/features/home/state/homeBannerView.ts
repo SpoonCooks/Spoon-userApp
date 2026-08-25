@@ -269,15 +269,28 @@ export function homeBannerFor(input: HomeBannerInput): HomeBannerViewModel | nul
 /**
  * Status (plus the two payload facts that statuses cannot express) → variant.
  *
- * `created` and `assigned` are one card: from the customer's side the booking is confirmed
- * either way, and whether a cook has been matched shows as the presence of the cook block, not
- * as a different banner.
+ * ## `created` is not confirmed
+ *
+ * `created` and `assigned` used to share the confirmed card, on the reading that "from the
+ * customer's side the booking is confirmed either way". They are not the same thing:
+ * `assigned` means the payment was captured and a cook was matched, and `created` means the
+ * payment has NOT been finalized. Drawing "Confirmed!" over an unpaid booking tells the customer
+ * their money moved and their cook is coming when neither is true — and, because a `created`
+ * booking sits in the active list until its service window elapses, it would keep saying so.
+ *
+ * There is no drawn card for "payment pending", and inventing one is not this file's decision to
+ * make, so the honest answer is no banner: Home falls back to its pre-booking variant and the
+ * customer is not told something false. `null` is already how this function declines a status it
+ * has no card for.
  */
 function variantFor(input: HomeBannerInput): HomeBannerVariant | null {
   const reassigned = input.reassigned === true;
 
   switch (input.status) {
+    // Payment not finalized. See the note above: no card claims confirmation for it.
     case 'created':
+      return null;
+
     case 'assigned':
       return reassigned ? 'reassignedConfirmed' : 'confirmed';
 

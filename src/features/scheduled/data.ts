@@ -88,6 +88,10 @@ export function useScheduleData(
       base: mode === 'reschedule' ? DEMO_SCHEDULE_RESCHEDULE : DEMO_SCHEDULE_BOOK,
       catalogue: catalogue.state.data,
       availability: availability.state.status === 'ready' ? availability.state.data : null,
+      // The day the grid describes, so the meal-period chips can tell an elapsed window from a
+      // future one. The SAME date the availability read was asked about — never a second reading
+      // of the clock, which could disagree with it across midnight.
+      serviceDate: date,
       // Loading is its own state. The chips stay exactly where they are — a read must never blank
       // a screen full of local choices — but the grid is withheld rather than drawn empty.
       slotsPending: availability.state.status !== 'ready',
@@ -113,7 +117,7 @@ export function useScheduleData(
         rows: DEMO_DURATION_GUIDE,
       },
     });
-  }, [catalogue.state, availability.state, mode]);
+  }, [catalogue.state, availability.state, date, mode]);
 
   return {
     state,

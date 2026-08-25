@@ -1,6 +1,6 @@
 import type { Catalogue } from '@features/catalogue';
 
-import { slotsByPeriodFrom, daysFrom, toServiceDate } from './adapters';
+import { slotsByPeriodFrom, daysFrom, periodsFrom, toServiceDate } from './adapters';
 import { addServiceDays, localMinuteIn, serviceDateIn, formatServiceTime } from './serviceTime';
 
 /**
@@ -131,7 +131,58 @@ describe('the calendar day is the service day', () => {
     const days = daysFrom(catalogueIn('Asia/Kolkata'), new Date('2026-08-23T06:00:00.000Z'));
 
     expect(days.map((day) => day.id)).toEqual(['2026-08-23', '2026-08-24', '2026-08-25']);
-    expect(days[2]?.caption).toBe('TUE');
+    // The FULL weekday, matching "TODAY" and "TOMORROW" beside it rather than abbreviating.
+    expect(days[2]?.caption).toBe('TUESDAY');
     expect(days[2]?.label).toContain('25');
+  });
+});
+
+/**
+ * The meal-period chips, gated by the SERVICE clock.
+ *
+ * A period whose window has entirely elapsed cannot hold a bookable start — every candidate in it
+ * comes back `SLOT_IN_PAST` from the scheduler — so the chip that leads there is drawn disabled
+ * rather than opening a duration section over a grid of uniformly grey cards.
+ *
+ * The boundaries are the catalogue's and the reading is in `operatingWindow.timeZone`, so these
+ * assertions hold wherever the test machine is. Every instant below is stated in UTC and
+ * annotated with its IST wall clock.
+ */
+describe('elapsed meal periods are not selectable', () => {
+  const catalogue = catalogueIn('Asia/Kolkata');
+  const disabledIds = (now: Date, serviceDate?: string) =>
+    periodsFrom(catalogue, { now, ...(serviceDate === undefined ? {} : { serviceDate }) })
+      .filter((period) => period.disabled === true)
+      .map((period) => period.id);
+
+  it('offers all three early in the morning', () => {
+    // 02:30Z is 08:00 IST — inside MORNING, which runs to 12:00.
+    expect(disabledIds(new Date('2026-08-25T02:30:00.000Z'))).toEqual([]);
+  });
+
+  it('closes MORNING once noon has passed', () => {
+    // 08:00Z is 13:30 IST — MORNING is behind us, NOON is running.
+    expect(disabledIds(new Date('2026-08-25T08:00:00.000Z'))).toEqual(['MORNING']);
+  });
+
+  it('leaves only EVENING clickable in the evening', () => {
+    // 12:30Z is 18:00 IST — the founder's case: morning and noon are gone.
+    expect(disabledIds(new Date('2026-08-25T12:30:00.000Z'))).toEqual(['MORNING', 'NOON']);
+  });
+
+  it('keeps a period alive while its window is still open', () => {
+    // 06:29Z is 11:59 IST — MORNING has one minute left and stays selectable. Whether any start
+    // in that minute is bookable is the server's question, answered as greyed cards in the grid.
+    expect(disabledIds(new Date('2026-08-25T06:29:00.000Z'))).toEqual([]);
+  });
+
+  it('gates TODAY only — a future day is wholly ahead of the clock', () => {
+    // 18:00 IST on the 25th, asking about the 26th: tomorrow's morning is bookable tonight.
+    expect(disabledIds(new Date('2026-08-25T12:30:00.000Z'), '2026-08-26')).toEqual([]);
+  });
+
+  it('treats an unstated date as today, which is what the availability read defaults to', () => {
+    const now = new Date('2026-08-25T12:30:00.000Z');
+    expect(disabledIds(now)).toEqual(disabledIds(now, '2026-08-25'));
   });
 });

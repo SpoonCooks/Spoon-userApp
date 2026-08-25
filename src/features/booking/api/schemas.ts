@@ -76,13 +76,71 @@ export const bookingAddressSchema = z.object({
   receiverPhone: z.string().nullable(),
 });
 
-export const bookingCookSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  phone: z.string().nullish(),
-  rating: z.number().nullish(),
-  photoUrl: z.string().nullish(),
-});
+/**
+ * The assigned cook on `GET /v1/bookings/:id`.
+ *
+ * ## This schema described a cook the backend has never sent
+ *
+ * It read `id`, `name`, `photoUrl` and a numeric `rating`. The backend sends `cookId`,
+ * `displayName`, `profileImageUrl` and `rating` as an OBJECT — `{ average, count }`. Three of
+ * those mismatches would only have emptied the fields, because every one was optional and Zod
+ * drops unknown keys. The fourth did far worse: an object where `z.number()` was expected is a
+ * type error, not a missing value, so `bookingDetailSchema.parse` THREW on every booking that
+ * had a cook.
+ *
+ * The blast radius was the whole detail read. `useBookingDetail` errored, `detailData` stayed
+ * null, and Home — which builds its banner from the detail — silently drew the pre-booking
+ * variant. A confirmed booking with a cook assigned to it produced no Upcoming banner at all,
+ * and nothing on screen said why. The booking detail screen was unreachable for the same reason.
+ *
+ * ## Why this normalises instead of renaming everywhere
+ *
+ * The output keeps the shape every existing reader already uses (`id`, `name`, `photoUrl`,
+ * `rating`), so the fix lands entirely at the boundary — which is where a provider's field names
+ * belong — rather than rippling through adapters and screens. Both spellings are accepted so the
+ * app parses whether it is pointed at the current backend or an older deployment, and `rating`
+ * takes either the object or a bare number for the same reason.
+ *
+ * `average` is what the card shows; `count` is carried through so a reader that wants "4.8 (312)"
+ * does not need a second request.
+ */
+const cookRatingSchema = z.union([
+  z.object({ average: z.number(), count: z.number().int().nonnegative().optional() }),
+  z.number().transform((average) => ({ average, count: undefined })),
+]);
+
+export const bookingCookSchema = z
+  .object({
+    // What the backend sends today.
+    cookId: z.string().optional(),
+    displayName: z.string().optional(),
+    profileImageUrl: z.string().nullish(),
+    // Tolerated legacy spellings, so an older deployment still parses.
+    id: z.string().optional(),
+    name: z.string().optional(),
+    photoUrl: z.string().nullish(),
+    // Not part of this projection — V0 carries no cook contact detail on the booking — but
+    // accepted rather than rejected if a deployment ever adds it.
+    phone: z.string().nullish(),
+    rating: cookRatingSchema.nullish(),
+  })
+  .transform((cook) => ({
+    id: cook.cookId ?? cook.id,
+    name: cook.displayName ?? cook.name,
+    phone: cook.phone,
+    /** The number the card draws. `null` when the server published none. */
+    rating: cook.rating?.average ?? null,
+    ratingCount: cook.rating?.count ?? null,
+    /**
+     * Absence is normalised to `null`, never `undefined`.
+     *
+     * The two spellings would otherwise disagree about what "no photo" looks like — a backend
+     * sending `profileImageUrl: null` produced `undefined` here purely because `??` fell through
+     * to the legacy key. Readers check both today, but one shape for one meaning is what keeps
+     * that true.
+     */
+    photoUrl: cook.profileImageUrl ?? cook.photoUrl ?? null,
+  }));
 
 /**
  * Service timing.
@@ -143,14 +201,14 @@ export type TipStatusDto = z.infer<typeof tipStatusSchema>;
  * a provider outage cannot hold the hub lock open. The quote therefore always names an
  * `extensionId` - which the verify route needs - and may still carry a null `providerOrderId`.
  *
- * ## `keyId` is OPTIONAL here, and that is a contract gap rather than a preference
+ * ## `keyId`
  *
- * `POST /payments/order` and `POST /tips` both attach the public Razorpay key to their reply.
- * This one does not: `ExtensionQuote` declares no `keyId` and the route sends the service result
- * unchanged. Checkout cannot be opened without a key, so the extension flow FAILS CLOSED at that
- * point rather than opening Razorpay against a guessed or embedded one - see
- * `usePayForExtension`. The field is modelled as optional so that the day the backend attaches
- * it, exactly as it already does for a tip, the flow completes with no further frontend change.
+ * The backend attaches the public Razorpay key here, exactly as `POST /payments/order` and
+ * `POST /tips` do; `ExtensionQuote` declares it in the published contract. It was once absent,
+ * which is why the field is modelled `.nullable().optional()` rather than required - a tolerant
+ * shape that parses both the old and the current reply, and leaves the decision about a missing
+ * key to `useCreateExtension`, which fails CLOSED rather than opening Razorpay against a guessed
+ * or app-embedded one.
  *
  * `pricePaise` is deprecated in the contract and deliberately not read: `totalAmountPaise` is
  * what the customer is charged.

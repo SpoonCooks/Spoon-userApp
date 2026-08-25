@@ -204,8 +204,18 @@ export const DEMO_PROFILE: ProfileViewModel = {
     // the footer panel dropped 154.43 → 110.43 with it. Nothing replaced it.
     // `6:779` in v4 carries the text ALONE — no leading mark and no trailing shield. The row is
     // a 28pt bar whose only child is the underlined label.
-    { id: 'legal', title: 'Terms of Service & Privacy Policy' },
+    //
+    // TWO rows, not one. `6:779` draws a single "Terms of Service & Privacy Policy" label, which
+    // is one control standing for two separate documents — so it could only ever open one of
+    // them, or a page that is neither. They are distinct legal instruments with distinct
+    // "Last Updated" dates, and a customer looking for the privacy policy should be able to press
+    // "Privacy Policy". Each row now names exactly what it opens.
+    { id: 'terms', title: 'Terms of Service' },
+    { id: 'privacy', title: 'Privacy Policy' },
   ],
+  // `6:779` draws the two as ONE line — "Terms of Service & Privacy Policy" — so this is the
+  // frame's own separator, not a layout decision.
+  linksSeparator: ' & ',
   // `6:789` reads exactly "Log Out".
   logoutLabel: 'Log Out',
 };
