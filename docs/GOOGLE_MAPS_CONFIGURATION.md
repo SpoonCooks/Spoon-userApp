@@ -58,7 +58,7 @@ was out of scope for this pass.
 
 ## 4. Verified against this build
 
-Measured, not assumed:
+Measured, not assumed, on the **development** build:
 
 | Fact | Value |
 | --- | --- |
@@ -70,6 +70,22 @@ Measured, not assumed:
 That SHA-1 is the **standard React Native / Expo debug keystore**, checked into `android/app` by
 prebuild. The release keystore is different, and its fingerprint must be added to the key's
 restriction (or given its own key) before a release build can render a map.
+
+### Application identities
+
+The Android package and the iOS bundle identifier are the same string in development and staging,
+and **deliberately differ in production**: the Apple App ID registered for release is
+`com.spoonhelp.customer`, while Android stays on `com.spoonhelp.userapp`.
+
+| Environment | `android.package` | `ios.bundleIdentifier` |
+| --- | --- | --- |
+| development | `com.spoonhelp.userapp.dev` | `com.spoonhelp.userapp.dev` |
+| staging | `com.spoonhelp.userapp.staging` | `com.spoonhelp.userapp.staging` |
+| production | `com.spoonhelp.userapp` | `com.spoonhelp.customer` |
+
+Both values are carried in `extra` as well (`extra.androidPackage`, `extra.iosBundleIdentifier`) and
+sent as `X-Android-Package` / `X-Ios-Bundle-Identifier`, so each key's application restriction must
+list the identity of the environment being built — see `app.config.ts`.
 
 ### Restriction status — ACTION REQUIRED
 
@@ -91,7 +107,9 @@ Recommended, in Google Cloud Console → Credentials:
 
 1. **Android key** → Application restrictions → *Android apps* → add
    `com.spoonhelp.userapp.dev` + `5E:8F:...:F6:25` (and the release package + its SHA-1).
-2. **iOS key** → Application restrictions → *iOS apps* → add `com.spoonhelp.userapp.dev`.
+2. **iOS key** → Application restrictions → *iOS apps* → add `com.spoonhelp.customer` (the
+   production Apple App ID — **not** the Android package), keeping `com.spoonhelp.userapp.dev`
+   for as long as development builds still need Maps.
 3. **Both** → API restrictions → restrict to exactly: the platform's Maps SDK, **Places API (New)**,
    **Geocoding API**.
 4. Set `ANDROID_SIGNING_SHA1` in `.env` and rebuild, so the app sends `X-Android-Cert`.
@@ -128,3 +146,7 @@ AppDelegate init, and adds the GoogleMaps pod; `googlePlaces.ts` selects the iOS
 `X-Ios-Bundle-Identifier`. No `ios/` project was generated and no simulator or device build was
 attempted — `/ios` is gitignored and this pass had only an Android handset. iOS runtime QA is
 outstanding.
+
+A production iOS build carries the Apple App ID `com.spoonhelp.customer`, not the Android package
+(§4, *Application identities*), so the iOS key's *iOS apps* restriction must list that bundle id
+before a release build can render a map.

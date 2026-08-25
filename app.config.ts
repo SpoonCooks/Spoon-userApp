@@ -54,7 +54,29 @@ const SPLASH_BACKGROUND = '#FFFDF5';
  */
 const DEV_FALLBACK_API_BASE_URL = 'https://spoon-api-kalc.onrender.com';
 
-const BUNDLE_ID = `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
+/**
+ * Native application identities — PER PLATFORM, deliberately not one shared constant.
+ *
+ * The Apple App ID registered for release is `com.spoonhelp.customer`, which does not match the
+ * Android package. Android stays on `com.spoonhelp.userapp`: a package rename is a new listing on
+ * Play rather than an update, so the two platforms diverge in production and only in production.
+ *
+ *                 Android                         iOS
+ *   development   com.spoonhelp.userapp.dev       com.spoonhelp.userapp.dev
+ *   staging       com.spoonhelp.userapp.staging   com.spoonhelp.userapp.staging
+ *   production    com.spoonhelp.userapp           com.spoonhelp.customer
+ *
+ * Both also travel in `extra`, because the Places / Geocoding REST calls send them as
+ * `X-Android-Package` / `X-Ios-Bundle-Identifier` so an application-restricted Maps key keeps
+ * working. The iOS key's restriction must therefore list `com.spoonhelp.customer` before a release
+ * build can render a map — see docs/GOOGLE_MAPS_CONFIGURATION.md.
+ */
+const ANDROID_PACKAGE = `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
+
+const IOS_BUNDLE_IDENTIFIER =
+  APP_ENV === 'production'
+    ? 'com.spoonhelp.customer'
+    : `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
 
 /**
  * Google Maps platform keys.
@@ -145,12 +167,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   icon: './assets/images/icon.png',
 
   ios: {
-    bundleIdentifier: BUNDLE_ID,
+    bundleIdentifier: IOS_BUNDLE_IDENTIFIER,
     supportsTablet: false,
   },
 
   android: {
-    package: BUNDLE_ID,
+    package: ANDROID_PACKAGE,
 
     ...(GOOGLE_SERVICES_JSON === '' ? {} : { googleServicesFile: GOOGLE_SERVICES_JSON }),
 
@@ -274,8 +296,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      * public facts about the build (anyone can read them out of the APK); carrying them is what
      * lets the key be locked down in Google Cloud without another release.
      */
-    androidPackage: BUNDLE_ID,
-    iosBundleIdentifier: BUNDLE_ID,
+    androidPackage: ANDROID_PACKAGE,
+    iosBundleIdentifier: IOS_BUNDLE_IDENTIFIER,
     androidSigningSha1: ANDROID_SIGNING_SHA1,
   },
 });
