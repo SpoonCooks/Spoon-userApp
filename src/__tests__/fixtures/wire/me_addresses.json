@@ -1,0 +1,27 @@
+{
+  "data": [
+    {
+      "id": "address-fixture-1",
+      "label": "Test home",
+      "flat": "11",
+      "tower": null,
+      "society": "Test Society",
+      "street": "Test Street",
+      "pincode": "560001",
+      "city": "Bengaluru",
+      "state": "Karnataka",
+      "hub_id": "hub-fixture-1",
+      "placeId": null,
+      "receiverName": null,
+      "receiverPhone": null,
+      "isDefault": true,
+      "latitude": 12.9,
+      "longitude": 77.6,
+      "serviceability": {
+        "status": "serviceable",
+        "reason": "AVAILABLE",
+        "hub": { "id": "hub-fixture-1", "name": "Test Hub" }
+      }
+    }
+  ]
+}

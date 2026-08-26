@@ -1,0 +1,14 @@
+{
+  "data": {
+    "bookingId": "booking-fixture-1",
+    "cancellable": true,
+    "band": "SCHEDULED_NO_REFUND",
+    "refundPercent": 0,
+    "minutesToStart": -400,
+    "serviceAmountPaise": 6900,
+    "capturedAmountPaise": 7245,
+    "refundAmountPaise": 0,
+    "chargeAmountPaise": 7245,
+    "policyVersion": "cancellation-captured-gross-v1"
+  }
+}

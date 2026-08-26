@@ -1,0 +1,25 @@
+{
+  "data": {
+    "bookings": [
+      {
+        "id": "booking-fixture-history-1",
+        "status": "cancelled",
+        "slotType": "scheduled",
+        "scheduledStart": "2026-08-26T04:30:00.000Z",
+        "durationMinutes": 30,
+        "price": {
+          "amountPaise": 7245,
+          "durationMinutes": 30,
+          "serviceAmountPaise": 6900,
+          "taxRateBps": 500,
+          "taxAmountPaise": 345,
+          "totalAmountPaise": 7245,
+          "currency": "INR",
+          "pricingVersion": "pricing-v1"
+        },
+        "addressLabel": "Test home",
+        "reassignment": { "occurred": false, "sequence": 0, "reassignedAt": null }
+      }
+    ]
+  }
+}

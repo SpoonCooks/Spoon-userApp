@@ -21,6 +21,9 @@ module.exports = {
   moduleNameMapper: {
     // Native bindings do not exist headlessly, and nothing under test reads app config.
     '^expo-constants$': '<rootDir>/src/test/stubs/expoConstants.js',
+    // addressApi uses the public auth feature barrel in the app; map that barrel to its
+    // headless API surface here so the live transport check never loads native screens.
+    '^@features/auth$': '<rootDir>/src/features/auth/api/authApi.ts',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@core/(.*)$': '<rootDir>/src/core/$1',
     '^@features/(.*)$': '<rootDir>/src/features/$1',

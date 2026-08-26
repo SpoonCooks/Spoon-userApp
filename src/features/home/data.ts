@@ -160,6 +160,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
               canRate: detailData.allowedActions.canRate,
               cancelledBy: detailData.cancellation?.cancelledBy ?? null,
               reassigned: detailData.reassignment?.occurred === true,
+              recoveryHandoff: detailData.recovery?.state === 'support_handoff',
             });
           })() ?? undefined);
 

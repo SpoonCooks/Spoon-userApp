@@ -59,6 +59,8 @@ export interface InstantViewModel {
 
 export interface BookingSummaryViewModel {
   readonly bannerTitle: string;
+  /** Server-projected recovery handoff changes the banner from confirmation to attention. */
+  readonly tone?: 'positive' | 'warning';
   /**
    * `250:2951` — "Today, Aug 5 • 12:00 PM • 1 hr", the one-line schedule summary now drawn under
    * the banner title. PRE-FORMATTED by the server: the client does not assemble it from the rows,

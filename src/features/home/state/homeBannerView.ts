@@ -141,6 +141,8 @@ export interface HomeBannerInput {
   readonly reassigned?: boolean;
   /** `336:4239` — server copy for the 5+ legend. */
   readonly ratingPrompt?: string;
+  /** True when the server has handed an elapsed, unserved booking to support. */
+  readonly recoveryHandoff?: boolean;
 }
 
 /** The drawn copy. Labels on a card; no endpoint serves them and none is expected to. */
@@ -157,6 +159,8 @@ const COPY = {
   captionArrivedAt: 'Arrived at',
   captionTimeLeft: 'Time left',
   badgeConfirmed: 'Confirmed!',
+  attention: 'Booking needs attention',
+  badgeAttention: 'Needs attention',
   badgeCompleted: 'Completed!',
   /** Shown where a number is designed but the server supplied none. Never a guessed figure. */
   badgeArrived: 'Arrived',
@@ -209,10 +213,20 @@ export function homeBannerFor(input: HomeBannerInput): HomeBannerViewModel | nul
 
   switch (variant) {
     case 'confirmed':
-      return { ...identity, variant, title: COPY.confirmed, badgeValue: COPY.badgeConfirmed };
+      return {
+        ...identity,
+        variant,
+        title: input.recoveryHandoff === true ? COPY.attention : COPY.confirmed,
+        badgeValue: input.recoveryHandoff === true ? COPY.badgeAttention : COPY.badgeConfirmed,
+      };
 
     case 'reassignedConfirmed':
-      return { ...identity, variant, title: COPY.reassigned, badgeValue: COPY.badgeConfirmed };
+      return {
+        ...identity,
+        variant,
+        title: input.recoveryHandoff === true ? COPY.attention : COPY.reassigned,
+        badgeValue: input.recoveryHandoff === true ? COPY.badgeAttention : COPY.badgeConfirmed,
+      };
 
     case 'arriving':
       return {

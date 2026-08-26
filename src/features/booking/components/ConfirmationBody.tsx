@@ -101,9 +101,9 @@ export function ConfirmationBody({
         <StatusBanner
           title={summary.bannerTitle}
           message={summary.scheduleLine}
-          tone="positive"
+          tone={summary.tone ?? 'positive'}
           layout="hero"
-          icon="checkCircle"
+          icon={summary.tone === 'warning' ? 'alert' : 'checkCircle'}
           testID="confirmation-banner"
         />
       </ServiceSection>

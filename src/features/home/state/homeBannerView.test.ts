@@ -26,6 +26,15 @@ describe('state mapping — `367:71`', () => {
     expect(banner?.badgeCaption).toBeUndefined();
   });
 
+  it('shows attention copy when an assigned booking is handed to support', () => {
+    expect(homeBannerFor(at({ recoveryHandoff: true }))).toMatchObject({
+      variant: 'confirmed',
+      title: 'Booking needs attention',
+      badgeValue: 'Needs attention',
+    });
+    expect(homeBannerFor(at({ recoveryHandoff: true }))?.badgeValue).not.toBe('Confirmed!');
+  });
+
   it('draws NO card for a booking whose payment has not been finalized', () => {
     // `created` is payment-pending. It shared the confirmed card until a real device showed the
     // consequence: "Confirmed!" over a booking nobody had paid for. There is no drawn
@@ -113,6 +122,14 @@ describe('reassignment — the two titles that change', () => {
       variant: 'reassignedArriving',
       title: 'Reassigned',
       badgeValue: '16 mins',
+    });
+  });
+
+  it('keeps support attention copy when the assigned booking was also reassigned', () => {
+    expect(homeBannerFor(at({ reassigned: true, recoveryHandoff: true }))).toMatchObject({
+      variant: 'reassignedConfirmed',
+      title: 'Booking needs attention',
+      badgeValue: 'Needs attention',
     });
   });
 

@@ -120,10 +120,16 @@ export function summaryFrom(input: {
   readonly base: BookingSummaryViewModel;
   readonly dto: BookingDetailDto;
 }): BookingSummaryViewModel {
+  const recoveryHandoff = input.dto.recovery?.state === 'support_handoff';
+
   return {
     ...input.base,
     scheduleLine: scheduleLineFrom(input.dto),
     rows: bookingRowsFrom(input.dto),
+    rescheduleAllowed: input.dto.allowedActions.canReschedule,
+    ...(recoveryHandoff
+      ? { bannerTitle: 'This booking needs attention', tone: 'warning' as const }
+      : {}),
   };
 }
 

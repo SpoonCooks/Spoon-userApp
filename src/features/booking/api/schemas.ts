@@ -295,6 +295,22 @@ export const bookingReassignmentSchema = z.object({
   reassignedAt: z.string().datetime().nullable(),
 });
 
+/**
+ * The backend's authoritative recovery state, published beside `status`.
+ *
+ * `support_handoff` is how a booking whose whole service window elapsed unserved stops being an
+ * ordinary "upcoming" one: the wire status is still `assigned` — `no_show` is deliberately not a
+ * booking status — so this fact is the ONLY truthful thing to render. `pending` means Spoon is
+ * still actively recovering the booking. Tolerant (`nullish`) so a backend that predates the
+ * field parses unchanged.
+ */
+export const bookingRecoverySchema = z.object({
+  state: z.enum(['pending', 'support_handoff']),
+  openedAt: z.string().datetime(),
+});
+
+export type BookingRecoveryDto = z.infer<typeof bookingRecoverySchema>;
+
 export const allowedActionsSchema = z.object({
   canCancel: z.boolean(),
   canReschedule: z.boolean(),
@@ -332,6 +348,7 @@ export const bookingDetailSchema = z.object({
   cook: bookingCookSchema.nullable(),
   timing: bookingTimingSchema,
   reassignment: bookingReassignmentSchema.nullish(),
+  recovery: bookingRecoverySchema.nullish(),
   cancellation: bookingCancellationSchema.nullable(),
   allowedActions: allowedActionsSchema,
 });
@@ -386,6 +403,7 @@ export const bookingSummarySchema = z.object({
   price: priceSchema,
   addressLabel: z.string().nullish(),
   reassignment: bookingReassignmentSchema.nullish(),
+  recovery: bookingRecoverySchema.nullish(),
 });
 
 export type BookingSummaryDto = z.infer<typeof bookingSummarySchema>;
