@@ -141,17 +141,15 @@ describe('what the viewer will and will not load', () => {
    * Everything else is REFUSED. A document that can be made to navigate is a document that can be
    * made to render something other than the terms the customer thinks they are reading.
    */
-  it.each([
-    'https://example.com',
-    'http://spoonhelp.com',
-    'file:///etc/passwd',
-    'spoon://home',
-  ])('refuses %s', (url) => {
-    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+  it.each(['https://example.com', 'http://spoonhelp.com', 'file:///etc/passwd', 'spoon://home'])(
+    'refuses %s',
+    (url) => {
+      const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
 
-    expect(navigate(url)).toBe(false);
-    expect(openURL).not.toHaveBeenCalled();
-  });
+      expect(navigate(url)).toBe(false);
+      expect(openURL).not.toHaveBeenCalled();
+    },
+  );
 
   /** The grievance-officer address is in both documents and has to be tappable. */
   it('hands a mailto to the OS without navigating the document', () => {
