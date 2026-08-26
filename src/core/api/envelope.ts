@@ -6,7 +6,7 @@ import { z } from 'zod';
  * Every Spoon response is one of exactly two shapes (`docs/09_ERROR_HANDLING.md`):
  *
  *   success   `{ "data": ... }`
- *   failure   `{ "error": { "code", "message", "requestId" } }`
+ *   failure   `{ "error": { "code", "message", "requestId", "details" } }`
  *
  * Unwrapping happens ONCE, in the transport, so no feature module ever writes `.data.data`, and
  * so a body that is neither shape is rejected at the boundary rather than reaching a screen as
@@ -66,6 +66,11 @@ export const errorEnvelopeSchema = z.object({
     code: z.string().min(1),
     message: z.string().optional(),
     requestId: z.string().optional(),
+    details: z
+      .object({
+        reason: z.string().min(1).optional(),
+      })
+      .optional(),
   }),
 });
 

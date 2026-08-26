@@ -18,6 +18,8 @@ export function fromStatus(
     code?: string;
     /** The backend's `error.requestId`. */
     requestId?: string;
+    /** Bounded backend context from the error envelope. */
+    details?: { readonly reason?: string | undefined };
   } = {},
 ): AppError {
   const message = options.message ?? `Request failed with status ${status}`;
@@ -27,6 +29,7 @@ export function fromStatus(
     ...(options.cause === undefined ? {} : { cause: options.cause }),
     ...(options.code === undefined ? {} : { code: options.code }),
     ...(options.requestId === undefined ? {} : { requestId: options.requestId }),
+    ...(options.details === undefined ? {} : { details: options.details }),
   };
 
   if (status === 401 || status === 403) {

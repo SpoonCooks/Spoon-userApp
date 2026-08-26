@@ -12,6 +12,7 @@ import type { BookingRequestInput } from './bookingApi';
 import type { CheckoutLauncher } from '@features/payment';
 import { unavailableCheckoutLauncher } from '@features/payment';
 import { bookingKeys } from './keys';
+import { availabilityKeys } from '@features/availability';
 import type {
   BookingCreateResponse,
   BookingDetailDto,
@@ -325,6 +326,7 @@ export function useCancelBooking() {
       idempotency.release(variables.scope);
       // The refund and the final state are the server's. Refetch everything a cancel touches.
       void queryClient.invalidateQueries({ queryKey: bookingKeys.all() });
+      void queryClient.invalidateQueries({ queryKey: availabilityKeys.all() });
     },
   });
 }
@@ -340,6 +342,7 @@ export function useRescheduleBooking() {
     onSuccess(_result, variables) {
       idempotency.release(variables.scope);
       void queryClient.invalidateQueries({ queryKey: bookingKeys.all() });
+      void queryClient.invalidateQueries({ queryKey: availabilityKeys.all() });
     },
   });
 }

@@ -18,6 +18,45 @@ import { homeBannerFor } from './state/homeBannerView';
 import { DEMO_HOME_ACTIVE_BOOKING } from '@/demo/fixtures/home';
 import type { HomeViewModel } from './types';
 
+import type { BookingSummaryDto } from '@features/booking';
+
+/**
+ * Picks the one booking Home should project when the server returns more than one active row.
+ * Live/actionable work outranks a completed unrated item; within a state the nearest upcoming
+ * service start wins, and the id tie-breaker makes equal timestamps deterministic.
+ */
+export function selectHomeBooking(
+  bookings: readonly BookingSummaryDto[],
+): BookingSummaryDto | null {
+  const rank: Readonly<Record<BookingSummaryDto['status'], number>> = {
+    cook_en_route: 0,
+    cook_arrived: 1,
+    cooking: 2,
+    assigned: 3,
+    created: 4,
+    completed: 5,
+    cancelled: 6,
+  };
+
+  return (
+    bookings
+      .filter((booking) => booking.status !== 'cancelled')
+      .slice()
+      .sort((left, right) => {
+        const stateOrder = rank[left.status] - rank[right.status];
+        if (stateOrder !== 0) return stateOrder;
+        const leftStart =
+          left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
+        const rightStart =
+          right.scheduledStart === null
+            ? Number.POSITIVE_INFINITY
+            : Date.parse(right.scheduledStart);
+        if (leftStart !== rightStart) return leftStart - rightStart;
+        return left.id.localeCompare(right.id);
+      })[0] ?? null
+  );
+}
+
 /**
  * Home data.
  *
@@ -47,7 +86,8 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   const active = useActiveBookings();
   const catalogue = useCatalogue();
 
-  const activeSummary = active.state.status === 'ready' ? (active.state.data[0] ?? null) : null;
+  const activeSummary =
+    active.state.status === 'ready' ? selectHomeBooking(active.state.data) : null;
 
   // The summary carries no cook, no timing and no allowed actions, so the banner's cook, its
   // countdown and its rateability all come from the DETAIL. Fetched only when there IS a booking.

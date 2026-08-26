@@ -85,6 +85,8 @@ export interface CancelBookingSheetProps {
    * sending a second cancellation.
    */
   readonly cancelling?: boolean;
+  /** A failed cancellation remains on the refund step so the customer can retry visibly. */
+  readonly cancelErrorMessage?: string | null;
 }
 
 export function CancelBookingSheet({
@@ -98,6 +100,7 @@ export function CancelBookingSheet({
   onBookAgain,
   onHelp,
   cancelling = false,
+  cancelErrorMessage = null,
 }: CancelBookingSheetProps) {
   const [reasonId, setReasonId] = useState<string | null>(null);
   const [detail, setDetail] = useState('');
@@ -283,16 +286,26 @@ export function CancelBookingSheet({
             <Button
               label={cancellation.cancelCtaLabel}
               onPress={() => {
-                if (cancelling) return;
+                if (cancelling || cancellation.refundPending === true) return;
                 onConfirmCancel(reasonId ?? '', detail);
               }}
               variant="primary"
               size="bar"
-              disabled={cancelling}
-              loading={cancelling}
+              disabled={cancelling || cancellation.refundPending === true}
+              loading={cancelling || cancellation.refundPending === true}
               style={styles.softCancel}
               testID="cancel-confirm"
             />
+            {cancelErrorMessage === null ? null : (
+              <Text
+                variant="body"
+                color="textSecondary"
+                accessibilityRole="alert"
+                testID="cancel-error"
+              >
+                {cancelErrorMessage}
+              </Text>
+            )}
           </View>
         );
 

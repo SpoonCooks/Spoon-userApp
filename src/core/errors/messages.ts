@@ -55,7 +55,17 @@ const CODE_COPY: Readonly<Record<string, string>> = {
   INTERNAL_ERROR: 'Something went wrong on our side. Please try again shortly.',
 };
 
+const BOUNDED_REASON_COPY: Readonly<Record<string, string>> = {
+  CUSTOMER_BOOKING_OVERLAP: 'You already have another booking at that time. Pick another slot.',
+  NO_ELIGIBLE_COOK: 'No cook is available for that time right now.',
+  SOCIETY_NOT_SUPPORTED: 'Spoon is not live in this society yet.',
+};
+
 export function getUserMessage(error: AppError): string {
+  if (error.code === 'SLOT_UNAVAILABLE' && error.details?.reason !== undefined) {
+    const reasonCopy = BOUNDED_REASON_COPY[error.details.reason];
+    if (reasonCopy !== undefined) return reasonCopy;
+  }
   if (error.code !== undefined) {
     const specific = CODE_COPY[error.code];
     if (specific !== undefined) return specific;
