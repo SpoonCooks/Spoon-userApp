@@ -1,5 +1,6 @@
 import { formatPaise } from '@core/format';
-import type { DetailRow } from '@ui';
+import type { CookViewModel, DetailRow } from '@ui';
+import { cookCardContentFor } from '@ui/components/cookCardContent';
 
 import { currentSkewMs } from '@core/time';
 
@@ -165,6 +166,74 @@ function cookFirstNameFrom(name: string): string {
 }
 
 /**
+ * The assigned-cook card, built ENTIRELY from the payload plus the bundled content the
+ * payload's own `profileCode` resolves.
+ *
+ * Nothing here falls back to sample data. The card used to spread a designed fixture cook
+ * underneath the payload, which meant a real cook rendered with Rekha's home state, dish chips,
+ * trust badges and — when the backend sent no photo — Rekha's photograph. Every field below is
+ * now either the server's value or honestly absent, and the card degrades exactly as it was
+ * built to: initials instead of a photograph, attribute rows dropped, no specialty grid.
+ *
+ * The bundled content — the photographs and the two designed dish-chip lists with their
+ * Figma-named glyphs — is resolved by the STABLE `profileCode` and by nothing else: not the
+ * display name, not the phone, not array order. A cook without a published code gets no bundled
+ * content, so sample imagery can never attach to the wrong person.
+ *
+ * Badges render only from the server's attested flags, fail-closed: absent or false is no
+ * badge. The whole block is omitted when nothing is attested, which keeps the drawn no-badge
+ * degradation reachable.
+ */
+function cookViewModelFrom(
+  cook: NonNullable<BookingDetailDto['cook']> & { readonly name: string },
+  bookingId: string,
+): CookViewModel {
+  const content = cookCardContentFor(cook.profileCode);
+  const photoUrl = cook.photoUrl ?? content?.photoUrl;
+  const languages = cook.languages ?? [];
+  const cuisine = cook.cuisines?.[0];
+  const anyBadge =
+    cook.spoonTrained === true || cook.backgroundVerified === true || cook.hygieneVerified === true;
+  return {
+    id: cook.id ?? bookingId,
+    displayName: cook.name,
+    firstName: cookFirstNameFrom(cook.name),
+    ...(photoUrl === undefined || photoUrl === null ? {} : { photoUrl }),
+    ...(cook.gender === null || cook.gender === undefined ? {} : { gender: cook.gender }),
+    ...(cuisine === undefined ? {} : { cuisine }),
+    ...(cook.region === null || cook.region === undefined ? {} : { homeState: cook.region }),
+    // The frames draw the language glyph with no label when there is nothing to say, which is
+    // how an empty list renders — by dropping the row, not by inventing a value.
+    ...(languages.length === 0 ? {} : { languages }),
+    ...(content === undefined
+      ? {}
+      : {
+          specialties: content.specialties,
+          pureVegSpecialties: content.pureVegSpecialties,
+        }),
+    ...(anyBadge
+      ? {
+          badges: {
+            spoonTrained: cook.spoonTrained === true,
+            backgroundVerified: cook.backgroundVerified === true,
+            hygienic: cook.hygieneVerified === true,
+          },
+        }
+      : {}),
+    ...(cook.profileVariant === null || cook.profileVariant === undefined
+      ? {}
+      : { profileVariant: cook.profileVariant }),
+  };
+}
+
+/** `veg` draws the card's pure-veg dish list; `mixed` (or absent) the standard one. */
+export function cookCardVariantFor(
+  profileVariant: CookViewModel['profileVariant'],
+): 'standard' | 'pureVeg' {
+  return profileVariant === 'veg' ? 'pureVeg' : 'standard';
+}
+
+/**
  * `timingVerdict` -> the drawn presentation.
  *
  * `ON_TIME | LATE | UNKNOWN`, measured by the backend against DEC-049's `customer_commitment_at`.
@@ -272,8 +341,19 @@ export function bookingDetailFrom(input: {
         ? summaryFrom({ base: base.summary, dto })
         : omitReassignNotice(summaryFrom({ base: base.summary, dto }));
 
+  /**
+   * The design fixture's sample cook is STRUCTURALLY excluded, not merely overridden.
+   *
+   * `base` is a designed screen and some designed screens carry a sample cook. Spreading it
+   * whole meant an unassigned or cancelled booking — where the server sends `cook: null` —
+   * silently inherited that sample: a real customer shown Rekha's card for a booking that has
+   * no cook, and a reassigned booking briefly showing the PREVIOUS design sample. Dropping the
+   * key before the spread makes "the server sent no cook" render as no cook, always.
+   */
+  const { cook: _designSampleCook, ...baseWithoutCook } = base;
+
   return {
-    ...base,
+    ...baseWithoutCook,
     view: resolution.view,
     headerSubtitle: headerSubtitleFrom(dto),
     ...(summary === undefined ? {} : { summary }),
@@ -282,17 +362,7 @@ export function bookingDetailFrom(input: {
       : { details: detailsSheetFrom({ base: base.details, dto }) }),
     ...(dto.cook === null || dto.cook.name === undefined
       ? {}
-      : {
-          cook: {
-            ...(base.cook ?? { id: dto.cook.id ?? dto.id, displayName: '', firstName: '' }),
-            id: dto.cook.id ?? dto.id,
-            displayName: dto.cook.name,
-            firstName: cookFirstNameFrom(dto.cook.name),
-            ...(dto.cook.photoUrl === null || dto.cook.photoUrl === undefined
-              ? {}
-              : { photoUrl: dto.cook.photoUrl }),
-          },
-        }),
+      : { cook: cookViewModelFrom({ ...dto.cook, name: dto.cook.name }, dto.id) }),
     /**
      * The countdown target is `timing.expectedEnd` and nothing else.
      *

@@ -14,6 +14,7 @@ import type { CookViewModel } from '@ui';
 
 import { SERVICE_SECTION_GAP, ServiceSection } from './ServiceSection';
 import { ServiceLinkRow } from './ServiceLinkRow';
+import { cookCardVariantFor } from '../adapters';
 import type { BookingSummaryViewModel } from '../types';
 
 /**
@@ -145,6 +146,7 @@ export function ConfirmationBody({
         <ServiceSection>
           <CookCard
             cook={cook}
+            variant={cookCardVariantFor(cook.profileVariant)}
             {...(onCallCook === undefined ? {} : { onCallCook })}
             testID="confirmation-cook"
           />

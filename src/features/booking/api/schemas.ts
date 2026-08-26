@@ -123,6 +123,30 @@ export const bookingCookSchema = z
     // accepted rather than rejected if a deployment ever adds it.
     phone: z.string().nullish(),
     rating: cookRatingSchema.nullish(),
+    /**
+     * The typed `CustomerCookCard` fields the deployed backend has always sent and this schema
+     * used to strip. Every one is `nullish`-tolerant so an older deployment still parses; the
+     * card was built to drop what is absent, never to invent it.
+     *
+     * `profileCode` is the STABLE card identity (`COOK_JYOTI`, ...) that resolves bundled card
+     * content — the photograph and the designed dish-chip lists — in
+     * `@ui/components/cookCardContent.ts`. Resolution is by this code alone: never by display
+     * name, phone or array position.
+     *
+     * `profileVariant` is the backend's veg/mixed presentation decision, derived server-side
+     * from the CUSTOMER's stored `dietaryPreference`. The client renders the variant it is
+     * told; it never re-derives one.
+     */
+    profileCode: z.string().nullish(),
+    profileVariant: z.enum(['veg', 'mixed']).nullish(),
+    region: z.string().nullish(),
+    languages: z.array(z.string()).nullish(),
+    cuisines: z.array(z.string()).nullish(),
+    specialties: z.array(z.string()).nullish(),
+    gender: z.string().nullish(),
+    spoonTrained: z.boolean().nullish(),
+    backgroundVerified: z.boolean().nullish(),
+    hygieneVerified: z.boolean().nullish(),
   })
   .transform((cook) => ({
     id: cook.cookId ?? cook.id,
@@ -140,6 +164,17 @@ export const bookingCookSchema = z
      * that true.
      */
     photoUrl: cook.profileImageUrl ?? cook.photoUrl ?? null,
+    profileCode: cook.profileCode ?? null,
+    /** Absent (older deployment) keeps the presentation the card has always defaulted to. */
+    profileVariant: cook.profileVariant ?? null,
+    region: cook.region ?? null,
+    languages: cook.languages ?? null,
+    cuisines: cook.cuisines ?? null,
+    specialties: cook.specialties ?? null,
+    gender: cook.gender ?? null,
+    spoonTrained: cook.spoonTrained ?? null,
+    backgroundVerified: cook.backgroundVerified ?? null,
+    hygieneVerified: cook.hygieneVerified ?? null,
   }));
 
 /**

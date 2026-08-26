@@ -14,6 +14,8 @@ import {
   homeFrom,
   minutesUntil,
 } from './adapters';
+import { cookCardContentFor } from '@ui/components/cookCardContent';
+
 import { homeBannerFor } from './state/homeBannerView';
 import { DEMO_HOME_ACTIVE_BOOKING } from '@/demo/fixtures/home';
 import type { HomeViewModel } from './types';
@@ -140,7 +142,13 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
               bookingId: activeSummary.id,
               status: detailData.status,
               cookName: detailData.cook?.name ?? null,
-              cookPhotoUrl: detailData.cook?.photoUrl ?? null,
+              // The banner draws the TRANSPARENT cut-out over its `#FFF7CC` panel (`337:4364`).
+              // A hosted photo wins; otherwise the cook's stable profileCode resolves the
+              // bundled cut-out, and a cook with neither renders the banner without a photo.
+              cookPhotoUrl:
+                detailData.cook?.photoUrl ??
+                cookCardContentFor(detailData.cook?.profileCode)?.cutoutPhotoUrl ??
+                null,
               dateLabel: formatDateLabel(detailData.scheduledStart, serverNow),
               timeLabel: formatTimeLabel(detailData.scheduledStart, detailData.durationMinutes),
               etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),

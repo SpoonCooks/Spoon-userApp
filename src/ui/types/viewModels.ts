@@ -75,6 +75,14 @@ export interface CookViewModel {
    */
   readonly pureVegSpecialties?: readonly DishViewModel[];
   readonly badges?: CookBadgesViewModel;
+  /**
+   * The backend's veg/mixed presentation decision for THIS customer, from
+   * `booking.cook.profileVariant`. `veg` renders the card's `pureVeg` mode, `mixed` (or absent,
+   * for an older deployment) renders `standard` — the default the card has always drawn. It is
+   * derived server-side from the customer's stored dietary preference and says nothing about
+   * the cook; the client never re-derives it.
+   */
+  readonly profileVariant?: 'veg' | 'mixed';
 }
 
 /** Presentation tone for a status pill. Never a backend status value. */

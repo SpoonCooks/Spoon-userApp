@@ -73,6 +73,74 @@ describe('the cook the deployed backend sends', () => {
   });
 });
 
+/**
+ * The typed `CustomerCookCard` the four-cook backend publishes: stable identity, the drawn
+ * attributes, all three attested badges and the server-decided veg/mixed presentation variant.
+ * These fields used to be silently STRIPPED by the schema, which is exactly how a real cook
+ * ended up rendered inside a design fixture's attributes.
+ */
+describe('the four-cook card the backend now publishes', () => {
+  const FOUR_COOK_CARD = {
+    cookId: 'd680481b-4ffe-55b1-9edf-74b746a43bba',
+    profileCode: 'COOK_JYOTI',
+    displayName: 'Cook Jyoti',
+    profileImageUrl: null,
+    region: 'Odisha',
+    languages: ['Hindi', 'Odiya'],
+    cuisines: ['North Indian'],
+    specialties: ['Chicken curry', 'Mutton masala'],
+    gender: 'Female',
+    spoonTrained: true,
+    backgroundVerified: true,
+    hygieneVerified: true,
+    specialtyDishes: [],
+    profileVariant: 'veg',
+    rating: { average: 5, count: 10 },
+  };
+
+  it('carries the stable identity and the presentation variant through the parse', () => {
+    const cook = bookingCookSchema.parse(FOUR_COOK_CARD);
+
+    // The two fields the whole wiring hangs off: bundled card content resolves by
+    // `profileCode`, and the card mode renders whatever variant the SERVER decided.
+    expect(cook.profileCode).toBe('COOK_JYOTI');
+    expect(cook.profileVariant).toBe('veg');
+  });
+
+  it('no longer strips the drawn attributes or the attested badges', () => {
+    const cook = bookingCookSchema.parse(FOUR_COOK_CARD);
+
+    expect(cook.region).toBe('Odisha');
+    expect(cook.languages).toEqual(['Hindi', 'Odiya']);
+    expect(cook.cuisines).toEqual(['North Indian']);
+    expect(cook.gender).toBe('Female');
+    expect(cook.spoonTrained).toBe(true);
+    expect(cook.backgroundVerified).toBe(true);
+    expect(cook.hygieneVerified).toBe(true);
+  });
+
+  it('treats an older deployment without the new fields as absent, never as invented', () => {
+    const cook = bookingCookSchema.parse(REAL_COOK);
+
+    expect(cook.profileCode).toBeNull();
+    expect(cook.profileVariant).toBeNull();
+    expect(cook.region).toBeNull();
+    expect(cook.gender).toBeNull();
+    // `false` from the deployed payload stays false — a badge is never granted client-side.
+    expect(cook.spoonTrained).toBe(false);
+    expect(cook.hygieneVerified).toBeNull();
+  });
+
+  it('refuses an unknown variant rather than guessing a presentation', () => {
+    const parsed = bookingCookSchema.safeParse({
+      ...FOUR_COOK_CARD,
+      profileVariant: 'jain-special',
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
 /** The full response, so the failure that actually broke Home is pinned end to end. */
 describe('the booking detail that carries that cook', () => {
   const REAL_DETAIL = {
