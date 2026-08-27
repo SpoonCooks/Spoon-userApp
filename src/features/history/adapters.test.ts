@@ -46,6 +46,28 @@ describe('the status pill states what actually happened', () => {
     expect(card.statusLabel).toBe('Payment pending');
   });
 
+  it('never calls a captured, cook-assigned booking payment pending', () => {
+    // The founder's 10:15 booking: payment captured, assignment made. It was overdue, not
+    // unpaid, and calling it "Payment pending" would tell the customer their money never moved.
+    // Only `created` carries that label, and this booking is not `created`.
+    const card = bookingCardFrom(at({ status: 'assigned' }), IST);
+
+    expect(card.statusLabel).not.toBe('Payment pending');
+    expect(card.statusLabel).toBe('Confirmed');
+  });
+
+  it('reads Cancelled once the expiry sweep has ended an abandoned checkout', () => {
+    // What the app shows on the refresh AFTER the backend sweep runs. The same booking that read
+    // "Payment pending" while it was `created` now reads a real ending, because the server moved
+    // it to a terminal status rather than leaving it unresolved forever.
+    const beforeSweep = bookingCardFrom(at({ status: 'created' }), IST);
+    const afterSweep = bookingCardFrom(at({ status: 'cancelled' }), IST);
+
+    expect(beforeSweep.statusLabel).toBe('Payment pending');
+    expect(afterSweep.statusLabel).toBe('Cancelled');
+    expect(afterSweep.statusLabel).not.toBe('Payment pending');
+  });
+
   it.each([
     ['cook_en_route', 'On the way'],
     ['cook_arrived', 'Arrived'],

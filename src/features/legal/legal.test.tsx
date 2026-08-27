@@ -37,8 +37,8 @@ describe('the published documents', () => {
 
   /** Both carry the source PDFs' own "Last Updated", so the app never states a date Legal did not. */
   it.each(['terms', 'privacy'] as const)('carries the source date for %s', (id) => {
-    expect(LEGAL_DOCUMENTS[id].updated).toBe('Last Updated: May 1, 2026');
-    expect(LEGAL_DOCUMENTS[id].html).toContain('May 1, 2026');
+    expect(LEGAL_DOCUMENTS[id].updated).toBe('Last Updated: September 1, 2026');
+    expect(LEGAL_DOCUMENTS[id].html).toContain('September 1, 2026');
   });
 
   /** Spot-checks that the transcription reached the end of each document, not just the opening. */

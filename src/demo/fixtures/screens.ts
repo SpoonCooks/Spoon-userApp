@@ -90,7 +90,7 @@ export const DEMO_ADDRESS_EDIT: AddressEditViewModel = {
 export const DEMO_ADDRESS_OUT_OF_SERVICE: AddressOutOfServiceViewModel = {
   headerTitle: 'Choose another location',
   title: 'Coming soon to your area!',
-  message: 'We are not operational in your area at the moment, , but we are working towards it!',
+  message: 'We are not operational in your area at the moment, but we are working towards it!',
 };
 
 /**

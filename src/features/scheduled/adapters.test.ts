@@ -69,6 +69,40 @@ describe('scheduled duration tiles', () => {
     const [tile] = durationsFrom(catalogueWith([69]));
     expect(tile?.price).toBe('₹69');
   });
+
+  it('draws the ₹5/min anchor as the struck price', () => {
+    // The pricing sheet's 30-min row: base 30 × ₹5 = ₹150, charged ₹69.
+    const [tile] = durationsFrom({
+      durations: [
+        {
+          durationMinutes: 30,
+          serviceAmountPaise: 6900,
+          taxAmountPaise: 0,
+          totalAmountPaise: 6900,
+          latestStartLocalMinute: 1290,
+        },
+      ],
+    } as unknown as Catalogue);
+
+    expect(tile?.strikePrice).toBe('₹150');
+  });
+
+  it('drops the strike when the real price reaches the anchor', () => {
+    // ₹5/min exactly — a ₹0-off promo is not a promo, so no strike.
+    const [tile] = durationsFrom({
+      durations: [
+        {
+          durationMinutes: 30,
+          serviceAmountPaise: 15000,
+          taxAmountPaise: 0,
+          totalAmountPaise: 15000,
+          latestStartLocalMinute: 1290,
+        },
+      ],
+    } as unknown as Catalogue);
+
+    expect(tile?.strikePrice).toBeUndefined();
+  });
 });
 
 /**

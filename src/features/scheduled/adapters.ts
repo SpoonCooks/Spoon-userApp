@@ -1,5 +1,5 @@
 import type { ScheduledAvailabilityDto } from '@features/availability';
-import { durationLabelFor } from '@features/booking';
+import { durationLabelFor, durationMerchandisingFor } from '@features/booking';
 import type { Catalogue } from '@features/catalogue';
 import { formatPaise } from '@core/format';
 
@@ -210,6 +210,8 @@ export function durationsFrom(catalogue: Catalogue) {
     id: `dur-${duration.durationMinutes}`,
     label: durationLabelFor(duration.durationMinutes),
     price: formatPaise(duration.serviceAmountPaise),
+    // The strike / "% off" treatment, shared with Instant so the two grids can never disagree.
+    ...durationMerchandisingFor(duration),
   }));
 }
 

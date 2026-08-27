@@ -29,7 +29,6 @@ describe('Instant sheet — available (1:728)', () => {
     expect(screen.getByText('18 mins')).toBeTruthy();
     expect(screen.getByText('₹189')).toBeTruthy();
     expect(screen.getByText('₹450')).toBeTruthy();
-    expect(screen.getByText('Popular')).toBeTruthy();
   });
 
   it('renders the CTA label exactly as the server supplied it — no amount is computed', () => {

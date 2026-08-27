@@ -27,9 +27,14 @@ const STATUS_PRESENTATION: Record<string, { readonly label: string; readonly ton
    * `created` is NOT confirmed — the payment has not been finalized.
    *
    * It read "Confirmed" until a real device showed what that means: a booking whose payment never
-   * completed, sitting in the list telling the customer it had. `created` reaching this list at
-   * all now means one specific thing — the service window elapsed with the checkout unfinished —
-   * so the label states that rather than the opposite of it.
+   * completed, sitting in the list telling the customer it had.
+   *
+   * This label now belongs to Home, not to Past bookings. History used to admit an elapsed
+   * `created` booking, and because nothing on the backend ever transitioned such a row, the
+   * customer was left with a permanent "Payment pending" card on a screen with no action on it.
+   * The backend's history read is terminal statuses only, and its checkout-expiry sweep turns an
+   * abandoned checkout into a real `cancelled` ending. So `created` reaching a card at all means
+   * the checkout is still unresolved and still cancellable — which is exactly what this says.
    */
   created: { label: 'Payment pending', tone: 'neutral' },
   assigned: { label: 'Confirmed', tone: 'info' },
