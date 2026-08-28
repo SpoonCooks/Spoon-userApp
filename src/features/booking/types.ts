@@ -107,7 +107,7 @@ export interface TrackingViewModel {
   readonly bannerTitle: string;
   readonly bannerMessage: string;
   /** Server verdict, not a client comparison of ETA against the clock. */
-  readonly tone: 'positive' | 'warning';
+  readonly tone: 'positive' | 'warning' | 'neutral';
   readonly etaLabel: string;
   readonly noteTitle: string;
   readonly noteBody: string;

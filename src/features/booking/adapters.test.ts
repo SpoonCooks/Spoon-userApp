@@ -158,20 +158,37 @@ describe('trackingDetailFrom', () => {
     );
   });
 
-  it('keeps the designed ETA copy when the server has no ETA', () => {
-    // A null ETA is a legitimate state (no cook is travelling yet). It is not an empty string.
+  it('removes the designed ETA and on-time copy when the server has no ETA', () => {
+    // A null ETA is a legitimate state. It must render as unavailable, never as the frame's
+    // transcribed number or punctuality claim.
     const view = trackingDetailFrom({ base: BASE, dto: tracking() });
 
-    expect(view.tracking?.etaLabel).toBe('DESIGNED ETA');
+    expect(view.tracking?.etaLabel).toBe('—');
+    expect(view.tracking?.tone).toBe('neutral');
+    expect(view.tracking?.bannerMessage).toBe('Cook arrival time is not available yet.');
   });
 
-  it('keeps the designed ETA copy when the server sends an unparseable instant', () => {
+  it('removes the designed ETA when the server sends an unparseable instant', () => {
     const view = trackingDetailFrom({
       base: BASE,
       dto: tracking({ eta: { estimatedArrivalAt: 'not-a-date', updatedAt: null } }),
     });
 
-    expect(view.tracking?.etaLabel).toBe('DESIGNED ETA');
+    expect(view.tracking?.etaLabel).toBe('—');
+    expect(view.tracking?.tone).toBe('neutral');
+  });
+
+  it('never renders on-time styling for an UNKNOWN verdict', () => {
+    const view = trackingDetailFrom({
+      base: BASE,
+      dto: tracking({
+        eta: { estimatedArrivalAt: '2026-08-18T09:35:00.000Z', updatedAt: null },
+        timingVerdict: 'UNKNOWN',
+      }),
+    });
+
+    expect(view.tracking?.tone).toBe('neutral');
+    expect(view.tracking?.bannerMessage).toBe('Cook arrival status is being updated.');
   });
 });
 

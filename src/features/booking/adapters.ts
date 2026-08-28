@@ -511,12 +511,23 @@ export function trackingDetailFrom(input: {
   const etaLabel = etaLabelFrom(dto.eta.estimatedArrivalAt);
   const arrivedAtLabel = arrivedAtLabelFrom(dto.arrivedAt);
   const late = isLateVerdict(dto.timingVerdict);
+  const knownVerdict = dto.timingVerdict === 'ON_TIME' || dto.timingVerdict === 'LATE';
+  const safeEtaLabel = etaLabel ?? '—';
 
   /** The server's punctuality answer, applied to whichever travelling surface is drawn. */
-  const verdictTone = <T extends TrackingViewModel>(surface: T): T =>
-    dto.timingVerdict === null || dto.timingVerdict === undefined || dto.timingVerdict === 'UNKNOWN'
-      ? surface
-      : { ...surface, tone: late ? ('warning' as const) : ('positive' as const) };
+  const trackingSurface = <T extends TrackingViewModel>(surface: T): T => ({
+    ...surface,
+    etaLabel: safeEtaLabel,
+    ...(knownVerdict && etaLabel !== null
+      ? { tone: late ? ('warning' as const) : ('positive' as const) }
+      : {
+          tone: 'neutral' as const,
+          bannerMessage:
+            etaLabel === null
+              ? 'Cook arrival time is not available yet.'
+              : 'Cook arrival status is being updated.',
+        }),
+  });
 
   return {
     ...base,
@@ -524,16 +535,14 @@ export function trackingDetailFrom(input: {
       ? {}
       : {
           tracking: {
-            ...verdictTone(base.tracking),
-            ...(etaLabel === null ? {} : { etaLabel }),
+            ...trackingSurface(base.tracking),
           },
         }),
     ...(base.reassigned === undefined
       ? {}
       : {
           reassigned: {
-            ...verdictTone(base.reassigned),
-            ...(etaLabel === null ? {} : { etaLabel }),
+            ...trackingSurface(base.reassigned),
           },
         }),
     ...(base.arrived === undefined
@@ -541,8 +550,7 @@ export function trackingDetailFrom(input: {
       : {
           arrived: {
             ...base.arrived,
-            ...(etaLabel === null ? {} : { etaLabel }),
-            ...(arrivedAtLabel === null ? {} : { etaLabel: arrivedAtLabel }),
+            etaLabel: arrivedAtLabel ?? etaLabel ?? '—',
             ...(start === null || start === undefined ? {} : { otpCode: start }),
           },
         }),

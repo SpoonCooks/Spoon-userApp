@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { isResolving } from '@core/auth';
+import { logBuildProvenance } from '@core/buildProvenance';
 import { QueryProvider, useAppStateFocus } from '@core/query';
 import { createAppRuntime } from '@core/runtime';
 import { RuntimeProvider } from '@core/runtimeContext';
@@ -53,6 +54,10 @@ export default function RootLayout() {
   useEffect(() => {
     void runtime.session.bootstrap();
   }, [runtime]);
+
+  useEffect(() => {
+    logBuildProvenance();
+  }, []);
 
   useEffect(() => {
     // A font failure must not strand the user on the splash — fall through to the system face.

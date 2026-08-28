@@ -78,6 +78,27 @@ const IOS_BUNDLE_IDENTIFIER =
     ? 'com.spoonhelp.customer'
     : `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
 
+const BUILD_PROVENANCE_RELEASE_SHA =
+  process.env.SPOON_RELEASE_SHA ?? process.env.GIT_COMMIT_SHA ?? 'unknown';
+const BUILD_PROVENANCE_TIMESTAMP = process.env.SPOON_BUILD_TIMESTAMP ?? new Date().toISOString();
+
+function runtimeVersionLabel(value: ExpoConfig['runtimeVersion']): string {
+  if (typeof value === 'string') return value;
+  if (value === undefined) return 'not-configured';
+  return JSON.stringify(value);
+}
+
+function buildProvenance(runtimeVersion: ExpoConfig['runtimeVersion']) {
+  return {
+    releaseSha: BUILD_PROVENANCE_RELEASE_SHA,
+    buildTimestamp: BUILD_PROVENANCE_TIMESTAMP,
+    environment: APP_ENV,
+    apiBaseUrlLabel: process.env.SPOON_API_BASE_URL_LABEL ?? APP_ENV,
+    expoRuntimeVersion: process.env.EXPO_RUNTIME_VERSION ?? runtimeVersionLabel(runtimeVersion),
+    expoUpdateId: process.env.EXPO_UPDATE_ID ?? 'not-applicable',
+  } as const;
+}
+
 /**
  * Google Maps platform keys.
  *
@@ -195,6 +216,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // react-native-reanimated's constrained partial specialisations, nor React Native's own
     // `std::format`. See plugins/withNdkVersion.js for the measurements behind the choice.
     './plugins/withNdkVersion',
+    './plugins/withStagingSigning',
 
     'expo-router',
 
@@ -276,6 +298,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     apiBaseUrl:
       process.env.EXPO_PUBLIC_API_BASE_URL ??
       (APP_ENV === 'production' ? '' : DEV_FALLBACK_API_BASE_URL),
+
+    buildProvenance: buildProvenance(config.runtimeVersion),
 
     apiTimeoutMs: Number(process.env.EXPO_PUBLIC_API_TIMEOUT_MS ?? 15000),
 

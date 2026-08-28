@@ -46,7 +46,7 @@ import { innerShadows } from '@ui/tokens/primitives';
  * (FRONTEND_FOUNDATION_PLAN.md §18 rule 4, §20).
  */
 
-export type StatusBannerTone = 'positive' | 'warning';
+export type StatusBannerTone = 'positive' | 'warning' | 'neutral';
 export type StatusBannerLayout = 'row' | 'hero' | 'heroCompact';
 
 export interface StatusBannerProps {
@@ -89,7 +89,7 @@ export function StatusBanner({
         styles.container,
         hero ? styles.hero : styles.row,
         compact ? styles.compact : null,
-        tone === 'warning' ? styles.warning : styles.positive,
+        tone === 'warning' ? styles.warning : tone === 'neutral' ? styles.neutral : styles.positive,
       ]}
     >
       <View style={hero ? styles.heroText : styles.text}>
@@ -151,6 +151,7 @@ const styles = StyleSheet.create({
   compact: { padding: lightTheme.space.md },
   positive: { backgroundColor: lightTheme.colors.surfacePositive },
   warning: { backgroundColor: lightTheme.colors.surfaceAccentStrong },
+  neutral: { backgroundColor: lightTheme.colors.surfaceMuted },
   /**
    * `3:1047` — a flat 64pt `#CFFF04` disc. The current file gives it NO drop shadow; the previous
    * `0 8 10 rgba(0,0,0,0.1)` lift came off the superseded node and is removed.
