@@ -48,15 +48,34 @@ export function toServiceDate(date: Date, timeZone?: string): string {
   return serviceDateIn(timeZone, date);
 }
 
-/** The day strip, sized by the published horizon. */
+/**
+ * The day strip, sized by the published horizon — and rolled PAST today the moment today's last
+ * bookable start has gone by.
+ *
+ * The boundary is `max(latestStartLocalMinute)` across the published durations: the last minute
+ * at which ANY slot can still start today, published by the catalogue and derived from the
+ * operating window, so a change to the cooks' hours moves it without a release (founder ruling
+ * 2026-08-29: "8 PM khatam hote hi it should default to tomorrow; if we have cooks till 9 PM,
+ * it should automatically be 9 PM"). Until this, the strip led with a TODAY whose every slot was
+ * `SLOT_IN_PAST` and only midnight fixed it.
+ */
 export function daysFrom(
   catalogue: Catalogue,
   now: Date = new Date(),
 ): readonly ScheduleDayOption[] {
   const timeZone = catalogue.operatingWindow.timeZone;
   const today = serviceDateIn(timeZone, now);
+  // A catalogue with no published latest starts cannot say when today ends, so it keeps the old
+  // midnight behaviour rather than guessing today away.
+  const lastStartMinute = Math.max(
+    0,
+    ...catalogue.durations.map((duration) => duration.latestStartLocalMinute),
+  );
+  const todayExhausted = lastStartMinute > 0 && localMinuteIn(timeZone, now) >= lastStartMinute;
+  const firstOffset = todayExhausted ? 1 : 0;
 
-  return Array.from({ length: catalogue.scheduled.horizonDays }, (_unused, offset) => {
+  return Array.from({ length: catalogue.scheduled.horizonDays }, (_unused, index) => {
+    const offset = firstOffset + index;
     // Stepped on the DATE, not on an instant: adding days to a local `Date` can be dragged across
     // a boundary by the device's offset, and the strip would then offer a day the server does not
     // recognise as today+n.
