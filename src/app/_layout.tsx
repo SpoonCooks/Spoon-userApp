@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { isResolving } from '@core/auth';
+import { logBuildProvenance } from '@core/buildProvenance';
 import { QueryProvider, useAppStateFocus } from '@core/query';
 import { createAppRuntime } from '@core/runtime';
 import { RuntimeProvider } from '@core/runtimeContext';
@@ -55,6 +56,10 @@ export default function RootLayout() {
   }, [runtime]);
 
   useEffect(() => {
+    logBuildProvenance();
+  }, []);
+
+  useEffect(() => {
     // A font failure must not strand the user on the splash — fall through to the system face.
     if (!isResolving(status) && (fontsLoaded || fontError !== null)) {
       void SplashScreen.hideAsync();
@@ -76,6 +81,8 @@ export default function RootLayout() {
                   <Stack.Screen name="index" />
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen name="(app)" />
+                  {/* Legal sits OUTSIDE both groups on purpose — see `app/legal/[doc].tsx`. */}
+                  <Stack.Screen name="legal/[doc]" />
                 </Stack>
               </ErrorBoundary>
             </ThemeProvider>

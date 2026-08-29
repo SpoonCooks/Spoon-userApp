@@ -85,8 +85,16 @@ export function BookingListView({
 }
 
 const styles = StyleSheet.create({
-  /** `6:228` — the list sits on `#F8FAFC`, not the app cream. */
-  screen: { flex: 1, backgroundColor: lightTheme.colors.surfaceForm },
+  /**
+   * `#FFFFFF` — plain white, for BOTH Past bookings (`6:227`) and Refunds (`71:615`).
+   *
+   * It was `#F8FAFC` (`surfaceForm`), transcribed off `6:228`'s own fill. The cards on these two
+   * screens are themselves near-white, so at that value the page read as a faintly grey band
+   * behind faintly-lighter cards — a difference too small to be legible as a deliberate layer and
+   * just large enough to look like a rendering fault on a device. Product's call is white on both
+   * (they are one screen with a card `variant`, so they cannot differ).
+   */
+  screen: { flex: 1, backgroundColor: lightTheme.colors.surface },
   /**
    * `6:228` / `71:619` — the 16pt-gutter body column, with the header inside it and 16pt between
    * the header and the card block.

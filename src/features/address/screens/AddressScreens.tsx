@@ -773,9 +773,27 @@ function AddressSearchResults({
 }
 
 /**
- * The search field is seeded from the payload and then owned by the user. It is REMOUNTED (via a
- * `key` on the caller) when the server sends a different value, rather than syncing in an effect —
- * an effect would fight the user's typing on every refetch.
+ * The search field. Seeded from the payload, owned by the user, and OVERRIDDEN whenever the value
+ * handed in changes.
+ *
+ * ## Why the override had to exist
+ *
+ * This used to be seed-once local state, remounted via a `key` on the caller when the server sent
+ * a different value. On the live map the key is the constant `'live'`, so it never remounted — and
+ * the hook's `query` is not only a seed there, it is written back when a Places suggestion is
+ * CHOSEN. Nothing carried that write into the input: tapping "Laxmi Nagar" moved the pin, resolved
+ * the address and updated `query`, while the box went on showing the half-typed "Laxmi naga" the
+ * customer had abandoned. The field disagreed with the pin directly beneath it.
+ *
+ * ## Why it is still not a plain controlled input
+ *
+ * Because the original concern was real. `onChange` is debounced into a network call, so echoing
+ * every keystroke back through the parent would make typing depend on a render round-trip, and a
+ * refetch mid-word could re-seed the box under the customer's fingers.
+ *
+ * Tracking the last value SEEN resolves both: local state still owns typing, and the incoming
+ * value wins exactly once each time it actually changes — which is only when something other than
+ * this input decided what the field should say.
  */
 function SearchInput({
   value,
@@ -787,6 +805,14 @@ function SearchInput({
   readonly onChange?: (next: string) => void;
 }) {
   const [text, setText] = useState(value);
+  const [seen, setSeen] = useState(value);
+
+  // Derived during render rather than in an effect: an effect would draw the stale text for one
+  // frame first, and the flash is visible on the handset.
+  if (value !== seen) {
+    setSeen(value);
+    if (value !== text) setText(value);
+  }
 
   return (
     <TextInput

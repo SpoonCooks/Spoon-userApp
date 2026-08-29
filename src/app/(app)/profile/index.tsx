@@ -1,4 +1,3 @@
-import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
@@ -55,13 +54,19 @@ export default function ProfileRoute() {
        * that URL and never a guessed one, because sending a customer to an invented address for a
        * terms document is worse than not linking it.
        */
+      /**
+       * Terms and Privacy open IN THE APP, at `spoon://legal/:doc`.
+       *
+       * This used to be `Linking.openURL`, which ejected the customer into Chrome or Safari — and
+       * with no legal URL published by any endpoint (BACKEND_GAP, see `features/legal`), the row
+       * had nothing to open at all and simply did nothing. The documents now ship with the app,
+       * so the link id IS the route parameter and there is no URL to look up or fail on.
+       *
+       * Pushed, not replaced: the customer is reading a document mid-session and Back has to
+       * return them to Profile.
+       */
       onOpenLink={(linkId) => {
-        if (state.status !== 'ready') return;
-        const url = state.data.links.find((link) => link.id === linkId)?.url;
-        if (url === undefined) return;
-        void Linking.openURL(url).catch(() => {
-          // No browser, or the URL was refused. Nothing to recover: the row is informational.
-        });
+        router.push(`/legal/${linkId}` as Href);
       }}
       onLogout={() => {
         // Revokes the session server-side, then clears SecureStore, the query cache and the

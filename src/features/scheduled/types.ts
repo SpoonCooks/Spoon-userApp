@@ -38,6 +38,15 @@ export interface ScheduleSlotOption {
   readonly id: string;
   readonly label: string;
   readonly disabled?: boolean;
+  /**
+   * The SERVER's machine reason a start time cannot be booked (`NO_PRESENT_COOK`,
+   * `NO_SHIFT_COVERAGE`, …). Carried, not drawn: no finalized frame writes a reason on a slot
+   * card, and inventing copy for one would be a design decision this screen has not been given.
+   *
+   * It is a bounded, non-identifying code — it names no cook, no booking and no schedule — so it
+   * is safe to hold on the view model, and it is what a future "why?" affordance would read.
+   */
+  readonly unavailableReason?: string;
 }
 
 export interface ScheduleSectionTitles {
@@ -55,8 +64,34 @@ export interface ScheduleViewModel {
   readonly periods: readonly SchedulePeriodOption[];
   /** Absent in reschedule mode — rescheduling moves *when*, never *how long*. */
   readonly durations?: readonly DurationOptionViewModel[];
-  /** Keyed by period id. */
+  /**
+   * Keyed by period id. Holds EVERY candidate the server returned for the day and duration —
+   * bookable and not — because the frames draw an unavailable start time grey rather than
+   * removing it. Filtering this by availability before rendering is the defect this contract
+   * exists to prevent.
+   */
   readonly slotsByPeriod: Readonly<Record<string, readonly ScheduleSlotOption[]>>;
+  /**
+   * The availability read owes an answer for the current day/duration and has not given one.
+   *
+   * The Start time grid is not drawn while this holds, so an in-flight read is never mistaken for
+   * "the server offers nothing", and a grid answered for a PREVIOUS duration is never left on
+   * screen as though it applied to the new one (task §6, §8).
+   */
+  readonly slotsPending: boolean;
+  /**
+   * The server refused the whole day rather than judging individual times. Distinct from an empty
+   * grid; carried so the two states can be told apart in code and in tests.
+   */
+  readonly slotsRejection?: string;
+  /**
+   * `slotsRejection` turned into something a customer can read.
+   *
+   * The raw code is kept beside it because it is the machine fact and tests assert on it; this is
+   * what the screen draws. Resolved in the adapter rather than in the screen, like every other
+   * string on this model — a screen never reaches for copy.
+   */
+  readonly slotsMessage?: string;
   readonly primaryCtaLabel: string;
   /**
    * `275:4180` — the underlined line beneath the CTA ("Check payment details"), exactly as the

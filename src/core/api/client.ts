@@ -157,7 +157,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     }
 
     if (!result.ok) {
-      // The backend answers every failure with `{ error: { code, message, requestId } }`.
+      // The backend answers every failure with `{ error: { code, message, requestId, details } }`.
       // Carrying the code through is what lets a screen distinguish
       // ADDRESS_NOT_SERVICEABLE from SLOT_UNAVAILABLE — both plain 4xx to the transport.
       const envelope = readErrorEnvelope(result.data);
@@ -169,6 +169,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
               code: envelope.code,
               ...(envelope.message === undefined ? {} : { message: envelope.message }),
               ...(envelope.requestId === undefined ? {} : { requestId: envelope.requestId }),
+              ...(envelope.details === undefined ? {} : { details: envelope.details }),
             }),
       });
       logger.warn('Request failed', {

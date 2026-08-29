@@ -12,6 +12,7 @@ import type { BookingRequestInput } from './bookingApi';
 import type { CheckoutLauncher } from '@features/payment';
 import { unavailableCheckoutLauncher } from '@features/payment';
 import { bookingKeys } from './keys';
+import { availabilityKeys } from '@features/availability';
 import type {
   BookingCreateResponse,
   BookingDetailDto,
@@ -325,6 +326,7 @@ export function useCancelBooking() {
       idempotency.release(variables.scope);
       // The refund and the final state are the server's. Refetch everything a cancel touches.
       void queryClient.invalidateQueries({ queryKey: bookingKeys.all() });
+      void queryClient.invalidateQueries({ queryKey: availabilityKeys.all() });
     },
   });
 }
@@ -340,6 +342,7 @@ export function useRescheduleBooking() {
     onSuccess(_result, variables) {
       idempotency.release(variables.scope);
       void queryClient.invalidateQueries({ queryKey: bookingKeys.all() });
+      void queryClient.invalidateQueries({ queryKey: availabilityKeys.all() });
     },
   });
 }
@@ -372,11 +375,12 @@ export function useRescheduleBooking() {
  *
  * ## `keyId`
  *
- * Checkout needs the public Razorpay key, and this endpoint does not yet publish one — see
- * `extensionQuoteSchema`. The refusal below is deliberate and fails CLOSED: opening Razorpay
- * against a fabricated or app-embedded key would either be rejected downstream or take a real
- * payment against the wrong merchant. The quote is still returned to the caller, so a `processing`
- * order and a missing key are distinguishable from a thrown transport error.
+ * Checkout needs the public Razorpay key, and the backend now publishes it on this reply exactly
+ * as it does for a booking order and a tip. The refusal below is kept anyway and fails CLOSED:
+ * opening Razorpay against a fabricated or app-embedded key would either be rejected downstream
+ * or take a real payment against the wrong merchant, so an environment that somehow answers
+ * without a key must stop here rather than improvise one. The quote is still returned to the
+ * caller, so a `processing` order and a missing key stay distinguishable from a transport error.
  */
 export function useCreateExtension(launcher: CheckoutLauncher = unavailableCheckoutLauncher) {
   const { api } = useRuntime();
@@ -400,8 +404,7 @@ export function useCreateExtension(launcher: CheckoutLauncher = unavailableCheck
       if (keyId === null) {
         throw new Error(
           'No Razorpay publishable key was returned with the extension quote, so checkout ' +
-            'cannot be opened. See docs/USER_APP_BACKEND_CONNECTIVITY_CLOSURE.md — ' +
-            'BLOCKED_BY_DEPLOYED_BACKEND: extension `keyId`.',
+            'cannot be opened. The deployed backend is not configured with RAZORPAY_KEY_ID.',
         );
       }
 

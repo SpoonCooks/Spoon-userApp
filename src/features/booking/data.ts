@@ -253,6 +253,30 @@ export function durationLabelFor(durationMinutes: number): string {
   return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} ${unit}`;
 }
 
+/**
+ * The struck "was" price on the duration tiles (pricing sheet, 2026-08-27).
+ *
+ * The backend publishes ONLY the amount actually charged (`serviceAmountPaise`); the struck
+ * figure is the sheet's Base column — a flat ₹5/min anchor — COMPUTED from that rate and the
+ * server's own price, never transcribed per tile. A price change therefore moves the strike with
+ * it, and the strike disappears for any duration the anchor no longer undercuts (a real price at
+ * or above ₹5/min draws a plain tile, not a ₹0-off promo).
+ */
+const ANCHOR_RATE_PAISE_PER_MINUTE = 500;
+
+export function durationMerchandisingFor(duration: {
+  readonly durationMinutes: number;
+  readonly serviceAmountPaise: number;
+}): { readonly strikePrice?: string } {
+  const anchorPaise = duration.durationMinutes * ANCHOR_RATE_PAISE_PER_MINUTE;
+
+  if (anchorPaise <= duration.serviceAmountPaise || duration.serviceAmountPaise === 0) {
+    return {};
+  }
+
+  return { strikePrice: formatPaise(anchorPaise) };
+}
+
 /** `dur-90` <-> 90. The id is the client's own handle for a server duration, not a server id. */
 const DURATION_ID_PREFIX = 'dur-';
 
@@ -336,6 +360,7 @@ export function useInstantData(
         id: durationIdFor(duration.durationMinutes),
         label: durationLabelFor(duration.durationMinutes),
         price: formatPaise(duration.serviceAmountPaise),
+        ...durationMerchandisingFor(duration),
       })),
       // `Book NOW • ₹198` — the amount is the quote's total, tax included, never assembled here.
       ...(priced === null

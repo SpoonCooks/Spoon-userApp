@@ -30,6 +30,10 @@ interface BaseAppError {
   readonly code?: string;
   /** The backend's `error.requestId`, for support and log correlation. */
   readonly requestId?: string;
+  /** Bounded backend context; never assume arbitrary server text is safe UI copy. */
+  readonly details?: {
+    readonly reason?: string | undefined;
+  };
 }
 
 export interface NetworkError extends BaseAppError {

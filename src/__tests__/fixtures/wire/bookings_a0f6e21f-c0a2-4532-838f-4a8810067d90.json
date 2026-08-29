@@ -1,0 +1,66 @@
+{
+  "data": {
+    "booking": {
+      "id": "booking-fixture-1",
+      "status": "assigned",
+      "slotType": "scheduled",
+      "scheduledStart": "2026-08-26T05:00:00.000Z",
+      "durationMinutes": 30,
+      "price": {
+        "amountPaise": 7245,
+        "durationMinutes": 30,
+        "serviceAmountPaise": 6900,
+        "taxRateBps": 500,
+        "taxAmountPaise": 345,
+        "totalAmountPaise": 7245,
+        "currency": "INR",
+        "pricingVersion": "pricing-v1"
+      },
+      "address": {
+        "label": "Test home",
+        "latitude": 12.9,
+        "longitude": 77.6,
+        "flat": "11",
+        "tower": null,
+        "society": "Test Society",
+        "street": "Test Street",
+        "pincode": "560001",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "hubName": "Test Hub",
+        "receiverName": null,
+        "receiverPhone": null
+      },
+      "mealNotes": null,
+      "referenceUrl": null,
+      "mealBrief": null,
+      "cook": {
+        "cookId": "cook-fixture-1",
+        "profileCode": "COOK_TEST",
+        "displayName": "Cook Test",
+        "profileImageUrl": null,
+        "region": "Karnataka",
+        "languages": [],
+        "cuisines": ["North Indian"],
+        "specialties": [],
+        "gender": "Female",
+        "spoonTrained": true,
+        "backgroundVerified": true,
+        "hygieneVerified": true,
+        "rating": { "average": 5, "count": 1 }
+      },
+      "timing": { "arrivedAt": null, "actualStart": null, "expectedEnd": null, "actualEnd": null },
+      "cancellation": null,
+      "reassignment": { "occurred": false, "sequence": 0, "reassignedAt": null },
+      "allowedActions": {
+        "canCancel": true,
+        "canReschedule": false,
+        "canExtend": false,
+        "canRate": false,
+        "canTip": false,
+        "canCallCook": true
+      }
+    },
+    "serverTime": "2026-08-26T11:39:10.857Z"
+  }
+}

@@ -125,7 +125,6 @@ export default function ShowcaseRoute() {
                 label={option.label}
                 price={option.price}
                 strikePrice={option.strikePrice}
-                {...('badge' in option ? { badge: option.badge } : {})}
                 selected={duration === option.id}
                 disabled={'disabled' in option ? option.disabled : false}
                 onPress={() => setDuration(option.id)}

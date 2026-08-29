@@ -97,6 +97,54 @@ describe('Select service location (53:31)', () => {
     expect(screen.getByText('Area 124, subarea 2 xyz, city efg')).toBeTruthy();
   });
 
+  /**
+   * `53:63` — the field has to state the place the pin is on.
+   *
+   * It was seed-once local state remounted by a `key`, and on the live map that key is a constant,
+   * so it never remounted. Choosing "Laxmi Nagar" therefore moved the pin and rewrote the hook's
+   * `query` while the box went on showing the abandoned "Laxmi naga" the customer had typed — the
+   * field disagreeing with the pin directly beneath it.
+   */
+  it('shows the chosen place in full once the query is rewritten', () => {
+    const { rerender } = render(
+      <AddressLocationView
+        state={ready(DEMO_ADDRESS_LOCATION)}
+        {...props}
+        map={{ ...mapProps, coordinates: POINT, query: 'Laxmi naga' }}
+      />,
+    );
+
+    expect(screen.getByTestId('address-search').props.value).toBe('Laxmi naga');
+
+    // What `chooseSuggestion` does: the whole place, primary AND locality.
+    rerender(
+      <AddressLocationView
+        state={ready(DEMO_ADDRESS_LOCATION)}
+        {...props}
+        map={{ ...mapProps, coordinates: POINT, query: 'Laxmi Nagar, Delhi' }}
+      />,
+    );
+
+    expect(screen.getByTestId('address-search').props.value).toBe('Laxmi Nagar, Delhi');
+  });
+
+  /** Typing still wins: an echo of the customer's own keystrokes must not fight them. */
+  it('keeps what is being typed rather than snapping back to the last value', () => {
+    const onSearch = jest.fn();
+    render(
+      <AddressLocationView
+        state={ready(DEMO_ADDRESS_LOCATION)}
+        {...props}
+        map={{ ...mapProps, coordinates: POINT, query: '', onSearch }}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByTestId('address-search'), 'Indira');
+
+    expect(onSearch).toHaveBeenCalledWith('Indira');
+    expect(screen.getByTestId('address-search').props.value).toBe('Indira');
+  });
+
   it('draws NO map until a point exists — a map has to be centred on something real', () => {
     render(
       <AddressLocationView

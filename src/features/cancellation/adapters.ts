@@ -68,12 +68,15 @@ export function cancellationFrom(input: {
   readonly catalogue: Catalogue | null;
   readonly preview: CancellationPreviewDto | null;
   readonly reschedule: RescheduleOptionsDto | null;
+  readonly previewPending?: boolean;
 }): CancellationViewModel {
   const { base, catalogue, preview, reschedule } = input;
 
   const refundRows =
     preview === null
-      ? base.refundRows
+      ? input.previewPending === true
+        ? []
+        : base.refundRows
       : [
           { label: 'Amount paid', value: formatPaise(preview.capturedAmountPaise) },
           { label: 'Cancellation fee', value: formatPaise(preview.chargeAmountPaise) },
@@ -86,6 +89,7 @@ export function cancellationFrom(input: {
       ? {}
       : { feeSchedule: feeScheduleFrom(catalogue), reasons: reasonsFrom(catalogue) }),
     refundRows,
+    ...(input.previewPending === true ? { refundPending: true } : { refundPending: false }),
     // Ruling R-3: absent hides the block entirely. The server owns the count and the limit.
     ...(reschedule === null ? {} : { rescheduleAllowed: reschedule.reschedulable }),
   };

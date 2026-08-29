@@ -4,6 +4,7 @@ import { getDeviceId } from '@core/auth';
 import { useApiQuery } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 import { useRuntime } from '@core/runtimeContext';
+import { bookingKeys } from '@features/booking';
 
 import { authKeys } from './keys';
 import { createAuthApi } from './authApi';
@@ -115,6 +116,11 @@ export function useUpdateProfile() {
         current === undefined ? current : { ...current, ...profile },
       );
       void queryClient.invalidateQueries({ queryKey: authKeys.me() });
+      // The assigned-cook card's veg/mixed projection is derived SERVER-SIDE from the stored
+      // `dietaryPreference`, so a profile save can change what every booking read returns.
+      // Refetching bookings here is what makes the card follow the answer without an app
+      // restart; the server remains the only thing that decides the variant.
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.all() });
     },
   });
 }

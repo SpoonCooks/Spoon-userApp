@@ -59,7 +59,7 @@ export const DEMO_DURATION_OPTIONS = [
   { id: 'dur-30', label: '30 mins', price: '₹69', strikePrice: '₹150' },
   { id: 'dur-45', label: '45 mins', price: '₹99', strikePrice: '₹225' },
   { id: 'dur-60', label: '1 hr', price: '₹129', strikePrice: '₹300' },
-  { id: 'dur-90', label: '1.5 hr', price: '₹189', strikePrice: '₹450', badge: 'Popular' },
+  { id: 'dur-90', label: '1.5 hr', price: '₹189', strikePrice: '₹450' },
   { id: 'dur-120', label: '2 hr', price: '₹259', strikePrice: '₹600' },
   { id: 'dur-150', label: '2.5 hrs', price: '₹319', strikePrice: '₹750', disabled: true },
 ] as const;

@@ -103,8 +103,17 @@ export const catalogueSchema = z.object({
     .nullable(),
   cancellation: z.object({
     policyVersion: z.string(),
-    /** What the percentages apply to — the snapshot's service amount, not the captured total. */
-    refundBasis: z.literal('service_amount'),
+    /**
+     * What the percentages apply to.
+     *
+     * The deployed backend moved this from `service_amount` to `captured_gross` (captured-gross
+     * refunds, live on staging 2026-08-26). Pinning the old literal made the whole catalogue
+     * parse throw on a 200 — and because the catalogue feeds the cancel sheet, the reschedule
+     * screen, the schedule screen and the instant duration list, every one of those actions
+     * collapsed into "Something went wrong". Both published values parse; rendering reads the
+     * bands themselves, never this label.
+     */
+    refundBasis: z.enum(['captured_gross', 'service_amount']),
     bands: z.array(cancellationBandSchema),
     reasons: z.array(cancellationReasonSchema),
     reasonCatalogueVersion: z.string(),

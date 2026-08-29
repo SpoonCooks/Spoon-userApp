@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { useBookingHistory, useRefunds } from '@features/booking';
+import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 
@@ -27,11 +28,23 @@ import type { BookingListViewModel } from './types';
  */
 export function useBookingHistoryData(): ScreenQuery<BookingListViewModel> {
   const history = useBookingHistory();
+  // Only for the service timezone the card dates are written on. Home and Schedule already read
+  // this catalogue, so it is warm in the cache and adds no request; the list still renders if it
+  // has not loaded, with the dates falling back to the device clock.
+  const catalogue = useCatalogue();
+  const timeZone =
+    catalogue.state.status === 'ready' ? catalogue.state.data.operatingWindow.timeZone : undefined;
 
   const state = useMemo(() => {
     if (history.state.status !== 'ready') return history.state;
-    return ready(bookingListFrom({ base: DEMO_BOOKING_HISTORY, bookings: history.state.data }));
-  }, [history.state]);
+    return ready(
+      bookingListFrom({
+        base: DEMO_BOOKING_HISTORY,
+        bookings: history.state.data,
+        timeZone,
+      }),
+    );
+  }, [history.state, timeZone]);
 
   return { state, refetch: history.refetch };
 }

@@ -41,6 +41,8 @@ export interface CancellationViewModel {
   readonly refundTitle: string;
   /** Original paid, processing fee and refund amount — all three from the server. */
   readonly refundRows: readonly DetailRow[];
+  /** True until the booking-specific preview has answered; no fixture amount may be shown. */
+  readonly refundPending?: boolean;
   readonly refundMethodTitle: string;
   readonly refundMethodBody: string;
   readonly cancelCtaLabel: string;

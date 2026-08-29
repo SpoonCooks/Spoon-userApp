@@ -1,0 +1,42 @@
+{
+  "data": {
+    "currency": "INR",
+    "taxRateBps": 500,
+    "pricingVersion": "pricing-v1",
+    "bookingPolicyVersion": "booking-v1",
+    "durations": [
+      {
+        "durationMinutes": 30,
+        "serviceAmountPaise": 6900,
+        "taxAmountPaise": 345,
+        "totalAmountPaise": 7245,
+        "latestStartLocalMinute": 1290
+      }
+    ],
+    "operatingWindow": {
+      "timeZone": "Asia/Kolkata",
+      "openLocalMinute": 300,
+      "closeLocalMinute": 1320
+    },
+    "scheduled": {
+      "horizonDays": 3,
+      "slotIntervalMinutes": 15,
+      "periods": [{ "id": "MORNING", "startMinute": 300, "endMinute": 720 }]
+    },
+    "instant": { "arrivalPromiseMinutes": 30 },
+    "extension": null,
+    "cancellation": {
+      "policyVersion": "cancellation-captured-gross-v1",
+      "refundBasis": "captured_gross",
+      "bands": [
+        { "band": "SCHEDULED_FULL_REFUND", "minMinutesToStart": 180, "refundPercent": 100 },
+        { "band": "SCHEDULED_NO_REFUND", "maxMinutesToStart": 60, "refundPercent": 0 }
+      ],
+      "reasons": [{ "code": "OTHER", "label": "Other", "requiresDetail": true }],
+      "reasonCatalogueVersion": "reasons-v1"
+    },
+    "tips": { "suggestedAmountsPaise": [2000], "currency": "INR" },
+    "mealBrief": { "minGuests": 1, "maxGuests": 12, "dietPreferences": ["veg"] },
+    "support": {}
+  }
+}

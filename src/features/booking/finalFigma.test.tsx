@@ -106,4 +106,39 @@ describe('Confirmation — the `383:743` share-recipe row (§15)', () => {
 
     expect(screen.queryByTestId('confirmation-share-recipe')).toBeNull();
   });
+
+  /**
+   * ABOVE the cook card, not filed under the links at the foot of the screen.
+   *
+   * It used to render beneath "View booking details". The finalized confirm frames put it
+   * directly under the banner, and the position carries meaning: sharing a recipe or a special
+   * request is something the customer does BEFORE the cook sets off, so it belongs with the
+   * confirmation rather than with the after-the-fact links.
+   */
+  it('sits above the cook card, directly under the banner', () => {
+    render(
+      <ConfirmationBody
+        summary={summary}
+        {...(DEMO_BOOKING_CONFIRMATION.cook === undefined
+          ? {}
+          : { cook: DEMO_BOOKING_CONFIRMATION.cook })}
+        onShareRecipe={() => undefined}
+        onViewDetails={() => undefined}
+      />,
+    );
+
+    // Every testID in render order, so the assertion is about POSITION rather than presence.
+    const order = screen
+      .getByTestId('confirmation-body')
+      .findAll((node) => typeof node.props['testID'] === 'string')
+      .map((node) => node.props['testID'] as string);
+
+    const at = (testID: string) => order.indexOf(testID);
+
+    expect(at('confirmation-banner')).toBeGreaterThanOrEqual(0);
+    expect(at('confirmation-share-recipe')).toBeGreaterThan(at('confirmation-banner'));
+    expect(at('confirmation-cook')).toBeGreaterThan(at('confirmation-share-recipe'));
+    // And it is no longer down with the links.
+    expect(at('confirmation-share-recipe')).toBeLessThan(at('confirmation-view-details'));
+  });
 });

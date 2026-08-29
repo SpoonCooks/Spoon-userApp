@@ -14,6 +14,7 @@ import type { CookViewModel } from '@ui';
 
 import { SERVICE_SECTION_GAP, ServiceSection } from './ServiceSection';
 import { ServiceLinkRow } from './ServiceLinkRow';
+import { cookCardVariantFor } from '../adapters';
 import type { BookingSummaryViewModel } from '../types';
 
 /**
@@ -100,9 +101,9 @@ export function ConfirmationBody({
         <StatusBanner
           title={summary.bannerTitle}
           message={summary.scheduleLine}
-          tone="positive"
+          tone={summary.tone ?? 'positive'}
           layout="hero"
-          icon="checkCircle"
+          icon={summary.tone === 'warning' ? 'alert' : 'checkCircle'}
           testID="confirmation-banner"
         />
       </ServiceSection>
@@ -119,10 +120,33 @@ export function ConfirmationBody({
         </ServiceSection>
       )}
 
+      {/*
+        `383:743` — ABOVE the cook card, directly under the banner (and under the reassignment
+        notice when there is one).
+
+        It was previously drawn beneath "View booking details", near the foot of the screen. The
+        finalized frames put it here on every confirmed variant — plain confirm and confirm-reassign
+        alike — and the position carries meaning: sharing a recipe or a special request is something
+        the customer does BEFORE the cook sets off, so it belongs with the confirmation, not filed
+        under the after-the-fact links at the bottom.
+      */}
+      {summary.shareRecipeLabel === undefined || onShareRecipe === undefined ? null : (
+        <ServiceSection>
+          <ServiceLinkRow
+            label={summary.shareRecipeLabel}
+            glyph={SHARE_RECIPE_GLYPH}
+            onPress={onShareRecipe}
+            trailing="whatsapp"
+            testID="confirmation-share-recipe"
+          />
+        </ServiceSection>
+      )}
+
       {cook === undefined ? null : (
         <ServiceSection>
           <CookCard
             cook={cook}
+            variant={cookCardVariantFor(cook.profileVariant)}
             {...(onCallCook === undefined ? {} : { onCallCook })}
             testID="confirmation-cook"
           />
@@ -148,19 +172,6 @@ export function ConfirmationBody({
             glyphOffset={-1.04}
             onPress={onViewDetails}
             testID="confirmation-view-details"
-          />
-        </ServiceSection>
-      )}
-
-      {/* `383:743` — NEW. Sits under "View booking details", same outlined treatment. */}
-      {summary.shareRecipeLabel === undefined || onShareRecipe === undefined ? null : (
-        <ServiceSection>
-          <ServiceLinkRow
-            label={summary.shareRecipeLabel}
-            glyph={SHARE_RECIPE_GLYPH}
-            onPress={onShareRecipe}
-            trailing="whatsapp"
-            testID="confirmation-share-recipe"
           />
         </ServiceSection>
       )}

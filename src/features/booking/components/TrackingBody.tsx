@@ -17,6 +17,7 @@ import { DETAILS_GLYPH } from './ConfirmationBody';
 import { ServiceHandoverBlock } from './ServiceHandoverBlock';
 import { ServiceLinkRow } from './ServiceLinkRow';
 import { SERVICE_SECTION_GAP, ServiceSection } from './ServiceSection';
+import { cookCardVariantFor } from '../adapters';
 import type { ArrivedViewModel, ReassignedViewModel, TrackingViewModel } from '../types';
 
 /**
@@ -124,6 +125,7 @@ export function TrackingBody({
         <ServiceSection>
           <CookCard
             cook={cook}
+            variant={cookCardVariantFor(cook.profileVariant)}
             {...(onCallCook === undefined ? {} : { onCallCook })}
             testID="tracking-cook"
           />

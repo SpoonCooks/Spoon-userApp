@@ -338,6 +338,74 @@ describe('device location acquisition', () => {
  * when they land out of order — the failure mode being an address for a place the customer has
  * already panned away from, sitting under a pin that is somewhere else entirely.
  */
+/**
+ * `53:63` — what the search field says after a suggestion is chosen.
+ *
+ * It used to take the suggestion's `primary` alone, which is only the first line of the two-line
+ * row the customer tapped: picking "Laxmi Nagar / Delhi, India" left the box reading "Laxmi
+ * Nagar" and dropped the half that disambiguates it. The pin moves to the whole place, so the
+ * field states the whole place.
+ */
+describe('choosing a Places suggestion rewrites the query', () => {
+  const suggestionsMock = jest.requireMock('./googlePlaces') as {
+    placesAutocomplete: jest.Mock;
+  };
+
+  /** Types, lets the debounce fire, and returns once the predictions are on the hook. */
+  async function searchFor(
+    result: { current: ReturnType<typeof useAddressLocation> },
+    text: string,
+  ) {
+    act(() => result.current.search(text));
+    await act(async () => {
+      jest.advanceTimersByTime(400);
+    });
+    await flush();
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    suggestionsMock.placesAutocomplete.mockResolvedValue({
+      ok: true,
+      value: [{ placeId: 'laxmi', primary: 'Laxmi Nagar', secondary: 'Delhi, India' }],
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    suggestionsMock.placesAutocomplete.mockResolvedValue({ ok: true, value: [] });
+  });
+
+  it('states the full place — primary AND locality — not just the first line', async () => {
+    const { result } = renderHook(() => useAddressLocation(), { wrapper });
+    await flush();
+
+    await searchFor(result, 'Laxmi naga');
+    expect(result.current.query).toBe('Laxmi naga');
+    expect(result.current.suggestions).toHaveLength(1);
+
+    act(() => result.current.chooseSuggestion('laxmi'));
+
+    expect(result.current.query).toBe('Laxmi Nagar, Delhi, India');
+  });
+
+  /** A prediction with no locality is not padded with a trailing comma. */
+  it('uses the primary alone when there is no locality under it', async () => {
+    suggestionsMock.placesAutocomplete.mockResolvedValue({
+      ok: true,
+      value: [{ placeId: 'solo', primary: 'Laxmi Nagar', secondary: '' }],
+    });
+
+    const { result } = renderHook(() => useAddressLocation(), { wrapper });
+    await flush();
+
+    await searchFor(result, 'Laxmi');
+    act(() => result.current.chooseSuggestion('solo'));
+
+    expect(result.current.query).toBe('Laxmi Nagar');
+  });
+});
+
 describe('settling on a point', () => {
   /**
    * Drains whatever a test left hanging. A geocode that is never resolved keeps a promise — and

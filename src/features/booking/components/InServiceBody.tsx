@@ -10,6 +10,7 @@ import { ExtendPromoCard } from './ExtendPromoCard';
 import { ServiceHandoverBlock } from './ServiceHandoverBlock';
 import { ServiceLinkRow } from './ServiceLinkRow';
 import { SERVICE_SECTION_GAP, ServiceSection } from './ServiceSection';
+import { cookCardVariantFor } from '../adapters';
 import type { InServiceViewModel } from '../types';
 
 /**
@@ -119,6 +120,7 @@ export function InServiceBody({
         <ServiceSection>
           <CookCard
             cook={cook}
+            variant={cookCardVariantFor(cook.profileVariant)}
             {...(onCallCook === undefined ? {} : { onCallCook })}
             testID="in-service-cook"
           />

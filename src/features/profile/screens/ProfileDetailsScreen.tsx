@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -28,6 +28,8 @@ import {
   EMPTY_PROFILE_DETAILS,
   addGrownUpEating,
   canSubmitProfileDetails,
+  grownUpEatingSuggestions,
+  matchGrownUpEating,
   removeGrownUpEating,
   toggleSingle,
 } from '../validation';
@@ -106,6 +108,12 @@ export function ProfileDetailsView({
   );
   /** `341:4678` — the search box's own text, which is NOT one of the collected values. */
   const [entry, setEntry] = useState('');
+  /**
+   * Whether the cuisine list is showing. Also not a collected value — it is the disclosure state
+   * of one control, and it closes as soon as a choice is made so the blocks below come back up.
+   */
+  const [entryOpen, setEntryOpen] = useState(false);
+  const entrySuggestions = grownUpEatingSuggestions(entry, values.grownUpEating);
 
   const keyboardHeight = useKeyboardHeight();
   const bottomGutter = useBottomGutter(lightTheme.space.lg);
@@ -241,14 +249,33 @@ export function ProfileDetailsView({
                 <Icon name="search" size={16} color="textSecondary" />
                 <TextInput
                   value={entry}
-                  onChangeText={setEntry}
-                  onFocus={onInputFocus}
+                  onChangeText={(next) => {
+                    setEntry(next);
+                    setEntryOpen(true);
+                  }}
+                  onFocus={() => {
+                    onInputFocus();
+                    // Focus alone opens the WHOLE list. The vocabulary is closed, so a customer
+                    // who does not already know what is in it has to be able to see it — typing
+                    // first would mean guessing at a list they have never been shown.
+                    setEntryOpen(true);
+                  }}
                   onSubmitEditing={() => {
+                    /**
+                     * Done commits only an EXACT published name.
+                     *
+                     * `addGrownUpEating` refuses anything else, so a half-typed word or a sentence
+                     * leaves the field alone rather than becoming a chip — and the list below is
+                     * still open, showing what could be chosen instead.
+                     */
+                    const matched = matchGrownUpEating(entry);
+                    if (matched === null) return;
                     setValues((current) => ({
                       ...current,
-                      grownUpEating: addGrownUpEating(current.grownUpEating, entry),
+                      grownUpEating: addGrownUpEating(current.grownUpEating, matched),
                     }));
                     setEntry('');
+                    setEntryOpen(false);
                   }}
                   placeholder={profilePromptField('grownUpEating').placeholder}
                   placeholderTextColor={lightTheme.colors.textSecondary}
@@ -259,6 +286,69 @@ export function ProfileDetailsView({
                   testID="profile-grown-up-entry"
                 />
               </View>
+
+              {/*
+                FIGMA_PENDING — `341:4655` draws the field and the chosen chips, and no list
+                between them. It has to exist regardless: the values are a closed vocabulary now,
+                and a search box over a list nobody can see is a guessing game. Drawn in the
+                field's own outline treatment so it reads as part of the control.
+
+                In FLOW, not floating. The page is one long ScrollView with the CTA at the bottom
+                of it, so an absolutely-positioned list would be clipped by the blocks below and
+                could not be scrolled to; pushing the content down is what lets a customer reach
+                the twenty-seventh option.
+              */}
+              {!entryOpen || entrySuggestions.length === 0 ? null : (
+                <ScrollView
+                  style={styles.entryList}
+                  // The list scrolls INSIDE its own five-row window rather than growing the page
+                  // by twenty-seven rows. `nestedScrollEnabled` is what makes that work on
+                  // Android, where the outer ScrollView would otherwise swallow the gesture.
+                  nestedScrollEnabled
+                  // A tap while the IME is up must select the option, not merely dismiss the
+                  // keyboard and leave the customer to tap again.
+                  keyboardShouldPersistTaps="handled"
+                  testID="profile-grown-up-options"
+                >
+                  {entrySuggestions.map((option) => (
+                    <Pressable
+                      key={option.id}
+                      onPress={() => {
+                        setValues((current) => ({
+                          ...current,
+                          grownUpEating: addGrownUpEating(current.grownUpEating, option.label),
+                        }));
+                        setEntry('');
+                        setEntryOpen(false);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={option.label}
+                      style={({ pressed }) => [
+                        styles.entryOption,
+                        pressed ? styles.entryOptionPressed : null,
+                      ]}
+                      testID={`profile-grown-up-option-${option.id}`}
+                    >
+                      <Text variant="bodyMedium" color="textPrimary">
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+
+              {/* Typed something the list does not contain. Said plainly, because the field
+                  silently doing nothing on Done is what would otherwise read as a broken box. */}
+              {!entryOpen || entry.trim() === '' || entrySuggestions.length > 0 ? null : (
+                <Text
+                  variant="bodyMedium"
+                  color="textSecondary"
+                  style={styles.entryNotice}
+                  testID="profile-grown-up-empty"
+                >
+                  No matching cuisine. Try a region — Punjabi, Bengali, Kerala.
+                </Text>
+              )}
 
               {/* `408:1381` — the selected chips, at a 10pt gutter. Wraps rather than scrolls:
                   the frame draws three on one row at 390dp, and a fourth (or a long cuisine name
@@ -482,6 +572,29 @@ const styles = StyleSheet.create({
     color: lightTheme.colors.textSecondary,
     ...lightTheme.typography.bodyMedium,
   },
+  /**
+   * FIGMA_PENDING — the cuisine list under `341:4672`.
+   *
+   * Given the field's own outline so the two read as one control: same `#CAD5E2` edge, same 24pt
+   * family softened to `lg` for a block rather than a pill, on white. Capped at ~5 rows and
+   * scrollable inside itself, so a 27-entry vocabulary cannot push Confirm off a short handset
+   * while the keyboard is up.
+   */
+  entryList: {
+    maxHeight: 200,
+    marginTop: lightTheme.space.s6,
+    borderRadius: lightTheme.radius.md,
+    borderWidth: lightTheme.stroke.thin,
+    borderColor: lightTheme.colors.border,
+    backgroundColor: lightTheme.colors.surface,
+    overflow: 'hidden',
+  },
+  entryOption: {
+    paddingHorizontal: 11.889,
+    paddingVertical: lightTheme.space.s10,
+  },
+  entryOptionPressed: { backgroundColor: lightTheme.colors.surfaceAccent },
+  entryNotice: { marginTop: lightTheme.space.s6 },
   /** `408:1381` — a 10pt gutter, wrapping. */
   chipRow: {
     flexDirection: 'row',

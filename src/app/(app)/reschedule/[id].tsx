@@ -1,8 +1,15 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useRescheduleBooking } from '@features/booking';
-import { ScheduleView, devScheduleSelection, useScheduleData } from '@features/scheduled';
+import { useBookingDetail, useRescheduleBooking } from '@features/booking';
+import {
+  ScheduleView,
+  devScheduleSelection,
+  serviceDateIn,
+  useScheduleData,
+} from '@features/scheduled';
+import { useCatalogue } from '@features/catalogue';
+import type { ScheduleSelection } from '@features/scheduled';
 import { getUserMessage, isAppError } from '@core/errors';
 import { useSafeBack } from '@core/navigation';
 import { InfoDialog } from '@ui';
@@ -43,11 +50,46 @@ export default function RescheduleRoute() {
   const router = useRouter();
   const { id, step } = useLocalSearchParams<{ id: string; step?: string }>();
   const bookingId = typeof id === 'string' ? id : '';
-  const { state, refetch } = useScheduleData('reschedule');
+  const booking = useBookingDetail(bookingId === '' ? null : bookingId);
+  const catalogue = useCatalogue();
+  const bookingData = booking.state.status === 'ready' ? booking.state.data : null;
+  const serviceTimeZone =
+    catalogue.state.status === 'ready'
+      ? catalogue.state.data.operatingWindow.timeZone
+      : 'Asia/Kolkata';
+  const bookingDate =
+    bookingData?.scheduledStart === null || bookingData?.scheduledStart === undefined
+      ? null
+      : serviceDateIn(serviceTimeZone, new Date(bookingData.scheduledStart));
+  const selectionScope = `${bookingId}:${bookingDate ?? 'pending'}:${bookingData?.durationMinutes ?? 'pending'}`;
+  const [selectionState, setSelectionState] = useState<{
+    scope: string;
+    value: ScheduleSelection | null;
+  }>({ scope: '', value: null });
+  const selection = selectionState.scope === selectionScope ? selectionState.value : null;
+
+  const handleSelectionChange = useCallback(
+    (value: ScheduleSelection) => setSelectionState({ scope: selectionScope, value }),
+    [selectionScope],
+  );
+
+  const { state, refetch } = useScheduleData('reschedule', {
+    date: selection?.dayId ?? bookingDate,
+    durationMinutes: bookingData?.durationMinutes ?? null,
+  });
   const reschedule = useRescheduleBooking();
   const [error, setError] = useState<string | null>(null);
 
   const seed = __DEV__ ? devScheduleSelection(state, step) : undefined;
+  const initialSelection =
+    bookingDate === null
+      ? seed
+      : {
+          dayId: bookingDate,
+          periodId: seed?.periodId ?? null,
+          durationId: null,
+          slotId: seed?.slotId ?? null,
+        };
 
   /**
    * The BOOKING being rescheduled — the only screen this one can be about. A notification that
@@ -59,10 +101,12 @@ export default function RescheduleRoute() {
   return (
     <>
       <ScheduleView
+        key={selectionScope}
         state={state}
         onRetry={refetch}
         onBack={goBack}
-        {...(seed === undefined ? {} : { initialSelection: seed })}
+        {...(initialSelection === undefined ? {} : { initialSelection })}
+        onSelectionChange={handleSelectionChange}
         /* Reschedule is free, so there is no quote to wait on — but the call in flight still has
            to hold the CTA, or a second tap moves the booking twice. */
         submitting={reschedule.isPending}

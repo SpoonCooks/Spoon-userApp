@@ -75,6 +75,7 @@ function bookingDto(overrides: {
   timing?: Record<string, unknown>;
   allowedActions?: Partial<typeof ALLOWED>;
   reassignment?: unknown;
+  recovery?: unknown;
   cancellation?: unknown;
 }): Record<string, unknown> {
   return {
@@ -105,6 +106,7 @@ function bookingDto(overrides: {
       sequence: 0,
       reassignedAt: null,
     },
+    recovery: overrides.recovery,
     cancellation: overrides.cancellation ?? null,
     allowedActions: { ...ALLOWED, ...overrides.allowedActions },
   };
@@ -166,6 +168,21 @@ describe('booking lifecycle from real DTOs', () => {
     await settle();
 
     expect(screen.getByTestId('confirmation-banner')).toBeTruthy();
+  });
+
+  it('renders a support handoff as attention, not Confirmed', async () => {
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+        booking: bookingDto({
+          status: 'assigned',
+          recovery: { state: 'support_handoff', openedAt: '2026-08-20T10:00:00.000Z' },
+        }),
+      }),
+    });
+    await settle();
+
+    expect(screen.getByText('This booking needs attention')).toBeTruthy();
+    expect(screen.queryByText('Booking confirmed!')).toBeNull();
   });
 
   /**

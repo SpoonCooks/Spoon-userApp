@@ -123,8 +123,21 @@ const styles = StyleSheet.create({
   /** The mark box starts 13 in; the copy column starts at 72, i.e. 47 + 12. */
   row: { flexDirection: 'row', paddingLeft: 13, gap: lightTheme.space.md },
   mark: { width: 47, height: 32 },
-  /** `222:1572` — the 32pt disc, drawn from x 0 of the 47pt box. */
-  avatar: { position: 'absolute', left: 0, top: 0, width: 32, height: 32 },
+  /**
+   * `222:1572` — the 32pt disc, drawn from x 0 of the 47pt box.
+   *
+   * CLIPPED TO A CIRCLE, which is not decoration — it is the fix for a visible artefact.
+   * `assets/figma/profile/avatar.png` was exported flattened onto WHITE: its four corners are
+   * `#FFFFFF` at full alpha, not transparent. On `6:663`'s identity card that is invisible,
+   * because the card is white. This card's ground is `#FFF7CC`, so the same asset drew a white
+   * SQUARE behind the yellow disc — the glitch reported on device.
+   *
+   * A 16pt radius on a 32pt box is a circle inscribed exactly where the disc already is, so the
+   * clip removes the baked corners and nothing else. Doing it here rather than re-cutting the PNG
+   * keeps the export byte-identical to the Figma node (task §0) and cannot leave the halo a naive
+   * white-key would, since the disc's own edge is anti-aliased against that white.
+   */
+  avatar: { position: 'absolute', left: 0, top: 0, width: 32, height: 32, borderRadius: 16 },
   /** `222:1582` — 15 × 32 at x 32.11. */
   exclamation: { position: 'absolute', left: 32.11, top: 0.34, width: 15, height: 32 },
   /** `222:1575` — a 241pt column at a 3pt gap. Not width-pinned: it flexes so a 320dp handset

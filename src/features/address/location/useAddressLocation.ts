@@ -514,7 +514,20 @@ export function useAddressLocation(): AddressLocationState {
       const chosen = suggestions.find((suggestion) => suggestion.placeId === placeId);
       setSuggestions([]);
       setSearchState('idle');
-      if (chosen !== undefined) setQuery(chosen.primary);
+      /**
+       * The field is rewritten to the WHOLE place that was chosen — `mainText` and the locality
+       * under it, exactly as the row the customer tapped read.
+       *
+       * It used to take `primary` alone, which is only the first line of a two-line row: tapping
+       * "Laxmi Nagar / Delhi, India" left the box saying "Laxmi Nagar" and dropped the half that
+       * disambiguates it. Now the box states the same place the pin has moved to, in full, so the
+       * two agree and re-opening the field shows what the search actually resolved.
+       */
+      if (chosen !== undefined) {
+        setQuery(
+          chosen.secondary === '' ? chosen.primary : `${chosen.primary}, ${chosen.secondary}`,
+        );
+      }
       setLocating(true);
 
       void (async () => {

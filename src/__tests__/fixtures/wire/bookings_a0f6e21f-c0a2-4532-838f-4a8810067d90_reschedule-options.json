@@ -1,0 +1,10 @@
+{
+  "data": {
+    "bookingId": "booking-fixture-1",
+    "durationMinutes": 30,
+    "currentServiceStart": "2026-08-26T05:00:00.000Z",
+    "rescheduleCount": 1,
+    "maxReschedules": 1,
+    "reschedulable": false
+  }
+}

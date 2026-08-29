@@ -14,17 +14,32 @@ const BASE: HomeBannerInput = {
 const at = (over: Partial<HomeBannerInput>): HomeBannerInput => ({ ...BASE, ...over });
 
 describe('state mapping — `367:71`', () => {
-  it('draws the confirmed card for both pre-service statuses', () => {
-    for (const status of ['created', 'assigned'] as const) {
-      const banner = homeBannerFor(at({ status }));
-      expect(banner).toMatchObject({
-        variant: 'confirmed',
-        title: 'Upcoming booking',
-        badgeValue: 'Confirmed!',
-      });
-      // `337:4261` has no caption — it is the 82pt block badge, not the caption-over-pill form.
-      expect(banner?.badgeCaption).toBeUndefined();
-    }
+  it('draws the confirmed card once a cook is assigned and the payment is captured', () => {
+    const banner = homeBannerFor(at({ status: 'assigned' }));
+
+    expect(banner).toMatchObject({
+      variant: 'confirmed',
+      title: 'Upcoming booking',
+      badgeValue: 'Confirmed!',
+    });
+    // `337:4261` has no caption — it is the 82pt block badge, not the caption-over-pill form.
+    expect(banner?.badgeCaption).toBeUndefined();
+  });
+
+  it('shows attention copy when an assigned booking is handed to support', () => {
+    expect(homeBannerFor(at({ recoveryHandoff: true }))).toMatchObject({
+      variant: 'confirmed',
+      title: 'Booking needs attention',
+      badgeValue: 'Needs attention',
+    });
+    expect(homeBannerFor(at({ recoveryHandoff: true }))?.badgeValue).not.toBe('Confirmed!');
+  });
+
+  it('draws NO card for a booking whose payment has not been finalized', () => {
+    // `created` is payment-pending. It shared the confirmed card until a real device showed the
+    // consequence: "Confirmed!" over a booking nobody had paid for. There is no drawn
+    // payment-pending card, so the honest answer is none at all.
+    expect(homeBannerFor(at({ status: 'created' }))).toBeNull();
   });
 
   it('draws the arriving card with the server ETA', () => {
@@ -107,6 +122,14 @@ describe('reassignment — the two titles that change', () => {
       variant: 'reassignedArriving',
       title: 'Reassigned',
       badgeValue: '16 mins',
+    });
+  });
+
+  it('keeps support attention copy when the assigned booking was also reassigned', () => {
+    expect(homeBannerFor(at({ reassigned: true, recoveryHandoff: true }))).toMatchObject({
+      variant: 'reassignedConfirmed',
+      title: 'Booking needs attention',
+      badgeValue: 'Needs attention',
     });
   });
 

@@ -32,6 +32,7 @@ export type {
 } from './components/BookingDetailsSheet';
 export {
   durationLabelFor,
+  durationMerchandisingFor,
   useBookingDetailData,
   useBookingSubmission,
   useExtensionCheckout,

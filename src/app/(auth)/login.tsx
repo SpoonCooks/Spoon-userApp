@@ -35,6 +35,21 @@ export default function LoginRoute() {
           ...loginWithError(DEMO_LOGIN, error),
           submitting: sendOtp.isPending,
         }}
+        /**
+         * `250:2423` — the two legal links under the CTA, which used to do NOTHING.
+         *
+         * `LoginScreen` has always accepted `onOpenTerms` / `onOpenPrivacy` as optional props and
+         * this route never supplied either, so both were drawn underlined, looked tappable, and
+         * absorbed the press silently. That is the dead control task §11 forbids, and it is worse
+         * here than anywhere else in the app: the line directly above them reads "By continuing, I
+         * accept the Terms of use & Privacy policy", so the customer was being asked to accept two
+         * documents they had no way to read.
+         *
+         * `/legal/:doc` sits outside the `(app)` group precisely so it is reachable from here,
+         * with no session. Pushed, so Back returns to Login with the typed number intact.
+         */
+        onOpenTerms={() => router.push('/legal/terms' as Href)}
+        onOpenPrivacy={() => router.push('/legal/privacy' as Href)}
         onRequestOtp={(digits) => {
           const phone = toE164(digits, DEMO_LOGIN.dialCode);
 

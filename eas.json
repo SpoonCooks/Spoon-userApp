@@ -17,6 +17,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6803578695",
+        "appleTeamId": "4D772L6YDV",
+        "bundleIdentifier": "com.spoonhelp.customer"
+      }
+    }
   }
 }

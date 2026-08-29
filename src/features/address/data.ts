@@ -69,6 +69,31 @@ const RESOLVING_LINE = 'Getting the address…';
 const AREA_UNRESOLVED = 'Pinned on the map';
 
 /**
+ * The resolved row before there is ANY point to describe.
+ *
+ * FIGMA_PENDING — `53:31` draws the row in its resolved state only, so the screen's fixture
+ * carries a transcribed sample address ("Street Name" / "Area 124, subarea 2 xyz, city efg").
+ * That copy may never be shown: it is a real-looking address for a place the customer has never
+ * been, and the one moment it used to appear was the worst possible one — a first-time customer,
+ * straight out of OTP, who declined the location permission. They were met by a saved-looking
+ * address they had never entered.
+ *
+ * It says what is true instead — there is no point yet — and the helper pill beside it already
+ * names both ways to produce one (allow location, or search above).
+ */
+const NO_POINT_TITLE = 'No location selected';
+const NO_POINT_LINE = 'Search above, or allow location, to place the pin';
+
+/**
+ * `60:655`'s Area row when the form has no point behind it at all.
+ *
+ * Same rule as `AREA_UNRESOLVED` and the same reason: the fixture's "Street name, Area 124,
+ * subarea xyz, city" is artboard copy, and printing it in the Area row of a form the customer is
+ * about to SAVE would put a place they have never been into their address book.
+ */
+const AREA_MISSING = 'No location pinned yet';
+
+/**
  * The map step — the screen's static copy composed with the device's real position.
  *
  * `DEMO_ADDRESS_LOCATION` supplies COPY only: the title, the search label and placeholder, the
@@ -101,21 +126,27 @@ export function useAddressLocationData(): ScreenQuery<AddressLocationViewModel> 
         (location.locating
           ? LOCATING_TITLE
           : location.coordinates === null
-            ? base.resolvedTitle
+            ? NO_POINT_TITLE
             : 'Selected location'),
       /**
-       * The static line is the SCREEN'S copy, and it may only be shown while the screen has no
-       * point of its own. Once the map has settled somewhere, showing it would put the fixture's
-       * "Area 124, subarea 2 xyz, city efg" under a pin that is nowhere near it — the customer
-       * would read a real-looking address for a place they have never been. Blank, or the
-       * resolving caption, is honest; fixture copy is not.
+       * The static line is the SCREEN'S copy and it is NEVER shown.
+       *
+       * It used to be the "no point yet" fallback, on the reading that fixture copy is harmless
+       * while the screen has nothing of its own to say. It is not: `53:31` is the first screen
+       * after OTP for a new account, and a customer who declines the location permission has no
+       * point at all — so the fixture's "Street Name / Area 124, subarea 2 xyz, city efg" was
+       * drawn in the resolved row, on the very first run, reading exactly like an address the app
+       * already had for them. Nothing on the screen distinguished it from one.
+       *
+       * The same rule the settled case already followed now covers the empty case too: this row
+       * describes the pin, and with no pin it says so.
        */
       resolvedLine:
         resolved?.line ??
         (location.locating
           ? ''
           : location.coordinates === null
-            ? base.resolvedLine
+            ? NO_POINT_LINE
             : location.resolving
               ? RESOLVING_LINE
               : ''),
@@ -226,9 +257,10 @@ export function useAddressDetailsData(addressId?: string | null): AddressDetails
     const base =
       area !== ''
         ? { ...copy, areaValue: area }
-        : pinned
-          ? { ...copy, areaValue: AREA_UNRESOLVED }
-          : copy;
+        : // With NO point either — which is only reachable by deep-linking straight to the form —
+          // the Area row still may not fall back to the fixture's sample address. It reports the
+          // absence, and "Change" beside it is the way back to the map.
+          { ...copy, areaValue: pinned ? AREA_UNRESOLVED : AREA_MISSING };
 
     // Adding: no record to prefill from, so every field starts empty as drawn.
     if (existing === null) return ready<AddressDetailsViewModel>(base);

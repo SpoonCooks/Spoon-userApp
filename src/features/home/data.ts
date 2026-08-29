@@ -14,9 +14,50 @@ import {
   homeFrom,
   minutesUntil,
 } from './adapters';
+import { cookCardContentFor } from '@ui/components/cookCardContent';
+
 import { homeBannerFor } from './state/homeBannerView';
 import { DEMO_HOME_ACTIVE_BOOKING } from '@/demo/fixtures/home';
 import type { HomeViewModel } from './types';
+
+import type { BookingSummaryDto } from '@features/booking';
+
+/**
+ * Picks the one booking Home should project when the server returns more than one active row.
+ * Live/actionable work outranks a completed unrated item; within a state the nearest upcoming
+ * service start wins, and the id tie-breaker makes equal timestamps deterministic.
+ */
+export function selectHomeBooking(
+  bookings: readonly BookingSummaryDto[],
+): BookingSummaryDto | null {
+  const rank: Readonly<Record<BookingSummaryDto['status'], number>> = {
+    cook_en_route: 0,
+    cook_arrived: 1,
+    cooking: 2,
+    assigned: 3,
+    created: 4,
+    completed: 5,
+    cancelled: 6,
+  };
+
+  return (
+    bookings
+      .filter((booking) => booking.status !== 'cancelled')
+      .slice()
+      .sort((left, right) => {
+        const stateOrder = rank[left.status] - rank[right.status];
+        if (stateOrder !== 0) return stateOrder;
+        const leftStart =
+          left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
+        const rightStart =
+          right.scheduledStart === null
+            ? Number.POSITIVE_INFINITY
+            : Date.parse(right.scheduledStart);
+        if (leftStart !== rightStart) return leftStart - rightStart;
+        return left.id.localeCompare(right.id);
+      })[0] ?? null
+  );
+}
 
 /**
  * Home data.
@@ -47,7 +88,8 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   const active = useActiveBookings();
   const catalogue = useCatalogue();
 
-  const activeSummary = active.state.status === 'ready' ? (active.state.data[0] ?? null) : null;
+  const activeSummary =
+    active.state.status === 'ready' ? selectHomeBooking(active.state.data) : null;
 
   // The summary carries no cook, no timing and no allowed actions, so the banner's cook, its
   // countdown and its rateability all come from the DETAIL. Fetched only when there IS a booking.
@@ -100,7 +142,13 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
               bookingId: activeSummary.id,
               status: detailData.status,
               cookName: detailData.cook?.name ?? null,
-              cookPhotoUrl: detailData.cook?.photoUrl ?? null,
+              // The banner draws the TRANSPARENT cut-out over its `#FFF7CC` panel (`337:4364`).
+              // A hosted photo wins; otherwise the cook's stable profileCode resolves the
+              // bundled cut-out, and a cook with neither renders the banner without a photo.
+              cookPhotoUrl:
+                detailData.cook?.photoUrl ??
+                cookCardContentFor(detailData.cook?.profileCode)?.cutoutPhotoUrl ??
+                null,
               dateLabel: formatDateLabel(detailData.scheduledStart, serverNow),
               timeLabel: formatTimeLabel(detailData.scheduledStart, detailData.durationMinutes),
               etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),
@@ -112,6 +160,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
               canRate: detailData.allowedActions.canRate,
               cancelledBy: detailData.cancellation?.cancelledBy ?? null,
               reassigned: detailData.reassignment?.occurred === true,
+              recoveryHandoff: detailData.recovery?.state === 'support_handoff',
             });
           })() ?? undefined);
 
@@ -123,12 +172,30 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
 
     return ready(
       homeFrom({
+        /**
+         * The arrival PROMISE appears TWICE on this screen and both readings are the catalogue's.
+         *
+         * The header headline was already patched from `instant.arrivalPromiseMinutes`; the
+         * Instant tile's emphasised run was not, so it kept rendering the fixture's transcribed
+         * " 18 mins" while the Instant sheet — which reads the same policy value — said 30. One
+         * screen stated the promise two ways, and the tile's was simply a number from a Figma
+         * frame. Both now come from the one published figure, so re-tuning the promise moves
+         * every surface at once and none of them can drift again.
+         *
+         * The tile is matched by id rather than by position: `tiles` is ordered content, and a
+         * future payload that puts Schedule first must not rewrite Schedule's subtitle.
+         */
         base:
           promiseMinutes === null
             ? base
             : {
                 ...base,
                 header: { ...base.header, etaHeadline: `Spoon in ${promiseMinutes} mins` },
+                tiles: base.tiles.map((tile) =>
+                  tile.id === 'instant' && tile.subtitleEmphasis !== undefined
+                    ? { ...tile, subtitleEmphasis: ` ${promiseMinutes} mins` }
+                    : tile,
+                ),
               },
         addressLabel: defaultAddress?.label ?? null,
         addressLine:

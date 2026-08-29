@@ -32,6 +32,7 @@ export function useCancellationData(
 
   const state = useMemo(() => {
     if (catalogue.state.status !== 'ready') return catalogue.state;
+    if (bookingId !== null && preview.state.status === 'error') return preview.state;
 
     return ready(
       cancellationFrom({
@@ -39,9 +40,10 @@ export function useCancellationData(
         catalogue: catalogue.state.data,
         preview: preview.state.status === 'ready' ? preview.state.data : null,
         reschedule: reschedule.state.status === 'ready' ? reschedule.state.data : null,
+        previewPending: bookingId !== null && preview.state.status !== 'ready',
       }),
     );
-  }, [catalogue.state, preview.state, reschedule.state]);
+  }, [bookingId, catalogue.state, preview.state, reschedule.state]);
 
   return {
     state,

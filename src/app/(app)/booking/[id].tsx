@@ -14,6 +14,7 @@ import { CancelBookingSheet, useCancellationData } from '@features/cancellation'
 import type { CancellationStep } from '@features/cancellation';
 import { useWhatsAppHelp } from '@features/support';
 import { ErrorBoundary, QueryBoundary, isNumericRating } from '@ui';
+import { getUserMessage, normalizeError } from '@core/errors';
 import { useAndroidBackHandler, useDeterministicBack } from '@core/navigation';
 
 /**
@@ -202,6 +203,11 @@ export default function BookingRoute() {
               onStepChange={setCancelStep}
               onClose={() => setCancelOpen(false)}
               cancelling={cancelBooking.isPending}
+              cancelErrorMessage={
+                cancelBooking.error === null
+                  ? null
+                  : getUserMessage(normalizeError(cancelBooking.error))
+              }
               onReschedule={() => {
                 setCancelOpen(false);
                 router.push(`/reschedule/${bookingId}`);

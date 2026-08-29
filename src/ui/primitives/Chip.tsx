@@ -154,7 +154,21 @@ const styles = StyleSheet.create({
   /** The label centres in the column track rather than sitting against its leading edge. */
   slotContent: { justifyContent: 'center' },
   slotDisabled: { opacity: 0.4 },
-  content: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.s6 },
+  /**
+   * Centred on BOTH axes, at every density.
+   *
+   * `justifyContent` used to belong to `slotContent` alone, so only the start-time grid centred
+   * its label. Day and Time chips are equal-width grid cells too (`ChipGroup` gives them a
+   * `33.33%` track), and without it their content sat against the leading edge: "TODAY / Aug 25"
+   * and the sunrise + "Morning" lockup were both drawn hard left inside a chip much wider than
+   * they are, which reads as a layout fault rather than as a choice.
+   */
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: lightTheme.space.s6,
+  },
   stack: { alignItems: 'center', flexShrink: 1 },
   /** `37:3719` — the caption is drawn at 70% on top of its already-70% ink. */
   caption: { opacity: 0.7 },
