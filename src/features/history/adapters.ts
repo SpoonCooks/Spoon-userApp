@@ -1,7 +1,8 @@
 import { formatPaise } from '@core/format';
-import type { BookingSummaryDto } from '@features/booking';
+import type { BookingSummaryCookDto, BookingSummaryDto } from '@features/booking';
 import { formatServiceDate, serviceDateIn } from '@features/scheduled';
 import type { BookingCardViewModel, StatusTone } from '@ui';
+import { cookCardContentFor } from '@ui/components/cookCardContent';
 
 import type { BookingListViewModel } from './types';
 
@@ -58,7 +59,10 @@ const STATUS_PRESENTATION: Record<string, { readonly label: string; readonly ton
  * `operatingWindow.timeZone`; `undefined` falls back to the device reading, which is what this
  * did everywhere before, so a catalogue that has not loaded degrades instead of blanking a label.
  */
-export function headlineFor(dto: BookingSummaryDto, timeZone?: string | undefined): string {
+export function headlineFor(
+  dto: Pick<BookingSummaryDto, 'scheduledStart' | 'durationMinutes'>,
+  timeZone?: string | undefined,
+): string {
   const duration =
     dto.durationMinutes % 60 === 0
       ? `${dto.durationMinutes / 60} hr`
@@ -75,6 +79,28 @@ export function headlineFor(dto: BookingSummaryDto, timeZone?: string | undefine
   return `${day} • ${duration}`;
 }
 
+/**
+ * The card's cook fields from the summary's remembered cook.
+ *
+ * The photograph resolves exactly as the live cook card resolves it: a hosted `profileImageUrl`
+ * wins, else the bundled per-`profileCode` photograph, else no photo and the card draws its
+ * initials disc. The rating is the COOK's own published average — the same figure the live card
+ * shows — never the rating this customer gave the booking.
+ */
+export function cookFieldsFrom(
+  cook: BookingSummaryCookDto | null | undefined,
+): Pick<BookingCardViewModel, 'cookName' | 'cookPhotoUrl' | 'rating'> {
+  if (cook === null || cook === undefined) return {};
+  const photoUrl = cook.profileImageUrl ?? cookCardContentFor(cook.profileCode)?.photoUrl;
+  return {
+    cookName: cook.displayName,
+    ...(photoUrl === undefined ? {} : { cookPhotoUrl: photoUrl }),
+    ...(cook.ratingAverage === null || cook.ratingAverage === undefined
+      ? {}
+      : { rating: cook.ratingAverage }),
+  };
+}
+
 export function bookingCardFrom(
   dto: BookingSummaryDto,
   timeZone?: string | undefined,
@@ -88,6 +114,7 @@ export function bookingCardFrom(
       ? {}
       : { statusLabel: presentation.label, statusTone: presentation.tone }),
     amount: formatPaise(dto.price.totalAmountPaise),
+    ...cookFieldsFrom(dto.cook),
     ...(dto.addressLabel === null || dto.addressLabel === undefined
       ? {}
       : { subtitle: dto.addressLabel }),

@@ -6,9 +6,10 @@ import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 
 import { formatPaise } from '@core/format';
+import { formatServiceDate, serviceDateIn } from '@features/scheduled';
 import type { StatusTone } from '@ui';
 
-import { bookingListFrom } from './adapters';
+import { bookingListFrom, cookFieldsFrom, headlineFor } from './adapters';
 import { DEMO_BOOKING_HISTORY, DEMO_REFUND_HISTORY } from '@/demo/fixtures/screens';
 import type { BookingListViewModel } from './types';
 
@@ -88,6 +89,11 @@ const REFUND_PRESENTATION: Record<string, { readonly label: string; readonly ton
  */
 export function useRefundHistoryData(): ScreenQuery<BookingListViewModel> {
   const refunds = useRefunds();
+  // The service timezone, for the same reason the history list reads it: the booking date on a
+  // refund row is calendar-day semantics on the service clock.
+  const catalogue = useCatalogue();
+  const timeZone =
+    catalogue.state.status === 'ready' ? catalogue.state.data.operatingWindow.timeZone : undefined;
 
   const state = useMemo(() => {
     if (refunds.state.status !== 'ready') return refunds.state;
@@ -96,16 +102,43 @@ export function useRefundHistoryData(): ScreenQuery<BookingListViewModel> {
       ...DEMO_REFUND_HISTORY,
       bookings: refunds.state.data.map((refund) => {
         const presentation = REFUND_PRESENTATION[refund.state];
+        // `71:615` heads the row with the BOOKING — "12th Apr • 1 hr" and the cook — and dates
+        // the refund outcome underneath. A response from a deployment that predates the booking
+        // context falls back to the amount-only headline the row always had.
+        const hasBooking =
+          refund.serviceStart !== null &&
+          refund.serviceStart !== undefined &&
+          refund.durationMinutes !== null &&
+          refund.durationMinutes !== undefined;
+        const outcomeAt = refund.completedAt ?? refund.requestedAt;
+        const outcomeDay = formatServiceDate(serviceDateIn(timeZone, new Date(outcomeAt)), {
+          day: 'numeric',
+          month: 'short',
+        });
         return {
           id: refund.refundId,
-          headline: `Refund • ${formatPaise(refund.amountPaise)}`,
+          headline: hasBooking
+            ? headlineFor(
+                {
+                  scheduledStart: refund.serviceStart ?? null,
+                  durationMinutes: refund.durationMinutes ?? 60,
+                },
+                timeZone,
+              )
+            : `Refund • ${formatPaise(refund.amountPaise)}`,
+          ...cookFieldsFrom(refund.cook),
+          amount: formatPaise(refund.amountPaise),
+          subtitle:
+            refund.completedAt !== null
+              ? `Refund complete - ${outcomeDay}`
+              : `Refund processing - ${outcomeDay}`,
           ...(presentation === undefined
             ? {}
             : { statusLabel: presentation.label, statusTone: presentation.tone }),
         };
       }),
     });
-  }, [refunds.state]);
+  }, [refunds.state, timeZone]);
 
   return { state, refetch: refunds.refetch };
 }
