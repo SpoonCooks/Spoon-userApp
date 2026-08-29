@@ -58,6 +58,15 @@ export function toServiceDate(date: Date, timeZone?: string): string {
  * 2026-08-29: "8 PM khatam hote hi it should default to tomorrow; if we have cooks till 9 PM,
  * it should automatically be 9 PM"). Until this, the strip led with a TODAY whose every slot was
  * `SLOT_IN_PAST` and only midnight fixed it.
+ *
+ * ## The horizon is an END, not a length
+ *
+ * The strip SHORTENS when it rolls. `horizonDays` counts days from TODAY — the scheduler rejects
+ * anything at `dayOffset >= horizonDays` with `OUTSIDE_BOOKING_WINDOW` — so once today is dropped
+ * there are only `horizonDays - 1` sellable days left. Keeping the chip COUNT instead of the
+ * horizon's end drew a third chip at today+3 every evening after the last start, and tapping it
+ * asked the server for a date it always refuses. Two real chips beat three with a trap in the last
+ * one.
  */
 export function daysFrom(
   catalogue: Catalogue,
@@ -73,8 +82,9 @@ export function daysFrom(
   );
   const todayExhausted = lastStartMinute > 0 && localMinuteIn(timeZone, now) >= lastStartMinute;
   const firstOffset = todayExhausted ? 1 : 0;
+  const length = Math.max(0, catalogue.scheduled.horizonDays - firstOffset);
 
-  return Array.from({ length: catalogue.scheduled.horizonDays }, (_unused, index) => {
+  return Array.from({ length }, (_unused, index) => {
     const offset = firstOffset + index;
     // Stepped on the DATE, not on an instant: adding days to a local `Date` can be dragged across
     // a boundary by the device's offset, and the strip would then offer a day the server does not
