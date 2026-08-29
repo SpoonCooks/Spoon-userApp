@@ -66,6 +66,22 @@ export const COOK_CARD_CUTOUT_PHOTO = Image.resolveAssetSource(
   require('../../../assets/figma/cook/rekha-cutout.png') as number,
 ).uri;
 
+/**
+ * Per-cook photographs for the onboarded partners, extracted from the Figma exports
+ * (`cookRekha.svg` / `cookSanchita.svg` / `cookBarsha.svg`) and bundled at 512px.
+ * Jyoti has no individual photograph yet and keeps the shared card export. The cut-out
+ * remains the shared export for all cooks until transparent per-cook cut-outs exist.
+ */
+const REKHA_PHOTO = Image.resolveAssetSource(
+  require('../../../assets/figma/cook/rekha-photo.jpg') as number,
+).uri;
+const SANCHITA_PHOTO = Image.resolveAssetSource(
+  require('../../../assets/figma/cook/sanchita-photo.jpg') as number,
+).uri;
+const BARSHA_PHOTO = Image.resolveAssetSource(
+  require('../../../assets/figma/cook/barsha-photo.jpg') as number,
+).uri;
+
 export interface CookCardContent {
   /** The card photograph (`CookCard`, completion). */
   readonly photoUrl: string;
@@ -107,7 +123,7 @@ const JYOTI: CookCardContent = {
 
 /** `289:8388` / `289:8263` — Cook Rekha, mixed and veg. */
 const REKHA: CookCardContent = {
-  photoUrl: COOK_CARD_PHOTO,
+  photoUrl: REKHA_PHOTO,
   cutoutPhotoUrl: COOK_CARD_CUTOUT_PHOTO,
   specialties: dishes(
     ['Chicken biryani', 'poultryLeg'],
@@ -135,7 +151,7 @@ const REKHA: CookCardContent = {
 
 /** `299:2255` / `289:7642` — Cook Sanchita, mixed and veg. */
 const SANCHITA: CookCardContent = {
-  photoUrl: COOK_CARD_PHOTO,
+  photoUrl: SANCHITA_PHOTO,
   cutoutPhotoUrl: COOK_CARD_CUTOUT_PHOTO,
   specialties: dishes(
     ['Chicken curries', 'poultryLeg'],
@@ -163,7 +179,7 @@ const SANCHITA: CookCardContent = {
 
 /** `289:7266` / `289:7767` — Cook Barsha, mixed and veg. */
 const BARSHA: CookCardContent = {
-  photoUrl: COOK_CARD_PHOTO,
+  photoUrl: BARSHA_PHOTO,
   cutoutPhotoUrl: COOK_CARD_CUTOUT_PHOTO,
   specialties: dishes(
     ['Butter Chicken', 'poultryLeg'],
