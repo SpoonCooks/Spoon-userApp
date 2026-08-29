@@ -180,12 +180,21 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
    * The second half of auto-selection: once the server has ANSWERED with the grid, the first
    * bookable start time in the selected period is selected. When nothing in that period is
    * bookable and the customer has not chosen it themselves, the selection advances to the first
-   * period that does hold one — and when the WHOLE DAY holds none, to the next day, so the
-   * screen opens on the first day Spoon can actually sell rather than on a wall of grey (today,
-   * before any cook has checked in, is exactly that wall). Each advance is the same movement a
-   * person makes by hand, it happens only while the screen is untouched, and it walks the
-   * server's own finite day list, so it always terminates. Applies equally after a manual day
-   * or duration change, so every step keeps completing the next one.
+   * period on the SAME DAY that does hold one. Applies equally after a manual day or duration
+   * change, so every step keeps completing the next one.
+   *
+   * ## It does not change the DAY (founder ruling, 2026-08-30)
+   *
+   * It used to: a day with nothing bookable moved the selection to the next offered day, so the
+   * screen would open on the first day Spoon could actually sell instead of on a wall of grey.
+   * That turned out to be the worse failure. On 30 Aug the customer app opened showing 1 Sep —
+   * because today answered `NO_PRESENT_COOK` and the screen had quietly walked two days forward
+   * — and it read as a broken date, not as a full day. It also hid the real outage: nobody could
+   * tell that today was unsellable, because nobody was ever shown today.
+   *
+   * A day the customer did not pick is a worse answer than an honest empty one. The grey grid is
+   * the truth, and the day chips are right there to move it. Advancing the PERIOD stays, because
+   * that moves within the day the customer is already looking at and cannot misrepresent a date.
    */
   useEffect(() => {
     if (state.status !== 'ready' || state.data.slotsPending || initialSelection !== undefined) {
@@ -197,7 +206,7 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
       const hasDurations = schedule.durations !== undefined && schedule.durations.length > 0;
       if (hasDurations && current.durationId === null) return current;
 
-      // A day auto-advance clears the daypart; refill it from the NEW day's answer (elapsed
+      // A manual day change clears the daypart; refill it from the NEW day's answer (elapsed
       // dayparts arrive disabled, so this stays "now" on today and "first" on a future day).
       let periodId = current.periodId;
       if (periodId === null) {
@@ -216,16 +225,8 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
         const slotId = firstBookable(period.id);
         if (slotId !== null) return { ...current, periodId: period.id, slotId };
       }
-      // The answered day holds nothing bookable at all: move to the next offered day. The date
-      // change re-asks the server, and this effect completes the new answer when it lands.
-      const dayIndex = schedule.days.findIndex((day) => day.id === current.dayId);
-      const nextDay =
-        dayIndex === -1
-          ? undefined
-          : schedule.days.slice(dayIndex + 1).find((day) => day.disabled !== true);
-      if (nextDay !== undefined) {
-        return { ...current, dayId: nextDay.id, periodId: null, slotId: null };
-      }
+      // The answered day holds nothing bookable at all. STAY on it: the customer sees the grey
+      // grid for the day they are actually looking at, and moves it with the day chips.
       return periodId === current.periodId ? current : { ...current, periodId };
     });
     // `selection` is a dependency because a manual day or duration change clears the slot

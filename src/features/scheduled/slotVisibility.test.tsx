@@ -227,6 +227,41 @@ describe('every candidate the server evaluated is drawn', () => {
     await waitFor(() => expect(cards()).toHaveLength(16));
     expect(cards().every((card) => card.props.accessibilityState.disabled === false)).toBe(true);
   });
+
+  /**
+   * A day with nothing bookable is shown, not skipped.
+   *
+   * The auto-selection used to advance to the next offered day when the answered one held no
+   * bookable start anywhere. On 30 Aug that opened the app on 1 Sep — today answered
+   * `NO_PRESENT_COOK`, the screen walked two days forward on its own, and it read as a broken
+   * date rather than a full day. It also hid the outage: nobody could see that today was
+   * unsellable, because nobody was ever shown today.
+   *
+   * Asserted on the DATES ASKED FOR rather than on a rendered chip, because that is the thing a
+   * silent advance cannot hide — moving the day re-asks the server. One date asked means the
+   * screen stayed where it opened.
+   */
+  it('stays on an unsellable day rather than walking the customer to another date', async () => {
+    const { recorded } = renderSchedule((params) =>
+      allUnavailable(params.get('date') ?? SERVICE_DATE),
+    );
+
+    const askedDates = () =>
+      new Set(
+        recorded.paths
+          .filter((path) => path.startsWith('/v1/availability/scheduled?'))
+          .map((path) => new URLSearchParams(path.split('?')[1] ?? '').get('date')),
+      );
+
+    // The screen auto-selects and asks once, unprompted.
+    await waitFor(() => expect(askedDates().size).toBeGreaterThan(0));
+    // Let every effect the answer triggers settle; an advance would land here.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(askedDates().size).toBe(1);
+  });
 });
 
 describe('only a start time the server offered can become a booking', () => {
