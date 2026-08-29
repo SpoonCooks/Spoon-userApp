@@ -180,31 +180,53 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
    * The second half of auto-selection: once the server has ANSWERED with the grid, the first
    * bookable start time in the selected period is selected. When nothing in that period is
    * bookable and the customer has not chosen it themselves, the selection advances to the first
-   * period that does hold one — the same movement a person makes by hand. Applies equally after
-   * a manual day or duration change, so every step keeps completing the next one.
+   * period that does hold one — and when the WHOLE DAY holds none, to the next day, so the
+   * screen opens on the first day Spoon can actually sell rather than on a wall of grey (today,
+   * before any cook has checked in, is exactly that wall). Each advance is the same movement a
+   * person makes by hand, it happens only while the screen is untouched, and it walks the
+   * server's own finite day list, so it always terminates. Applies equally after a manual day
+   * or duration change, so every step keeps completing the next one.
    */
   useEffect(() => {
     if (state.status !== 'ready' || state.data.slotsPending || initialSelection !== undefined) {
       return;
     }
     setSelection((current) => {
-      if (current.slotId !== null || current.dayId === null || current.periodId === null) {
-        return current;
-      }
+      if (current.slotId !== null || current.dayId === null) return current;
       const schedule = state.data;
       const hasDurations = schedule.durations !== undefined && schedule.durations.length > 0;
       if (hasDurations && current.durationId === null) return current;
-      const firstBookable = (periodId: string): string | null =>
-        (schedule.slotsByPeriod[periodId] ?? []).find((slot) => slot.disabled !== true)?.id ?? null;
-      const own = firstBookable(current.periodId);
-      if (own !== null) return { ...current, slotId: own };
+
+      // A day auto-advance clears the daypart; refill it from the NEW day's answer (elapsed
+      // dayparts arrive disabled, so this stays "now" on today and "first" on a future day).
+      let periodId = current.periodId;
+      if (periodId === null) {
+        if (userTouched.current) return current;
+        periodId = schedule.periods.find((period) => period.disabled !== true)?.id ?? null;
+        if (periodId === null) return current;
+      }
+
+      const firstBookable = (id: string): string | null =>
+        (schedule.slotsByPeriod[id] ?? []).find((slot) => slot.disabled !== true)?.id ?? null;
+      const own = firstBookable(periodId);
+      if (own !== null) return { ...current, periodId, slotId: own };
       if (userTouched.current) return current;
       for (const period of schedule.periods) {
         if (period.disabled === true) continue;
         const slotId = firstBookable(period.id);
         if (slotId !== null) return { ...current, periodId: period.id, slotId };
       }
-      return current;
+      // The answered day holds nothing bookable at all: move to the next offered day. The date
+      // change re-asks the server, and this effect completes the new answer when it lands.
+      const dayIndex = schedule.days.findIndex((day) => day.id === current.dayId);
+      const nextDay =
+        dayIndex === -1
+          ? undefined
+          : schedule.days.slice(dayIndex + 1).find((day) => day.disabled !== true);
+      if (nextDay !== undefined) {
+        return { ...current, dayId: nextDay.id, periodId: null, slotId: null };
+      }
+      return periodId === current.periodId ? current : { ...current, periodId };
     });
     // `selection` is a dependency because a manual day or duration change clears the slot
     // WITHOUT changing `state` when the grid for it is already held; the completion must follow
