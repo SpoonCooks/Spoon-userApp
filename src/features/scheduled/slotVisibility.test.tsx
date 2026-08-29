@@ -230,26 +230,36 @@ describe('every candidate the server evaluated is drawn', () => {
 });
 
 describe('only a start time the server offered can become a booking', () => {
-  it('keeps Book Now grey until a start time is chosen, then lights it', async () => {
+  it('completes the chosen daypart with its first bookable start time on its own', async () => {
     renderSchedule(() => allAvailable());
     await selectNoonTwoHours();
     await waitFor(() => expect(cards()).toHaveLength(16));
 
-    expect(ctaDisabled()).toBe(true);
-    fireEvent.press(screen.getByTestId(slotTestId(0)));
+    // Auto-selection: once the server has answered, the first bookable start time is already
+    // chosen and the CTA is live — the customer books the nearest slot with a single tap.
     await waitFor(() => expect(ctaDisabled()).toBe(false));
+    expect(screen.getByTestId(slotTestId(0)).props.accessibilityState.selected).toBe(true);
+
+    // A different card is still an ordinary choice on top of the auto-selection.
+    fireEvent.press(screen.getByTestId(slotTestId(2)));
+    await waitFor(() =>
+      expect(screen.getByTestId(slotTestId(2)).props.accessibilityState.selected).toBe(true),
+    );
+    expect(screen.getByTestId(slotTestId(0)).props.accessibilityState.selected).toBe(false);
   });
 
-  it('ignores a press on an unavailable card and leaves Book Now grey', async () => {
+  it('ignores a press on an unavailable card and keeps the auto-selected start', async () => {
     renderSchedule(() => mixed());
     await selectNoonTwoHours();
     await waitFor(() => expect(cards()).toHaveLength(16));
+    await waitFor(() => expect(ctaDisabled()).toBe(false));
 
-    // Index 1 is unavailable in the mixed payload.
+    // Index 1 is unavailable in the mixed payload; index 0 is the auto-selected first bookable.
     fireEvent.press(screen.getByTestId(slotTestId(1)));
 
     expect(screen.getByTestId(slotTestId(1)).props.accessibilityState.selected).toBe(false);
-    expect(ctaDisabled()).toBe(true);
+    expect(screen.getByTestId(slotTestId(0)).props.accessibilityState.selected).toBe(true);
+    expect(ctaDisabled()).toBe(false);
   });
 });
 
@@ -259,15 +269,23 @@ describe('a selection never outlives the answer that justified it', () => {
     await selectNoonTwoHours();
     await waitFor(() => expect(cards()).toHaveLength(16));
 
-    fireEvent.press(screen.getByTestId(slotTestId(0)));
-    await waitFor(() => expect(ctaDisabled()).toBe(false));
+    fireEvent.press(screen.getByTestId(slotTestId(3)));
+    await waitFor(() =>
+      expect(screen.getByTestId(slotTestId(3)).props.accessibilityState.selected).toBe(true),
+    );
 
     fireEvent.press(screen.getByTestId('schedule-duration-dur-60'));
 
-    await waitFor(() => expect(ctaDisabled()).toBe(true));
+    // The old choice does not outlive its answer: the server is re-asked for the new duration,
+    // and what ends up selected is the NEW answer's first bookable start — auto-selection — not
+    // the start chosen against the old one.
     await waitFor(() =>
       expect(recorded.paths.some((path) => path.includes('durationMinutes=60'))).toBe(true),
     );
+    await waitFor(() =>
+      expect(screen.getByTestId(slotTestId(0)).props.accessibilityState.selected).toBe(true),
+    );
+    expect(screen.getByTestId(slotTestId(3)).props.accessibilityState.selected).toBe(false);
   });
 
   it('clears the chosen start time when the DAY changes', async () => {
