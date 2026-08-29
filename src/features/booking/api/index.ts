@@ -44,6 +44,7 @@ export type {
   BookingCreateResponse,
   BookingDetailDto,
   BookingStatus,
+  BookingSummaryCookDto,
   BookingSummaryDto,
   CancellationPreviewDto,
   ExtensionOptionDto,

@@ -393,6 +393,20 @@ export const bookingCreateResponseSchema = z.object({
 
 export type BookingCreateResponse = z.infer<typeof bookingCreateResponseSchema>;
 
+/**
+ * The booking's remembered cook — its last assignment, published on summaries so the history and
+ * refund cards can draw her name, photograph and rating (`6:245`) without a detail fetch.
+ * `.nullish()` throughout so a response from a deployment that predates the field still parses.
+ */
+export const bookingSummaryCookSchema = z.object({
+  displayName: z.string(),
+  profileCode: z.string().nullish(),
+  profileImageUrl: z.string().nullish(),
+  ratingAverage: z.number().nullish(),
+  ratingCount: z.number().int().nullish(),
+});
+export type BookingSummaryCookDto = z.infer<typeof bookingSummaryCookSchema>;
+
 /** A row of `GET /v1/me/bookings` and `/me/bookings/active` — a summary, not the full detail. */
 export const bookingSummarySchema = z.object({
   id: z.string(),
@@ -402,6 +416,7 @@ export const bookingSummarySchema = z.object({
   durationMinutes: z.number().int().positive(),
   price: priceSchema,
   addressLabel: z.string().nullish(),
+  cook: bookingSummaryCookSchema.nullish(),
   reassignment: bookingReassignmentSchema.nullish(),
   recovery: bookingRecoverySchema.nullish(),
 });
@@ -473,6 +488,14 @@ export const refundSchema = z.object({
   requestedAt: z.string(),
   /** Set once the provider settled it; null while the refund is still in flight. */
   completedAt: z.string().nullable(),
+  /**
+   * Booking context the drawn refund row heads with (`71:615`): the service date and duration,
+   * and the booking's remembered cook. `.nullish()` for pre-field deployments, whose rows then
+   * render the amount-only fallback they always did.
+   */
+  serviceStart: z.string().nullish(),
+  durationMinutes: z.number().int().positive().nullish(),
+  cook: bookingSummaryCookSchema.nullish(),
 });
 
 export type RefundDto = z.infer<typeof refundSchema>;
