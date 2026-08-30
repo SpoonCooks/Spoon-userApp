@@ -1,11 +1,13 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { DirectionalDisc, RatingWidget, Text, lightTheme } from '@ui';
-import type { RatingSelection } from '@ui';
 
 import { HOME_BANNER_SAD_CLOUD } from '../assets';
 import { HOME_DESIGN } from '../layout';
 import type { HomeBannerViewModel } from '../state/homeBannerView';
+
+/** The strip is `pointerEvents="none"`, so this can never actually be called. */
+const NO_OP = (): void => {};
 
 const { activeBooking: DESIGN } = HOME_DESIGN;
 
@@ -49,15 +51,12 @@ const { activeBooking: DESIGN } = HOME_DESIGN;
 export interface HomeBookingBannerProps {
   readonly booking: HomeBannerViewModel;
   readonly onOpen?: () => void;
-  /** Raised when the user picks a value on the rate presentation. Reports; never persists. */
-  readonly onRate?: (value: RatingSelection) => void;
   readonly testID?: string;
 }
 
 export function HomeBookingBanner({
   booking,
   onOpen,
-  onRate,
   testID = 'home-upcoming-booking',
 }: HomeBookingBannerProps) {
   const rate = booking.variant === 'rate';
@@ -136,16 +135,32 @@ export function HomeBookingBanner({
     </View>
   );
 
+  /**
+   * `336:4235` — the scale on the "Share your rating!" card is a PREVIEW of page 14a, not a
+   * second place to rate from.
+   *
+   * It used to submit: a tap on a chip fired a rating mutation straight from Home. That put the
+   * one irreversible action in the flow — a rating cannot be changed once stored — behind a
+   * single tap on a scrolling list, with no cook shown, no `5+` explanation, no feedback field
+   * and no confirmation. Customers hit it by accident while scrolling, and a mis-tap was final.
+   *
+   * The documented tap target for this card is page 14a, and 14a is where the whole rating UI
+   * actually lives. So the strip is drawn at full strength — it is the invitation — but takes no
+   * touches: `pointerEvents="none"` lets every tap fall through to the card's own Pressable,
+   * which opens the booking. `disabled` is deliberately NOT used, because that dims the chips to
+   * `textDisabled` and the frame draws them live.
+   */
   const rating =
     booking.rating === undefined ? null : (
-      <RatingWidget
-        value={booking.rating.value ?? null}
-        onChange={(value) => onRate?.(value)}
-        showExceptionalPrompt
-        promptText={booking.rating.description}
-        disabled={onRate === undefined}
-        testID={`${testID}-rating`}
-      />
+      <View pointerEvents="none">
+        <RatingWidget
+          value={booking.rating.value ?? null}
+          onChange={NO_OP}
+          showExceptionalPrompt
+          promptText={booking.rating.description}
+          testID={`${testID}-rating`}
+        />
+      </View>
     );
 
   const content = (

@@ -159,16 +159,26 @@ export function CompletionBody({
           />
         )}
         {submitted ? null : (
+          /*
+           * Submit is gated on the RATING, not on the words.
+           *
+           * It used to require feedback text: a customer who picked five stars and wrote nothing
+           * found Submit dead, with nothing on screen explaining why. The rating is the thing
+           * this screen exists to collect — `299:1424` labels the scale "Please rate this
+           * service!" and the field is an optional invitation below it — and the submit handler
+           * already drops empty feedback from the request. Requiring prose to record a rating
+           * lost ratings.
+           */
           <Pressable
             onPress={() => onSubmitFeedback(feedback)}
-            disabled={feedback.trim().length === 0}
+            disabled={rating === null}
             accessibilityRole="button"
             accessibilityLabel={completion.submitLabel}
-            accessibilityState={{ disabled: feedback.trim().length === 0 }}
+            accessibilityState={{ disabled: rating === null }}
             hitSlop={10}
             style={({ pressed }) => [
               styles.submit,
-              feedback.trim().length === 0 ? styles.submitDisabled : null,
+              rating === null ? styles.submitDisabled : null,
               pressed ? styles.pressed : null,
             ]}
             testID="completion-submit"

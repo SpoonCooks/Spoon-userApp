@@ -113,9 +113,9 @@ describe('Schedule — server data, not client rules', () => {
     // auto-selected first BOOKABLE start (05:30) stays exactly where it was.
     fireEvent.press(soldOut);
     expect(soldOut.props.accessibilityState.selected).toBe(false);
-    expect(
-      screen.getByTestId('schedule-slots-am-0530AM').props.accessibilityState.selected,
-    ).toBe(true);
+    expect(screen.getByTestId('schedule-slots-am-0530AM').props.accessibilityState.selected).toBe(
+      true,
+    );
     expect(screen.getByTestId('schedule-submit').props.accessibilityState.disabled).toBe(false);
   });
 
@@ -183,12 +183,40 @@ describe('Schedule — finalized footer (275:4177)', () => {
   });
 
   /**
-   * Task §11 — no clickable dead controls. `275:4180` has no designed breakdown sheet for
-   * Scheduled, so the route wires no handler and the line must not be drawn: a link that absorbs a
-   * press and opens nothing reads as the app having failed.
+   * Frame 5d draws "Check payment details" under Book NOW and it opens the SAME taxes explainer
+   * the Instant sheet raises (`25:1585`). The line was withheld entirely on the reading that no
+   * such sheet existed for Scheduled, so a customer on the Schedule screen had no way to see what
+   * they were being charged. The screen now owns the sheet, with no host seam required.
    */
-  it('omits the payment-details line when the host opens no breakdown', () => {
-    renderBook();
+  it('opens the taxes explainer from the payment line with no host handler wired', () => {
+    render(<ScheduleView state={ready(DEMO_SCHEDULE_BOOK)} {...actions} />);
+
+    const link = screen.getByTestId('schedule-payment-details');
+    expect(link).toBeTruthy();
+
+    fireEvent.press(link);
+    expect(screen.getByTestId('schedule-taxes')).toBeTruthy();
+  });
+
+  /** A reschedule is free, so it must offer neither the line nor a breakdown to open. */
+  it('draws no payment line in reschedule mode', () => {
+    render(<ScheduleView state={ready(DEMO_SCHEDULE_RESCHEDULE)} {...actions} />);
+
+    expect(screen.queryByTestId('schedule-payment-details')).toBeNull();
+  });
+
+  /**
+   * Task §11 — no clickable dead controls, still enforced, but the test of "dead" has moved.
+   *
+   * This used to assert the line was ABSENT whenever the host wired no handler, because the
+   * reading then was that Scheduled had no designed breakdown sheet. Frame 5d says otherwise
+   * (founder, 2026-08-31), and the screen now owns the explainer itself — so a book-mode screen
+   * with no host handler draws a line that DOES open something, which is the rule being kept
+   * rather than broken. What must still never appear is a line with no sheet behind it at all.
+   */
+  it('draws no payment line when there is no breakdown to open', () => {
+    const { taxesInfo: _none, ...withoutBreakdown } = DEMO_SCHEDULE_BOOK;
+    render(<ScheduleView state={ready(withoutBreakdown)} {...actions} />);
 
     expect(screen.getByTestId('schedule-submit')).toBeTruthy();
     expect(screen.queryByTestId('schedule-payment-details')).toBeNull();
@@ -308,9 +336,9 @@ describe('Book Now is disabled until every required selection is made', () => {
     // bookable start time is selected on its own and `34:3035`'s live CTA follows. The bare
     // `275:4938` state exists only while a NEW grid is in flight, which `slotsPending` covers.
     expect(disabled()).toBe(false);
-    expect(
-      screen.getByTestId('schedule-slots-am-0530AM').props.accessibilityState.selected,
-    ).toBe(true);
+    expect(screen.getByTestId('schedule-slots-am-0530AM').props.accessibilityState.selected).toBe(
+      true,
+    );
   });
 
   it('presses through to nothing while it is disabled', () => {

@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
 import { QueryBoundary, lightTheme } from '@ui';
-import type { RatingSelection } from '@ui';
 
 import { HomeBookingBanner } from '../components/HomeBookingBanner';
 import { HomeBookingTiles } from '../components/HomeBookingTiles';
@@ -62,18 +61,6 @@ export interface HomeActions {
    * from disagreeing — and stops the host issuing a second copy of every Home query (§3).
    */
   readonly onOpenActiveBooking: (destination: HomeBannerDestination) => void;
-  /**
-   * `336:4235` — only the rate presentation raises this. Reports a choice; persists nothing.
-   *
-   * Carries the banner's OWN destination for the same reason `onOpenActiveBooking` does: the host
-   * must not have to re-read Home to learn which booking the card was about. A second copy of
-   * every Home query is the cost, and a host and a banner disagreeing about which booking is
-   * being rated is the risk (§3).
-   */
-  readonly onRateActiveBooking?: (
-    value: RatingSelection,
-    destination: HomeBannerDestination,
-  ) => void;
 }
 
 export interface HomeViewProps extends HomeActions {
@@ -126,7 +113,6 @@ export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps)
                     <HomeBookingBanner
                       booking={home.activeBooking}
                       onOpen={bannerOpener(home.activeBooking, actions.onOpenActiveBooking)}
-                      {...bannerRater(home.activeBooking, actions.onRateActiveBooking)}
                     />
                   )}
 
@@ -155,20 +141,6 @@ function bannerOpener(
   onOpen: HomeActions['onOpenActiveBooking'],
 ): () => void {
   return () => onOpen(booking.destination);
-}
-
-/**
- * The same binding for the rating chips.
- *
- * Returns NO `onRate` when the host wires none, which is what leaves `RatingWidget` disabled —
- * the designed inert state — rather than drawing live chips over a handler that does not exist.
- */
-function bannerRater(
-  booking: NonNullable<HomeViewModel['activeBooking']>,
-  onRate: HomeActions['onRateActiveBooking'],
-): { onRate?: (value: RatingSelection) => void } {
-  if (onRate === undefined) return {};
-  return { onRate: (value) => onRate(value, booking.destination) };
 }
 
 export function HomeScreen(actions: HomeActions) {

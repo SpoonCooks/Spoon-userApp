@@ -311,6 +311,25 @@ export function scheduleFrom(input: {
     }),
     // Reschedule moves WHEN, never HOW LONG — so it publishes no duration tiles.
     ...(base.mode === 'reschedule' ? {} : { durations: durationsFrom(catalogue) }),
+    /*
+     * `275:4180` — the underlined "Check payment details" line beneath Book NOW.
+     *
+     * This was withheld as FIGMA_PENDING on the reading that no breakdown sheet was drawn for
+     * Scheduled. The founder confirmed against frame 5d (2026-08-31) that the line IS on the
+     * Scheduled screen and opens the same taxes sheet the Instant sheet raises. Book mode only:
+     * a reschedule is free and takes no payment, so it has no breakdown to open.
+     */
+    ...(base.mode === 'reschedule'
+      ? {}
+      : {
+          paymentDetailsLabel: 'Check payment details',
+          taxesInfo: {
+            title: 'What is Taxes and Fee?',
+            body:
+              'Taxes levied as per Govt. regulations, subject to change basis final service ' +
+              'value. This includes a 5% GST.',
+          },
+        }),
     slotsByPeriod: slotsByPeriodFrom({
       catalogue,
       availability: pending ? null : input.availability,

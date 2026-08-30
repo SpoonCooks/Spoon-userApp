@@ -264,6 +264,13 @@ export const DEMO_SCHEDULE_BOOK: ScheduleViewModel = {
    */
   primaryCtaLabel: 'Book Now',
   paymentDetailsLabel: 'Check payment details',
+  /** `25:1585` — the same explainer the Instant sheet raises. Book mode only. */
+  taxesInfo: {
+    title: 'What is Taxes and Fee?',
+    body:
+      'Taxes levied as per Govt. regulations, subject to change basis final service value. ' +
+      'This includes a 5% GST.',
+  },
 };
 
 /** `47:*` — Reschedule: same screen, no Duration section, no price on the bar (C-2/C-3). */

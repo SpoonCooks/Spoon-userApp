@@ -1,15 +1,9 @@
 import { useState } from 'react';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import {
-  InstantSheet,
-  useBookingSubmission,
-  useInstantData,
-  useRateBooking,
-} from '@features/booking';
+import { InstantSheet, useBookingSubmission, useInstantData } from '@features/booking';
 import { HomeScreen } from '@features/home';
 import { useAddressGate } from '@features/address';
-import { isNumericRating } from '@ui';
 import { DEMO_INSTANT_NO_SLOTS, DEMO_INSTANT_OUT_OF_SHIFT } from '@/demo/fixtures/booking';
 
 /**
@@ -51,24 +45,6 @@ export default function HomeRoute() {
   const addressGate = useAddressGate();
 
   /**
-   * `336:4235` — the rating chips ON the "Share your rating!" banner.
-   *
-   * The control is already drawn and already wired to an `onRate` seam; nothing new is added
-   * here. What was missing was the other end of it: `HomeBookingBanner` disables the widget when
-   * no handler is supplied, and this route supplied none, so the banner rendered a rating row the
-   * customer could look at and not use.
-   *
-   * The banner is only offered for a booking the SERVER says may still be rated
-   * (`allowedActions.canRate`), and the mutation invalidates the active list, so submitting a
-   * rating is what makes the card go away — the client never removes it on its own.
-   *
-   * `5+` is carried intact: `exceptional` is a field of its own, valid only alongside `stars: 5`,
-   * exactly as the completion screen sends it. It moves no money — the five-plus earnings bonus
-   * remains `stars === 5`.
-   */
-  const rate = useRateBooking();
-
-  /**
    * FIRST-RUN ADDRESS (task section 4). A customer with no saved address goes straight into
    * `53:31` ("Select service location") - the first step that can actually produce an address -
    * rather than onto a Home whose booking CTAs cannot enable.
@@ -102,22 +78,13 @@ export default function HomeRoute() {
          * the lifecycle host then picks 8a / 8b / 8c / 9a / 9b / 10a / 10b / 11 / 12a / 12b / 14a
          * from the server's state, which is the only party entitled to decide it.
          */
+        /**
+         * The rating card opens page 14a like every other banner state — it does NOT rate from
+         * here. Rating is irreversible, and it belongs on the completion screen that shows the
+         * cook, explains `5+` and carries the feedback field, not behind one tap on a scrolling
+         * Home. See `HomeBookingBanner`.
+         */
         onOpenActiveBooking={(destination) => router.push(`/booking/${destination.bookingId}`)}
-        onRateActiveBooking={(value, destination) => {
-          if (rate.isPending) return;
-          const exceptional = !isNumericRating(value);
-          rate
-            .mutateAsync({
-              bookingId: destination.bookingId,
-              stars: exceptional ? 5 : value,
-              ...(exceptional ? { exceptional: true } : {}),
-              scope: `booking.rate:${destination.bookingId}`,
-            })
-            .catch(() => {
-              // Normalized and surfaced by the mutation. Nothing here claims a rating landed,
-              // and the banner stays put until the server's list says otherwise.
-            });
-        }}
       />
 
       {instant.state.status === 'ready' ? (

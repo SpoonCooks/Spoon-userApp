@@ -107,10 +107,13 @@ export default function ScheduledRoute() {
           });
       }}
       /*
-       * `onOpenPaymentDetails` is deliberately NOT passed. FIGMA_PENDING: the breakdown sheet is
-       * drawn for the Instant sheet (`25:1585`) and for the extension (`275:4189`) but NOT for
-       * Scheduled — the numbers exist on the quote and there is no frame to render them in. The
-       * screen therefore draws no link at all, rather than one that opens nothing.
+       * `onOpenPaymentDetails` is still not passed, and no longer needs to be.
+       *
+       * It was withheld as FIGMA_PENDING on the reading that no breakdown sheet existed for
+       * Scheduled. The founder confirmed against frame 5d (2026-08-31) that the line IS drawn
+       * there and opens the same explainer as `25:1585`. The screen now owns that sheet itself,
+       * exactly as the Instant sheet does, so the link is live without a host seam; this prop
+       * remains only as an override for a host that wants a different destination.
        */
     />
   );

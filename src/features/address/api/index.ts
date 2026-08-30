@@ -11,6 +11,7 @@ export {
   useAddresses,
   useCreateAddress,
   useDeleteAddress,
+  useSetDefaultAddress,
   useServiceabilityCheck,
   useUpdateAddress,
 } from './hooks';

@@ -399,7 +399,7 @@ describe('Booking host — in service (101:1812)', () => {
 });
 
 describe('Booking host — completion (143:207)', () => {
-  it('renders the rating scale and keeps feedback submission disabled while empty', () => {
+  it('renders the rating scale and keeps Submit disabled until a rating is picked', () => {
     render(
       <BookingDetailView
         state={ready(DEMO_BOOKING_COMPLETION)}
@@ -410,6 +410,30 @@ describe('Booking host — completion (143:207)', () => {
 
     expect(screen.getByTestId('completion-rating')).toBeTruthy();
     expect(screen.getByTestId('completion-submit').props.accessibilityState.disabled).toBe(true);
+  });
+
+  /**
+   * The regression this screen actually shipped: Submit was gated on the FEEDBACK text, so a
+   * customer who picked a rating and wrote nothing found the button dead with no explanation.
+   * The rating is what the screen exists to collect, and the words are optional — the submit
+   * handler already drops an empty string from the request.
+   */
+  it('enables Submit on the rating alone and sends it with no feedback', () => {
+    const onSubmitFeedback = jest.fn();
+    render(
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_COMPLETION)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onSubmitFeedback={onSubmitFeedback}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('completion-rating-5'));
+    expect(screen.getByTestId('completion-submit').props.accessibilityState.disabled).toBe(false);
+
+    fireEvent.press(screen.getByTestId('completion-submit'));
+    expect(onSubmitFeedback).toHaveBeenCalledWith('', 5);
   });
 
   it('accepts a half-step rating and opens the tip sheet from the `308:3121` row', () => {

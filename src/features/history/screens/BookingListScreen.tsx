@@ -9,8 +9,10 @@ import type { BookingCardVariant } from '@ui';
 import type { BookingListViewModel } from '../types';
 
 /** `683:65` and `684:71`, exported from the v16 frames at their drawn 150pt size. */
-const BOOKING_EMPTY_ART = require('../../../../assets/figma/history/booking-empty.png') as ImageSourcePropType;
-const REFUND_EMPTY_ART = require('../../../../assets/figma/history/refund-empty.png') as ImageSourcePropType;
+const BOOKING_EMPTY_ART =
+  require('../../../../assets/figma/history/booking-empty.png') as ImageSourcePropType;
+const REFUND_EMPTY_ART =
+  require('../../../../assets/figma/history/refund-empty.png') as ImageSourcePropType;
 
 /**
  * Booking history (`6:227`) and Refunds (`71:615`).

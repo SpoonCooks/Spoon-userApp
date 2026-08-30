@@ -6,6 +6,7 @@ import {
   Button,
   ChipGroup,
   HelpMePickSheet,
+  InfoDialog,
   NoteCard,
   PriceTile,
   QueryBoundary,
@@ -129,6 +130,7 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
    * holds, so it starts no read and shows no loading state (task §3).
    */
   const [helpOpen, setHelpOpen] = useState(false);
+  const [taxesOpen, setTaxesOpen] = useState(false);
   const [selection, setSelection] = useState<ScheduleSelection>({
     dayId: initialSelection?.dayId ?? null,
     periodId: initialSelection?.periodId ?? null,
@@ -371,9 +373,10 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                     for Scheduled, and a link that opens nothing is the dead control §11 forbids —
                     so the seam decides, not the label's presence. */}
                 {schedule.paymentDetailsLabel === undefined ||
-                actions.onOpenPaymentDetails === undefined ? null : (
+                (actions.onOpenPaymentDetails === undefined &&
+                  schedule.taxesInfo === undefined) ? null : (
                   <Pressable
-                    onPress={actions.onOpenPaymentDetails}
+                    onPress={actions.onOpenPaymentDetails ?? ((): void => setTaxesOpen(true))}
                     accessibilityRole="button"
                     accessibilityLabel={schedule.paymentDetailsLabel}
                     hitSlop={16}
@@ -548,6 +551,15 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                   />
                 )}
               </View>
+            )}
+            {schedule.taxesInfo === undefined ? null : (
+              <InfoDialog
+                visible={taxesOpen}
+                onClose={() => setTaxesOpen(false)}
+                title={schedule.taxesInfo.title}
+                body={schedule.taxesInfo.body}
+                testID="schedule-taxes"
+              />
             )}
             {schedule.durationHelp === undefined ? null : (
               <HelpMePickSheet

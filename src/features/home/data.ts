@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActiveBookings, useBookingDetail, useTracking } from '@features/booking';
 import { addressLineOf, useAddresses } from '@features/address';
 import { useCatalogue } from '@features/catalogue';
+import { useInstantAvailability } from '@features/availability';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 import { currentSkewMs } from '@core/time';
@@ -127,8 +128,41 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   const tracking = useTracking(enRoute && activeSummary !== null ? activeSummary.id : null);
   const trackingData = tracking.state.status === 'ready' ? tracking.state.data : null;
 
+  /**
+   * Can Spoon deliver an instant booking AT ALL right now?
+   *
+   * `3:684` promises "Spoon in 30 mins" in the header and again on the Instant tile. Both were
+   * drawn unconditionally from the catalogue's arrival promise, so at 1 AM — with every cook off
+   * shift and the Instant sheet about to refuse — Home still advertised a cook in 30 minutes.
+   * The promise has to be answerable before it is made.
+   *
+   * The probe asks about the SHORTEST duration in the catalogue deliberately: it is the most
+   * permissive question available, so a `false` here means no duration could be served, not that
+   * one particular length was too long. Availability is a question about a specific duration, so
+   * some duration has to be named; the shortest is the one that cannot produce a false negative.
+   */
+  const defaultAddressId =
+    addresses.state.status === 'ready'
+      ? ((addresses.state.data.find((address) => address.isDefault) ?? addresses.state.data[0])
+          ?.id ?? null)
+      : null;
+  const shortestDurationMinutes =
+    catalogue.state.status === 'ready' && catalogue.state.data.durations.length > 0
+      ? Math.min(...catalogue.state.data.durations.map((duration) => duration.durationMinutes))
+      : null;
+  const instantAvailability = useInstantAvailability({
+    addressId: defaultAddressId,
+    durationMinutes: shortestDurationMinutes,
+  });
+
   const state = useMemo(() => {
     if (addresses.state.status !== 'ready') return addresses.state;
+
+    // Only a SETTLED refusal suppresses the promise. While the probe is still in flight the
+    // header keeps the catalogue's wording, because flickering "Spoon in 30 mins" -> "Spoon" on
+    // every cold start would be worse than a promise that is briefly optimistic.
+    const instantUnavailable =
+      instantAvailability.state.status === 'ready' && !instantAvailability.state.data.available;
 
     const defaultAddress =
       addresses.state.data.find((address) => address.isDefault) ?? addresses.state.data[0] ?? null;
@@ -195,8 +229,25 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
          * future payload that puts Schedule first must not rewrite Schedule's subtitle.
          */
         base:
-          promiseMinutes === null
-            ? base
+          instantUnavailable || promiseMinutes === null
+            ? {
+                ...base,
+                // No promise can be kept, so none is made: the header is the brand alone, and
+                // the Instant tile drops its emphasised " 30 mins" run rather than shrinking it
+                // to a smaller lie.
+                ...(instantUnavailable
+                  ? {
+                      header: { ...base.header, etaHeadline: 'Spoon' },
+                      tiles: base.tiles.map((tile) => {
+                        if (tile.id !== 'instant' || tile.subtitleEmphasis === undefined) {
+                          return tile;
+                        }
+                        const { subtitleEmphasis: _dropped, ...withoutPromise } = tile;
+                        return withoutPromise;
+                      }),
+                    }
+                  : {}),
+              }
             : {
                 ...base,
                 header: { ...base.header, etaHeadline: `Spoon in ${promiseMinutes} mins` },
@@ -214,7 +265,15 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
         activeBooking,
       }),
     );
-  }, [addresses.state, activeSummary, detailData, trackingData, catalogue.state, serverNowMs]);
+  }, [
+    addresses.state,
+    activeSummary,
+    detailData,
+    trackingData,
+    catalogue.state,
+    instantAvailability.state,
+    serverNowMs,
+  ]);
 
   const refetchers = useRef({
     addresses: addresses.refetch,
