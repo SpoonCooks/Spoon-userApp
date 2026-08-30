@@ -362,6 +362,19 @@ export const bookingDetailSchema = z.object({
    * `.nullish()` so a deployment predating the field still parses; the banner then reads
    * "Booking confirmed!", exactly as it did before this existed.
    */
+  /**
+   * Whether the assigned cook has real travel evidence — a computed origin, route and
+   * departure time.
+   *
+   * `false` is a CAPACITY-level assignment: a cook is rostered and free, but the server cannot
+   * say when or whether they will arrive. The screen must not present that as travel under way.
+   * On 2026-08-30 a customer watched a confirmed booking with a named cook for an hour in
+   * exactly that state, because nothing in the payload distinguished it.
+   *
+   * `.nullish()` so a deployment predating the field still parses; absence is treated as "not
+   * known to be ready" by the caller rather than as readiness.
+   */
+  dispatchReady: z.boolean().nullish(),
   rescheduleCount: z.number().int().nonnegative().nullish(),
 });
 

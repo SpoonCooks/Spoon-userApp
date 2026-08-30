@@ -54,20 +54,16 @@ export function selectHomeBooking(
    * for a cancellation the customer made themselves.
    */
   return (
-    bookings
-      .slice()
-      .sort((left, right) => {
-        const stateOrder = rank[left.status] - rank[right.status];
-        if (stateOrder !== 0) return stateOrder;
-        const leftStart =
-          left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
-        const rightStart =
-          right.scheduledStart === null
-            ? Number.POSITIVE_INFINITY
-            : Date.parse(right.scheduledStart);
-        if (leftStart !== rightStart) return leftStart - rightStart;
-        return left.id.localeCompare(right.id);
-      })[0] ?? null
+    bookings.slice().sort((left, right) => {
+      const stateOrder = rank[left.status] - rank[right.status];
+      if (stateOrder !== 0) return stateOrder;
+      const leftStart =
+        left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
+      const rightStart =
+        right.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(right.scheduledStart);
+      if (leftStart !== rightStart) return leftStart - rightStart;
+      return left.id.localeCompare(right.id);
+    })[0] ?? null
   );
 }
 
@@ -173,6 +169,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
               cancelledBy: detailData.cancellation?.cancelledBy ?? null,
               reassigned: detailData.reassignment?.occurred === true,
               recoveryHandoff: detailData.recovery?.state === 'support_handoff',
+              dispatchReady: detailData.dispatchReady ?? true,
             });
           })() ?? undefined);
 

@@ -198,3 +198,44 @@ describe('the demo fixtures quote the SAME destinations', () => {
     expect(DEMO_BANNER_DESTINATION_PAGE).toEqual(BANNER_DESTINATION_PAGE);
   });
 });
+
+/**
+ * A capacity-level assignment must not read as a cook on the way.
+ *
+ * `dispatchReady: false` means the server has a rostered, free cook but no origin, route or
+ * departure time — it cannot say when, or whether, anybody arrives. On 2026-08-30 a customer
+ * watched exactly that state for an hour under a "Confirmed!" badge, because nothing in the
+ * payload distinguished it from a cook who was genuinely coming.
+ */
+describe('the badge tells the truth about dispatch readiness', () => {
+  const assigned = {
+    bookingId: 'b1',
+    status: 'assigned' as const,
+    dateLabel: 'Tomorrow, Aug 5',
+    timeLabel: '1:15 PM • 1 hr',
+  };
+
+  it('says Confirmed when the cook has real travel evidence', () => {
+    expect(homeBannerFor({ ...assigned, dispatchReady: true })?.badgeValue).toBe('Confirmed!');
+  });
+
+  it('stops claiming Confirmed when the cook has none', () => {
+    const banner = homeBannerFor({ ...assigned, dispatchReady: false });
+
+    expect(banner?.badgeValue).toBe('Assigning cook');
+    expect(banner?.badgeValue).not.toBe('Confirmed!');
+  });
+
+  it('treats an older deployment that omits the field as ready', () => {
+    // Absence must preserve the behaviour that shipped before the field existed, rather than
+    // downgrading every banner the moment a client meets an older API.
+    expect(homeBannerFor(assigned)?.badgeValue).toBe('Confirmed!');
+  });
+
+  it('lets a support handoff outrank readiness', () => {
+    // A booking in handoff has a bigger problem than an unproven cook.
+    expect(
+      homeBannerFor({ ...assigned, dispatchReady: false, recoveryHandoff: true })?.badgeValue,
+    ).toBe('Needs attention');
+  });
+});
