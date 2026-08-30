@@ -9,6 +9,12 @@ import type { BookingCardViewModel } from '@ui';
 export interface BookingListViewModel {
   readonly title: string;
   readonly bookings: readonly BookingCardViewModel[];
+  /**
+   * The single line drawn under the illustration on `679:1050` / `679:1147`.
+   *
+   * There is deliberately no second line. Both designed empty states are artwork plus one
+   * sentence; the explanatory `emptyDescription` this used to carry was invented back when
+   * neither screen had an empty state drawn for it.
+   */
   readonly emptyTitle: string;
-  readonly emptyDescription: string;
 }

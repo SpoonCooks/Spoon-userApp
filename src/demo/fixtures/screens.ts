@@ -308,8 +308,9 @@ export const DEMO_BOOKING_HISTORY: BookingListViewModel = {
     DEMO_BOOKING_UNFULFILLED,
     { ...DEMO_BOOKING_COMPLETED, id: 'demo-booking-3' },
   ],
-  emptyTitle: 'No past bookings yet',
-  emptyDescription: 'Your completed bookings will appear here.',
+  // `683:68` — the designed line, verbatim. It was an invented "No past bookings yet" over a
+  // second explanatory line, from when this screen had no empty state drawn for it at all.
+  emptyTitle: 'Your bookings will appear here',
 };
 
 export const DEMO_BOOKING_HISTORY_EMPTY: BookingListViewModel = {
@@ -320,8 +321,8 @@ export const DEMO_BOOKING_HISTORY_EMPTY: BookingListViewModel = {
 export const DEMO_REFUND_HISTORY: BookingListViewModel = {
   title: 'Refunds',
   bookings: [DEMO_REFUND_PROCESSING, DEMO_REFUND_COMPLETED],
-  emptyTitle: 'No refunds yet',
-  emptyDescription: 'Refunds for cancelled bookings will appear here.',
+  // `684:73`, same as above.
+  emptyTitle: 'Your refunds will appear here',
 };
 
 /* ----------------------------------------------------------------- cancellation */

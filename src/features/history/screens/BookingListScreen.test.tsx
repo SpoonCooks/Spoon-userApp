@@ -27,6 +27,39 @@ describe('Booking history (6:227)', () => {
   });
 
   /**
+   * `679:1050` — the designed empty state, which did not exist when this screen was built.
+   *
+   * It drew a neutral 28pt icon, an invented "No past bookings yet", and a second explanatory
+   * line. The design is one 150pt illustration over a single sentence, so all three are asserted:
+   * the artwork is present, the line is the design's, and there is no second line to contradict
+   * it.
+   */
+  it('draws the designed illustration and the single designed line', () => {
+    render(<BookingListView state={ready(DEMO_BOOKING_HISTORY_EMPTY)} {...props} />);
+
+    expect(screen.getByTestId('booking-list-screen-empty-illustration')).toBeTruthy();
+    expect(screen.getByText('Your bookings will appear here')).toBeTruthy();
+    expect(screen.queryByText(/No past bookings yet/)).toBeNull();
+    expect(screen.queryByText(/completed bookings will appear/)).toBeNull();
+  });
+
+  /** `679:1147` — the refund variant gets its OWN artwork, not the booking calendar. */
+  it('gives Refunds its own empty artwork and line', () => {
+    render(
+      <BookingListView
+        state={ready({ ...DEMO_REFUND_HISTORY, bookings: [] })}
+        variant="refund"
+        {...props}
+      />,
+    );
+
+    const art = screen.getByTestId('booking-list-screen-empty-illustration');
+    expect(art).toBeTruthy();
+    expect(screen.getByText('Your refunds will appear here')).toBeTruthy();
+    expect(screen.queryByText(/No refunds yet/)).toBeNull();
+  });
+
+  /**
    * LOADING RULE, reversed for V8 (task §13 / §25).
    *
    * This used to assert the opposite — that the branded `71:747` interstitial was rendered here.

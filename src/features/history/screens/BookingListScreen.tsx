@@ -1,4 +1,5 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
@@ -6,6 +7,10 @@ import { BookingCard, EmptyState, QueryBoundary, ScreenHeader, lightTheme } from
 import type { BookingCardVariant } from '@ui';
 
 import type { BookingListViewModel } from '../types';
+
+/** `683:65` and `684:71`, exported from the v16 frames at their drawn 150pt size. */
+const BOOKING_EMPTY_ART = require('../../../../assets/figma/history/booking-empty.png') as ImageSourcePropType;
+const REFUND_EMPTY_ART = require('../../../../assets/figma/history/refund-empty.png') as ImageSourcePropType;
 
 /**
  * Booking history (`6:227`) and Refunds (`71:615`).
@@ -59,10 +64,19 @@ export function BookingListView({
             {/* `6:239` / `71:621` — px 4 / py 6, 16pt between cards. */}
             <View style={styles.list}>
               {list.bookings.length === 0 ? (
+                /*
+                 * `679:1050` Booking empty / `679:1147` Refund empty — designed in v16, where
+                 * before there was nothing and this drew the neutral 28pt icon with a second
+                 * explanatory line. Each is one 150pt illustration over a single centred line,
+                 * so no `description` is passed: the design has no second line to render.
+                 *
+                 * The artwork is chosen by `variant` rather than carried on the view model,
+                 * because which of the two frames this is, is a property of the SCREEN and not
+                 * of the data the server returned.
+                 */
                 <EmptyState
                   title={list.emptyTitle}
-                  description={list.emptyDescription}
-                  icon="empty"
+                  illustration={variant === 'refund' ? REFUND_EMPTY_ART : BOOKING_EMPTY_ART}
                   testID={`${testID}-empty`}
                 />
               ) : (
