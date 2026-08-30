@@ -351,6 +351,18 @@ export const bookingDetailSchema = z.object({
   recovery: bookingRecoverySchema.nullish(),
   cancellation: bookingCancellationSchema.nullable(),
   allowedActions: allowedActionsSchema,
+  /**
+   * How many times the CUSTOMER has moved this booking. Capped server-side at 1.
+   *
+   * The only thing separating the two designed confirmation banners — "Booking confirmed!" and
+   * "Rescheduled!" (`687:92`). A rescheduled booking keeps its `created`/`assigned` status and
+   * merely carries a different `timing.serviceStart`, so without this the screen cannot tell
+   * them apart and always said "confirmed".
+   *
+   * `.nullish()` so a deployment predating the field still parses; the banner then reads
+   * "Booking confirmed!", exactly as it did before this existed.
+   */
+  rescheduleCount: z.number().int().nonnegative().nullish(),
 });
 
 export type BookingDetailDto = z.infer<typeof bookingDetailSchema>;

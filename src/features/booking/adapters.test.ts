@@ -258,3 +258,54 @@ describe('summaryFrom server-owned action and recovery state', () => {
     });
   });
 });
+
+/**
+ * `687:75` Page 6d — the Rescheduled flow's confirmation.
+ *
+ * It is the confirmed frame with one word changed, and the customer was landing on it after a
+ * reschedule still reading "Booking confirmed!" — the reschedule appeared not to have happened.
+ * The distinguishing fact is the SERVER's `rescheduleCount`; a rescheduled booking keeps its
+ * status and only its `serviceStart` moves.
+ */
+describe('the confirmation banner says what happened to the booking', () => {
+  it('says Rescheduled once the server reports the booking was moved', () => {
+    const summary = summaryFrom({
+      base: DEMO_BOOKING_CONFIRMATION.summary!,
+      dto: { ...SUMMARY_DTO, rescheduleCount: 1 } as BookingDetailDto,
+    });
+
+    expect(summary.bannerTitle).toBe('Rescheduled!');
+  });
+
+  it('still says confirmed for a booking that was never moved', () => {
+    expect(
+      summaryFrom({
+        base: DEMO_BOOKING_CONFIRMATION.summary!,
+        dto: { ...SUMMARY_DTO, rescheduleCount: 0 } as BookingDetailDto,
+      }).bannerTitle,
+    ).toBe(DEMO_BOOKING_CONFIRMATION.summary!.bannerTitle);
+  });
+
+  it('falls back to confirmed against a deployment that does not publish the count', () => {
+    // The field is nullish precisely so an older API keeps working rather than blanking a banner.
+    expect(
+      summaryFrom({
+        base: DEMO_BOOKING_CONFIRMATION.summary!,
+        dto: SUMMARY_DTO,
+      }).bannerTitle,
+    ).toBe(DEMO_BOOKING_CONFIRMATION.summary!.bannerTitle);
+  });
+
+  it('lets a support handoff outrank it — that is the more urgent thing to say', () => {
+    const summary = summaryFrom({
+      base: DEMO_BOOKING_CONFIRMATION.summary!,
+      dto: {
+        ...SUMMARY_DTO,
+        rescheduleCount: 1,
+        recovery: { state: 'support_handoff', openedAt: '2026-08-20T10:00:00.000Z' },
+      } as BookingDetailDto,
+    });
+
+    expect(summary.bannerTitle).toBe('This booking needs attention');
+  });
+});

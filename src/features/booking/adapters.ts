@@ -122,11 +122,26 @@ export function summaryFrom(input: {
 }): BookingSummaryViewModel {
   const recoveryHandoff = input.dto.recovery?.state === 'support_handoff';
 
+  /**
+   * `687:92` — the Rescheduled flow's own confirmation, which is the same frame as the confirmed
+   * one with a different word in the banner.
+   *
+   * Read from the SERVER's `rescheduleCount`, never inferred from having just come through the
+   * reschedule screen: reopening the booking later must still say what happened to it, and a
+   * navigation flag would forget. A pre-revision deployment omits the field, and the banner then
+   * reads "Booking confirmed!" exactly as before.
+   *
+   * The handoff banner still wins — a booking that needs attention has something more urgent to
+   * say than how it was last moved.
+   */
+  const rescheduled = (input.dto.rescheduleCount ?? 0) > 0;
+
   return {
     ...input.base,
     scheduleLine: scheduleLineFrom(input.dto),
     rows: bookingRowsFrom(input.dto),
     rescheduleAllowed: input.dto.allowedActions.canReschedule,
+    ...(rescheduled ? { bannerTitle: 'Rescheduled!' } : {}),
     ...(recoveryHandoff
       ? { bannerTitle: 'This booking needs attention', tone: 'warning' as const }
       : {}),
