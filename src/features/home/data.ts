@@ -40,9 +40,21 @@ export function selectHomeBooking(
     cancelled: 6,
   };
 
+  /*
+   * Cancelled bookings are no longer filtered out.
+   *
+   * They were, and that quietly disabled a card the design draws and this app already fully
+   * implements: `393:1072`, the apology leading to page 8c. A booking Spoon cancelled went
+   * straight into Past bookings and Refunds while Home said nothing, so the customer's first news
+   * of it was a refund line.
+   *
+   * The SERVER decides which cancellations qualify — its own, where money was actually taken, and
+   * only while they are recent — so nothing here re-derives that. `rank` still puts them last,
+   * because a live booking always outranks an apology, and `homeBannerFor` refuses to draw one
+   * for a cancellation the customer made themselves.
+   */
   return (
     bookings
-      .filter((booking) => booking.status !== 'cancelled')
       .slice()
       .sort((left, right) => {
         const stateOrder = rank[left.status] - rank[right.status];
