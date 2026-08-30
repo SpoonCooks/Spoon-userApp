@@ -108,17 +108,43 @@ describe('Instant sheet — taxes dialog above the sheet (25:1585)', () => {
       />,
     );
 
-    expect(screen.queryByText('What is Taxes?')).toBeNull();
+    expect(screen.queryByText('What is Taxes and Fee?')).toBeNull();
 
     fireEvent.press(screen.getByTestId('instant-sheet-payment-details'));
 
-    expect(screen.getByText('What is Taxes?')).toBeTruthy();
+    expect(screen.getByText('What is Taxes and Fee?')).toBeTruthy();
     expect(screen.getByTestId('instant-sheet-dialog-layer')).toBeTruthy();
     // The sheet stays mounted behind it, hidden from assistive tech.
     expect(screen.getByText('Book NOW', { includeHiddenElements: true })).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('info-dialog-close'));
-    expect(screen.queryByText('What is Taxes?')).toBeNull();
+    expect(screen.queryByText('What is Taxes and Fee?')).toBeNull();
+  });
+
+  /**
+   * The sheet states the tax the customer is actually charged, in the design's own words.
+   *
+   * It used to say "What is Taxes?" and describe a 2.5% CGST + 2.5% SGST split — a title and a
+   * breakdown that appear nowhere in the finalized file. Both tax sheets in v16 (`47:6619` on
+   * Instant, `275:4274` on the scheduled side) carry this same title and a flat 5% GST. Pinned as
+   * a literal, because the point is that the string matches the DESIGN and not merely itself.
+   */
+  it('states the tax exactly as the design does', () => {
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_AVAILABLE}
+        selectedDurationId={null}
+        {...actions}
+      />,
+    );
+    fireEvent.press(screen.getByTestId('instant-sheet-payment-details'));
+
+    expect(
+      screen.getByText(
+        'Taxes levied as per Govt. regulations, subject to change basis final service value. This includes a 5% GST.',
+      ),
+    ).toBeTruthy();
   });
 });
 

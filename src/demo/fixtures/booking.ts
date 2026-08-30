@@ -51,9 +51,17 @@ export const DEMO_INSTANT_AVAILABLE: InstantViewModel = {
    */
   ctaLabel: 'Book NOW',
   paymentDetailsLabel: 'Check payment details',
+  /**
+   * `25:1585` Page 4d, sheet `47:6628` — transcribed from the finalized v16 file.
+   *
+   * It read "What is Taxes?" with a 2.5% CGST + 2.5% SGST split, which appears nowhere in the
+   * design. Both tax sheets in v16 (`47:6619` here and `275:4274` on the scheduled side) carry
+   * the SAME title and the same flat 5% GST, so the two are now identical rather than differing
+   * on a distinction the design never drew.
+   */
   taxesInfo: {
-    title: 'What is Taxes?',
-    body: 'Taxes levied as per Govt. regulations, subject to change basis final service value. This includes a 2.5% CGST and 2.5% SGST.',
+    title: 'What is Taxes and Fee?',
+    body: 'Taxes levied as per Govt. regulations, subject to change basis final service value. This includes a 5% GST.',
   },
 };
 
@@ -448,7 +456,8 @@ export const DEMO_BOOKING_AUTO_CANCELLED: BookingDetailViewModel = {
   ...HEADER,
   view: 'autoCancelled',
   autoCancelled: {
-    title: 'This booking has been cancelled',
+    // `201:278` — the frame's own heading.
+    title: 'Sorry, this booking is cancelled',
     rows: [
       { label: 'Date', value: 'Today, Aug 5' },
       { label: 'Start time', value: '5:30 PM', emphasis: 'hero' },
@@ -456,8 +465,9 @@ export const DEMO_BOOKING_AUTO_CANCELLED: BookingDetailViewModel = {
       { label: 'Total', value: '₹135', emphasis: 'total' },
     ],
     apologyTitle: 'We sincerely apologize for cancelling this booking',
+    // Verbatim `201:278`: "couldn't", not "could not", and ALL inconveniences, not "related" ones.
     apologyBody:
-      'We regret that we could not serve you this time due to operational constraints & sincerely apologize for related inconveniences caused.',
+      'We regret that we couldn’t serve you this time due to operational constraints & sincerely apologize for all inconveniences caused.',
     refundTitle: 'Amount shall be refunded to original source',
     refundBody:
       'The amount paid against this booking shall be refunded back to your source. And we promise to not let you down again!',
@@ -478,8 +488,10 @@ export const DEMO_BOOKING_ARRIVED: BookingDetailViewModel = {
   view: 'arrived',
   cook: DEMO_COOK_REKHA,
   arrived: {
-    bannerTitle: 'Cook Rekha has arrived',
-    bannerMessage: 'The cook will be at your doorstep very soon!',
+    // `3:1658` — "Cook has arrived!" with the name filled in by `withCookName`, and the frame's
+    // own second line, which read "will be at your doorstep very soon!" here.
+    bannerTitle: 'Cook Rekha has arrived!',
+    bannerMessage: 'The cook will reach your doorstep soon',
     tone: 'positive',
     // `99:1620` — once the cook has ARRIVED the panel stops counting down and shows a clock time.
     // Still a server string; the client neither formats it nor derives it from the countdown.
@@ -518,7 +530,8 @@ export function demoInServiceBooking(
       // `101:1887` / `101:1889` — the current file rewrote both. The message dropped from two
       // lines (h 32) to one (h 16), which is why the h1 block closed 35 → 19.
       statusTitle: 'Time left to service end',
-      statusMessage: 'Cooking in progress',
+      // `101:1889` in v16 states what the timer MEANS, not just that cooking is happening.
+      statusMessage: 'Cooking in progress. Your booking ends after timer',
       endsAtMs: nowMs + remainingMs,
       // The server would report its own clock; zero means "device and server agree".
       clockSkewMs: 0,
@@ -586,10 +599,14 @@ const COMPLETION = {
   // `319:3228` — what the legend says on `319:3191`.
   ratedCaption: "Thank you for appreciating the cook's efforts!",
   bookingHeadline: '12th April • 1:15 PM • 1 hr',
-  // `143:288` — the label is now a full sentence, centred, not a field caption.
-  feedbackTitle: 'We appreciate any feedback that helps us improve!',
+  // `143:288` — the label is a full sentence, centred, not a field caption. v16 shortened both
+  // this and the acknowledgement; they read "We appreciate any feedback that helps us improve!"
+  // and "Thanks for sharing your feedback!" before.
+  feedbackTitle: 'Your feedback helps us improve!',
+  // `319:3191` — 14b swaps the heading rather than repeating the invitation.
+  feedbackSubmittedTitle: 'Rating & Feedback submitted!',
   feedbackPlaceholder: 'Amazing homestyle flavor! Roti was extremely soft.',
-  feedbackAcknowledgement: 'Thanks for sharing your feedback!',
+  feedbackAcknowledgement: 'Thanks for sharing!',
   submitLabel: 'Submit',
   tipRowLabel: 'Would you like to tip the cook?',
 } as const;
@@ -643,7 +660,8 @@ export const DEMO_EXTENSION: ExtensionViewModel = {
   defaultOptionId: 'ext-10',
   ctaLabel: 'Extend • ₹16',
   paymentDetailsLabel: 'Check payment details',
-  // `275:4274` / `275:4275` — NOT the Instant sheet's copy: this one is a flat 5% GST.
+  // `275:4274` / `275:4275`. Identical to the Instant sheet's, which is what v16 draws — the two
+  // used to differ only because the Instant one carried a CGST/SGST split the design never had.
   taxesInfo: {
     title: 'What is Taxes and Fee?',
     body: 'Taxes levied as per Govt. regulations, subject to change basis final service value. This includes a 5% GST.',

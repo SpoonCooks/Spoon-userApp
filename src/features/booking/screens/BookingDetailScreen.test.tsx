@@ -451,7 +451,11 @@ describe('Booking host — completion (143:207)', () => {
     expect(screen.getByTestId('completion-rating-prompt')).toBeTruthy();
     expect(screen.queryByTestId('completion-rating-5')).toBeNull();
     expect(screen.queryByTestId('completion-submit')).toBeNull();
-    expect(screen.getByText('Thanks for sharing your feedback!')).toBeTruthy();
+    // `319:3191` — the heading reports the submission rather than repeating the invitation, and
+    // the acknowledgement is the shorter v16 line.
+    expect(screen.getByText('Rating & Feedback submitted!')).toBeTruthy();
+    expect(screen.getByText('Thanks for sharing!')).toBeTruthy();
+    expect(screen.queryByText('Your feedback helps us improve!')).toBeNull();
   });
 });
 

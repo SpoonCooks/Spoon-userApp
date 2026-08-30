@@ -405,7 +405,10 @@ describe('booking lifecycle from real DTOs', () => {
     });
     await settle();
 
-    expect(screen.getByText('Thanks for sharing your feedback!')).toBeTruthy();
+    // `319:3191` — v16 swaps the heading to report that the feedback landed, and shortens the
+    // line beneath it. These read "…helps us improve!" over "Thanks for sharing your feedback!".
+    expect(screen.getByText('Rating & Feedback submitted!')).toBeTruthy();
+    expect(screen.getByText('Thanks for sharing!')).toBeTruthy();
   });
 
   /**

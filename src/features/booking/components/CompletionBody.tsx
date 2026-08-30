@@ -133,8 +133,12 @@ export function CompletionBody({
 
       {/* `143:286` — feedback. */}
       <View style={styles.feedback}>
+        {/*
+          `143:288` asks; `319:3191` reports. Keeping the asking headline over the
+          acknowledgement left a customer who had just submitted still being invited to.
+        */}
         <Text variant="bodyStrong" color="textPrimary" align="center">
-          {completion.feedbackTitle}
+          {submitted ? completion.feedbackSubmittedTitle : completion.feedbackTitle}
         </Text>
         {submitted ? (
           <View style={styles.input} testID="completion-feedback-submitted">
