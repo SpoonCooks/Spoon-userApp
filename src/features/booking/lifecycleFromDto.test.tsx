@@ -454,6 +454,56 @@ describe('booking lifecycle from real DTOs', () => {
   });
 
   /**
+   * Opening 8c tells the server the apology has been read.
+   *
+   * Home draws the Cancelled banner (`393:1072`) until it is told, so without this the customer
+   * comes back from the apology to Home and is shown it again — being notified of something they
+   * have just dealt with. The design offers nothing to press, so ARRIVING here is the only signal
+   * there is.
+   */
+  it('marks the apology as seen when 8c opens, exactly once', async () => {
+    const seen: string[] = [];
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+        booking: bookingDto({
+          status: 'cancelled',
+          cancellation: {
+            cancelledAt: '2026-08-20T05:00:00.000Z',
+            cancelledBy: 'system',
+            reasonCode: 'NO_COOK_AVAILABLE',
+            reasonDetail: null,
+          },
+        }),
+      }),
+      [`GET /v1/bookings/${BOOKING_ID}/refunds`]: () => ({ refunds: [] }),
+      [`POST /v1/bookings/${BOOKING_ID}/cancellation/seen`]: () => {
+        seen.push(BOOKING_ID);
+        return { acknowledged: true };
+      },
+    });
+    await settle();
+
+    expect(screen.getByTestId('auto-cancelled-body')).toBeTruthy();
+    // Once, not once per refetch: the screen polls, and every poll changes the query result's
+    // identity. A guard keyed on the booking is what keeps this to a single request.
+    expect(seen).toEqual([BOOKING_ID]);
+  });
+
+  it('never marks a booking that was not cancelled', async () => {
+    let posted = false;
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({ booking: bookingDto({ status: 'assigned' }) }),
+      [`POST /v1/bookings/${BOOKING_ID}/cancellation/seen`]: () => {
+        posted = true;
+        return { acknowledged: false };
+      },
+    });
+    await settle();
+
+    expect(posted).toBe(false);
+  });
+
+  /**
    * A CUSTOMER cancellation has no designed surface, and `201:278` is not it — that frame
    * apologises for a cancellation Spoon made. The safe fallback is the correct answer here, and
    * it is recorded as a UI gap rather than solved by showing the wrong apology.

@@ -306,6 +306,31 @@ export function useCreateBooking() {
   });
 }
 
+/**
+ * Marks Spoon's apology for a cancelled booking as read.
+ *
+ * Fired when page 8c opens, because reading it IS the acknowledgement — the design draws no
+ * button and asks the customer to do nothing. On success only the ACTIVE list is invalidated:
+ * that is the read Home's banner comes from, and nothing else on screen changes when a notice
+ * stops being new.
+ *
+ * A failure is deliberately silent to the customer. The worst outcome is that Home shows the
+ * apology once more, which is the state they were already in; interrupting the page they came to
+ * read with an error about bookkeeping would be the worse trade.
+ */
+export function useMarkCancellationSeen() {
+  const { api } = useRuntime();
+  const queryClient = useQueryClient();
+  const bookings = createBookingApi(api);
+
+  return useMutation<unknown, Error, { bookingId: string }>({
+    mutationFn: ({ bookingId }) => bookings.markCancellationSeen(bookingId),
+    onSuccess() {
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.active() });
+    },
+  });
+}
+
 export function useCancelBooking() {
   const { api } = useRuntime();
   const queryClient = useQueryClient();

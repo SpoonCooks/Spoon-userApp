@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { DataState } from '@core/data';
 import { getLogger } from '@core/logging';
@@ -15,6 +15,7 @@ import { InServiceBody } from '../components/InServiceBody';
 import { TipSheet } from '../components/TipSheet';
 import { TrackingBody } from '../components/TrackingBody';
 import { extensionMinutesFrom } from '../adapters';
+import { useMarkCancellationSeen } from '../api/hooks';
 import { useBookingDetailData, useExtensionData } from '../data';
 import type { BookingDetailViewModel } from '../types';
 
@@ -441,6 +442,30 @@ export function BookingDetailScreen({
   ...actions
 }: BookingDetailActions & { readonly bookingId: string }) {
   const { state, refetch } = useBookingDetailData(bookingId);
+
+  /**
+   * Arriving on `201:278` IS the acknowledgement of Spoon's apology.
+   *
+   * Home keeps drawing the Cancelled banner (`393:1072`) until the server is told the customer
+   * has read it. The design offers nothing to press — no "Got it", no dismiss — so the only
+   * honest signal is that this page was actually opened.
+   *
+   * Fired once per booking, guarded by a ref rather than by the effect's dependencies: `state`
+   * changes identity on every refetch and poll, and without the guard each one would re-post.
+   * The server keeps the first instant regardless, so a duplicate is harmless — this just avoids
+   * making the request at all.
+   */
+  const seen = useMarkCancellationSeen();
+  const acknowledged = useRef<string | null>(null);
+  const isAutoCancelled = state.status === 'ready' && state.data.view === 'autoCancelled';
+
+  useEffect(() => {
+    if (!isAutoCancelled || bookingId === '' || acknowledged.current === bookingId) return;
+    acknowledged.current = bookingId;
+    // Fire and forget: see `useMarkCancellationSeen` for why a failure stays silent here.
+    seen.mutate({ bookingId });
+  }, [isAutoCancelled, bookingId, seen]);
+
   /**
    * KEYED BY BOOKING. Expo Router keeps this route mounted and swaps the param, so without a key
    * the view's local state — the rating in progress, an open sheet, a chosen extension option —

@@ -53,6 +53,8 @@ export const BOOKING_PATHS = {
   refunds: (id: string) => `/v1/bookings/${id}/refunds`,
   cancellationPreview: (id: string) => `/v1/bookings/${id}/cancellation-preview`,
   cancel: (id: string) => `/v1/bookings/${id}/cancel`,
+  /** Reading page 8c IS the acknowledgement; this is what takes the banner off Home. */
+  cancellationSeen: (id: string) => `/v1/bookings/${id}/cancellation/seen`,
   rescheduleOptions: (id: string) => `/v1/bookings/${id}/reschedule-options`,
   reschedule: (id: string) => `/v1/bookings/${id}/reschedule`,
   extensionOptions: (id: string) => `/v1/bookings/${id}/extension-options`,
@@ -186,6 +188,24 @@ export function createBookingApi(api: ApiClient) {
       return api.request(BOOKING_PATHS.cancellationPreview(bookingId), {
         parse: (data) => cancellationPreviewSchema.parse(data),
         ...(signal === undefined ? {} : { signal }),
+      });
+    },
+
+    /**
+     * `POST /v1/bookings/:id/cancellation/seen`.
+     *
+     * Records that the customer has READ Spoon's apology for cancelling this booking. Home draws
+     * the Cancelled banner (`393:1072`) until this lands, so this is what takes it down.
+     *
+     * Carries no idempotency scope: the server keeps the FIRST instant and treats a repeat as a
+     * no-op, so retries and a second visit to page 8c are both harmless. It is also not an error
+     * when it acknowledges nothing — opening a booking that was never cancelled simply reports
+     * `acknowledged: false`.
+     */
+    async markCancellationSeen(bookingId: string) {
+      return api.request(BOOKING_PATHS.cancellationSeen(bookingId), {
+        method: 'POST',
+        parse: (data) => data,
       });
     },
 
