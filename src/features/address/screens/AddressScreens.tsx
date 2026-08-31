@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import type { ImageSourcePropType, KeyboardTypeOptions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
@@ -744,7 +744,13 @@ function AddressSearchResults({
       {suggestions.map((suggestion) => (
         <Pressable
           key={suggestion.placeId}
-          onPress={() => onChoose(suggestion.placeId)}
+          onPress={() => {
+            // Choosing a prediction IS the end of searching. Leaving the keyboard up after it
+            // covered the CTA the customer now wants, on the one screen whose whole purpose is
+            // to end with Confirm.
+            Keyboard.dismiss();
+            onChoose(suggestion.placeId);
+          }}
           accessibilityRole="button"
           accessibilityLabel={`${suggestion.primary}. ${suggestion.secondary}`}
           style={({ pressed }) => [styles.suggestionRow, pressed ? styles.pressed : null]}
@@ -826,6 +832,16 @@ function SearchInput({
       accessibilityLabel={placeholder}
       style={styles.searchInput}
       returnKeyType="search"
+      /*
+       * The search key has to end the search.
+       *
+       * `returnKeyType="search"` only labels the key; with no `onSubmitEditing` behind it, tapping
+       * it did nothing and the keyboard stayed up over `Confirm` — so a customer who had already
+       * found their address had no way to get to the button without guessing at a tap on the map.
+       * Dismissing explicitly rather than relying on `blurOnSubmit` because the field sits inside
+       * a sticky bar over the map, where a blur alone does not always retract the keyboard.
+       */
+      onSubmitEditing={() => Keyboard.dismiss()}
       testID="address-search"
     />
   );
