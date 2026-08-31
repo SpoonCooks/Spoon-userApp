@@ -32,6 +32,30 @@ const IST = 'Asia/Kolkata';
 
 const at = (over: Partial<BookingSummaryDto>): BookingSummaryDto => ({ ...BASE, ...over });
 
+/**
+ * `6:227` draws `Scheduled · 4:00 PM` under the cook's name — how the booking was made and
+ * when it ran. The card used to print the ADDRESS label there instead, so every row read "Home":
+ * the least distinguishing fact available, since a customer's bookings are nearly all at one
+ * address.
+ */
+describe('the line under the cook name says how and when', () => {
+  it('names the slot type and the start time for a scheduled booking', () => {
+    expect(bookingCardFrom(at({}), IST).subtitle).toBe('Scheduled · 10:00 AM');
+  });
+
+  it('reads the start time in the published timezone, not the device one', () => {
+    expect(bookingCardFrom(at({}), 'UTC').subtitle).toBe('Scheduled · 4:30 AM');
+  });
+
+  it('says only Instant for an instant booking, which promised no start time', () => {
+    expect(bookingCardFrom(at({ slotType: 'instant' }), IST).subtitle).toBe('Instant');
+  });
+
+  it('falls back to the bare word when the server carries no start', () => {
+    expect(bookingCardFrom(at({ scheduledStart: null }), IST).subtitle).toBe('Scheduled');
+  });
+});
+
 describe('the status pill states what actually happened', () => {
   it('calls a paid, cook-assigned booking Confirmed', () => {
     expect(bookingCardFrom(at({ status: 'assigned' }), IST).statusLabel).toBe('Confirmed');

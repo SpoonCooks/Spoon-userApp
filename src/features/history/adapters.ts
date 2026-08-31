@@ -106,6 +106,7 @@ export function bookingCardFrom(
   timeZone?: string | undefined,
 ): BookingCardViewModel {
   const presentation = STATUS_PRESENTATION[dto.status];
+  const subtitle = bookingSubtitleFor(dto, timeZone);
 
   return {
     id: dto.id,
@@ -115,10 +116,35 @@ export function bookingCardFrom(
       : { statusLabel: presentation.label, statusTone: presentation.tone }),
     amount: formatPaise(dto.price.totalAmountPaise),
     ...cookFieldsFrom(dto.cook),
-    ...(dto.addressLabel === null || dto.addressLabel === undefined
-      ? {}
-      : { subtitle: dto.addressLabel }),
+    ...(subtitle === undefined ? {} : { subtitle }),
   };
+}
+
+/**
+ * `6:227` — the line under the cook's name: `Scheduled · 4:00 PM`, or a bare `Instant`.
+ *
+ * It used to be the ADDRESS label, so every row read "Home". That is the least distinguishing
+ * fact on the card — a customer's bookings are nearly all at the same address — while HOW and
+ * WHEN the booking ran is what tells two rows apart. An instant booking carries no start time in
+ * the frame because it had none to promise: it was whenever a cook could get there.
+ */
+function bookingSubtitleFor(
+  dto: Pick<BookingSummaryDto, 'slotType' | 'scheduledStart'>,
+  timeZone?: string | undefined,
+): string | undefined {
+  if (dto.slotType === 'instant') return 'Instant';
+  if (dto.scheduledStart === null) return 'Scheduled';
+  const instant = new Date(dto.scheduledStart);
+  if (Number.isNaN(instant.getTime())) return 'Scheduled';
+  const time = new Intl.DateTimeFormat('en-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    ...(timeZone === undefined ? {} : { timeZone }),
+  })
+    .format(instant)
+    .toUpperCase();
+  return `Scheduled · ${time}`;
 }
 
 export function bookingListFrom(input: {
