@@ -67,19 +67,31 @@ export const COOK_CARD_CUTOUT_PHOTO = Image.resolveAssetSource(
 ).uri;
 
 /**
- * Per-cook photographs for the onboarded partners, extracted from the Figma exports
- * (`cookRekha.svg` / `cookSanchita.svg` / `cookBarsha.svg`) and bundled at 512px.
- * Jyoti has no individual photograph yet and keeps the shared card export. The cut-out
- * remains the shared export for all cooks until transparent per-cook cut-outs exist.
+ * Per-cook photographs, bundled at 512px WITH THEIR ALPHA CHANNEL.
+ *
+ * The `.jpg` versions these replace are why every card had a black box where the cook should be.
+ * Figma's exports are transparent PNGs — `289:7269` places one over the photo panel's own yellow
+ * fill, which is what shows through — and converting them to JPEG dropped the alpha, because JPEG
+ * has no such channel. Every transparent pixel flattened to black, and the panel's yellow was
+ * covered by a rectangle of it.
+ *
+ * So the format is the requirement here, not a preference: these must stay PNG. Re-exporting or
+ * re-compressing them through any format without alpha reintroduces the same black box.
+ *
+ * All four onboarded cooks now have their own photograph. The cut-out used by the Home banner is
+ * still the shared export — a separate gap, tracked on `COOK_CARD_CUTOUT_PHOTO`.
  */
 const REKHA_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/rekha-photo.jpg') as number,
+  require('../../../assets/figma/cook/rekha-card.png') as number,
 ).uri;
 const SANCHITA_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/sanchita-photo.jpg') as number,
+  require('../../../assets/figma/cook/sanchita-card.png') as number,
 ).uri;
 const BARSHA_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/barsha-photo.jpg') as number,
+  require('../../../assets/figma/cook/barsha-card.png') as number,
+).uri;
+const JYOTI_PHOTO = Image.resolveAssetSource(
+  require('../../../assets/figma/cook/jyoti-card.png') as number,
 ).uri;
 
 export interface CookCardContent {
@@ -95,7 +107,7 @@ export interface CookCardContent {
 
 /** `289:7392` / `289:7891` — Cook Jyoti, mixed and veg. */
 const JYOTI: CookCardContent = {
-  photoUrl: COOK_CARD_PHOTO,
+  photoUrl: JYOTI_PHOTO,
   cutoutPhotoUrl: COOK_CARD_CUTOUT_PHOTO,
   specialties: dishes(
     ['Chicken curry', 'poultryLeg'],
