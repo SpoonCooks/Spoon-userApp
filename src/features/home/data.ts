@@ -239,11 +239,15 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
                   ? {
                       header: { ...base.header, etaHeadline: 'Spoon' },
                       tiles: base.tiles.map((tile) => {
-                        if (tile.id !== 'instant' || tile.subtitleEmphasis === undefined) {
-                          return tile;
-                        }
+                        if (tile.id !== 'instant') return tile;
+                        // "Get a cook in" is a sentence with its minutes torn off — it reads as
+                        // truncated, not as restraint. With no promise to make, the tile says
+                        // what it still honestly offers: "Get a cook".
                         const { subtitleEmphasis: _dropped, ...withoutPromise } = tile;
-                        return withoutPromise;
+                        return {
+                          ...withoutPromise,
+                          subtitle: tile.subtitle.replace(/\s+in$/, ''),
+                        };
                       }),
                     }
                   : {}),
