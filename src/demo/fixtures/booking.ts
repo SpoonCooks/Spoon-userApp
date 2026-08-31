@@ -481,7 +481,9 @@ export const DEMO_BOOKING_AUTO_CANCELLED: BookingDetailViewModel = {
     refundAmountLabel: 'Refund Amount',
     refundAmount: '₹135',
     refundDestination: 'Refund to original payment source',
-    refundTimeframe: 'Takes 5-7 business days',
+    // `201:88` reads 5-6. The app carried 5-7 here and 3-5 on the cancellation sheet, so the
+    // same refund was promised three different ways depending on which screen you asked.
+    refundTimeframe: 'Takes 5-6 business days',
     rebookPrompt: 'Give us another chance, book again!',
     rebookAcceptLabel: 'Yes',
     rebookDeclineLabel: 'No',
