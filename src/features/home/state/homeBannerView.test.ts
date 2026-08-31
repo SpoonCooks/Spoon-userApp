@@ -219,11 +219,26 @@ describe('the badge tells the truth about dispatch readiness', () => {
     expect(homeBannerFor({ ...assigned, dispatchReady: true })?.badgeValue).toBe('Confirmed!');
   });
 
-  it('stops claiming Confirmed when the cook has none', () => {
+  it('stops claiming Confirmed when no cook is named either', () => {
     const banner = homeBannerFor({ ...assigned, dispatchReady: false });
 
     expect(banner?.badgeValue).toBe('Assigning cook');
     expect(banner?.badgeValue).not.toBe('Confirmed!');
+  });
+
+  /**
+   * `Assigning cook` is a claim about WHO, and `dispatchReady` is a fact about WHEN.
+   *
+   * A departure plan can exist with `travel_source: 'unavailable'` and a null `required_start_at`
+   * -- seen on 2026-09-01 for a 5:00 AM booking -- because the cook had no position to route
+   * from. Reading that as "no cook yet" put `Assigning cook` directly above a card naming Test
+   * Cook, with her photograph and a `Call Cook` button. Both cannot be true.
+   */
+  it('keeps Confirmed when a cook is named but her travel is unknown', () => {
+    const banner = homeBannerFor({ ...assigned, dispatchReady: false, cookName: 'Test Cook' });
+
+    expect(banner?.badgeValue).toBe('Confirmed!');
+    expect(banner?.cookName).toBe('Test Cook');
   });
 
   it('treats an older deployment that omits the field as ready', () => {

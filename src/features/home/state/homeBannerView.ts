@@ -194,7 +194,21 @@ const COPY = {
  */
 function placedBadge(input: HomeBannerInput): string {
   if (input.recoveryHandoff === true) return COPY.badgeAttention;
-  if (input.dispatchReady === false) return COPY.badgeAssigning;
+  /*
+   * `Assigning cook` only when there is genuinely no cook.
+   *
+   * `dispatchReady: false` means the platform could not compute a DEPARTURE PLAN -- on
+   * 2026-09-01 the plan for a 5:00 AM booking existed with `travel_source: 'unavailable'` and a
+   * null `required_start_at`, because the cook had no position to route from. That is a statement
+   * about the ETA, not about whether anybody is coming.
+   *
+   * Treating it as the latter put "Assigning cook" directly above a card naming Test Cook, with
+   * her photograph, her cuisines and a `Call Cook` button. The two cannot both be true, and the
+   * customer is left to guess which half to believe. Where a cook IS named the booking is
+   * confirmed and says so; what stays absent is the arrival time, which this banner does not
+   * promise in the placed state anyway.
+   */
+  if (input.dispatchReady === false && (input.cookName ?? '') === '') return COPY.badgeAssigning;
   return COPY.badgeConfirmed;
 }
 
