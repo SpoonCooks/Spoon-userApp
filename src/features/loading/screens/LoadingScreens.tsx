@@ -154,13 +154,19 @@ export function IntroLoading({
 /**
  * `433:2290` "Page 21- confirmation loading" — NEW in the final file.
  *
- * The frame, read off the nodes:
+ * The frame, re-read off the nodes on 2026-08-31 — the founder reported this screen had changed,
+ * and it had. The mark is a DIFFERENT node at three times the size:
  *   `433:2291`  the 370 × 835 viewport
- *   `433:2304`  a 338 × 134 block at y 350.5, whose centre is 417.5 — exactly half of 835, so the
- *               block is VERTICALLY CENTRED rather than positioned
- *   `433:2308`  the 72 × 72 "In Progress" mark, centred (x 133 = (338 − 72) / 2), 6pt down
- *   `433:2313`  a 44pt box 6pt below it, holding `433:2315` "Confirmation in progress" —
+ *   `433:2304`  a 338 × 278.32 block at y 278.34, vertically centred in the viewport
+ *   `526:283`   the 220.66 × 216.32 progress mark, centred (x 58.67 = (338 − 220.66) / 2), 6pt
+ *               down. This REPLACES the old 72 × 72 `433:2308`, which no longer exists.
+ *   `433:2313`  a 44pt box 6pt below it, holding `433:2315` "Confirmation in progress ..." —
  *               28pt line, centred
+ *
+ * ARTWORK GAP — the bundled `confirmation-progress.png` is the SUPERSEDED mark: lime, with round
+ * dots. `526:283` is two-tone green with rectangular dashes and a darker green tick. Exporting it
+ * needs `assets/figma/loading` added to Figma Dev Mode's allowed-directories list, which only the
+ * file's owner can do, so the geometry below is correct and the image is not yet.
  *
  * There is NO header, no back control and no CTA. That is the point of the screen: it is the few
  * seconds between a verified payment and a booking the server has confirmed (V7 founder comment,
@@ -177,7 +183,7 @@ export function IntroLoading({
  * and reads them off the server.
  */
 export interface ConfirmationLoadingProps {
-  /** `433:2315` — "Confirmation in progress", the frame's own words. */
+  /** `433:2315` — "Confirmation in progress ...", the frame's own words, ellipsis included. */
   readonly title?: string;
   readonly testID?: string;
 }
@@ -186,7 +192,7 @@ export interface ConfirmationLoadingProps {
 const PROGRESS_SPIN_MS = 1400;
 
 export function ConfirmationLoading({
-  title = 'Confirmation in progress',
+  title = 'Confirmation in progress ...',
   testID = 'confirmation-loading',
 }: ConfirmationLoadingProps) {
   /**
@@ -274,7 +280,8 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.s6,
   },
   /** `433:2308` — 72 x 72. */
-  confirmingMark: { width: 72, height: 72 },
+  /** `526:283` — 220.66 × 216.32, superseding the 72 × 72 mark this screen used to draw. */
+  confirmingMark: { width: 220.66, height: 216.32 },
   /** `433:2313` — a 44pt box around the 28pt line, i.e. 8pt above and below. */
   confirmingTitle: {
     alignSelf: 'stretch',

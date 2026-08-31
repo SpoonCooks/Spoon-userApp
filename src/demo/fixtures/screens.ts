@@ -347,7 +347,12 @@ export const DEMO_CANCELLATION: CancellationViewModel = {
     {
       id: 'reschedule-once',
       title: 'Cancellation on rescheduled bookings',
-      body: 'An original booking can be rescheduled only once',
+      // `107:2618` is TWO sentences. The second was dropped, which removed the only place the
+      // app states that an instant booking cannot be cancelled at all — a customer met that rule
+      // for the first time when the control was simply absent from a live instant booking.
+      body:
+        'An original booking can be rescheduled only once. Instant bookings can not be ' +
+        'cancelled.',
     },
   ],
   reasonTitle: 'Why do you want to cancel?',
