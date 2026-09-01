@@ -349,6 +349,13 @@ export const bookingDetailSchema = z.object({
   timing: bookingTimingSchema,
   reassignment: bookingReassignmentSchema.nullish(),
   recovery: bookingRecoverySchema.nullish(),
+  /**
+   * The extension that took effect, when one has — `292:1197` "Page 12b- Cooking extended".
+   *
+   * `nullish` so an older deployment still parses. Absent means the screen renders 12a, which is
+   * what it did for every booking before the field existed.
+   */
+  extension: z.object({ minutes: z.number(), confirmedAt: z.string().nullable() }).nullish(),
   cancellation: bookingCancellationSchema.nullable(),
   allowedActions: allowedActionsSchema,
   /**

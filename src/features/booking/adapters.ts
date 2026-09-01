@@ -10,6 +10,7 @@ import { viewForBooking } from './state/bookingStatusView';
 import type {
   BookingDetailViewModel,
   BookingSummaryViewModel,
+  InServiceViewModel,
   TipSheetViewModel,
   TrackingViewModel,
 } from './types';
@@ -400,14 +401,33 @@ export function bookingDetailFrom(input: {
      * code back; leaving the fixture's `111` here would show the customer a code that ends
      * nothing — and would show it in the one place they are being asked to read digits aloud.
      */
+    /*
+     * 12a `101:1812`, and 12b `292:1197` when the server reports an extension.
+     *
+     * The notice used to be unreachable: the detail carried no extension field, so nothing could
+     * populate it, and the fixture's copy was deliberately not inherited. It is a SERVER report --
+     * `extension.minutes` -- and never inferred from a moved `expectedEnd`, which also moves when
+     * a service merely starts late and would have apologised for an extension nobody bought.
+     *
+     * Dropped when absent rather than left in place, the same rule `omitReassignNotice` applies:
+     * a screen rendered from designed copy must not announce something that never happened.
+     */
     ...(base.inService === undefined
       ? {}
       : {
           inService: {
-            ...base.inService,
+            ...omitExtendedNotice(base.inService),
             endsAtMs: expectedEndMsFrom(dto.timing.expectedEnd),
             clockSkewMs: currentSkewMs(),
             otpCode: '',
+            ...(dto.extension == null
+              ? {}
+              : {
+                  extendedNotice: {
+                    title: 'Booking extended!',
+                    body: `End time extended by ${dto.extension.minutes} mins`,
+                  },
+                }),
           },
         }),
     // Arrival is backend-confirmed state. The customer message and displayed clock time must not
@@ -475,6 +495,16 @@ export function bookingDetailFrom(input: {
     // §11 — instant draws no Cancel / Reschedule. Passed through verbatim; not interpreted here.
     slotType: dto.slotType,
   };
+}
+
+/**
+ * Exact-optional-safe removal, so a designed screen's own extension notice cannot survive onto a
+ * booking that was never extended. The sibling of `omitReassignNotice`, for the same reason.
+ */
+function omitExtendedNotice(inService: InServiceViewModel): InServiceViewModel {
+  if (inService.extendedNotice === undefined) return inService;
+  const { extendedNotice: _dropped, ...rest } = inService;
+  return rest;
 }
 
 /** Exact-optional-safe removal: the key is dropped, never set to `undefined`. */

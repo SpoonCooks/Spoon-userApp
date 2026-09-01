@@ -24,6 +24,37 @@ import { addServiceDays, serviceDateIn } from './serviceTime';
  */
 
 const TIME_ZONE = 'Asia/Kolkata';
+
+/**
+ * The clock is FROZEN for this file, at a mid-morning IST instant.
+ *
+ * `SERVICE_DATE` is resolved once, at module load, from the same clock the screen resolves "today"
+ * from. Left on the real clock those two reads straddle midnight for a few minutes each night: the
+ * module computes one date, the screen computes the next, and `stays on an unsellable day` sees
+ * TWO dates asked for and calls it an advance. Reproduced at 23:46 IST, and it would have failed
+ * every night in the same window while passing every daytime run.
+ *
+ * Fixed rather than merely tolerated, because the assertion under test is exactly "how many dates
+ * were asked for", and a test that cannot distinguish a real advance from a date rollover is not
+ * testing the thing it claims to.
+ */
+jest.useFakeTimers({
+  now: Date.parse('2026-08-23T10:00:00+05:30'),
+  // Timers themselves stay real: the cases await effects and network settling, and faking those
+  // would deadlock the waits rather than steady them.
+  doNotFake: [
+    'setTimeout',
+    'setInterval',
+    'clearTimeout',
+    'clearInterval',
+    'setImmediate',
+    'clearImmediate',
+    'nextTick',
+    'queueMicrotask',
+    'performance',
+  ],
+});
+
 /** Two days out, resolved the way the day strip resolves it. Tuesday 25 Aug in the report. */
 const SERVICE_DATE = addServiceDays(serviceDateIn(TIME_ZONE, new Date()), 2);
 const DURATION_MINUTES = 120;
