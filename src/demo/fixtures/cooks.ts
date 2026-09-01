@@ -1,6 +1,5 @@
 import type { CookViewModel } from '@ui/types/viewModels';
 import {
-  COOK_CARD_CUTOUT_PHOTO,
   COOK_CARD_PHOTO,
   cookCardContentFor,
   type CookCardContent,
@@ -20,9 +19,15 @@ import {
  * card can never drift apart: one transcription, three readers.
  */
 
-/** Kept exports: the same bundled photographs, under their historical fixture names. */
+/**
+ * Kept exports: the same bundled photograph, under its historical fixture names.
+ *
+ * `COOK_CUTOUT_PHOTO` is now an alias of the same picture. The cut-out was never a different
+ * image — every export already carries its alpha — and keeping them apart is what let the Home
+ * banner drift onto one cook's face for every booking.
+ */
 export const COOK_SAMPLE_PHOTO = COOK_CARD_PHOTO;
-export const COOK_CUTOUT_PHOTO = COOK_CARD_CUTOUT_PHOTO;
+export const COOK_CUTOUT_PHOTO = COOK_CARD_PHOTO;
 
 /**
  * Every card in `289:8515` earns all three badges. That is a property of the SAMPLE, not of cooks

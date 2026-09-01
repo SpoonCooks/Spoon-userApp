@@ -2,7 +2,7 @@ import { formatPaise } from '@core/format';
 import type { BookingSummaryCookDto, BookingSummaryDto } from '@features/booking';
 import { formatServiceDate, serviceDateIn } from '@features/scheduled';
 import type { BookingCardViewModel, StatusTone } from '@ui';
-import { cookCardContentFor } from '@ui/components/cookCardContent';
+import { cookPhotoFor } from '@ui/components/cookPhoto';
 
 import type { BookingListViewModel } from './types';
 
@@ -91,7 +91,10 @@ export function cookFieldsFrom(
   cook: BookingSummaryCookDto | null | undefined,
 ): Pick<BookingCardViewModel, 'cookName' | 'cookPhotoUrl' | 'rating'> {
   if (cook === null || cook === undefined) return {};
-  const photoUrl = cook.profileImageUrl ?? cookCardContentFor(cook.profileCode)?.photoUrl;
+  // Was `cook.profileImageUrl ?? ...` here and `cook.photoUrl ?? ...` in the booking adapter --
+  // two spellings of one server field, so whichever surface read the wrong one silently drew
+  // nothing. The resolver accepts both.
+  const photoUrl = cookPhotoFor(cook) ?? undefined;
   return {
     cookName: cook.displayName,
     ...(photoUrl === undefined ? {} : { cookPhotoUrl: photoUrl }),

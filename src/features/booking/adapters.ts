@@ -1,6 +1,7 @@
 import { formatPaise } from '@core/format';
 import type { CookViewModel, DetailRow } from '@ui';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
+import { cookPhotoFor } from '@ui/components/cookPhoto';
 
 import { currentSkewMs } from '@core/time';
 
@@ -210,7 +211,7 @@ function cookViewModelFrom(
   bookingId: string,
 ): CookViewModel {
   const content = cookCardContentFor(cook.profileCode);
-  const photoUrl = cook.photoUrl ?? content?.photoUrl;
+  const photoUrl = cookPhotoFor(cook);
   const languages = cook.languages ?? [];
   const cuisine = cook.cuisines?.[0];
   const anyBadge =

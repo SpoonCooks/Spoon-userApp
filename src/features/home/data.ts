@@ -15,7 +15,7 @@ import {
   homeFrom,
   minutesUntil,
 } from './adapters';
-import { cookCardContentFor } from '@ui/components/cookCardContent';
+import { cookPhotoFor } from '@ui/components/cookPhoto';
 
 import { homeBannerFor } from './state/homeBannerView';
 import { DEMO_HOME_ACTIVE_BOOKING } from '@/demo/fixtures/home';
@@ -184,13 +184,11 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
               bookingId: activeSummary.id,
               status: detailData.status,
               cookName: detailData.cook?.name ?? null,
-              // The banner draws the TRANSPARENT cut-out over its `#FFF7CC` panel (`337:4364`).
-              // A hosted photo wins; otherwise the cook's stable profileCode resolves the
-              // bundled cut-out, and a cook with neither renders the banner without a photo.
-              cookPhotoUrl:
-                detailData.cook?.photoUrl ??
-                cookCardContentFor(detailData.cook?.profileCode)?.cutoutPhotoUrl ??
-                null,
+              // The banner draws over its `#FFF7CC` panel (`337:4364`), and every bundled export
+              // is already transparent. It used to resolve a SEPARATE `cutoutPhotoUrl`, which was
+              // one shared picture of Rekha for all four cooks -- so this banner drew her over
+              // every booking while the screen one tap inside drew the right person.
+              cookPhotoUrl: cookPhotoFor(detailData.cook),
               dateLabel: formatDateLabel(detailData.scheduledStart, serverNow),
               timeLabel: formatTimeLabel(detailData.scheduledStart, detailData.durationMinutes),
               etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),

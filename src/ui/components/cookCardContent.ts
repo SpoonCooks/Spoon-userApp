@@ -47,23 +47,19 @@ function dishes(
 }
 
 /**
- * `94:910` — the cook photograph the frames ship, exported at 4×.
+ * A sample photograph for the DEMO fixtures and the component showcase. Not production content.
  *
- * It is named for the CARD, not for any one cook: all eight frames in `289:8515`, and the
- * in-flow cards such as `300:2632`, place the SAME image fill at the same 89 × 133.5 crop,
- * so every published V0 profile carries it.
+ * It resolves the same PNG Cook Rekha's card does, rather than the `.jpg` it used to: JPEG has no
+ * alpha channel, and that is the whole reason every card once drew a black box where the cook
+ * should be. A fixture pointing at a format that cannot carry transparency is a standing invitation
+ * to reintroduce it.
+ *
+ * Production surfaces never read this. They resolve a cook's own photograph through
+ * `cookPhotoFor`, keyed by her stable `profileCode`, so a sample can never attach to a real
+ * person.
  */
 export const COOK_CARD_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/rekha-sample.jpg') as number,
-).uri;
-
-/**
- * `337:4364` — the same photograph as a TRANSPARENT cut-out, which is what the Home
- * active-booking banner and the rating card place over their `#FFF7CC` panel. A photo with a
- * baked-in background there would paint a second, wrong ground inside the box.
- */
-export const COOK_CARD_CUTOUT_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/rekha-cutout.png') as number,
+  require('../../../assets/figma/cook/rekha-card.png') as number,
 ).uri;
 
 /**
@@ -80,7 +76,7 @@ export const COOK_CARD_CUTOUT_PHOTO = Image.resolveAssetSource(
  *
  * All four onboarded cooks have their own photograph, and each one IS a cut-out: between 39% and
  * 47% of every export is fully transparent. So the Home banner takes the same file the card does
- * rather than a separate asset — see `cutoutPhotoUrl` below.
+ * rather than a separate asset: there is one photo field, read through `cookPhotoFor`.
  */
 const REKHA_PHOTO = Image.resolveAssetSource(
   require('../../../assets/figma/cook/rekha-card.png') as number,
@@ -96,20 +92,19 @@ const JYOTI_PHOTO = Image.resolveAssetSource(
 ).uri;
 
 export interface CookCardContent {
-  /** The card photograph (`CookCard`, completion). */
-  readonly photoUrl: string;
   /**
-   * The transparent cut-out (Home banner, rating card).
+   * The cook's photograph — ONE field, for every surface that draws her.
    *
-   * Every cook's own photograph, NOT a shared export. It was `COOK_CARD_CUTOUT_PHOTO` for all
-   * four, so the Home banner drew Rekha's face over every upcoming booking while the booking
-   * screen beneath it — which reads `photoUrl` — drew the right cook. A founder testing a booking
-   * with Sanchita saw Rekha on Home and Sanchita one tap later.
+   * There used to be a second, `cutoutPhotoUrl`, for the surfaces that draw over a coloured panel.
+   * Every bundled export is already transparent (39–47% of each PNG is fully clear), so the two
+   * resolved the same picture and existed only to be got wrong — which is exactly what happened:
+   * the cut-out stayed a single shared image of Rekha for all four cooks, and the Home banner drew
+   * her over every booking. One field cannot disagree with itself.
    *
-   * The card exports already carry their alpha (39–47% of each is fully transparent), so this is
-   * the same file `photoUrl` resolves rather than a second asset that has to be kept in step.
+   * Read it through `cookPhotoFor`, never directly, so the server-then-bundled fallback exists in
+   * one place.
    */
-  readonly cutoutPhotoUrl: string;
+  readonly photoUrl: string;
   /** The mixed-variant 3×3 chip list, glyphs as the frame names them. */
   readonly specialties: readonly DishViewModel[];
   /** The veg-variant 3×3 chip list. Separately curated; not a filter of the mixed list. */
@@ -119,7 +114,6 @@ export interface CookCardContent {
 /** `289:7392` / `289:7891` — Cook Jyoti, mixed and veg. */
 const JYOTI: CookCardContent = {
   photoUrl: JYOTI_PHOTO,
-  cutoutPhotoUrl: JYOTI_PHOTO,
   specialties: dishes(
     ['Chicken curry', 'poultryLeg'],
     ['Mutton masala', 'meat'],
@@ -147,7 +141,6 @@ const JYOTI: CookCardContent = {
 /** `289:8388` / `289:8263` — Cook Rekha, mixed and veg. */
 const REKHA: CookCardContent = {
   photoUrl: REKHA_PHOTO,
-  cutoutPhotoUrl: REKHA_PHOTO,
   specialties: dishes(
     ['Chicken biryani', 'poultryLeg'],
     ['Fish curries', 'fish'],
@@ -175,7 +168,6 @@ const REKHA: CookCardContent = {
 /** `299:2255` / `289:7642` — Cook Sanchita, mixed and veg. */
 const SANCHITA: CookCardContent = {
   photoUrl: SANCHITA_PHOTO,
-  cutoutPhotoUrl: SANCHITA_PHOTO,
   specialties: dishes(
     ['Chicken curries', 'poultryLeg'],
     ['Mutton masala', 'meat'],
@@ -203,7 +195,6 @@ const SANCHITA: CookCardContent = {
 /** `289:7266` / `289:7767` — Cook Barsha, mixed and veg. */
 const BARSHA: CookCardContent = {
   photoUrl: BARSHA_PHOTO,
-  cutoutPhotoUrl: BARSHA_PHOTO,
   specialties: dishes(
     ['Butter Chicken', 'poultryLeg'],
     ['Fish fry', 'fish'],
