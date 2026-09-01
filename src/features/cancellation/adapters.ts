@@ -21,7 +21,32 @@ import type { CancellationViewModel } from './types';
  * belt-and-braces — the backend refuses the same request.
  */
 
-/** `104:2298` — one row of the published cancellation schedule. */
+/**
+ * A boundary in the words `6:22` uses: hours where the boundary is whole hours, minutes below.
+ *
+ * The published boundaries are minutes (180, 60). Printing them as minutes gave rows reading
+ * "More than 180 mins before" against a design that says "More than 3 hrs to start time" — the
+ * same rule, stated in a unit nobody cancelling a booking thinks in.
+ */
+function boundaryLabel(minutes: number): string {
+  if (minutes % 60 !== 0) return `${minutes} mins`;
+  const hours = minutes / 60;
+  return `${hours} ${hours === 1 ? 'hr' : 'hrs'}`;
+}
+
+/**
+ * `104:2298` / `6:22` — one row of the published cancellation schedule.
+ *
+ * The column is headed "Fee as percentage", so each row states the FEE. This used to state the
+ * refund instead — "75% refund" under a fee column — which inverted every number on the one
+ * screen whose entire job is to tell a customer what cancelling costs.
+ *
+ * The fee is the band's published `chargePercent`, never `100 - refundPercent`: that complement
+ * is only true under the captured-gross basis, and the service-base arithmetic leaves a
+ * non-refundable tax residual that makes it wrong. A band that publishes no fee and refunds
+ * everything is "Free"; one that publishes no fee and refunds less is shown as a refund, because
+ * stating a fee the policy has not published would be inventing the number.
+ */
 export function feeScheduleFrom(catalogue: Catalogue): readonly FeeScheduleRow[] {
   return catalogue.cancellation.bands.map((band) => {
     const { minMinutesToStart: min, maxMinutesToStart: max } = band;
@@ -29,19 +54,25 @@ export function feeScheduleFrom(catalogue: Catalogue): readonly FeeScheduleRow[]
     // A window description, written from the published boundaries rather than restated.
     const window =
       min !== undefined && max !== undefined
-        ? `${min}–${max} mins before`
+        ? `Between ${boundaryLabel(max)} to ${boundaryLabel(min)} to start time`
         : min !== undefined
-          ? `More than ${min} mins before`
+          ? `More than ${boundaryLabel(min)} to start time`
           : max !== undefined
-            ? `Less than ${max} mins before`
+            ? `Within ${boundaryLabel(max)} to start time`
             : 'Any time';
+
+    // `6:22` draws a full refund in the "free" green. Supplied from the published percentage,
+    // not derived by matching on the words.
+    if (band.refundPercent === 100) {
+      return { label: window, value: 'Free', free: true };
+    }
 
     return {
       label: window,
-      value: `${band.refundPercent}% refund`,
-      // `6:22` draws a full refund in the "free" green. Supplied from the published percentage,
-      // not derived by matching on the words.
-      ...(band.refundPercent === 100 ? { free: true } : {}),
+      value:
+        band.chargePercent === undefined
+          ? `${band.refundPercent}% refund`
+          : `${band.chargePercent}%`,
     };
   });
 }
