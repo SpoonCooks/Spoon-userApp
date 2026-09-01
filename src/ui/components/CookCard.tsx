@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
-import type { ImageSourcePropType } from 'react-native';
+import type { ImageSourcePropType, ImageStyle, StyleProp } from 'react-native';
 
 import { Text } from '@ui/primitives/Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
@@ -100,6 +101,54 @@ function dishesFor(cook: CookViewModel, variant: CookCardVariant): readonly Dish
   return cook.specialties ?? [];
 }
 
+/** `289:7520` — the photo panel, identical on all eight frames. */
+const PHOTO_PANEL_WIDTH = 85;
+const PHOTO_PANEL_HEIGHT = 90;
+
+/**
+ * How much of the vertical overflow is taken off the TOP of the photograph.
+ *
+ * All eight frames draw the portrait as an 89 × 134 box at `(−0.889, −12)` inside the 85 × 90
+ * panel: 44pt taller than the panel, pushed up by 12. So the design keeps 12/44 of the overflow
+ * above the face and 32/44 below it — a crop deliberately biased AWAY from centre, because a
+ * portrait's subject sits high in the frame and a centred crop takes the top of the head off.
+ *
+ * Expressed as a fraction rather than the literal −12, this reproduces the frame exactly for a
+ * 2:3 source and stays right for any other shape the payload sends.
+ */
+const PHOTO_TOP_BIAS = 12 / 44;
+
+/**
+ * The design's crop window, for a source of known intrinsic size.
+ *
+ * `resizeMode="cover"` was here before and always centres, which is what cut Cook Rekha's hair
+ * off: her portrait is 2:3, so covering an 85 × 90 panel scales it to 127.5 tall and a centred
+ * crop discards 18.75 from the top — twice what the frame discards. The three square portraits
+ * were unaffected, which is why it looked like one cook's photo was broken rather than the rule.
+ *
+ * Cover-scale is unchanged; only where the overflow is taken from moves. A source with no
+ * vertical overflow (the square exports) is untouched, so this cannot regress them.
+ */
+function photoCropFor(sourceWidth: number, sourceHeight: number): StyleProp<ImageStyle> {
+  if (sourceWidth <= 0 || sourceHeight <= 0) return styles.photoImage;
+
+  const ratio = sourceWidth / sourceHeight;
+  const widthFitHeight = PHOTO_PANEL_WIDTH / ratio;
+  const covers = widthFitHeight >= PHOTO_PANEL_HEIGHT;
+  const width = covers ? PHOTO_PANEL_WIDTH : PHOTO_PANEL_HEIGHT * ratio;
+  const height = covers ? widthFitHeight : PHOTO_PANEL_HEIGHT;
+
+  return {
+    position: 'absolute',
+    width,
+    height,
+    // Horizontal overflow stays centred; the frame's own −0.889 is half of its 4pt of extra
+    // width, which is a centred crop already.
+    left: -(width - PHOTO_PANEL_WIDTH) / 2,
+    top: -(height - PHOTO_PANEL_HEIGHT) * PHOTO_TOP_BIAS,
+  };
+}
+
 export function CookCard({
   cook,
   variant = 'standard',
@@ -109,6 +158,7 @@ export function CookCard({
 }: CookCardProps) {
   const attributes = attributesOf(cook);
   const dishes = dishesFor(cook, variant);
+  const [photoSize, setPhotoSize] = useState<{ width: number; height: number } | null>(null);
 
   return (
     <View style={styles.card} testID={testID}>
@@ -121,7 +171,17 @@ export function CookCard({
           ) : (
             <Image
               source={{ uri: cook.photoUrl }}
-              style={styles.photoImage}
+              style={
+                photoSize === null
+                  ? styles.photoImage
+                  : photoCropFor(photoSize.width, photoSize.height)
+              }
+              // The source's own dimensions decide where the crop is taken from, so the card
+              // never assumes a framing the payload did not promise.
+              onLoad={(event) => {
+                const { width, height } = event.nativeEvent.source;
+                setPhotoSize({ width, height });
+              }}
               resizeMode="cover"
               accessibilityIgnoresInvertColors
             />
@@ -251,18 +311,9 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   /**
-   * The portrait FILLS the 85 × 90 panel and is centre-cropped by `resizeMode="cover"`.
+   * The fallback while the source's own size is still unknown — a plain centred cover.
    *
-   * `289:7521` draws it 89 × 133.5 from (−0.89, −12) — a 148 % vertical blow-up lifted so the
-   * crop lands on the face — and that was transcribed literally. It only works for the ONE
-   * portrait the frame was drawn around. Every cook photo the server sends is framed differently,
-   * and applied to them the same window zooms ~1.5× into an already head-and-shoulders shot and
-   * pushes it up: the observed result on device is a face cropped through the chin with the
-   * shoulder filling the bottom corner.
-   *
-   * `cover` at 100 % is the honest generalisation of what the frame is doing — fill the panel,
-   * preserve the aspect ratio, crop the overflow — without assuming a framing the payload never
-   * promised. The panel is near-square (85 × 90), so a centred crop of a portrait keeps the face.
+   * `photoCrop` below replaces it the moment the image reports its dimensions.
    */
   photoImage: {
     position: 'absolute',

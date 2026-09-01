@@ -1,3 +1,4 @@
+import { Image, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import {
@@ -160,5 +161,56 @@ describe('CookCard — calling', () => {
     // And the view model has no phone field at all, so there is nothing to leak.
     expect(Object.keys(DEMO_COOK_REKHA)).not.toContain('phone');
     expect(JSON.stringify(screen.toJSON())).not.toMatch(/"(phone|mobile|tel)"\s*:/i);
+  });
+});
+
+/**
+ * `289:7520` — where the photograph is cropped.
+ *
+ * All eight frames draw the portrait as an 89 × 134 box at `(−0.889, −12)` inside the 85 × 90
+ * panel, so 12 of the 44pt of vertical overflow sits above the face and 32 below it.
+ * `resizeMode="cover"` centres instead, which discarded 18.75 from the top of Cook Rekha's 2:3
+ * portrait and cut her hair off. The other three exports are square and have no vertical overflow
+ * at all, which is why this read as one cook's photo being broken rather than the rule being wrong.
+ */
+describe('the cook photograph is cropped where the design crops it', () => {
+  const PANEL_WIDTH = 85;
+  const PANEL_HEIGHT = 90;
+
+  function cropAfterLoad(source: { width: number; height: number }) {
+    render(<CookCard cook={{ ...DEMO_COOK_REKHA, photoUrl: 'https://cdn.example/r.png' }} />);
+    const image = screen.getByTestId('cook-card-avatar').findByType(Image);
+    fireEvent(image, 'load', { nativeEvent: { source } });
+    return StyleSheet.flatten(image.props.style) as Record<string, number>;
+  }
+
+  it('keeps a 2:3 portrait from losing the top of the head', () => {
+    // Cook Rekha's export is 512 × 768.
+    const crop = cropAfterLoad({ width: 512, height: 768 });
+
+    expect(crop['width']).toBeCloseTo(PANEL_WIDTH, 3);
+    expect(crop['height']).toBeCloseTo(127.5, 1);
+    // The frame's share of the overflow, not half of it.
+    expect(crop['top']).toBeCloseTo(-(127.5 - PANEL_HEIGHT) * (12 / 44), 2);
+    // The regression this exists to catch: a centred cover took 18.75 off the top.
+    expect(Math.abs(crop['top'] ?? 0)).toBeLessThan(18.75);
+  });
+
+  it('leaves a square portrait exactly where it was', () => {
+    // The other three exports are 512 × 512: they cover the panel by HEIGHT, so there is no
+    // vertical overflow to bias and this rule must not move them.
+    const crop = cropAfterLoad({ width: 512, height: 512 });
+
+    expect(crop['height']).toBeCloseTo(PANEL_HEIGHT, 3);
+    expect(crop['top']).toBeCloseTo(0, 6);
+    expect(crop['left']).toBeCloseTo(-(PANEL_HEIGHT - PANEL_WIDTH) / 2, 3);
+  });
+
+  it('guesses no crop before the source reports its size', () => {
+    render(<CookCard cook={{ ...DEMO_COOK_REKHA, photoUrl: 'https://cdn.example/r.png' }} />);
+    const style = StyleSheet.flatten(
+      screen.getByTestId('cook-card-avatar').findByType(Image).props.style,
+    ) as Record<string, unknown>;
+    expect(style['width']).toBe('100%');
   });
 });
