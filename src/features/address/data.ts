@@ -188,6 +188,25 @@ export interface AddressDetailsData extends ScreenQuery<AddressDetailsViewModel>
   /** The saved Places identity, if the address originally came from Places search. */
   readonly savedPlaceId: string | null;
   /**
+   * The area fields already stored against the address being edited, or `null` when adding.
+   *
+   * Exactly the reasoning behind `savedPoint`, applied to the rest of the record. `PUT
+   * /v1/me/addresses/:id` requires `street` and `pincode` as well as the point, and an edit that
+   * never revisited the map has no draft to take them from: the draft belongs to whatever the
+   * customer last pinned, which for an edit opened from the list is a different address.
+   *
+   * Only the point was carried across before, so renaming an address sent `pincode: ''` — which
+   * the endpoint refuses (`minLength: 5`) — and `street` silently fell back to the BUILDING name.
+   * The save failed with "Couldn't save address", and would have corrupted the street if it had
+   * not.
+   */
+  readonly savedArea: {
+    readonly street: string | null;
+    readonly pincode: string | null;
+    readonly city: string | null;
+    readonly state: string | null;
+  } | null;
+  /**
    * Whether a CONFIRMED, server-approved coordinate exists for the address about to be saved.
    *
    * ADDING: the map step's draft, and only once `POST /v1/serviceability/check` answered
@@ -305,11 +324,21 @@ export function useAddressDetailsData(addressId?: string | null): AddressDetails
   const savedPoint =
     existing === null ? null : { latitude: existing.latitude, longitude: existing.longitude };
   const savedPlaceId = existing?.placeId ?? null;
+  const savedArea =
+    existing === null
+      ? null
+      : {
+          street: existing.street ?? null,
+          pincode: existing.pincode ?? null,
+          city: existing.city ?? null,
+          state: existing.state ?? null,
+        };
 
   return {
     state,
     savedPoint,
     savedPlaceId,
+    savedArea,
     // The draft's verdict is the SERVER's, recorded by `53:31` on Confirm. `serviceable === true`
     // is required explicitly: `null` means the point was never checked and `false` means it was
     // refused, and neither may enable a write.

@@ -42,7 +42,7 @@ export default function AddressDetailsRoute() {
     onboarding?: string;
   }>();
   const editingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
-  const { state, refetch, savedPoint, savedPlaceId, locationReady } =
+  const { state, refetch, savedPoint, savedPlaceId, savedArea, locationReady } =
     useAddressDetailsData(editingId);
   const draft = useAddressDraftStore((store) => store.draft);
   const clearDraft = useAddressDraftStore((store) => store.clear);
@@ -142,16 +142,37 @@ export default function AddressDetailsRoute() {
                 ? form.labelText.trim()
                 : 'Home';
 
+          /*
+           * The area the address is saved with, resolved the same way its POINT is.
+           *
+           * `repinned` is the one discriminator: a draft carrying a point means the customer
+           * walked back to `53:31` and pinned somewhere new, so the geocoder's area belongs to
+           * that new point. Otherwise this is an edit of the record in place and the area is the
+           * record's own.
+           *
+           * It used to be `draft.street ?? form.building.trim()` and `draft.pincode ?? ''`, with
+           * no saved fallback at all. On an edit that never revisited the map the draft is empty,
+           * so renaming an address sent `pincode: ''` — which `PUT /v1/me/addresses/:id` refuses
+           * with `minLength: 5` — and the save died as "Couldn't save address". Had the pincode
+           * passed, `street` would have been overwritten with the BUILDING name, quietly
+           * corrupting the address the customer was only relabelling.
+           */
+          const repinned = draft.latitude !== null && draft.longitude !== null;
+          const area = repinned ? draft : (savedArea ?? draft);
+          const street = area.street ?? '';
+          const pincode = area.pincode ?? '';
+
           const fields = {
             label,
             ...(form.flat.trim() === '' ? {} : { flat: form.flat.trim() }),
             ...(form.building.trim() === '' ? {} : { society: form.building.trim() }),
-            // The geocoder's street is a prefill for a field the design does not draw, so it
-            // is sent as-is; an empty one is sent as empty rather than guessed at.
-            street: draft.street ?? form.building.trim(),
-            pincode: draft.pincode ?? '',
-            ...(draft.city === null ? {} : { city: draft.city }),
-            ...(draft.state === null ? {} : { state: draft.state }),
+            // The geocoder's street is a prefill for a field the design does not draw, so it is
+            // sent as-is. It is never the building name: those are different fields, and the
+            // endpoint stores them separately.
+            street,
+            pincode,
+            ...(area.city === null || area.city === undefined ? {} : { city: area.city }),
+            ...(area.state === null || area.state === undefined ? {} : { state: area.state }),
             ...(form.receiverName.trim() === '' ? {} : { receiverName: form.receiverName.trim() }),
             ...(form.receiverPhone.trim() === ''
               ? {}
