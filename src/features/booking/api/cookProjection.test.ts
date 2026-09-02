@@ -86,7 +86,7 @@ describe('the four-cook card the backend now publishes', () => {
     displayName: 'Cook Jyoti',
     profileImageUrl: null,
     region: 'Odisha',
-    languages: ['Hindi', 'Odiya'],
+    languages: ['Hindi'],
     cuisines: ['North Indian'],
     specialties: ['Chicken curry', 'Mutton masala'],
     gender: 'Female',
@@ -111,7 +111,7 @@ describe('the four-cook card the backend now publishes', () => {
     const cook = bookingCookSchema.parse(FOUR_COOK_CARD);
 
     expect(cook.region).toBe('Odisha');
-    expect(cook.languages).toEqual(['Hindi', 'Odiya']);
+    expect(cook.languages).toEqual(['Hindi']);
     expect(cook.cuisines).toEqual(['North Indian']);
     expect(cook.gender).toBe('Female');
     expect(cook.spoonTrained).toBe(true);

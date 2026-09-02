@@ -44,7 +44,7 @@ import { TrustBadges } from './TrustBadges';
  * FIGMA CONTENT QUIRK, recorded not reproduced: six of the eight cards — Rekha, Sanchita and
  * Barsha in both variants (`299:1811`, `299:2277`, `299:2070`, `299:1892`, `299:2096`, `299:2122`)
  * — draw the language GLYPH with no label beside it, because those cards carry no language data.
- * Only Jyoti labels it ("Hindi, Odiya"). An orphan icon is not a state, so the attribute is
+ * Only Jyoti labels it ("Hindi"). An orphan icon is not a state, so the attribute is
  * omitted when the payload has no languages.
  */
 

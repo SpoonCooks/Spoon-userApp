@@ -1,9 +1,9 @@
 import { cookCardContentFor } from '@ui/components/cookCardContent';
 
-import { bookingDetailFrom, cookCardVariantFor } from './adapters';
-import { bookingDetailResponseSchema } from './api/schemas';
-import type { BookingDetailDto } from './api';
 import { DEMO_BOOKING_CONFIRMATION } from '@/demo/fixtures/booking';
+import { bookingDetailFrom, cookCardVariantFor } from './adapters';
+import type { BookingDetailDto } from './api';
+import { bookingDetailResponseSchema } from './api/schemas';
 
 /**
  * The four-cook card wiring: a real booking's cook renders ONLY what the payload and the
@@ -69,7 +69,7 @@ const JYOTI_CARD = {
   displayName: 'Cook Jyoti',
   profileImageUrl: null,
   region: 'Odisha',
-  languages: ['Hindi', 'Odiya'],
+  languages: ['Hindi'],
   cuisines: ['North Indian'],
   specialties: ['Chicken curry', 'Mutton masala'],
   gender: 'Female',
@@ -99,7 +99,7 @@ describe('the assigned-cook card is payload-driven', () => {
       gender: 'Female',
       cuisine: 'North Indian',
       homeState: 'Odisha',
-      languages: ['Hindi', 'Odiya'],
+      languages: ['Hindi'],
       badges: { spoonTrained: true, backgroundVerified: true, hygienic: true },
       profileVariant: 'veg',
     });

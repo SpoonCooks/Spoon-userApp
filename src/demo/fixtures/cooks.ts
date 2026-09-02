@@ -1,9 +1,9 @@
-import type { CookViewModel } from '@ui/types/viewModels';
 import {
   COOK_CARD_PHOTO,
   cookCardContentFor,
   type CookCardContent,
 } from '@ui/components/cookCardContent';
+import type { CookViewModel } from '@ui/types/viewModels';
 
 /**
  * DEMO / TEST FIXTURES — NOT PRODUCTION DATA.
@@ -65,7 +65,7 @@ export const DEMO_COOK_JYOTI: CookViewModel = {
   gender: 'Female',
   cuisine: 'North Indian',
   homeState: 'Odisha',
-  languages: ['Hindi', 'Odiya'],
+  languages: ['Hindi'],
   specialties: contentOf('COOK_JYOTI').specialties,
   pureVegSpecialties: contentOf('COOK_JYOTI').pureVegSpecialties,
   badges: ALL_BADGES,

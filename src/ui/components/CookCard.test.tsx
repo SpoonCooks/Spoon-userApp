@@ -22,8 +22,13 @@ function renderedText(node: unknown): string {
 describe('CookCard — standard', () => {
   it('renders a languages attribute when the payload carries one', () => {
     // `289:7392` (Jyoti) is the card that DOES list languages; `289:8388` (Rekha) does not.
+    //
+    // Hindi alone since 2026-09-02: the launch cards had published one shared Hindi/Odiya value
+    // for all four cooks, and the founder corrected it per cook. The row is what matters here,
+    // not the words in it — a cook listed as speaking a language she does not is matched with a
+    // household she cannot talk to.
     render(<CookCard cook={DEMO_COOK_JYOTI} />);
-    expect(screen.getByText('Hindi, Odiya')).toBeTruthy();
+    expect(screen.getByText('Hindi')).toBeTruthy();
   });
 
   it('renders identity, attributes and the specialty grid', () => {
