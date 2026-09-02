@@ -71,12 +71,26 @@ const DEV_FALLBACK_API_BASE_URL = 'https://spoon-api-kalc.onrender.com';
  * working. The iOS key's restriction must therefore list `com.spoonhelp.customer` before a release
  * build can render a map — see docs/GOOGLE_MAPS_CONFIGURATION.md.
  */
-const ANDROID_PACKAGE = `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
-
+/**
+ * ONE identity per environment, on both platforms.
+ *
+ * Production used to differ: iOS carried `com.spoonhelp.customer` because that is the Apple App ID
+ * registered for release, while Android stayed on `com.spoonhelp.userapp`. Two names for one app
+ * meant every external registration keyed on it had to be done twice and kept in step -- the Maps
+ * key restrictions, the Firebase app entries, the push sender identity -- and each one is a silent
+ * failure when it drifts: a grey map, or a device token that no push can reach.
+ *
+ * Android moves to Apple's name rather than the reverse, because the Apple App ID is the one that
+ * cannot change: App Store Connect app 6803578695 is registered under it. Done on 2026-09-02,
+ * BEFORE the Android app is published -- a Play package name is permanent once uploaded, so this
+ * was the last moment it could be aligned at all.
+ */
 const IOS_BUNDLE_IDENTIFIER =
   APP_ENV === 'production'
     ? 'com.spoonhelp.customer'
     : `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
+
+const ANDROID_PACKAGE = IOS_BUNDLE_IDENTIFIER;
 
 const BUILD_PROVENANCE_RELEASE_SHA =
   process.env.SPOON_RELEASE_SHA ?? process.env.GIT_COMMIT_SHA ?? 'unknown';

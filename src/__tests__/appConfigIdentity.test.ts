@@ -1,9 +1,21 @@
 /**
- * The native application identities are the one place where the two platforms deliberately
- * disagree: the Apple App ID registered for release is `com.spoonhelp.customer`, while Android's
- * production package stays `com.spoonhelp.userapp` (renaming a package is a new Play listing, not
- * an update). Either one being wrong is discovered at upload time at the earliest, so all six
- * environment/platform combinations are pinned here.
+ * The native application identities, pinned for all six environment/platform combinations because
+ * either one being wrong is discovered at upload time at the earliest.
+ *
+ * They USED to disagree in production — Apple on `com.spoonhelp.customer`, Android on
+ * `com.spoonhelp.userapp` — and this file's own note gave the reason not to touch it: renaming a
+ * package is a new Play listing, not an update. That is exactly right AFTER publishing, and it is
+ * why the change was made on 2026-09-02 and not later: the Android app had not been published, so
+ * it was the last moment the two could be aligned at all.
+ *
+ * They are aligned now. Two names for one app meant every external registration keyed on the
+ * identity had to be done twice and kept in step — the Maps key restrictions, the Firebase Android
+ * app entry, the push sender identity — and each is a silent failure when it drifts: a grey map,
+ * or a device token no push can reach. Android moved to Apple's name rather than the reverse,
+ * because App Store Connect app 6803578695 is registered under it and cannot change.
+ *
+ * The original warning still stands for the future: once `com.spoonhelp.customer` is on Play, this
+ * value is permanent. A test failure here is the intended alarm, not a line to update.
  *
  * The `extra` copies are pinned against the native values too. They are not decoration: the Places
  * and Geocoding REST calls send them as `X-Android-Package` / `X-Ios-Bundle-Identifier`, and an
@@ -25,7 +37,7 @@ const EXPECTED_IDENTITIES: Record<AppEnv, { android: string; ios: string }> = {
     ios: 'com.spoonhelp.userapp.staging',
   },
   production: {
-    android: 'com.spoonhelp.userapp',
+    android: 'com.spoonhelp.customer',
     ios: 'com.spoonhelp.customer',
   },
 };
@@ -111,15 +123,18 @@ describe('app.config application identities', () => {
     }
   });
 
-  it('splits the platforms in production, iOS onto the Apple App ID', () => {
+  it('gives both platforms the Apple App ID in production', () => {
     const config = resolveConfig('production');
 
+    // This assertion was `not.toBe` until 2026-09-02, when the two were aligned. The equality is
+    // the point now: one identity is what keeps the Maps restrictions, the Firebase app entry and
+    // the push sender from having to be registered twice and kept in step.
     expect(config.ios?.bundleIdentifier).toBe('com.spoonhelp.customer');
-    expect(config.android?.package).toBe('com.spoonhelp.userapp');
-    expect(config.ios?.bundleIdentifier).not.toBe(config.android?.package);
+    expect(config.android?.package).toBe('com.spoonhelp.customer');
+    expect(config.ios?.bundleIdentifier).toBe(config.android?.package);
   });
 
-  it('leaves the EAS project and the Expo slug untouched by the iOS split', () => {
+  it('leaves the EAS project and the Expo slug untouched', () => {
     const config = resolveConfig('production');
 
     expect(runtimeExtra(config).eas.projectId).toBe(EAS_PROJECT_ID);
