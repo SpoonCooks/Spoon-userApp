@@ -1,3 +1,5 @@
+import { minutesToPromisedArrival } from '@core/format';
+
 import type { HomeBannerViewModel } from './state/homeBannerView';
 import type { HomeViewModel } from './types';
 
@@ -74,6 +76,25 @@ export function minutesUntil(
   if (Number.isNaN(target.getTime())) return null;
   const minutes = Math.round((target.getTime() - now.getTime()) / 60_000);
   return minutes < 0 ? 0 : minutes;
+}
+
+/**
+ * Minutes until the cook arrives, under the rule EVERY screen uses.
+ *
+ * `minutesUntil` above is raw arithmetic over an instant and stays that way -- the in-service
+ * countdown legitimately wants exactly that. An ARRIVAL is different: it is never promised before
+ * the booking it belongs to, which is why the clamp lives in `core/format/arrival` and both this
+ * banner and the booking detail read it from there.
+ */
+export function etaMinutesFor(
+  etaIso: string | null | undefined,
+  scheduledStartIso: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (etaIso === null || etaIso === undefined) return null;
+  const projected = new Date(etaIso);
+  if (Number.isNaN(projected.getTime())) return null;
+  return minutesToPromisedArrival(projected, now.getTime(), scheduledStartIso);
 }
 
 /**

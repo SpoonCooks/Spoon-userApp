@@ -13,6 +13,7 @@ import {
   formatDateLabel,
   formatTimeLabel,
   homeFrom,
+  etaMinutesFor,
   minutesUntil,
 } from './adapters';
 import { cookPhotoFor } from '@ui/components/cookPhoto';
@@ -191,7 +192,18 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
               cookPhotoUrl: cookPhotoFor(detailData.cook),
               dateLabel: formatDateLabel(detailData.scheduledStart, serverNow),
               timeLabel: formatTimeLabel(detailData.scheduledStart, detailData.durationMinutes),
-              etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),
+              /*
+               * The SAME arrival rule the booking page uses.
+               *
+               * `minutesUntil` was raw arithmetic over the ETA, so this banner promised an
+               * arrival before the booking it belonged to. On 2026-09-02 Home read "Arriving in
+               * 2 mins" while the booking page read "6 mins", for one cook on one booking.
+               */
+              etaMinutes: etaMinutesFor(
+                trackingData?.eta.estimatedArrivalAt,
+                detailData?.scheduledStart,
+                serverNow,
+              ),
               minutesLeft:
                 detailData.status === 'cooking'
                   ? minutesUntil(detailData.timing.expectedEnd, serverNow)

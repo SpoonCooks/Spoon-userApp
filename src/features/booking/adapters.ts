@@ -1,4 +1,4 @@
-import { formatPaise } from '@core/format';
+import { formatPaise, promisedArrivalAt } from '@core/format';
 import type { CookViewModel, DetailRow } from '@ui';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
 import { cookPhotoFor } from '@ui/components/cookPhoto';
@@ -637,14 +637,9 @@ function etaLabelFrom(
    * the time they chose. A LATE arrival is unaffected: it is after the start, so the projection
    * still wins and the delay is reported honestly.
    */
-  const start =
-    scheduledStartIso === null || scheduledStartIso === undefined
-      ? null
-      : new Date(scheduledStartIso);
-  const at =
-    start !== null && !Number.isNaN(start.getTime()) && start.getTime() > projected.getTime()
-      ? start
-      : projected;
+  // The clamp lives in `core/format/arrival` because Home draws the same number, and the two
+  // disagreed on screen when only this one applied it.
+  const at = promisedArrivalAt(projected, scheduledStartIso);
 
   /*
    * MINUTES REMAINING, because that is what the label above it promises.
