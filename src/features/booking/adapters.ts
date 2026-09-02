@@ -671,8 +671,14 @@ function etaLabelFrom(
    * still ahead. An ETA that has passed without an arrival is reachable — a stalled cook, a late
    * refresh — and printing "0 mins" or a negative reads as broken rather than imminent. The
    * banner's own late copy carries the story; this says only that the wait is short.
+   *
+   * It must also FIT. `94:1097` is a fixed 122pt panel and the label is `numberOfLines={1}`, so
+   * anything wider than about "16 mins" is silently ellipsised — which is exactly what happened to
+   * the "Any moment" this used to return: the banner read "Any mo…", which says nothing at all.
+   * Seven characters is the working budget, and this stays inside it while keeping the minutes
+   * register the positive case uses.
    */
-  if (minutes <= 0) return 'Any moment';
+  if (minutes <= 0) return '< 1 min';
   return `${minutes} ${minutes === 1 ? 'min' : 'mins'}`;
 }
 

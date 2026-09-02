@@ -191,8 +191,31 @@ describe('trackingDetailFrom', () => {
     // Reachable: a stalled cook, or a refresh that lands after the projection. "0 mins" and
     // "-2 mins" both read as broken rather than imminent; the banner's own late copy carries the
     // story, and this says only that the wait is short.
-    expect(etaLabelIn(-5 * 60_000)).toBe('Any moment');
-    expect(etaLabelIn(0)).toBe('Any moment');
+    expect(etaLabelIn(-5 * 60_000)).toBe('< 1 min');
+    expect(etaLabelIn(0)).toBe('< 1 min');
+  });
+
+  it('keeps every ETA label inside the fixed panel it is drawn in', () => {
+    /*
+     * `94:1097` is a fixed 122pt panel and the label is `numberOfLines={1}`, so a label the panel
+     * cannot fit is ellipsised with no other symptom. "Any moment" produced "Any mo…" on a live
+     * banner — a screen telling the customer nothing while looking like it worked.
+     *
+     * "16 mins" is the widest label the panel is known to render whole (the horizontal inset was
+     * cut from 8 to 5 for exactly that string), so its length is the budget every branch must
+     * stay inside.
+     */
+    const BUDGET = '16 mins'.length;
+    /*
+     * Up to 45 minutes, because that is `BOOKING_MAX_EARLY_DEPARTURE_MINUTES` — travel cannot
+     * legitimately begin earlier, so no larger figure can reach this banner, and two digits is
+     * the widest number it has to draw. A three-digit ETA would not fit the panel either; if the
+     * departure bound is ever raised, this test is the thing that should stop it quietly.
+     */
+    const tooWide = [-5 * 60_000, 0, 30_000, 60_000, 9 * 60_000, 45 * 60_000]
+      .map((ms) => etaLabelIn(ms) ?? '')
+      .filter((label) => label.length > BUDGET);
+    expect(tooWide).toEqual([]);
   });
 
   it('uses the persisted arrival instant from tracking when it is present', () => {
