@@ -619,7 +619,29 @@ function etaLabelFrom(estimatedArrivalAt: string | null): string | null {
   if (estimatedArrivalAt === null) return null;
   const at = new Date(estimatedArrivalAt);
   if (Number.isNaN(at.getTime())) return null;
-  return at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+  /*
+   * MINUTES REMAINING, because that is what the label above it promises.
+   *
+   * `9a` reads "Cook is arriving in" over "16 mins". This returned a clock time, so the screen
+   * said "Cook Test Cook is arriving in / 7:38 AM" -- the wrong quantity, and a sentence that does
+   * not finish. Seen on the handset on 2026-09-02.
+   *
+   * `Date.now() + currentSkewMs()` is the SERVER's clock as this device best knows it, the same
+   * correction the in-service countdown uses. A handset minutes out would otherwise report a
+   * remaining time nobody else agrees with, off one correct arrival instant.
+   */
+  const remainingMs = at.getTime() - (Date.now() + currentSkewMs());
+  const minutes = Math.ceil(remainingMs / 60_000);
+
+  /*
+   * FIGMA_PENDING: the frames draw only a positive number, because a projected arrival is normally
+   * still ahead. An ETA that has passed without an arrival is reachable — a stalled cook, a late
+   * refresh — and printing "0 mins" or a negative reads as broken rather than imminent. The
+   * banner's own late copy carries the story; this says only that the wait is short.
+   */
+  if (minutes <= 0) return 'Any moment';
+  return `${minutes} ${minutes === 1 ? 'min' : 'mins'}`;
 }
 
 /** The persisted backend arrival instant, never a handset detection time or an ETA. */

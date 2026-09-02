@@ -134,16 +134,38 @@ describe('trackingDetailFrom', () => {
     expect(view.inService?.otpCode).toBe('DESIGNED');
   });
 
-  it('renders the server ETA on the tracking banner', () => {
-    const at = new Date('2026-08-18T09:35:00.000Z');
-    const view = trackingDetailFrom({
+  /**
+   * `9a` reads "Cook is arriving in" over "16 mins" — a DURATION.
+   *
+   * This used to render the arrival instant as a clock time, so the screen said "Cook Test Cook is
+   * arriving in / 7:38 AM": the wrong quantity, under a label that does not finish as a sentence.
+   * Seen on the handset on 2026-09-02.
+   */
+  const etaLabelIn = (millisFromNow: number) =>
+    trackingDetailFrom({
       base: BASE,
-      dto: tracking({ eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null } }),
-    });
+      dto: tracking({
+        eta: {
+          estimatedArrivalAt: new Date(Date.now() + millisFromNow).toISOString(),
+          updatedAt: null,
+        },
+      }),
+    }).tracking?.etaLabel;
 
-    expect(view.tracking?.etaLabel).toBe(
-      at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
-    );
+  it('renders the server ETA as minutes remaining, not a clock time', () => {
+    expect(etaLabelIn(16 * 60_000)).toBe('16 mins');
+  });
+
+  it('says one minute in the singular', () => {
+    expect(etaLabelIn(45_000)).toBe('1 min');
+  });
+
+  it('does not print a zero or a negative once the ETA has passed', () => {
+    // Reachable: a stalled cook, or a refresh that lands after the projection. "0 mins" and
+    // "-2 mins" both read as broken rather than imminent; the banner's own late copy carries the
+    // story, and this says only that the wait is short.
+    expect(etaLabelIn(-5 * 60_000)).toBe('Any moment');
+    expect(etaLabelIn(0)).toBe('Any moment');
   });
 
   it('uses the persisted arrival instant from tracking when it is present', () => {
