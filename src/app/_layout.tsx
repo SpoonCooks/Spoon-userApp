@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { isResolving } from '@core/auth';
+import { useScreenTracking } from '@core/analytics/screenTracking';
 import { logBuildProvenance } from '@core/buildProvenance';
 import { QueryProvider, useAppStateFocus } from '@core/query';
 import { createAppRuntime } from '@core/runtime';
@@ -35,6 +36,16 @@ export default function RootLayout() {
    * Mounted at the ROOT because it is a property of the app, not of any screen.
    */
   useAppStateFocus();
+
+  /**
+   * Every screen the customer reaches, reported to Firebase Analytics.
+   *
+   * Mounted at the ROOT for the same reason as the line above: it is a property of the app, not of
+   * any screen. `expo-router` already knows the route, so no screen has to remember to log itself
+   * — and a screen added later is counted without anyone touching it. The route PATTERN is sent,
+   * never the resolved path, so no booking id reaches a third party.
+   */
+  useScreenTracking();
 
   // Every weight the design uses. RN cannot synthesise these — see tokens/primitives.ts.
   //

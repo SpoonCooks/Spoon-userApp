@@ -166,7 +166,27 @@ const ANDROID_SIGNING_SHA1 = (process.env.ANDROID_SIGNING_SHA1 ?? '')
  * iOS needs an APNs key uploaded to EAS instead; there is no file to reference here, which is why
  * only Android has one.
  */
-const GOOGLE_SERVICES_JSON = process.env.GOOGLE_SERVICES_JSON ?? '';
+/*
+ * Defaulted to the repo root as of 2026-09-02, when the founder registered com.spoonhelp.customer
+ * in Firebase project august-dev-3b4bf and the file landed there.
+ *
+ * It stayed empty-by-default while no such file existed, and the note above is right that an
+ * absent value should still build. But "still builds" quietly meant "ships with no push", and the
+ * env var was never set on any build machine -- so the fail-closed path was the only path anyone
+ * ever took. A default that finds the file is the difference between opt-in and opt-out, and push
+ * silently not working is not a state worth defaulting to.
+ */
+const GOOGLE_SERVICES_JSON = process.env.GOOGLE_SERVICES_JSON ?? './google-services.json';
+
+/**
+ * Firebase iOS config, the plist counterpart of the JSON above.
+ *
+ * `@react-native-firebase/app`'s config plugin THROWS without it — "Path to
+ * GoogleService-Info.plist is not defined" — so an iOS build simply stops rather than shipping an
+ * app whose analytics silently never report. That is the right failure and the reason this is not
+ * optional the way it might look: the plugin will not let the two platforms drift.
+ */
+const GOOGLE_SERVICES_PLIST = process.env.GOOGLE_SERVICES_PLIST ?? './GoogleService-Info.plist';
 
 /**
  * Production refuses to build without them, for the same reason it refuses without an API base
@@ -203,6 +223,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   ios: {
     bundleIdentifier: IOS_BUNDLE_IDENTIFIER,
+    googleServicesFile: GOOGLE_SERVICES_PLIST,
     supportsTablet: false,
     infoPlist: {
       NSPhotoLibraryUsageDescription:
@@ -225,6 +246,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
 
   plugins: [
+    /*
+     * Firebase, for Analytics. Declared before anything that depends on it, which is the order
+     * `@react-native-firebase` documents.
+     *
+     * The plugin is what makes this work under `prebuild`: it applies the google-services Gradle
+     * plugin on Android and copies the plist into the Xcode project on iOS. Hand-editing either
+     * would survive exactly until the next `prebuild --clean`, which deletes both native folders.
+     *
+     * Analytics only. Crashlytics and Performance are deliberately absent — each is a separate
+     * package and a separate Data Safety declaration, and neither was asked for.
+     */
+    '@react-native-firebase/app',
+    '@react-native-firebase/analytics',
     // Pins the Android NDK. `expo-root-project` defaults to 27.1.12297006, whose copy on the
     // build machine is a damaged package shipping clang 17 — which cannot compile
     // react-native-reanimated's constrained partial specialisations, nor React Native's own
