@@ -111,10 +111,10 @@ export function homeFrom(input: {
   readonly base: HomeViewModel;
   readonly addressLabel?: string | null;
   readonly addressLine?: string | null;
-  readonly activeBooking?: HomeBannerViewModel | undefined;
+  readonly activeBookings?: readonly HomeBannerViewModel[] | undefined;
 }): HomeViewModel {
   const { base } = input;
-  const { activeBooking: _ignored, ...rest } = base;
+  const { activeBookings: _ignored, ...rest } = base;
 
   return {
     ...rest,
@@ -127,6 +127,12 @@ export function homeFrom(input: {
       addressLabel: input.addressLabel ?? null,
       addressLine: input.addressLine ?? null,
     },
-    ...(input.activeBooking === undefined ? {} : { activeBooking: input.activeBooking }),
+    /*
+     * An EMPTY list is the same as none: Home draws its pre-booking variant either way, and
+     * carrying `[]` would make every consumer check both shapes for one meaning.
+     */
+    ...(input.activeBookings === undefined || input.activeBookings.length === 0
+      ? {}
+      : { activeBookings: input.activeBookings }),
   };
 }

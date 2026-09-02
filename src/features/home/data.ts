@@ -25,13 +25,18 @@ import type { HomeViewModel } from './types';
 import type { BookingSummaryDto } from '@features/booking';
 
 /**
- * Picks the one booking Home should project when the server returns more than one active row.
+ * Orders the customer's active bookings the way Home draws them, most urgent first.
+ *
  * Live/actionable work outranks a completed unrated item; within a state the nearest upcoming
  * service start wins, and the id tie-breaker makes equal timestamps deterministic.
+ *
+ * This used to return only the winner, and Home drew that one card. Every other booking the
+ * customer held was discarded here -- silently, with nothing on screen to say so. It returns the
+ * whole ORDER now; `[0]` is still the one Home leads with and fetches a detail for.
  */
-export function selectHomeBooking(
+export function sortHomeBookings(
   bookings: readonly BookingSummaryDto[],
-): BookingSummaryDto | null {
+): readonly BookingSummaryDto[] {
   const rank: Readonly<Record<BookingSummaryDto['status'], number>> = {
     cook_en_route: 0,
     cook_arrived: 1,
@@ -55,18 +60,23 @@ export function selectHomeBooking(
    * because a live booking always outranks an apology, and `homeBannerFor` refuses to draw one
    * for a cancellation the customer made themselves.
    */
-  return (
-    bookings.slice().sort((left, right) => {
-      const stateOrder = rank[left.status] - rank[right.status];
-      if (stateOrder !== 0) return stateOrder;
-      const leftStart =
-        left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
-      const rightStart =
-        right.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(right.scheduledStart);
-      if (leftStart !== rightStart) return leftStart - rightStart;
-      return left.id.localeCompare(right.id);
-    })[0] ?? null
-  );
+  return bookings.slice().sort((left, right) => {
+    const stateOrder = rank[left.status] - rank[right.status];
+    if (stateOrder !== 0) return stateOrder;
+    const leftStart =
+      left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
+    const rightStart =
+      right.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(right.scheduledStart);
+    if (leftStart !== rightStart) return leftStart - rightStart;
+    return left.id.localeCompare(right.id);
+  });
+}
+
+/** The single booking Home leads with. Kept for callers that only want the winner. */
+export function selectHomeBooking(
+  bookings: readonly BookingSummaryDto[],
+): BookingSummaryDto | null {
+  return sortHomeBookings(bookings)[0] ?? null;
 }
 
 /**
@@ -98,8 +108,10 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   const active = useActiveBookings();
   const catalogue = useCatalogue();
 
-  const activeSummary =
-    active.state.status === 'ready' ? selectHomeBooking(active.state.data) : null;
+  const activeSummaries =
+    active.state.status === 'ready' ? sortHomeBookings(active.state.data) : null;
+  // The one Home leads with, and the only one it fetches a detail for.
+  const activeSummary = activeSummaries?.[0] ?? null;
 
   // The summary carries no cook, no timing and no allowed actions, so the banner's cook, its
   // countdown and its rateability all come from the DETAIL. Fetched only when there IS a booking.
@@ -176,7 +188,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
      * service starts late or is extended. `scheduledStart + duration` is deliberately not used
      * for either.
      */
-    const activeBooking =
+    const leadBooking =
       activeSummary === null || detailData === null || serverNowMs === null
         ? undefined
         : ((() => {
@@ -222,6 +234,43 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
       catalogue.state.status === 'ready'
         ? catalogue.state.data.instant.arrivalPromiseMinutes
         : null;
+
+    /**
+     * Every OTHER booking the customer holds, drawn from its summary alone.
+     *
+     * Home used to take the highest-ranked booking and drop the rest on the floor, so a customer
+     * with an 11:30 and a 2:00 booking saw one card and no hint the second existed. The payload
+     * always had them: `GET /v1/me/bookings/active` returns up to 20.
+     *
+     * The LEAD card keeps the full treatment -- detail plus tracking -- because it is the one with
+     * a live ETA and a rating prompt on it. The rest are built from the summary, which already
+     * carries the status, the time and the cook. That is a deliberate limit rather than a gap:
+     * a per-card detail read cannot be written as a hook (the count is not fixed), and the only
+     * field the summary lacks is the ETA, which belongs to the booking a cook is travelling to --
+     * and the server's own ranking puts that one first.
+     */
+    const followers =
+      activeSummaries === null || serverNowMs === null
+        ? []
+        : activeSummaries
+            .filter((summary) => summary.id !== activeSummary?.id)
+            .map((summary) => {
+              const serverNow = new Date(serverNowMs);
+              return homeBannerFor({
+                bookingId: summary.id,
+                status: summary.status,
+                cookName: summary.cook?.displayName ?? null,
+                cookPhotoUrl: cookPhotoFor(summary.cook),
+                dateLabel: formatDateLabel(summary.scheduledStart, serverNow),
+                timeLabel: formatTimeLabel(summary.scheduledStart, summary.durationMinutes),
+                ...(summary.reassignment?.occurred === undefined
+                  ? {}
+                  : { reassigned: summary.reassignment.occurred }),
+              });
+            })
+            .filter((banner): banner is NonNullable<typeof banner> => banner !== null);
+
+    const activeBookings = leadBooking === undefined ? followers : [leadBooking, ...followers];
 
     return ready(
       homeFrom({
@@ -276,12 +325,13 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
           defaultAddress === undefined || defaultAddress === null
             ? null
             : addressLineOf(defaultAddress),
-        activeBooking,
+        activeBookings,
       }),
     );
   }, [
     addresses.state,
     activeSummary,
+    activeSummaries,
     detailData,
     trackingData,
     catalogue.state,

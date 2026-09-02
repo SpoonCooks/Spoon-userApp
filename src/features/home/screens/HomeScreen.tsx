@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { DataState } from '@core/data';
 import { QueryBoundary, lightTheme } from '@ui';
 
-import { HomeBookingBanner } from '../components/HomeBookingBanner';
+import { HomeBookingCarousel } from '../components/HomeBookingCarousel';
 import { HomeBookingTiles } from '../components/HomeBookingTiles';
 import { HomeMarketing } from '../components/HomeMarketing';
 import { HomePromoCarousel } from '../components/HomePromoCarousel';
@@ -30,7 +30,7 @@ import type { HomeViewModel } from '../types';
  *   top banner (sticky)
  *   → promo carousel
  *   → Instant + Schedule tiles
- *   → [HomeBookingBanner]          ← conditional, data-driven, MOVED below the tiles
+ *   → [HomeBookingCarousel]        ← conditional, data-driven, MOVED below the tiles
  *   → cuisine mosaic
  *   → reasons grid
  *   → duration matrix
@@ -109,10 +109,10 @@ export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps)
                     CONDITIONAL INSERT — never a second Home, never a replacement. Everything
                     below this point renders identically whether or not the card is present.
                   */}
-                  {home.activeBooking === undefined ? null : (
-                    <HomeBookingBanner
-                      booking={home.activeBooking}
-                      onOpen={bannerOpener(home.activeBooking, actions.onOpenActiveBooking)}
+                  {home.activeBookings === undefined ? null : (
+                    <HomeBookingCarousel
+                      bookings={home.activeBookings}
+                      onOpen={actions.onOpenActiveBooking}
                     />
                   )}
 
@@ -127,20 +127,6 @@ export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps)
       </QueryBoundary>
     </SafeAreaView>
   );
-}
-
-/**
- * Binds the banner to its own destination.
- *
- * Extracted so the JSX carries no non-null assertion: narrowing `home.activeBooking` inside the
- * conditional does not survive into the arrow function's body, and asserting it there would be
- * asserting the one thing the conditional already proved.
- */
-function bannerOpener(
-  booking: NonNullable<HomeViewModel['activeBooking']>,
-  onOpen: HomeActions['onOpenActiveBooking'],
-): () => void {
-  return () => onOpen(booking.destination);
 }
 
 export function HomeScreen(actions: HomeActions) {
