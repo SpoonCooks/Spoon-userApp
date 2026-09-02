@@ -347,12 +347,21 @@ export const DEMO_CANCELLATION: CancellationViewModel = {
     {
       id: 'reschedule-once',
       title: 'Cancellation on rescheduled bookings',
-      // `107:2618` is TWO sentences. The second was dropped, which removed the only place the
-      // app states that an instant booking cannot be cancelled at all — a customer met that rule
-      // for the first time when the control was simply absent from a live instant booking.
+      /*
+       * TWO sentences, and the second is `687:1069`'s, not `6:2`'s.
+       *
+       * `6:2` ends "Instant bookings can not be cancelled"; `687:1069` — the same sheet reached
+       * from a booking that has already been moved — ends "Cancellation fee shall be applicable
+       * as per original booking". The second is the one that states a FEE RULE, and it is the one
+       * the engine now follows: a cancellation is priced against the original booking, so a
+       * customer cannot move a slot an hour out to next week and cancel into the free band.
+       *
+       * The instant sentence is not lost by dropping it here — an instant booking draws no Cancel
+       * control at all, so the sheet it appears on is unreachable for one.
+       */
       body:
-        'An original booking can be rescheduled only once. Instant bookings can not be ' +
-        'cancelled.',
+        'An original booking can be rescheduled only once. Cancellation fee shall be ' +
+        'applicable as per original booking.',
     },
   ],
   reasonTitle: 'Why do you want to cancel?',
