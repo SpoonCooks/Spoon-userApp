@@ -549,12 +549,14 @@ function omitReassignNotice(summary: BookingSummaryViewModel): BookingSummaryVie
 export function trackingDetailFrom(input: {
   readonly base: BookingDetailViewModel;
   readonly dto: TrackingDto;
+  /** The booking's own start. The arrival shown to a customer is never earlier than this. */
+  readonly scheduledStartIso?: string | null;
 }): BookingDetailViewModel {
   const { base, dto } = input;
 
   const start = dto.serviceOtp?.start;
   const end = dto.serviceOtp?.end;
-  const etaLabel = etaLabelFrom(dto.eta.estimatedArrivalAt);
+  const etaLabel = etaLabelFrom(dto.eta.estimatedArrivalAt, input.scheduledStartIso);
   const arrivedAtLabel = arrivedAtLabelFrom(dto.arrivedAt);
   const late = isLateVerdict(dto.timingVerdict);
   const knownVerdict = dto.timingVerdict === 'ON_TIME' || dto.timingVerdict === 'LATE';
@@ -615,10 +617,34 @@ export function trackingDetailFrom(input: {
  * The arrival instant as the banner draws it. `null` when the server has no ETA, which leaves the
  * designed copy in place instead of rendering an empty or invented time.
  */
-function etaLabelFrom(estimatedArrivalAt: string | null): string | null {
+function etaLabelFrom(
+  estimatedArrivalAt: string | null,
+  scheduledStartIso?: string | null,
+): string | null {
   if (estimatedArrivalAt === null) return null;
-  const at = new Date(estimatedArrivalAt);
-  if (Number.isNaN(at.getTime())) return null;
+  const projected = new Date(estimatedArrivalAt);
+  if (Number.isNaN(projected.getTime())) return null;
+
+  /*
+   * Never earlier than the booking itself.
+   *
+   * The projection answers "when would she get there if she left now", and a cook who sets off
+   * early gets there early: at 11:06 for an 11:30 booking the customer was told the cook arrives
+   * in 2 MINUTES. True about the walk, and useless as a promise -- nobody is at the door at 11:08,
+   * and a customer who believes it goes and waits.
+   *
+   * The booking is what the customer was sold, so the soonest they are told to expect anyone is
+   * the time they chose. A LATE arrival is unaffected: it is after the start, so the projection
+   * still wins and the delay is reported honestly.
+   */
+  const start =
+    scheduledStartIso === null || scheduledStartIso === undefined
+      ? null
+      : new Date(scheduledStartIso);
+  const at =
+    start !== null && !Number.isNaN(start.getTime()) && start.getTime() > projected.getTime()
+      ? start
+      : projected;
 
   /*
    * MINUTES REMAINING, because that is what the label above it promises.
@@ -632,7 +658,13 @@ function etaLabelFrom(estimatedArrivalAt: string | null): string | null {
    * remaining time nobody else agrees with, off one correct arrival instant.
    */
   const remainingMs = at.getTime() - (Date.now() + currentSkewMs());
-  const minutes = Math.ceil(remainingMs / 60_000);
+  /*
+   * ROUNDED, because the Home banner (`minutesUntil`) and the Cook App both round, and a customer
+   * comparing the two screens must not see different numbers for one arrival. This briefly used
+   * `Math.ceil`, which is why the booking page said "3 mins" while Home and the cook's own card
+   * both said 2.
+   */
+  const minutes = Math.round(remainingMs / 60_000);
 
   /*
    * FIGMA_PENDING: the frames draw only a positive number, because a projected arrival is normally

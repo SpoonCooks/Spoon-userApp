@@ -141,7 +141,7 @@ describe('trackingDetailFrom', () => {
    * arriving in / 7:38 AM": the wrong quantity, under a label that does not finish as a sentence.
    * Seen on the handset on 2026-09-02.
    */
-  const etaLabelIn = (millisFromNow: number) =>
+  const etaLabelIn = (millisFromNow: number, scheduledStartIso?: string | null) =>
     trackingDetailFrom({
       base: BASE,
       dto: tracking({
@@ -150,6 +150,7 @@ describe('trackingDetailFrom', () => {
           updatedAt: null,
         },
       }),
+      ...(scheduledStartIso === undefined ? {} : { scheduledStartIso }),
     }).tracking?.etaLabel;
 
   it('renders the server ETA as minutes remaining, not a clock time', () => {
@@ -157,7 +158,33 @@ describe('trackingDetailFrom', () => {
   });
 
   it('says one minute in the singular', () => {
-    expect(etaLabelIn(45_000)).toBe('1 min');
+    expect(etaLabelIn(75_000)).toBe('1 min');
+  });
+
+  /**
+   * Never earlier than the booking the customer bought.
+   *
+   * The projection answers "when would she get there if she left now", and a cook who sets off
+   * early gets there early. At 11:06 for an 11:30 booking the customer was told the cook arrives
+   * in TWO MINUTES — true about the walk, useless as a promise, and a customer who believes it
+   * goes and waits at the door for twenty minutes.
+   */
+  it('never promises an arrival before the booking starts', () => {
+    // Cook two minutes away; booking still half an hour off.
+    const label = etaLabelIn(2 * 60_000, new Date(Date.now() + 30 * 60_000).toISOString());
+    expect(label).toBe('30 mins');
+  });
+
+  it('still reports a late arrival honestly', () => {
+    // Projected after the start, so the projection wins and the delay is not hidden.
+    const label = etaLabelIn(40 * 60_000, new Date(Date.now() + 30 * 60_000).toISOString());
+    expect(label).toBe('40 mins');
+  });
+
+  it('agrees with the Home banner and the Cook App on rounding', () => {
+    // Both round; this briefly used `Math.ceil`, so the booking page said "3 mins" while Home and
+    // the cook's own card said 2 for the same arrival.
+    expect(etaLabelIn(2 * 60_000 + 20_000)).toBe('2 mins');
   });
 
   it('does not print a zero or a negative once the ETA has passed', () => {

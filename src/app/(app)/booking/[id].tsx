@@ -91,7 +91,15 @@ export default function BookingRoute() {
         onBack={goBack}
         onReschedule={() => router.push(`/reschedule/${bookingId}`)}
         onHelp={() => {
-          openHelp(`Hi Spoon, I need help with my booking ${bookingId}.`);
+          /*
+           * No booking id in the message.
+           *
+           * A customer opening WhatsApp is handed a draft they can read, edit and forward, and a
+           * UUID in it is noise to them and an identifier to anyone the chat is shared with. Ops
+           * can find the booking from the phone number the message arrives on, which they have to
+           * verify against anyway before acting on a request.
+           */
+          openHelp('Hi Spoon, I need help with my booking.');
         }}
         onCallCook={() => {
           void callCook.call();
@@ -249,7 +257,8 @@ export default function BookingRoute() {
                 router.replace('/home');
               }}
               onHelp={() => {
-                openHelp(`Hi Spoon, I need help cancelling my booking ${bookingId}.`);
+                // No booking id — see the note on the help draft above.
+                openHelp('Hi Spoon, I need help cancelling my booking.');
               }}
             />
           )}

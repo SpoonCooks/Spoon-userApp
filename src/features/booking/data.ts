@@ -750,7 +750,13 @@ export function useBookingDetailData(bookingId: string): ScreenQuery<BookingDeta
     });
 
     const withTracking =
-      tracked === null ? detail : trackingDetailFrom({ base: detail, dto: tracked });
+      tracked === null
+        ? detail
+        : trackingDetailFrom({
+            base: detail,
+            dto: tracked,
+            scheduledStartIso: dto.scheduledStart,
+          });
 
     // Until the catalogue is in, the sheet keeps its designed copy rather than showing an empty
     // amount row — and it cannot be opened to a wrong figure, because the amounts only appear
