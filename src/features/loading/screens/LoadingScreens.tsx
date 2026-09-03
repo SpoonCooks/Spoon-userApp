@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
-import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Image, StyleSheet, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -172,11 +172,10 @@ export function IntroLoading({
  * seconds between a verified payment and a booking the server has confirmed (V7 founder comment,
  * task §9), and there is nothing to do on it.
  *
- * MOTION — recorded deviation. `get_motion_context` returns no animated nodes for `433:2290`, so
- * the rotation below is not transcribed from the file. It is read off the MARK: `433:2400` is a
- * ring whose solid arc trails away into detached dots, and those dots are only meaningful as the
- * trail of something turning. A screen that exists to say "this is in progress" cannot show a
- * frozen spinner, so it turns, at the rate a still frame implies rather than at an invented one.
+ * MOTION — static. `get_motion_context` returns no animated nodes for `433:2290`, so the mark is
+ * rendered exactly as supplied by the design. The detached segments are part of the artwork, not
+ * a runtime spinner; rotating the whole image made the confirmation screen move when it should
+ * have been fixed.
  *
  * BOUNDARY: this component renders. It does not poll, does not decide that a booking is
  * confirmed, and does not navigate — see `app/(app)/booking/confirming.tsx`, which owns all three
@@ -188,36 +187,10 @@ export interface ConfirmationLoadingProps {
   readonly testID?: string;
 }
 
-/** One turn of `433:2400`. Slow enough to read as deliberate, fast enough to read as alive. */
-const PROGRESS_SPIN_MS = 1400;
-
 export function ConfirmationLoading({
   title = 'Confirmation in progress ...',
   testID = 'confirmation-loading',
 }: ConfirmationLoadingProps) {
-  /**
-   * Held in state rather than a ref, matching `BottomSheet`: the value is created once by the
-   * lazy initialiser and never reassigned, and reading it during render is then legitimate.
-   */
-  const [spin] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.timing(spin, {
-        toValue: 1,
-        duration: PROGRESS_SPIN_MS,
-        // LINEAR, and looped rather than reversed: a spinner that eases is a spinner that keeps
-        // appearing to stop, which on this screen would read as the confirmation having stalled.
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [spin]);
-
-  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-
   return (
     <View
       style={styles.confirming}
@@ -229,11 +202,12 @@ export function ConfirmationLoading({
     >
       {/* `433:2304` — the centred block. */}
       <View style={styles.confirmingBlock}>
-        <Animated.Image
+        <Image
           source={LOADING_CONFIRMATION_PROGRESS}
-          style={[styles.confirmingMark, { transform: [{ rotate }] }]}
+          style={styles.confirmingMark}
           resizeMode="contain"
           accessibilityIgnoresInvertColors
+          testID={`${testID}-mark`}
         />
 
         <View style={styles.confirmingTitle}>
