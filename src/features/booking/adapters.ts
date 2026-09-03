@@ -740,6 +740,18 @@ export function extensionMinutesFrom(optionId: string | null): number | null {
  */
 const DRAWN_DEFAULT_TIP_PAISE = 5000;
 
+/**
+ * `306:3060` — the tip CTA names the amount it will charge.
+ *
+ * Exported because the SHEET has to rebuild it: the label was composed once here from the
+ * preselected amount and then rendered verbatim, so choosing ₹20 left the button reading
+ * "Tip • ₹50" — and pressing it charged ₹20, which is worse than the wrong number alone. Both
+ * sides now format through this, so the button and the selection cannot name different prices.
+ */
+export function tipCtaLabelFor(amountLabel: string): string {
+  return `Tip • ${amountLabel}`;
+}
+
 export function tipSheetFrom(input: {
   readonly base: TipSheetViewModel;
   readonly suggestedAmountsPaise: readonly number[];
@@ -763,6 +775,6 @@ export function tipSheetFrom(input: {
     ...(preselected === null ? {} : { defaultOptionId: tipIdFor(preselected) }),
     // `306:3060` — the CTA carries the amount. Recomputed from the SAME server figure the
     // preselection uses, so the button can never name a price the sheet does not offer.
-    ...(preselected === null ? {} : { ctaLabel: `Tip • ${formatAmount(preselected)}` }),
+    ...(preselected === null ? {} : { ctaLabel: tipCtaLabelFor(formatAmount(preselected)) }),
   };
 }
