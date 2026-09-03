@@ -300,10 +300,20 @@ const styles = StyleSheet.create({
     ...lightTheme.typography.bodyMedium,
   },
   /** `143:292` — a CENTRED 102 × 25 `#E2FF68` chip at a 5pt radius. */
+  /**
+   * `143:292` — a 102 × 25 chip, with 25 as a FLOOR rather than a fixed height.
+   *
+   * The frame's 25 assumes the system font scale is 1. It is not on every phone, and a label that
+   * scales inside a box that does not is a label with its bottom sheared off — which is how
+   * "SUBMIT" arrived on the founder's device. Padding plus a minimum keeps the drawn size at 1,
+   * and lets the chip grow rather than crop past it. The width is a minimum for the same reason.
+   */
   submit: {
     alignSelf: 'center',
-    width: 102,
-    height: 25,
+    minWidth: 102,
+    minHeight: 25,
+    paddingHorizontal: lightTheme.space.s6,
+    paddingVertical: lightTheme.space.xxs,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: lightTheme.radius.r5,
