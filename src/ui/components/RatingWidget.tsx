@@ -121,26 +121,41 @@ export function RatingWidget({
   testID = 'rating-widget',
 }: RatingWidgetProps) {
   const exceptional = value === RATING_EXCEPTIONAL;
+  // A submitted numeric rating still belongs in the summary row. Previously every submitted
+  // value rendered the exceptional-service label, so an ordinary 5 looked like 5+.
+  const submittedNumeric = !showScale && isNumericRating(value);
+  const promptLabel = submittedNumeric ? String(value) : '5+';
+  const promptSelected = exceptional || submittedNumeric;
+  const promptDisabled = disabled || !showScale;
 
   return (
     <View style={styles.container} testID={testID}>
       {showExceptionalPrompt ? (
         <Pressable
-          onPress={() => onChange(RATING_EXCEPTIONAL)}
-          disabled={disabled}
-          accessibilityRole="radio"
-          accessibilityLabel="5 plus — exceptional service"
-          accessibilityState={{ selected: exceptional, disabled, checked: exceptional }}
-          style={({ pressed }) => [styles.prompt, pressed && !disabled ? styles.pressed : null]}
+          onPress={showScale ? () => onChange(RATING_EXCEPTIONAL) : undefined}
+          disabled={promptDisabled}
+          accessibilityRole={showScale ? 'radio' : 'text'}
+          accessibilityLabel={
+            submittedNumeric ? `${value} out of 5` : '5 plus — exceptional service'
+          }
+          accessibilityState={{
+            selected: promptSelected,
+            disabled: promptDisabled,
+            checked: promptSelected,
+          }}
+          style={({ pressed }) => [
+            styles.prompt,
+            pressed && !promptDisabled ? styles.pressed : null,
+          ]}
           testID={`${testID}-prompt`}
         >
           {/* `383:765` — chosen, the chip FILLS with the top of the ramp; at rest it is white. */}
           <View
-            style={[styles.plusChip, exceptional ? styles.plusChipSelected : null]}
+            style={[styles.plusChip, promptSelected ? styles.plusChipSelected : null]}
             testID={`${testID}-exceptional`}
           >
             <Text variant="ratingPlus" color="textPrimary" align="center">
-              5+
+              {promptLabel}
             </Text>
           </View>
           <Text variant="captionMedium" color="textSecondary" style={styles.promptText}>

@@ -99,4 +99,12 @@ describe('RatingWidget — exceptional-service prompt', () => {
     expect(screen.getByText('5+')).toBeTruthy();
     expect(screen.getByText(/exceeded your expectations/)).toBeTruthy();
   });
+
+  it('shows a submitted numeric value as numeric, not as the exceptional 5+ choice', () => {
+    render(<RatingWidget value={5} onChange={jest.fn()} showExceptionalPrompt showScale={false} />);
+
+    expect(screen.getByText('5')).toBeTruthy();
+    expect(screen.queryByText('5+')).toBeNull();
+    expect(screen.getByTestId('rating-widget-prompt').props.onPress).toBeUndefined();
+  });
 });
