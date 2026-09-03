@@ -462,6 +462,33 @@ describe('Booking host — completion (143:207)', () => {
     expect(screen.getByTestId('tip-sheet')).toBeTruthy();
   });
 
+  it('updates the tip CTA to the selected catalogue amount', () => {
+    const tip = DEMO_BOOKING_COMPLETION.tip;
+    if (tip === undefined) throw new Error('expected the completion fixture to include tips');
+
+    const booking = {
+      ...DEMO_BOOKING_COMPLETION,
+      tip: {
+        ...tip,
+        options: [{ id: 'tip-20', label: '₹20' }, ...tip.options],
+      },
+    };
+
+    render(
+      <BookingDetailView
+        state={ready(booking)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onSelectTip={jest.fn(() => new Promise<void>(() => undefined))}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('completion-tip-row'));
+    fireEvent.press(screen.getByTestId('tip-sheet-option-tip-20'));
+
+    expect(screen.getByText('Tip • ₹20')).toBeTruthy();
+  });
+
   it('drops the scale and the Submit chip once the SERVER says the feedback is in', () => {
     render(
       <BookingDetailView
