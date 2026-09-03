@@ -1240,16 +1240,8 @@ function AddressDetailsForm({
                     resizeMode="cover"
                     accessibilityIgnoresInvertColors
                   />
-                  <Image
-                    source={ADDRESS_MAP_PIN}
-                    style={styles.changeAreaPin}
-                    resizeMode="contain"
-                    accessibilityIgnoresInvertColors
-                  />
-                  {/* `63:808` — Livvic SemiBold 11/16.5 at 70% black, centred on y 40. */}
-                  <Text variant="label" color="textSecondary" style={styles.changeAreaLabel}>
-                    {details.changeLabel}
-                  </Text>
+                  {/* `change-area.png` already contains the designed pin and Change label. Do not
+                      paint them a second time: the duplicate layers made both look hazy on-device. */}
                 </Pressable>
               </View>
             </View>
@@ -1737,8 +1729,6 @@ const styles = StyleSheet.create({
     height: 59,
     borderRadius: lightTheme.radius.xs,
   },
-  changeAreaPin: { position: 'absolute', left: 19, top: 12, width: 22, height: 22 },
-  changeAreaLabel: { position: 'absolute', left: 8, top: 31 },
   /** `60:710` — four chips, 8pt apart, wrapping on a narrow column. */
   labelChips: { flexDirection: 'row', flexWrap: 'wrap', gap: lightTheme.space.sm },
   /**
