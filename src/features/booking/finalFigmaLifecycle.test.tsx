@@ -40,10 +40,42 @@ describe('Confirmation CTAs — scheduled vs instant (§11)', () => {
     expect(screen.getByTestId('confirmation-reschedule')).toBeTruthy();
   });
 
-  it('draws NEITHER for an instant booking, even with both handlers and the server saying yes', () => {
+  /*
+   * The instant case is no longer decided here.
+   *
+   * §11 removed both controls from an instant booking client-side. The owner reopened
+   * cancellation for instant on 2026-09-03 (an instant booking is the only kind the Delhi pilot
+   * places, so "cannot cancel" meant nobody could cancel anything), and this screen kept its own
+   * copy of the old rule and drew nothing regardless. The slot type is now the server's business
+   * on both controls, so this asserts the screen follows the flags rather than the slot type.
+   */
+  it('follows the server on an instant booking rather than deciding the slot type itself', () => {
     render(
       <BookingDetailView
         state={ready(INSTANT)}
+        onRetry={jest.fn()}
+        onBack={jest.fn()}
+        onCancel={jest.fn()}
+        onReschedule={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('confirmation-cancel')).toBeTruthy();
+    expect(screen.getByTestId('confirmation-reschedule')).toBeTruthy();
+  });
+
+  it('draws neither control when the server withholds both, whatever the slot type', () => {
+    const refused: BookingDetailViewModel = {
+      ...INSTANT,
+      cancelAllowed: false,
+      ...(INSTANT.summary === undefined
+        ? {}
+        : { summary: { ...INSTANT.summary, rescheduleAllowed: false } }),
+    };
+
+    render(
+      <BookingDetailView
+        state={ready(refused)}
         onRetry={jest.fn()}
         onBack={jest.fn()}
         onCancel={jest.fn()}

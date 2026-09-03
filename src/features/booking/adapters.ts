@@ -152,6 +152,10 @@ export function summaryFrom(input: {
     scheduleLine: scheduleLineFrom(input.dto),
     rows: bookingRowsFrom(input.dto),
     rescheduleAllowed: input.dto.allowedActions.canReschedule,
+    ...(() => {
+      const n = rescheduleBlockedNoteFrom(input.dto.allowedActions.rescheduleBlockedReason);
+      return n === undefined ? {} : { rescheduleBlockedNote: n };
+    })(),
     ...(rescheduled ? { bannerTitle: 'Rescheduled!' } : {}),
     ...(recoveryHandoff
       ? { bannerTitle: 'This booking needs attention', tone: 'warning' as const }
@@ -357,6 +361,10 @@ export function bookingDetailFrom(input: {
     ...surface,
     bannerTitle: withCookName(surface.bannerTitle, cookName),
     rescheduleAllowed: dto.allowedActions.canReschedule,
+    ...(() => {
+      const n = rescheduleBlockedNoteFrom(dto.allowedActions.rescheduleBlockedReason);
+      return n === undefined ? {} : { rescheduleBlockedNote: n };
+    })(),
   });
 
   /**
@@ -786,4 +794,22 @@ export function tipSheetFrom(input: {
     // preselection uses, so the button can never name a price the sheet does not offer.
     ...(preselected === null ? {} : { ctaLabel: tipCtaLabelFor(formatAmount(preselected)) }),
   };
+}
+
+/**
+ * The one line that explains a Reschedule button the customer cannot see.
+ *
+ * The button is hidden rather than disabled, so when cancellation is closed too the whole action
+ * row disappears and the screen accounts for none of it. Only the two reasons a customer cannot
+ * work out for themselves get a line. COOK_DISPATCHED and the terminal states do not: the banner
+ * above already says the cook has arrived, or that the booking is over.
+ */
+export function rescheduleBlockedNoteFrom(reason: string | null | undefined): string | undefined {
+  if (reason === 'INSTANT_NOT_RESCHEDULABLE') {
+    return 'An instant booking brings a cook out now, so it cannot be moved to a later time. Cancel it and book the time you want.';
+  }
+  if (reason === 'ALREADY_RESCHEDULED') {
+    return 'This booking has already been moved once. Cancel it and book again if the time no longer works.';
+  }
+  return undefined;
 }

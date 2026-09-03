@@ -95,6 +95,8 @@ export interface BookingSummaryViewModel {
    * say", which hides the action.
    */
   readonly rescheduleAllowed?: boolean;
+  /** Why Reschedule is absent, when the reason is not evident from the banner. */
+  readonly rescheduleBlockedNote?: string;
   /**
    * `292:201` — Confirm reassign (`289:6607`) inserts ONE notice between the banner and the cook
    * card. Its PRESENCE is the server reporting a reassignment; the client never decides that one
@@ -118,6 +120,8 @@ export interface TrackingViewModel {
   readonly rescheduleLabel: string;
   /** Ruling R-3: absent means "the server did not say", which hides Reschedule. */
   readonly rescheduleAllowed?: boolean;
+  /** Why Reschedule is absent, when the reason is not evident from the banner. */
+  readonly rescheduleBlockedNote?: string;
 }
 
 /**

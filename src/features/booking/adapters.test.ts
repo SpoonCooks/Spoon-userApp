@@ -314,6 +314,33 @@ describe('summaryFrom server-owned action and recovery state', () => {
     ).toBe(false);
   });
 
+  /*
+   * The Reschedule button is hidden, not disabled. On an instant booking — every booking placed in
+   * the Delhi pilot — it is never offered, and once cancellation was closed too the action row
+   * vanished whole and the screen explained none of it. The note is what the customer reads
+   * instead, so it is mapped from the server's reason rather than inferred from the slot type
+   * here, which would put a second copy of the policy in the client.
+   */
+  it('explains a withheld reschedule, and stays quiet when the banner already says why', () => {
+    const withReason = (reason: string | undefined) =>
+      summaryFrom({
+        base: DEMO_BOOKING_CONFIRMATION.summary!,
+        dto: {
+          ...SUMMARY_DTO,
+          allowedActions: { ...SUMMARY_DTO.allowedActions, rescheduleBlockedReason: reason },
+        } as BookingDetailDto,
+      }).rescheduleBlockedNote;
+
+    expect(withReason('INSTANT_NOT_RESCHEDULABLE')).toContain('cannot be moved to a later time');
+    expect(withReason('ALREADY_RESCHEDULED')).toContain('already been moved once');
+    // The banner above already reports these, and a second line under the buttons only repeats it.
+    expect(withReason('COOK_DISPATCHED')).toBeUndefined();
+    expect(withReason('BOOKING_COMPLETED')).toBeUndefined();
+    // A code this build has never heard of must read as "no explanation", never as a crash.
+    expect(withReason('SOME_REASON_SHIPPED_LATER')).toBeUndefined();
+    expect(withReason(undefined)).toBeUndefined();
+  });
+
   it('renders a support handoff as attention rather than confirmation', () => {
     const summary = summaryFrom({
       base: DEMO_BOOKING_CONFIRMATION.summary!,

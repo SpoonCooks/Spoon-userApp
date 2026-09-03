@@ -266,26 +266,29 @@ export function BookingDetailView({
    * attached, both of which the backend decides, so offering the control on any basis other than
    * its answer would put the customer in a flow it will refuse.
    */
-  /**
-   * §11 — an INSTANT booking offers neither control, on any lifecycle view.
+  /*
+   * Both controls are the server's verdict alone.
    *
-   * Expressed once, here, rather than at each of the four call sites, so a view added later
-   * cannot quietly reintroduce them. `slotType` absent is treated as NOT instant: the safe
-   * direction is to keep obeying `allowedActions`, which is what a scheduled booking needs.
+   * §11 used to be enforced a second time here, as "an INSTANT booking offers neither control".
+   * When the owner reopened cancellation for instant on 2026-09-03 the backend started saying yes
+   * and this screen went on saying no, so the button stayed off the screen and the change looked
+   * like it had not shipped. A rule with two homes only ever gets moved into one of them.
+   *
+   * `cancelAllowed` and `rescheduleAllowed` are both computed backend-side from the same
+   * predicates the cancel and reschedule commands enforce, so a control offered here cannot be
+   * refused on press.
    */
-  function instantBooking(booking: BookingDetailViewModel): boolean {
-    return booking.slotType === 'instant';
-  }
-
   function cancelSeam(booking: BookingDetailViewModel) {
     if (actions.onCancel === undefined || booking.cancelAllowed !== true) return {};
-    if (instantBooking(booking)) return {};
     return { onCancel: actions.onCancel };
   }
 
-  /** Reschedule is likewise removed for instant, and otherwise left to the server's verdict. */
   function rescheduleSeam(booking: BookingDetailViewModel) {
-    if (actions.onReschedule === undefined || instantBooking(booking)) return {};
+    const serverAllowed =
+      booking.summary?.rescheduleAllowed === true ||
+      booking.tracking?.rescheduleAllowed === true ||
+      booking.reassigned?.rescheduleAllowed === true;
+    if (actions.onReschedule === undefined || !serverAllowed) return {};
     return { onReschedule: actions.onReschedule };
   }
 

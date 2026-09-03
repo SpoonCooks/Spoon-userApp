@@ -316,6 +316,14 @@ export type BookingRecoveryDto = z.infer<typeof bookingRecoverySchema>;
 export const allowedActionsSchema = z.object({
   canCancel: z.boolean(),
   canReschedule: z.boolean(),
+  /**
+   * Why reschedule is closed. Sent only when `canReschedule` is false.
+   *
+   * `nullish` and open to unknown codes on purpose: the server owns this list and may add to it,
+   * and an unrecognised reason must degrade to "no explanation shown" rather than failing the
+   * whole booking parse and blanking the screen.
+   */
+  rescheduleBlockedReason: z.string().nullish(),
   canExtend: z.boolean(),
   canRate: z.boolean(),
   canTip: z.boolean(),
