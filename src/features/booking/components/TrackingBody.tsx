@@ -9,6 +9,7 @@ import {
   NoteCard,
   NoticeCard,
   StatusBanner,
+  Text,
   lightTheme,
 } from '@ui';
 import type { CookViewModel } from '@ui';
@@ -183,6 +184,11 @@ export function TrackingBody({
           ) : null}
         </View>
       ) : null}
+      {tracking.rescheduleBlockedNote === undefined ? null : (
+        <Text variant="caption" style={styles.rescheduleNote} testID="tracking-reschedule-note">
+          {tracking.rescheduleBlockedNote}
+        </Text>
+      )}
     </View>
   );
 }
@@ -192,6 +198,11 @@ function noop() {
 }
 
 const styles = StyleSheet.create({
+  /** Sits where the Reschedule bar would be, on the gutter the action row uses. */
+  rescheduleNote: {
+    color: lightTheme.colors.textMuted,
+    paddingHorizontal: lightTheme.space.xs,
+  },
   /** `3:1382` — the section BOXES sit 16pt apart. */
   container: { gap: SERVICE_SECTION_GAP },
   /** `292:241` — the same pair Confirmation draws. */
