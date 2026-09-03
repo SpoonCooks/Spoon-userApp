@@ -187,6 +187,8 @@ export const bookingCookSchema = z
 export const bookingTimingSchema = z.object({
   /** Persisted cook arrival time, distinct from service start. */
   arrivedAt: z.string().datetime().nullish(),
+  /** Planned booking-window end, present before the Start OTP; not the live countdown target. */
+  scheduledEnd: z.string().datetime().nullish(),
   actualStart: z.string().datetime().nullable(),
   expectedEnd: z.string().datetime().nullable(),
   actualEnd: z.string().datetime().nullable(),

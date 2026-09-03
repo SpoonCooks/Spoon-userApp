@@ -44,7 +44,16 @@ import type { BookingDetailsViewModel } from './components/BookingDetailsSheet';
 /** `3:1095` — Date / Start time / Duration / End Time, formatted from server instants. */
 export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
   const start = dto.scheduledStart === null ? null : new Date(dto.scheduledStart);
-  const end = dto.timing.expectedEnd === null ? null : new Date(dto.timing.expectedEnd);
+  const scheduledEnd =
+    dto.timing.scheduledEnd === null || dto.timing.scheduledEnd === undefined
+      ? start === null || Number.isNaN(start.getTime())
+        ? null
+        : new Date(start.getTime() + dto.durationMinutes * 60_000)
+      : new Date(dto.timing.scheduledEnd);
+  // Before the Start OTP the session has no `expectedEnd`; show the booking's planned end in the
+  // details sheet. Once the session exists, `expectedEnd` remains the authoritative actual end.
+  const end =
+    dto.timing.expectedEnd === null ? scheduledEnd : new Date(dto.timing.expectedEnd);
 
   const time = (date: Date | null) =>
     date === null || Number.isNaN(date.getTime())
