@@ -65,7 +65,14 @@ export function TrustBadges({ badges, testID = 'trust-badges' }: TrustBadgesProp
                 accessibilityIgnoresInvertColors
               />
             </View>
-            <Text variant="labelUpperQuiet" color="textTrust" align="center" numberOfLines={2}>
+            <Text
+              variant="labelUpperQuiet"
+              color="textTrust"
+              align="center"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {definition.label}
             </Text>
           </View>
@@ -79,7 +86,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignSelf: 'stretch',
     paddingHorizontal: lightTheme.space.s15,
     paddingVertical: 9.889,
@@ -91,8 +98,8 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
     elevation: 1,
   },
-  slot: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 11 },
-  item: { alignItems: 'center', gap: 1, flexShrink: 1 },
+  slot: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  item: { alignItems: 'center', gap: 1 },
   /** `289:7622` — an 18pt `rgba(0,0,0,0.8)` disc, with 2pt of clearance beneath it. */
   disc: {
     width: 18,
