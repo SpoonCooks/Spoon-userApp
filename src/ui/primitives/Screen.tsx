@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import type { PropsWithChildren, ReactNode, RefObject } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -181,6 +181,8 @@ export function Screen({
 }: PropsWithChildren<ScreenProps>) {
   const content = padded ? styles.padded : undefined;
   const keyboardHeight = useKeyboardHeight();
+  const { scrollRef, viewportRef, onViewportLayout, onScroll, onInputFocus } =
+    useKeyboardAwareScroll(keyboardHeight);
   const footerGutter = useBottomGutter(lightTheme.space.lg);
 
   return (
@@ -192,13 +194,32 @@ export function Screen({
       {header ?? null}
 
       {scroll ? (
-        <ScrollView
-          style={keyboardHeight === 0 ? undefined : { marginBottom: keyboardHeight }}
-          contentContainerStyle={[styles.scrollContent, content, contentStyle]}
-          keyboardShouldPersistTaps="handled"
+        <View
+          ref={viewportRef}
+          onLayout={onViewportLayout}
+          onFocus={onInputFocus}
+          style={[
+            styles.flex,
+            Platform.OS === 'ios' || keyboardHeight === 0 ? null : { marginBottom: keyboardHeight },
+          ]}
         >
-          {children}
-        </ScrollView>
+          <ScrollView
+            ref={scrollRef}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            /*
+             * Shrinking for the keyboard is not the same as scrolling to the field being typed in.
+             * Android uses the measured viewport and focus handlers above. iOS owns the equivalent
+             * inset and first-responder reveal through `automaticallyAdjustKeyboardInsets`, so the
+             * two platforms do not double-count the keyboard.
+             */
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            contentContainerStyle={[styles.scrollContent, content, contentStyle]}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+        </View>
       ) : (
         <View style={[styles.flex, content]}>{children}</View>
       )}
