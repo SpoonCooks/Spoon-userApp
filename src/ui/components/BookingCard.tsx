@@ -50,6 +50,11 @@ export interface BookingCardProps {
   readonly testID?: string;
 }
 
+/** One decimal, always. `4` and `4.97` are both ratings and must read alike. */
+function formatRating(value: number | undefined): string {
+  return value === undefined ? '' : value.toFixed(1);
+}
+
 export function BookingCard({
   booking,
   variant = 'history',
@@ -109,14 +114,22 @@ export function BookingCard({
               {booking.subtitle ?? ''}
             </Text>
             {/* `275:5708` — the score 3pt clear of the exported 13pt star. */}
+            {/*
+              A rating always carries one decimal.
+
+              `String(4)` prints "4" and `String(4.97)` prints "4.97", so the same figure
+              changed shape depending on what it happened to be — a cook averaging exactly 4.0
+              read as a whole number while everyone else read as a fraction, and it looked like
+              two different measurements.
+            */}
             {showRating ? (
               <View
                 style={styles.rating}
-                accessibilityLabel={`Rated ${String(booking.rating)}`}
+                accessibilityLabel={`Rated ${formatRating(booking.rating)}`}
                 testID={`${testID}-rating`}
               >
                 <Text variant="bodyBold" color="textStrong" align="right">
-                  {String(booking.rating)}
+                  {formatRating(booking.rating)}
                 </Text>
                 <Image
                   source={BOOKING_RATING_STAR}
