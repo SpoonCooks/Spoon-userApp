@@ -84,9 +84,22 @@ export function headlineFor(
  *
  * The photograph resolves exactly as the live cook card resolves it: a hosted `profileImageUrl`
  * wins, else the bundled per-`profileCode` photograph, else no photo and the card draws its
- * initials disc. The rating is the COOK's own published average — the same figure the live card
- * shows — never the rating this customer gave the booking.
+ * initials disc.
+ *
+ * The rating here is the COOK's published average, the same figure the live card shows. That is
+ * right while a booking is live — it is what the customer is being told about the person coming
+ * — and wrong on a finished row, where a customer reads a star beside their own booking as the
+ * score they gave it. Showing what they actually gave needs a field the summary does not carry
+ * yet; until it does, a cancelled row shows none at all rather than the cook's.
  */
+/** The cook's name and face without her score, for a row that has nothing to score. */
+function withoutRating(
+  cook: BookingSummaryCookDto | null | undefined,
+): Pick<BookingCardViewModel, 'cookName' | 'cookPhotoUrl'> {
+  const { rating: _rating, ...rest } = cookFieldsFrom(cook);
+  return rest;
+}
+
 export function cookFieldsFrom(
   cook: BookingSummaryCookDto | null | undefined,
 ): Pick<BookingCardViewModel, 'cookName' | 'cookPhotoUrl' | 'rating'> {
@@ -118,7 +131,15 @@ export function bookingCardFrom(
       ? {}
       : { statusLabel: presentation.label, statusTone: presentation.tone }),
     amount: formatPaise(dto.price.totalAmountPaise),
-    ...cookFieldsFrom(dto.cook),
+    /*
+     * A cancelled booking carries no score.
+     *
+     * Nobody cooked, so there was nothing to rate — and the star on those cards was the cook's
+     * published average, which made four cancelled bookings all read "5" as though the customer
+     * had rated each of them. It said something about the cook on a row that is about a service
+     * that never happened.
+     */
+    ...(dto.status === 'cancelled' ? withoutRating(dto.cook) : cookFieldsFrom(dto.cook)),
     ...(subtitle === undefined ? {} : { subtitle }),
   };
 }

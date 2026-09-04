@@ -141,3 +141,32 @@ describe('the date is read on the service clock, not the device', () => {
     expect(headlineFor(at({ scheduledStart: null, durationMinutes: 60 }), IST)).toBe('1 hr');
   });
 });
+
+/*
+ * Four cancelled bookings in a row each showed "5 ★". Nobody had cooked and nobody had rated —
+ * that was the cook's published average, printed beside a service that never happened, where a
+ * customer reads it as the score they gave.
+ */
+describe('the star on a history card', () => {
+  const cook = {
+    cookId: 'cook-1',
+    displayName: 'Cook Sanchita',
+    profileImageUrl: null,
+    // The boundary has already flattened the server's { average, count } by this point.
+    ratingAverage: 5,
+  };
+
+  it('is dropped from a cancelled booking', () => {
+    const card = bookingCardFrom(at({ status: 'cancelled', cook } as never), IST);
+
+    expect(card.rating).toBeUndefined();
+    // Her name and face stay: the row is still about who it was going to be.
+    expect(card.cookName).toBe('Cook Sanchita');
+  });
+
+  it('is kept on a booking that actually ran', () => {
+    const card = bookingCardFrom(at({ status: 'completed', cook } as never), IST);
+
+    expect(card.rating).toBe(5);
+  });
+});
