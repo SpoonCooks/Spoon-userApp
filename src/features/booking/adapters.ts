@@ -822,7 +822,7 @@ export function tipSheetFrom(input: {
  */
 export function cancelBlockedNoteFrom(reason: string | null | undefined): string | undefined {
   if (reason === 'INSTANT_CONFIRMED') {
-    return 'An instant booking sends a cook out straight away, so it cannot be cancelled once she is on her way. Message us on WhatsApp if something has gone wrong.';
+    return 'An instant booking sends a cook out straight away, so it cannot be cancelled or moved to another time. Message us on WhatsApp if something has gone wrong.';
   }
   if (reason === 'COOK_DISPATCHED') {
     return 'Your cook has arrived, so this can no longer be cancelled here. Message us on WhatsApp if something has gone wrong.';
@@ -832,7 +832,7 @@ export function cancelBlockedNoteFrom(reason: string | null | undefined): string
 
 export function rescheduleBlockedNoteFrom(reason: string | null | undefined): string | undefined {
   if (reason === 'INSTANT_NOT_RESCHEDULABLE') {
-    return 'An instant booking brings a cook out now, so it cannot be moved to a later time. Cancel it and book the time you want.';
+    return 'An instant booking brings a cook out now, so it cannot be moved to another time. Message us on WhatsApp if something has gone wrong.';
   }
   if (reason === 'ALREADY_RESCHEDULED') {
     return 'This booking has already been moved once. Cancel it and book again if the time no longer works.';

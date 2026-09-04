@@ -331,7 +331,7 @@ describe('summaryFrom server-owned action and recovery state', () => {
         } as BookingDetailDto,
       }).rescheduleBlockedNote;
 
-    expect(withReason('INSTANT_NOT_RESCHEDULABLE')).toContain('cannot be moved to a later time');
+    expect(withReason('INSTANT_NOT_RESCHEDULABLE')).toContain('cannot be moved to another time');
     expect(withReason('ALREADY_RESCHEDULED')).toContain('already been moved once');
     // The banner above already reports these, and a second line under the buttons only repeats it.
     expect(withReason('COOK_DISPATCHED')).toBeUndefined();
@@ -356,7 +356,7 @@ describe('summaryFrom server-owned action and recovery state', () => {
         } as BookingDetailDto,
       }).cancelBlockedNote;
 
-    expect(withReason('INSTANT_CONFIRMED')).toContain('cannot be cancelled once she is on her way');
+    expect(withReason('INSTANT_CONFIRMED')).toContain('cannot be cancelled or moved');
     expect(withReason('COOK_DISPATCHED')).toContain('Your cook has arrived');
     // Terminal states are already the whole subject of the banner above.
     expect(withReason('BOOKING_COMPLETED')).toBeUndefined();
