@@ -245,8 +245,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
     ...(GOOGLE_SERVICES_JSON === '' ? {} : { googleServicesFile: GOOGLE_SERVICES_JSON }),
 
+    /*
+     * Three layers, because an adaptive icon is three layers.
+     *
+     * These files were Expo's blue chevron template until 2026-09-04 -- the app shipped with no
+     * Spoon branding at all, on the home screen or in the tray. They are generated now by
+     * `scripts/build-app-icons.py` from the brand wordmark, which is also where the safe-zone
+     * arithmetic lives: a launcher may mask away everything outside the centre 66 of 108dp, so
+     * the foreground is sized and optically centred for that and nothing else.
+     *
+     * The background is an IMAGE rather than a colour because the designed tile is a yellow to
+     * lime diagonal, and `backgroundColor` can only be flat. It is drawn full bleed, so whatever
+     * shape a launcher cuts out of it there is no seam and no corner of the old cream showing.
+     */
     adaptiveIcon: {
-      backgroundColor: SPLASH_BACKGROUND,
+      backgroundImage: './assets/images/android-icon-background.png',
       foregroundImage: './assets/images/android-icon-foreground.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
