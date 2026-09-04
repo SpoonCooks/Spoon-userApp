@@ -42,6 +42,15 @@ const BUNDLE_SUFFIX: Record<AppEnv, string> = {
 const SPLASH_BACKGROUND = '#FFFDF5';
 
 /**
+ * The brand yellow, Figma `#ffd600`.
+ *
+ * Used as the notification accent: Android tints the silhouette with it, so it has to be a
+ * colour that reads against a light tray. The splash background is a near-white and would
+ * have drawn the mark invisibly.
+ */
+const BRAND_YELLOW = '#FFD600';
+
+/**
  * The deployed API, used when no `EXPO_PUBLIC_API_BASE_URL` is supplied in development.
  *
  * A developer who has not written a `.env` gets the real staging deployment rather than an
@@ -278,10 +287,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      * one of them needs the NATIVE module, and on iOS the plugin is also what adds the
      * `aps-environment` entitlement and the remote-notification background mode.
      *
-     * No icon or colour is configured, deliberately: the design does not specify a notification
-     * icon, and choosing one here would be a visual decision made in a build file.
+     * The icon is the monochrome app mark, and it has to be that one. Android draws a
+     * notification icon as an alpha silhouette — every coloured pixel is discarded and what
+     * remains is filled with the accent colour — so handing it the full-colour launcher icon
+     * produces a white blob. `android-icon-monochrome.png` already exists for the themed-icon
+     * slot and is exactly the shape this needs.
+     *
+     * Without any of this Android substitutes its own default mark, which is what was showing
+     * in the tray.
      */
-    'expo-notifications',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/images/android-icon-monochrome.png',
+        color: BRAND_YELLOW,
+      },
+    ],
 
     [
       'expo-splash-screen',
