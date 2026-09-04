@@ -279,13 +279,24 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      * Analytics only. Crashlytics and Performance are deliberately absent — each is a separate
      * package and a separate Data Safety declaration, and neither was asked for.
      */
-    '@react-native-firebase/app',
+    /*
+     * `disableSPM` is the library's OWN supported option, and replaces the hand-written Podfile
+     * edit that first got past this. From RN 0.75 these pods resolve the Firebase iOS SDK through
+     * Swift Package Manager, whose products are automatic libraries -- so under static linkage
+     * each pod embeds its own copy and they collide as duplicate symbols. `pod install` refuses
+     * rather than emitting a binary that fails later and less legibly.
+     *
+     * Taking the upstream option rather than editing the Podfile ourselves means the placement
+     * stays right if the library changes where the flag has to sit. It writes the same
+     * `$RNFirebaseDisableSPM = true`, anchored after `prepare_react_native_project!`.
+     */
+    ['@react-native-firebase/app', { ios: { disableSPM: true } }],
     '@react-native-firebase/analytics',
     // Pins the Android NDK. `expo-root-project` defaults to 27.1.12297006, whose copy on the
     // build machine is a damaged package shipping clang 17 — which cannot compile
     // react-native-reanimated's constrained partial specialisations, nor React Native's own
     // `std::format`. See plugins/withNdkVersion.js for the measurements behind the choice.
-    './plugins/withFirebaseCocoaPods',
+    './plugins/withPodModularHeaders',
     './plugins/withGradleHeap',
     './plugins/withNdkVersion',
     './plugins/withStagingSigning',
