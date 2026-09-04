@@ -285,6 +285,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // build machine is a damaged package shipping clang 17 — which cannot compile
     // react-native-reanimated's constrained partial specialisations, nor React Native's own
     // `std::format`. See plugins/withNdkVersion.js for the measurements behind the choice.
+    './plugins/withGradleHeap',
     './plugins/withNdkVersion',
     './plugins/withStagingSigning',
 
