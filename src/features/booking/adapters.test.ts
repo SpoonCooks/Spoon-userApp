@@ -1,4 +1,10 @@
-import { bookingDetailFrom, bookingRowsFrom, summaryFrom, trackingDetailFrom } from './adapters';
+import {
+  blockedNotesFrom,
+  bookingDetailFrom,
+  bookingRowsFrom,
+  summaryFrom,
+  trackingDetailFrom,
+} from './adapters';
 import { DEMO_BOOKING_CONFIRMATION } from '@/demo/fixtures/booking';
 import type { BookingDetailDto, TrackingDto } from './api';
 import type { BookingDetailViewModel } from './types';
@@ -496,3 +502,39 @@ function minutesBetween(from: string, to: string): number {
   };
   return parse(to) - parse(from);
 }
+
+/**
+ * One fact, said once.
+ *
+ * Cancel and Reschedule are separate rulings, and an instant booking refuses both for the same
+ * reason. Each note was built on its own, so the screen printed two paragraphs saying the same
+ * thing in different words -- "cannot be cancelled or moved to another time" directly above
+ * "cannot be moved to another time". From the handset, 2026-09-04.
+ */
+describe('the blocked-action notes', () => {
+  it('says it once for an instant booking', () => {
+    const notes = blockedNotesFrom({
+      cancelBlockedReason: 'INSTANT_CONFIRMED',
+      rescheduleBlockedReason: 'INSTANT_NOT_RESCHEDULABLE',
+    });
+
+    // The cancel sentence names both refusals, so it is the only one that appears.
+    expect(notes.cancelBlockedNote).toContain('cannot be cancelled or moved to another time');
+    expect(notes.rescheduleBlockedNote).toBeUndefined();
+  });
+
+  /* Two genuinely different reasons are two genuinely different things to say. */
+  it('keeps both when the reasons differ', () => {
+    const notes = blockedNotesFrom({
+      cancelBlockedReason: 'COOK_DISPATCHED',
+      rescheduleBlockedReason: 'ALREADY_RESCHEDULED',
+    });
+
+    expect(notes.cancelBlockedNote).toContain('arrived');
+    expect(notes.rescheduleBlockedNote).toContain('already been moved once');
+  });
+
+  it('says nothing when nothing is blocked', () => {
+    expect(blockedNotesFrom({})).toEqual({});
+  });
+});

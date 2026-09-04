@@ -168,14 +168,7 @@ export function summaryFrom(input: {
     scheduleLine: scheduleLineFrom(input.dto),
     rows: bookingRowsFrom(input.dto),
     rescheduleAllowed: input.dto.allowedActions.canReschedule,
-    ...(() => {
-      const n = rescheduleBlockedNoteFrom(input.dto.allowedActions.rescheduleBlockedReason);
-      return n === undefined ? {} : { rescheduleBlockedNote: n };
-    })(),
-    ...(() => {
-      const n = cancelBlockedNoteFrom(input.dto.allowedActions.cancelBlockedReason);
-      return n === undefined ? {} : { cancelBlockedNote: n };
-    })(),
+    ...blockedNotesFrom(input.dto.allowedActions),
     ...(rescheduled ? { bannerTitle: 'Rescheduled!' } : {}),
     ...(recoveryHandoff
       ? { bannerTitle: 'This booking needs attention', tone: 'warning' as const }
@@ -381,14 +374,7 @@ export function bookingDetailFrom(input: {
     ...surface,
     bannerTitle: withCookName(surface.bannerTitle, cookName),
     rescheduleAllowed: dto.allowedActions.canReschedule,
-    ...(() => {
-      const n = rescheduleBlockedNoteFrom(dto.allowedActions.rescheduleBlockedReason);
-      return n === undefined ? {} : { rescheduleBlockedNote: n };
-    })(),
-    ...(() => {
-      const n = cancelBlockedNoteFrom(dto.allowedActions.cancelBlockedReason);
-      return n === undefined ? {} : { cancelBlockedNote: n };
-    })(),
+    ...blockedNotesFrom(dto.allowedActions),
   });
 
   /**
@@ -854,4 +840,35 @@ export function rescheduleBlockedNoteFrom(reason: string | null | undefined): st
     return 'This booking has already been moved once. Cancel it and book again if the time no longer works.';
   }
   return undefined;
+}
+
+/**
+ * The two notes together, so one fact is never stated twice.
+ *
+ * Cancel and Reschedule are separate rulings with separate reasons, and for an instant booking
+ * BOTH are refused for the same reason: the cook is already on her way. Each note was built
+ * independently, so the screen printed two paragraphs that said the same thing in slightly
+ * different words -- "cannot be cancelled or moved to another time" directly above "cannot be
+ * moved to another time". Seen on the handset on 2026-09-04; it reads like a rendering fault.
+ *
+ * The cancel sentence already covers both, so it wins and the reschedule one is dropped. Where
+ * the two reasons are genuinely different -- an already-rescheduled booking that is also past
+ * its cancellation point -- both still appear, because then there really are two things to say.
+ */
+export function blockedNotesFrom(actions: {
+  readonly cancelBlockedReason?: string | null | undefined;
+  readonly rescheduleBlockedReason?: string | null | undefined;
+}): { cancelBlockedNote?: string; rescheduleBlockedNote?: string } {
+  const cancel = cancelBlockedNoteFrom(actions.cancelBlockedReason);
+  const reschedule = rescheduleBlockedNoteFrom(actions.rescheduleBlockedReason);
+
+  // One booking, one explanation: the instant sentence names both refusals itself.
+  const sameFact =
+    actions.cancelBlockedReason === 'INSTANT_CONFIRMED' &&
+    actions.rescheduleBlockedReason === 'INSTANT_NOT_RESCHEDULABLE';
+
+  return {
+    ...(cancel === undefined ? {} : { cancelBlockedNote: cancel }),
+    ...(reschedule === undefined || sameFact ? {} : { rescheduleBlockedNote: reschedule }),
+  };
 }
