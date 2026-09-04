@@ -52,8 +52,24 @@ export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
       : new Date(dto.timing.scheduledEnd);
   // Before the Start OTP the session has no `expectedEnd`; show the booking's planned end in the
   // details sheet. Once the session exists, `expectedEnd` remains the authoritative actual end.
-  const end =
-    dto.timing.expectedEnd === null ? scheduledEnd : new Date(dto.timing.expectedEnd);
+  const end = dto.timing.expectedEnd === null ? scheduledEnd : new Date(dto.timing.expectedEnd);
+
+  /**
+   * ONE CLOCK for both ends of the row.
+   *
+   * `End Time` switches to the real end the moment the Start OTP is verified, while `Start time`
+   * stayed on the booked slot — so a service booked for 2:00 that actually began at 1:54 read
+   * "2:00 PM ... 2:24 PM" beside "Duration 30 mins". Twenty-four minutes labelled thirty: the two
+   * rows were measuring from different starts, and the arithmetic on the customer's screen did
+   * not add up.
+   *
+   * Once cooking has begun, `actualStart` is what `expectedEnd` was computed from, so reading
+   * both from it makes the three rows agree. Before it, there is no actual start and the booked
+   * time is the only honest answer — which is also what the customer is waiting for.
+   */
+  const actualStart = dto.timing.actualStart === null ? null : new Date(dto.timing.actualStart);
+  const displayStart =
+    actualStart !== null && !Number.isNaN(actualStart.getTime()) ? actualStart : start;
 
   const time = (date: Date | null) =>
     date === null || Number.isNaN(date.getTime())
@@ -73,7 +89,7 @@ export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
           ? '—'
           : start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
     },
-    { label: 'Start time', value: time(start) },
+    { label: 'Start time', value: time(displayStart) },
     { label: 'Duration', value: duration },
     { label: 'End Time', value: time(end) },
   ];

@@ -307,6 +307,48 @@ describe('Booking host — in service (101:1812)', () => {
   });
 
   /**
+   * A REAL booking is priced by its own read, and by nothing else.
+   *
+   * The test above has NO `bookingId` — that is the review route, which opens the sheet to show
+   * what extensions cost, and the catalogue is the right source for it.
+   *
+   * Give the sheet a booking and the catalogue must stop pricing it. `GET /extension-options` is
+   * the only source that simulates the assigned cook's remaining day, so it is the only one that
+   * can say whether she is able to stay another ten minutes. Falling back to the catalogue made
+   * the sheet sell what was never on offer: observed on device 2026-09-04, a live service drew
+   * "10 mins" at ₹15.75 with the bar enabled, and the server refused the press with
+   * `EXTENSION_CONFLICT` — "That extension is no longer available."
+   *
+   * The stub transport has no route for `extension-options`, so this is exactly that case: the
+   * per-booking read does not answer, and the sheet must offer nothing rather than borrow prices.
+   */
+  it('never prices a real booking from the catalogue', async () => {
+    const now = 3_000_000;
+    jest.setSystemTime(now);
+
+    render(
+      <BookingDetailView
+        state={ready(demoInServiceBooking(now))}
+        bookingId="booking-under-service"
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onExtendBooking={jest.fn(() => Promise.resolve())}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('in-service-extend-cta'));
+    await settleReads();
+
+    // The catalogue's ₹15 / ₹35 are published and would have been drawn before this change.
+    expect(screen.getByTestId('extension-sheet')).toBeTruthy();
+    expect(screen.queryByText('₹35')).toBeNull();
+    expect(screen.queryByText('₹15')).toBeNull();
+    expect(screen.queryByText('Extend • ₹15.75')).toBeNull();
+    // Nothing purchasable means nothing purchasable: the bar names no price and cannot be pressed.
+    expect(screen.getByTestId('extension-submit').props.accessibilityState.disabled).toBe(true);
+  });
+
+  /**
    * Task §11 / §27 — the extension must not be a button that closes a sheet and changes nothing.
    *
    * It sends `POST /v1/bookings/:id/extensions` with the catalogue's own minutes, and the sheet

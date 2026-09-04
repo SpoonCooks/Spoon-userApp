@@ -1,4 +1,4 @@
-import { bookingDetailFrom, summaryFrom, trackingDetailFrom } from './adapters';
+import { bookingDetailFrom, bookingRowsFrom, summaryFrom, trackingDetailFrom } from './adapters';
 import { DEMO_BOOKING_CONFIRMATION } from '@/demo/fixtures/booking';
 import type { BookingDetailDto, TrackingDto } from './api';
 import type { BookingDetailViewModel } from './types';
@@ -433,3 +433,66 @@ describe('the confirmation banner says what happened to the booking', () => {
     expect(summary.bannerTitle).toBe('This booking needs attention');
   });
 });
+
+/**
+ * Date / Start time / Duration / End Time — all four read on ONE clock.
+ *
+ * `End Time` switches to the real end as soon as the Start OTP is verified. `Start time` did not,
+ * so a service booked for 2:00 that began at 1:54 drew "2:00 PM" beside "2:24 PM" and "30 mins":
+ * twenty-four minutes labelled thirty, because the two rows were measuring from different starts.
+ * Reported from the handset on 2026-09-03.
+ */
+describe('the booking details rows agree with each other', () => {
+  const dto = (timing: Record<string, unknown>): BookingDetailDto =>
+    ({
+      scheduledStart: '2026-09-03T08:30:00.000Z', // 2:00 PM IST
+      durationMinutes: 30,
+      timing: { arrivedAt: null, scheduledEnd: null, actualEnd: null, ...timing },
+    }) as never;
+
+  const valueOf = (rows: readonly { label: string; value: string }[], label: string): string =>
+    rows.find((row) => row.label === label)?.value ?? '';
+
+  it('runs the row from the real start once cooking has begun', () => {
+    const rows = bookingRowsFrom(
+      dto({
+        actualStart: '2026-09-03T08:24:00.000Z', // 1:54 PM IST
+        expectedEnd: '2026-09-03T08:54:00.000Z', // 2:24 PM IST
+      }),
+    );
+
+    // Start and End are thirty minutes apart, which is what the Duration row already claimed.
+    const start = valueOf(rows, 'Start time');
+    const end = valueOf(rows, 'End Time');
+    expect(valueOf(rows, 'Duration')).toBe('30 mins');
+    expect(start).not.toBe(end);
+    expect(minutesBetween(start, end)).toBe(30);
+  });
+
+  /*
+   * Before the Start OTP there is no actual start, and the booked time is both the only honest
+   * answer and the one the customer is waiting on.
+   */
+  it('keeps the booked time until the service actually starts', () => {
+    const rows = bookingRowsFrom(dto({ actualStart: null, expectedEnd: null }));
+
+    expect(valueOf(rows, 'Start time')).toBe(
+      new Date('2026-09-03T08:30:00.000Z').toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+    );
+  });
+});
+
+/** Minutes between two rendered `h:mm AM/PM` strings, for the agreement check above. */
+function minutesBetween(from: string, to: string): number {
+  const parse = (value: string): number => {
+    const match = /(\d+):(\d+)\s*([AP]M)?/i.exec(value);
+    if (match === null) return Number.NaN;
+    const hour = Number(match[1]) % 12;
+    const pm = (match[3] ?? '').toUpperCase() === 'PM';
+    return (hour + (pm ? 12 : 0)) * 60 + Number(match[2]);
+  };
+  return parse(to) - parse(from);
+}

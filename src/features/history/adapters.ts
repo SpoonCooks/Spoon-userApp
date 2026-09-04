@@ -86,18 +86,36 @@ export function headlineFor(
  * wins, else the bundled per-`profileCode` photograph, else no photo and the card draws its
  * initials disc.
  *
- * The rating here is the COOK's published average, the same figure the live card shows. That is
- * right while a booking is live — it is what the customer is being told about the person coming
- * — and wrong on a finished row, where a customer reads a star beside their own booking as the
- * score they gave it. Showing what they actually gave needs a field the summary does not carry
- * yet; until it does, a cancelled row shows none at all rather than the cook's.
+ * The rating here is the COOK's published average. That is right on a LIVE card, where it is
+ * what the customer is being told about the person coming, and wrong on a finished row, where a
+ * customer reads a star beside their own booking as the score they gave it.
+ *
+ * So Past bookings no longer draws it at all: {@link givenRatingFor} supplies the score the
+ * customer actually gave, and a row with no score shows no star rather than borrowing hers.
  */
-/** The cook's name and face without her score, for a row that has nothing to score. */
+/** The cook's name and face without her score, for a row that scores the service, not the cook. */
 function withoutRating(
   cook: BookingSummaryCookDto | null | undefined,
 ): Pick<BookingCardViewModel, 'cookName' | 'cookPhotoUrl'> {
   const { rating: _rating, ...rest } = cookFieldsFrom(cook);
   return rest;
+}
+
+/**
+ * The star on a Past-bookings row: what the CUSTOMER gave, or nothing.
+ *
+ * Three cases, and only the first draws a star:
+ *
+ *  - rated → their own score, which is the only number that belongs on their own row;
+ *  - completed but never rated → no star. The card has a rating prompt for that, and a
+ *    placeholder number here would be indistinguishable from a real answer;
+ *  - cancelled → no star. Nobody cooked, so there was nothing to rate. Four cancelled bookings
+ *    in a row each read "5" because the cook's average was standing in for a score that never
+ *    existed.
+ */
+function givenRatingFor(dto: BookingSummaryDto): Pick<BookingCardViewModel, 'rating'> {
+  const given = dto.ratingStars;
+  return given === null || given === undefined ? {} : { rating: given };
 }
 
 export function cookFieldsFrom(
@@ -132,14 +150,14 @@ export function bookingCardFrom(
       : { statusLabel: presentation.label, statusTone: presentation.tone }),
     amount: formatPaise(dto.price.totalAmountPaise),
     /*
-     * A cancelled booking carries no score.
+     * Her name and face, never her average — the star on this row is the customer's own.
      *
-     * Nobody cooked, so there was nothing to rate — and the star on those cards was the cook's
-     * published average, which made four cancelled bookings all read "5" as though the customer
-     * had rated each of them. It said something about the cook on a row that is about a service
-     * that never happened.
+     * The card is about a service that has already happened (or did not), so the question it
+     * answers is "how did that go", not "how is this cook rated". Those were one number, which is
+     * why a booking the customer scored 3 could show 5.
      */
-    ...(dto.status === 'cancelled' ? withoutRating(dto.cook) : cookFieldsFrom(dto.cook)),
+    ...withoutRating(dto.cook),
+    ...givenRatingFor(dto),
     ...(subtitle === undefined ? {} : { subtitle }),
   };
 }

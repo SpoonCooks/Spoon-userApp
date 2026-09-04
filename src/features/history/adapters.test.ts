@@ -143,9 +143,12 @@ describe('the date is read on the service clock, not the device', () => {
 });
 
 /*
- * Four cancelled bookings in a row each showed "5 ★". Nobody had cooked and nobody had rated —
- * that was the cook's published average, printed beside a service that never happened, where a
- * customer reads it as the score they gave.
+ * The star on a Past-bookings row is the CUSTOMER's score, never the cook's average.
+ *
+ * It was the average. Four cancelled bookings in a row each showed "5 ★" — nobody had cooked and
+ * nobody had rated — and a booking the customer had scored 3 showed 5, because the number came
+ * from the cook rather than from them. A customer reads a star on their own row as the score they
+ * gave it, so these check that the two numbers never stand in for each other again.
  */
 describe('the star on a history card', () => {
   const cook = {
@@ -157,16 +160,42 @@ describe('the star on a history card', () => {
   };
 
   it('is dropped from a cancelled booking', () => {
-    const card = bookingCardFrom(at({ status: 'cancelled', cook } as never), IST);
+    const card = bookingCardFrom(
+      at({ status: 'cancelled', cook, ratingStars: null } as never),
+      IST,
+    );
 
     expect(card.rating).toBeUndefined();
     // Her name and face stay: the row is still about who it was going to be.
     expect(card.cookName).toBe('Cook Sanchita');
   });
 
-  it('is kept on a booking that actually ran', () => {
+  it('shows what the customer gave, not what the cook averages', () => {
+    const card = bookingCardFrom(at({ status: 'completed', cook, ratingStars: 3 } as never), IST);
+
+    // 3, not her 5. This is the defect the founder reported: "in past booking we should be able
+    // to see whats the booking we gave her not her actuall current rating".
+    expect(card.rating).toBe(3);
+    expect(card.cookName).toBe('Cook Sanchita');
+  });
+
+  /*
+   * No placeholder for an unrated booking. The card carries its own rating prompt, and a number
+   * here would be indistinguishable from an answer the customer never gave.
+   */
+  it('shows no star on a completed booking nobody rated', () => {
+    const card = bookingCardFrom(
+      at({ status: 'completed', cook, ratingStars: null } as never),
+      IST,
+    );
+
+    expect(card.rating).toBeUndefined();
+  });
+
+  /* An older deployment sends no field at all; absent must behave exactly as unrated. */
+  it('treats a missing field as unrated rather than falling back to her average', () => {
     const card = bookingCardFrom(at({ status: 'completed', cook } as never), IST);
 
-    expect(card.rating).toBe(5);
+    expect(card.rating).toBeUndefined();
   });
 });

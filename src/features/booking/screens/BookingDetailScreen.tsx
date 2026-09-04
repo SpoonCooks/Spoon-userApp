@@ -122,6 +122,19 @@ export function BookingDetailView({
     optionId: extensionOptionId,
   });
 
+  /**
+   * Ask again on the way in.
+   *
+   * Which lengths the cook can absorb is a fact about her REMAINING DAY, and it decays: options
+   * read when the screen mounted may already be gone by the time the customer, minutes into a
+   * service, decides they want longer. Re-reading on open costs one request and is the difference
+   * between a sheet that reflects the service now and one that reflects it on arrival.
+   */
+  const openExtensionSheet = () => {
+    extension.refetch();
+    setExtensionOpen(true);
+  };
+
   return (
     <Screen scroll tone="plain" testID="booking-detail-screen">
       <QueryBoundary state={state} onRetry={onRetry}>
@@ -394,7 +407,7 @@ export function BookingDetailView({
             inService={booking.inService}
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
             {...callCookSeam(booking)}
-            onExtend={() => setExtensionOpen(true)}
+            onExtend={openExtensionSheet}
             onEndService={actions.onEndService ?? noop}
             {...detailsSeam(booking)}
             // Reaching zero asks the server what happens next; it never ends the session.

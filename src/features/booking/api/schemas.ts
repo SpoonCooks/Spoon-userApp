@@ -467,6 +467,15 @@ export const bookingSummarySchema = z.object({
   price: priceSchema,
   addressLabel: z.string().nullish(),
   cook: bookingSummaryCookSchema.nullish(),
+  /**
+   * The score the CUSTOMER gave this booking, null when they never rated it.
+   *
+   * Deliberately NOT `cook.ratingAverage`, which sits beside it and answers a different question.
+   * The Past-bookings card was drawing the average, so a cook with a 5.0 made every finished row
+   * read "5" whatever the customer had actually said. `nullish` so an older deployment still
+   * parses; absent behaves exactly as unrated.
+   */
+  ratingStars: z.number().nullish(),
   reassignment: bookingReassignmentSchema.nullish(),
   recovery: bookingRecoverySchema.nullish(),
 });

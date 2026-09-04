@@ -211,11 +211,7 @@ export function ConfirmationBody({
         </Text>
       )}
       {summary.rescheduleBlockedNote === undefined ? null : (
-        <Text
-          variant="caption"
-          style={styles.rescheduleNote}
-          testID="confirmation-reschedule-note"
-        >
+        <Text variant="caption" style={styles.rescheduleNote} testID="confirmation-reschedule-note">
           {summary.rescheduleBlockedNote}
         </Text>
       )}
