@@ -341,6 +341,31 @@ describe('summaryFrom server-owned action and recovery state', () => {
     expect(withReason(undefined)).toBeUndefined();
   });
 
+  /*
+   * Cancel is withheld on every instant booking once it has a cook, and instant is the only
+   * kind the pilot places — so without a line here the control just disappears from the busiest
+   * screen in the product and the customer is left guessing.
+   */
+  it('explains a withheld cancel, and stays quiet when the banner already says why', () => {
+    const withReason = (reason: string | undefined) =>
+      summaryFrom({
+        base: DEMO_BOOKING_CONFIRMATION.summary!,
+        dto: {
+          ...SUMMARY_DTO,
+          allowedActions: { ...SUMMARY_DTO.allowedActions, cancelBlockedReason: reason },
+        } as BookingDetailDto,
+      }).cancelBlockedNote;
+
+    expect(withReason('INSTANT_CONFIRMED')).toContain('cannot be cancelled once she is on her way');
+    expect(withReason('COOK_DISPATCHED')).toContain('Your cook has arrived');
+    // Terminal states are already the whole subject of the banner above.
+    expect(withReason('BOOKING_COMPLETED')).toBeUndefined();
+    expect(withReason('BOOKING_ALREADY_CANCELLED')).toBeUndefined();
+    // A code shipped later must read as "no explanation", never as a crash.
+    expect(withReason('SOMETHING_NEW')).toBeUndefined();
+    expect(withReason(undefined)).toBeUndefined();
+  });
+
   it('renders a support handoff as attention rather than confirmation', () => {
     const summary = summaryFrom({
       base: DEMO_BOOKING_CONFIRMATION.summary!,

@@ -205,6 +205,11 @@ export function ConfirmationBody({
           ) : null}
         </View>
       ) : null}
+      {summary.cancelBlockedNote === undefined ? null : (
+        <Text variant="caption" style={styles.rescheduleNote} testID="confirmation-cancel-note">
+          {summary.cancelBlockedNote}
+        </Text>
+      )}
       {summary.rescheduleBlockedNote === undefined ? null : (
         <Text
           variant="caption"

@@ -40,6 +40,15 @@ export interface BookingDetailActions {
    * state, so it reuses the `InfoDialog` the taxes explainers already use.
    */
   readonly callCookError?: string | null;
+  /**
+   * Why the last extension attempt failed, if it did.
+   *
+   * The seam that submits an extension swallowed its rejection with a comment saying the
+   * mutation surfaced it. Nothing did: the sheet simply stayed open and still, so a refused
+   * extension was indistinguishable from a dead button — which is how it was reported.
+   */
+  readonly extendError?: string | null;
+  readonly onDismissExtendError?: () => void;
   readonly onDismissCallCookError?: () => void;
   readonly onReschedule?: () => void;
   readonly onCancel?: () => void;
@@ -169,6 +178,15 @@ export function BookingDetailView({
               />
             )}
 
+            {/* FIGMA_PENDING — an extension failure has no designed frame either. */}
+            <InfoDialog
+              visible={actions.extendError !== null && actions.extendError !== undefined}
+              onClose={() => actions.onDismissExtendError?.()}
+              title="Couldn’t extend"
+              body={actions.extendError ?? ''}
+              testID="extend-error"
+            />
+
             {/* FIGMA_PENDING — a Call Cook failure has no designed frame. */}
             <InfoDialog
               visible={actions.callCookError !== null && actions.callCookError !== undefined}
@@ -200,6 +218,8 @@ export function BookingDetailView({
     return {
       onExtend: () => {
         const minutes = extensionMinutesFrom(extensionOptionId ?? serverDefaultOptionId);
+        // No option chosen and no server default: there is no length to ask for. Nothing is
+        // submitted, and the sheet keeps the choice in front of the customer.
         if (minutes === null) return;
         void submit(minutes)
           .then(() => setExtensionOpen(false))

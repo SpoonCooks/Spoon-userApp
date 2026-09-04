@@ -689,3 +689,39 @@ describe('Booking host — Cancel is gated by allowedActions (§36)', () => {
     expect(screen.getByText(DEMO_BOOKING_EN_ROUTE.tracking?.cancelLabel ?? 'Cancel')).toBeTruthy();
   });
 });
+
+/*
+ * A refused extension used to say nothing at all.
+ *
+ * The seam swallowed the rejection with a comment claiming the mutation surfaced it, and
+ * nothing did — so the sheet stayed open and still, and the button looked dead. It was
+ * reported exactly that way: "not even disabled, just unable to do that".
+ */
+describe('a failed extension', () => {
+  it('tells the customer instead of leaving the sheet silent', () => {
+    render(
+      <BookingDetailView
+        state={ready(demoInServiceBooking(Date.now()))}
+        onRetry={jest.fn()}
+        onBack={jest.fn()}
+        extendError="That length is no longer available."
+      />,
+    );
+
+    expect(screen.getByTestId('extend-error')).toBeTruthy();
+    expect(screen.getByText('That length is no longer available.')).toBeTruthy();
+  });
+
+  it('shows nothing when the extension has not failed', () => {
+    render(
+      <BookingDetailView
+        state={ready(demoInServiceBooking(Date.now()))}
+        onRetry={jest.fn()}
+        onBack={jest.fn()}
+        extendError={null}
+      />,
+    );
+
+    expect(screen.queryByTestId('extend-error')).toBeNull();
+  });
+});

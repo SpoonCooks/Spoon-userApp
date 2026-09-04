@@ -128,6 +128,14 @@ export default function BookingRoute() {
           })
         }
         extending={extend.isPending}
+        /*
+         * A refused extension has to say so. The server declines for real reasons — the
+         * session is not running, the length is no longer available, the payment did not
+         * complete — and without this the sheet just sat there, which reads as a broken
+         * button rather than an answer.
+         */
+        extendError={extend.error === null ? null : getUserMessage(normalizeError(extend.error))}
+        onDismissExtendError={() => extend.reset()}
         /**
          * `201:93` / `201:96` — the auto-cancelled rebook prompt.
          *

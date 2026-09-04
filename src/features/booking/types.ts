@@ -95,6 +95,8 @@ export interface BookingSummaryViewModel {
    * say", which hides the action.
    */
   readonly rescheduleAllowed?: boolean;
+  /** Why Cancel is absent, when the reason is not evident from the banner. */
+  readonly cancelBlockedNote?: string;
   /** Why Reschedule is absent, when the reason is not evident from the banner. */
   readonly rescheduleBlockedNote?: string;
   /**
@@ -120,6 +122,8 @@ export interface TrackingViewModel {
   readonly rescheduleLabel: string;
   /** Ruling R-3: absent means "the server did not say", which hides Reschedule. */
   readonly rescheduleAllowed?: boolean;
+  /** Why Cancel is absent, when the reason is not evident from the banner. */
+  readonly cancelBlockedNote?: string;
   /** Why Reschedule is absent, when the reason is not evident from the banner. */
   readonly rescheduleBlockedNote?: string;
 }

@@ -184,6 +184,11 @@ export function TrackingBody({
           ) : null}
         </View>
       ) : null}
+      {tracking.cancelBlockedNote === undefined ? null : (
+        <Text variant="caption" style={styles.rescheduleNote} testID="tracking-cancel-note">
+          {tracking.cancelBlockedNote}
+        </Text>
+      )}
       {tracking.rescheduleBlockedNote === undefined ? null : (
         <Text variant="caption" style={styles.rescheduleNote} testID="tracking-reschedule-note">
           {tracking.rescheduleBlockedNote}

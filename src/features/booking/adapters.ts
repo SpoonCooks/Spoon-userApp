@@ -156,6 +156,10 @@ export function summaryFrom(input: {
       const n = rescheduleBlockedNoteFrom(input.dto.allowedActions.rescheduleBlockedReason);
       return n === undefined ? {} : { rescheduleBlockedNote: n };
     })(),
+    ...(() => {
+      const n = cancelBlockedNoteFrom(input.dto.allowedActions.cancelBlockedReason);
+      return n === undefined ? {} : { cancelBlockedNote: n };
+    })(),
     ...(rescheduled ? { bannerTitle: 'Rescheduled!' } : {}),
     ...(recoveryHandoff
       ? { bannerTitle: 'This booking needs attention', tone: 'warning' as const }
@@ -364,6 +368,10 @@ export function bookingDetailFrom(input: {
     ...(() => {
       const n = rescheduleBlockedNoteFrom(dto.allowedActions.rescheduleBlockedReason);
       return n === undefined ? {} : { rescheduleBlockedNote: n };
+    })(),
+    ...(() => {
+      const n = cancelBlockedNoteFrom(dto.allowedActions.cancelBlockedReason);
+      return n === undefined ? {} : { cancelBlockedNote: n };
     })(),
   });
 
@@ -804,6 +812,24 @@ export function tipSheetFrom(input: {
  * work out for themselves get a line. COOK_DISPATCHED and the terminal states do not: the banner
  * above already says the cook has arrived, or that the booking is over.
  */
+/**
+ * The line that explains a Cancel button the customer cannot see.
+ *
+ * An instant booking is the only kind the pilot places, and it closes to cancellation the
+ * moment it has a cook — so without this the control simply disappears and the screen offers
+ * no account of itself. WhatsApp is named because something has usually gone wrong by the
+ * time somebody is looking for this, and the support handoff is the real next step.
+ */
+export function cancelBlockedNoteFrom(reason: string | null | undefined): string | undefined {
+  if (reason === 'INSTANT_CONFIRMED') {
+    return 'An instant booking sends a cook out straight away, so it cannot be cancelled once she is on her way. Message us on WhatsApp if something has gone wrong.';
+  }
+  if (reason === 'COOK_DISPATCHED') {
+    return 'Your cook has arrived, so this can no longer be cancelled here. Message us on WhatsApp if something has gone wrong.';
+  }
+  return undefined;
+}
+
 export function rescheduleBlockedNoteFrom(reason: string | null | undefined): string | undefined {
   if (reason === 'INSTANT_NOT_RESCHEDULABLE') {
     return 'An instant booking brings a cook out now, so it cannot be moved to a later time. Cancel it and book the time you want.';
