@@ -184,17 +184,59 @@ export function useKeyboardAwareScroll(
     [keyboardHeight, gap],
   );
 
-  const reveal = useCallback(() => {
+  /**
+   * The taller control to reveal INSTEAD of the bare focused input, while focus stays inside it.
+   *
+   * Without this, `revealView` could never fire at a useful moment on a control that opens a list.
+   * Three things happen in this order when the grown-up-food search is tapped, and the reveal has
+   * to survive all three:
+   *
+   *   1. the field takes focus       -> `onInputFocus` runs, and `keyboardHeight` is still 0,
+   *                                     so `revealNode` returns immediately;
+   *   2. the options list opens      -> the block relayouts and calls `revealView`, and the
+   *                                     keyboard STILL has not reported, so that returns too;
+   *   3. the keyboard opens          -> the viewport's `marginBottom` changes, `onViewportLayout`
+   *                                     fires, and this is the first moment the geometry is real.
+   *
+   * Step 3 used to reveal `currentlyFocusedInput()` — the search field, which sits ABOVE its own
+   * list and is usually already clear of the keyboard, so the overlap computed to zero and
+   * nothing moved. The list, the entire reason the customer tapped, stayed underneath the IME.
+   *
+   * The block's own `onLayout` does not fire again either: shrinking the viewport moves the
+   * ScrollView's frame, not the position of the content inside it.
+   *
+   * So the node asked for in step 2 is remembered and used in step 3. `onInputFocus` clears it,
+   * which keeps every ordinary field behaving exactly as before and means only a control that
+   * explicitly asked to be revealed whole keeps that treatment — and only until focus leaves it.
+   */
+  const preferred = useRef<MeasurableNode | null>(null);
+
+  const revealView = useCallback(
+    (node: MeasurableNode | null) => {
+      preferred.current = node;
+      revealNode(node);
+    },
+    [revealNode],
+  );
+
+  /** Focus moving to a plain field retires any remembered control. */
+  const revealFocusedInput = useCallback(() => {
+    preferred.current = null;
     revealNode(TextInput.State.currentlyFocusedInput());
+  }, [revealNode]);
+
+  /** The relayout that follows the keyboard: prefer the whole control, fall back to the input. */
+  const revealPreferred = useCallback(() => {
+    revealNode(preferred.current ?? TextInput.State.currentlyFocusedInput());
   }, [revealNode]);
 
   return {
     scrollRef,
     viewportRef,
-    onViewportLayout: reveal,
+    onViewportLayout: revealPreferred,
     onScroll,
-    onInputFocus: reveal,
-    revealView: revealNode,
+    onInputFocus: revealFocusedInput,
+    revealView,
   };
 }
 
