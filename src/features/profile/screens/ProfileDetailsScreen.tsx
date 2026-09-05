@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -117,8 +117,18 @@ export function ProfileDetailsView({
 
   const keyboardHeight = useKeyboardHeight();
   const bottomGutter = useBottomGutter(lightTheme.space.lg);
-  const { scrollRef, viewportRef, onViewportLayout, onScroll, onInputFocus } =
+  const { scrollRef, viewportRef, onViewportLayout, onScroll, onInputFocus, revealView } =
     useKeyboardAwareScroll(keyboardHeight);
+
+  /**
+   * The grown-up-food search and the list it opens, measured together.
+   *
+   * `onInputFocus` reveals the INPUT, and on this control that is not enough: the list renders
+   * BELOW the field, so a scroll that stops as soon as the field's own bottom edge clears the
+   * IME leaves every option behind the keyboard — which is the whole thing the customer tapped
+   * the field to see. Revealing the wrapper reveals both.
+   */
+  const entryBlockRef = useRef<View>(null);
 
   /**
    * The ONE gate (task §6). The CTA is drawn from it and the handler asks it again, so a grey
@@ -237,7 +247,17 @@ export function ProfileDetailsView({
             {/* `341:4655` — the MULTI-select. Adding is a submit on the search field; removing is
                 the chip's own cross. Both go through `validation.ts`, so removing one value
                 cannot disturb the others (founder rule, task §5). */}
-            <View style={styles.block}>
+            <View
+              ref={entryBlockRef}
+              /**
+               * Fires when the list opens, closes or changes length — which is exactly when the
+               * control's height changes and the reveal has to be recomputed. Focus alone is one
+               * commit too early: the list is not laid out yet, so there is nothing to measure.
+               */
+              onLayout={() => revealView(entryBlockRef.current)}
+              style={styles.block}
+              testID="profile-grown-up-block"
+            >
               <Text variant="fieldSection" color="textPrimary">
                 {profilePromptField('grownUpEating').label}
               </Text>
@@ -278,7 +298,7 @@ export function ProfileDetailsView({
                     setEntryOpen(false);
                   }}
                   placeholder={profilePromptField('grownUpEating').placeholder}
-                  placeholderTextColor={lightTheme.colors.textSecondary}
+                  placeholderTextColor={lightTheme.colors.textPlaceholder}
                   accessibilityLabel={profilePromptField('grownUpEating').label}
                   style={styles.searchInput}
                   returnKeyType="done"
@@ -496,7 +516,7 @@ function FieldInput({
       onChangeText={onChangeText}
       onFocus={onFocus}
       placeholder={placeholder}
-      placeholderTextColor={lightTheme.colors.textSecondary}
+      placeholderTextColor={lightTheme.colors.textPlaceholder}
       accessibilityLabel={placeholder}
       style={[styles.input, tone === 'gold' ? styles.inputGold : styles.inputLime]}
       testID={testID}

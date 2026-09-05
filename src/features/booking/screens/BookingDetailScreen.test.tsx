@@ -307,6 +307,48 @@ describe('Booking host — in service (101:1812)', () => {
   });
 
   /**
+   * A REAL booking is priced by its own read, and by nothing else.
+   *
+   * The test above has NO `bookingId` — that is the review route, which opens the sheet to show
+   * what extensions cost, and the catalogue is the right source for it.
+   *
+   * Give the sheet a booking and the catalogue must stop pricing it. `GET /extension-options` is
+   * the only source that simulates the assigned cook's remaining day, so it is the only one that
+   * can say whether she is able to stay another ten minutes. Falling back to the catalogue made
+   * the sheet sell what was never on offer: observed on device 2026-09-04, a live service drew
+   * "10 mins" at ₹15.75 with the bar enabled, and the server refused the press with
+   * `EXTENSION_CONFLICT` — "That extension is no longer available."
+   *
+   * The stub transport has no route for `extension-options`, so this is exactly that case: the
+   * per-booking read does not answer, and the sheet must offer nothing rather than borrow prices.
+   */
+  it('never prices a real booking from the catalogue', async () => {
+    const now = 3_000_000;
+    jest.setSystemTime(now);
+
+    render(
+      <BookingDetailView
+        state={ready(demoInServiceBooking(now))}
+        bookingId="booking-under-service"
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onExtendBooking={jest.fn(() => Promise.resolve())}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('in-service-extend-cta'));
+    await settleReads();
+
+    // The catalogue's ₹15 / ₹35 are published and would have been drawn before this change.
+    expect(screen.getByTestId('extension-sheet')).toBeTruthy();
+    expect(screen.queryByText('₹35')).toBeNull();
+    expect(screen.queryByText('₹15')).toBeNull();
+    expect(screen.queryByText('Extend • ₹15.75')).toBeNull();
+    // Nothing purchasable means nothing purchasable: the bar names no price and cannot be pressed.
+    expect(screen.getByTestId('extension-submit').props.accessibilityState.disabled).toBe(true);
+  });
+
+  /**
    * Task §11 / §27 — the extension must not be a button that closes a sheet and changes nothing.
    *
    * It sends `POST /v1/bookings/:id/extensions` with the catalogue's own minutes, and the sheet
@@ -399,7 +441,7 @@ describe('Booking host — in service (101:1812)', () => {
 });
 
 describe('Booking host — completion (143:207)', () => {
-  it('renders the rating scale and keeps feedback submission disabled while empty', () => {
+  it('renders the rating scale and keeps Submit disabled until a rating is picked', () => {
     render(
       <BookingDetailView
         state={ready(DEMO_BOOKING_COMPLETION)}
@@ -410,6 +452,30 @@ describe('Booking host — completion (143:207)', () => {
 
     expect(screen.getByTestId('completion-rating')).toBeTruthy();
     expect(screen.getByTestId('completion-submit').props.accessibilityState.disabled).toBe(true);
+  });
+
+  /**
+   * The regression this screen actually shipped: Submit was gated on the FEEDBACK text, so a
+   * customer who picked a rating and wrote nothing found the button dead with no explanation.
+   * The rating is what the screen exists to collect, and the words are optional — the submit
+   * handler already drops an empty string from the request.
+   */
+  it('enables Submit on the rating alone and sends it with no feedback', () => {
+    const onSubmitFeedback = jest.fn();
+    render(
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_COMPLETION)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onSubmitFeedback={onSubmitFeedback}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('completion-rating-5'));
+    expect(screen.getByTestId('completion-submit').props.accessibilityState.disabled).toBe(false);
+
+    fireEvent.press(screen.getByTestId('completion-submit'));
+    expect(onSubmitFeedback).toHaveBeenCalledWith('', 5);
   });
 
   it('accepts a half-step rating and opens the tip sheet from the `308:3121` row', () => {
@@ -438,6 +504,33 @@ describe('Booking host — completion (143:207)', () => {
     expect(screen.getByTestId('tip-sheet')).toBeTruthy();
   });
 
+  it('updates the tip CTA to the selected catalogue amount', () => {
+    const tip = DEMO_BOOKING_COMPLETION.tip;
+    if (tip === undefined) throw new Error('expected the completion fixture to include tips');
+
+    const booking = {
+      ...DEMO_BOOKING_COMPLETION,
+      tip: {
+        ...tip,
+        options: [{ id: 'tip-20', label: '₹20' }, ...tip.options],
+      },
+    };
+
+    render(
+      <BookingDetailView
+        state={ready(booking)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onSelectTip={jest.fn(() => new Promise<void>(() => undefined))}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('completion-tip-row'));
+    fireEvent.press(screen.getByTestId('tip-sheet-option-tip-20'));
+
+    expect(screen.getByText('Tip • ₹20')).toBeTruthy();
+  });
+
   it('drops the scale and the Submit chip once the SERVER says the feedback is in', () => {
     render(
       <BookingDetailView
@@ -451,7 +544,11 @@ describe('Booking host — completion (143:207)', () => {
     expect(screen.getByTestId('completion-rating-prompt')).toBeTruthy();
     expect(screen.queryByTestId('completion-rating-5')).toBeNull();
     expect(screen.queryByTestId('completion-submit')).toBeNull();
-    expect(screen.getByText('Thanks for sharing your feedback!')).toBeTruthy();
+    // `319:3191` — the heading reports the submission rather than repeating the invitation, and
+    // the acknowledgement is the shorter v16 line.
+    expect(screen.getByText('Rating & Feedback submitted!')).toBeTruthy();
+    expect(screen.getByText('Thanks for sharing!')).toBeTruthy();
+    expect(screen.queryByText('Your feedback helps us improve!')).toBeNull();
   });
 });
 
@@ -632,5 +729,41 @@ describe('Booking host — Cancel is gated by allowedActions (§36)', () => {
     );
 
     expect(screen.getByText(DEMO_BOOKING_EN_ROUTE.tracking?.cancelLabel ?? 'Cancel')).toBeTruthy();
+  });
+});
+
+/*
+ * A refused extension used to say nothing at all.
+ *
+ * The seam swallowed the rejection with a comment claiming the mutation surfaced it, and
+ * nothing did — so the sheet stayed open and still, and the button looked dead. It was
+ * reported exactly that way: "not even disabled, just unable to do that".
+ */
+describe('a failed extension', () => {
+  it('tells the customer instead of leaving the sheet silent', () => {
+    render(
+      <BookingDetailView
+        state={ready(demoInServiceBooking(Date.now()))}
+        onRetry={jest.fn()}
+        onBack={jest.fn()}
+        extendError="That length is no longer available."
+      />,
+    );
+
+    expect(screen.getByTestId('extend-error')).toBeTruthy();
+    expect(screen.getByText('That length is no longer available.')).toBeTruthy();
+  });
+
+  it('shows nothing when the extension has not failed', () => {
+    render(
+      <BookingDetailView
+        state={ready(demoInServiceBooking(Date.now()))}
+        onRetry={jest.fn()}
+        onBack={jest.fn()}
+        extendError={null}
+      />,
+    );
+
+    expect(screen.queryByTestId('extend-error')).toBeNull();
   });
 });

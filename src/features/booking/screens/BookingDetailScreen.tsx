@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { DataState } from '@core/data';
 import { getLogger } from '@core/logging';
@@ -15,6 +15,7 @@ import { InServiceBody } from '../components/InServiceBody';
 import { TipSheet } from '../components/TipSheet';
 import { TrackingBody } from '../components/TrackingBody';
 import { extensionMinutesFrom } from '../adapters';
+import { useMarkCancellationSeen } from '../api/hooks';
 import { useBookingDetailData, useExtensionData } from '../data';
 import type { BookingDetailViewModel } from '../types';
 
@@ -39,6 +40,15 @@ export interface BookingDetailActions {
    * state, so it reuses the `InfoDialog` the taxes explainers already use.
    */
   readonly callCookError?: string | null;
+  /**
+   * Why the last extension attempt failed, if it did.
+   *
+   * The seam that submits an extension swallowed its rejection with a comment saying the
+   * mutation surfaced it. Nothing did: the sheet simply stayed open and still, so a refused
+   * extension was indistinguishable from a dead button — which is how it was reported.
+   */
+  readonly extendError?: string | null;
+  readonly onDismissExtendError?: () => void;
   readonly onDismissCallCookError?: () => void;
   readonly onReschedule?: () => void;
   readonly onCancel?: () => void;
@@ -112,6 +122,19 @@ export function BookingDetailView({
     optionId: extensionOptionId,
   });
 
+  /**
+   * Ask again on the way in.
+   *
+   * Which lengths the cook can absorb is a fact about her REMAINING DAY, and it decays: options
+   * read when the screen mounted may already be gone by the time the customer, minutes into a
+   * service, decides they want longer. Re-reading on open costs one request and is the difference
+   * between a sheet that reflects the service now and one that reflects it on arrival.
+   */
+  const openExtensionSheet = () => {
+    extension.refetch();
+    setExtensionOpen(true);
+  };
+
   return (
     <Screen scroll tone="plain" testID="booking-detail-screen">
       <QueryBoundary state={state} onRetry={onRetry}>
@@ -168,6 +191,15 @@ export function BookingDetailView({
               />
             )}
 
+            {/* FIGMA_PENDING — an extension failure has no designed frame either. */}
+            <InfoDialog
+              visible={actions.extendError !== null && actions.extendError !== undefined}
+              onClose={() => actions.onDismissExtendError?.()}
+              title="Couldn’t extend"
+              body={actions.extendError ?? ''}
+              testID="extend-error"
+            />
+
             {/* FIGMA_PENDING — a Call Cook failure has no designed frame. */}
             <InfoDialog
               visible={actions.callCookError !== null && actions.callCookError !== undefined}
@@ -199,6 +231,8 @@ export function BookingDetailView({
     return {
       onExtend: () => {
         const minutes = extensionMinutesFrom(extensionOptionId ?? serverDefaultOptionId);
+        // No option chosen and no server default: there is no length to ask for. Nothing is
+        // submitted, and the sheet keeps the choice in front of the customer.
         if (minutes === null) return;
         void submit(minutes)
           .then(() => setExtensionOpen(false))
@@ -265,26 +299,29 @@ export function BookingDetailView({
    * attached, both of which the backend decides, so offering the control on any basis other than
    * its answer would put the customer in a flow it will refuse.
    */
-  /**
-   * §11 — an INSTANT booking offers neither control, on any lifecycle view.
+  /*
+   * Both controls are the server's verdict alone.
    *
-   * Expressed once, here, rather than at each of the four call sites, so a view added later
-   * cannot quietly reintroduce them. `slotType` absent is treated as NOT instant: the safe
-   * direction is to keep obeying `allowedActions`, which is what a scheduled booking needs.
+   * §11 used to be enforced a second time here, as "an INSTANT booking offers neither control".
+   * When the owner reopened cancellation for instant on 2026-09-03 the backend started saying yes
+   * and this screen went on saying no, so the button stayed off the screen and the change looked
+   * like it had not shipped. A rule with two homes only ever gets moved into one of them.
+   *
+   * `cancelAllowed` and `rescheduleAllowed` are both computed backend-side from the same
+   * predicates the cancel and reschedule commands enforce, so a control offered here cannot be
+   * refused on press.
    */
-  function instantBooking(booking: BookingDetailViewModel): boolean {
-    return booking.slotType === 'instant';
-  }
-
   function cancelSeam(booking: BookingDetailViewModel) {
     if (actions.onCancel === undefined || booking.cancelAllowed !== true) return {};
-    if (instantBooking(booking)) return {};
     return { onCancel: actions.onCancel };
   }
 
-  /** Reschedule is likewise removed for instant, and otherwise left to the server's verdict. */
   function rescheduleSeam(booking: BookingDetailViewModel) {
-    if (actions.onReschedule === undefined || instantBooking(booking)) return {};
+    const serverAllowed =
+      booking.summary?.rescheduleAllowed === true ||
+      booking.tracking?.rescheduleAllowed === true ||
+      booking.reassigned?.rescheduleAllowed === true;
+    if (actions.onReschedule === undefined || !serverAllowed) return {};
     return { onReschedule: actions.onReschedule };
   }
 
@@ -370,7 +407,7 @@ export function BookingDetailView({
             inService={booking.inService}
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
             {...callCookSeam(booking)}
-            onExtend={() => setExtensionOpen(true)}
+            onExtend={openExtensionSheet}
             onEndService={actions.onEndService ?? noop}
             {...detailsSeam(booking)}
             // Reaching zero asks the server what happens next; it never ends the session.
@@ -441,6 +478,30 @@ export function BookingDetailScreen({
   ...actions
 }: BookingDetailActions & { readonly bookingId: string }) {
   const { state, refetch } = useBookingDetailData(bookingId);
+
+  /**
+   * Arriving on `201:278` IS the acknowledgement of Spoon's apology.
+   *
+   * Home keeps drawing the Cancelled banner (`393:1072`) until the server is told the customer
+   * has read it. The design offers nothing to press — no "Got it", no dismiss — so the only
+   * honest signal is that this page was actually opened.
+   *
+   * Fired once per booking, guarded by a ref rather than by the effect's dependencies: `state`
+   * changes identity on every refetch and poll, and without the guard each one would re-post.
+   * The server keeps the first instant regardless, so a duplicate is harmless — this just avoids
+   * making the request at all.
+   */
+  const seen = useMarkCancellationSeen();
+  const acknowledged = useRef<string | null>(null);
+  const isAutoCancelled = state.status === 'ready' && state.data.view === 'autoCancelled';
+
+  useEffect(() => {
+    if (!isAutoCancelled || bookingId === '' || acknowledged.current === bookingId) return;
+    acknowledged.current = bookingId;
+    // Fire and forget: see `useMarkCancellationSeen` for why a failure stays silent here.
+    seen.mutate({ bookingId });
+  }, [isAutoCancelled, bookingId, seen]);
+
   /**
    * KEYED BY BOOKING. Expo Router keeps this route mounted and swaps the param, so without a key
    * the view's local state — the rating in progress, an open sheet, a chosen extension option —

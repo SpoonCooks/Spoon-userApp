@@ -143,6 +143,15 @@ export interface HomeBannerInput {
   readonly ratingPrompt?: string;
   /** True when the server has handed an elapsed, unserved booking to support. */
   readonly recoveryHandoff?: boolean;
+  /**
+   * Whether the assigned cook has real travel evidence — origin, route, departure time.
+   *
+   * `false` is a CAPACITY-level assignment: rostered and free, but the server cannot say when
+   * anybody will arrive. The banner must not imply travel is under way in that state. Absent
+   * (older deployment) is treated as ready, preserving the behaviour that shipped before the
+   * field existed rather than blanking every banner.
+   */
+  readonly dispatchReady?: boolean;
 }
 
 /** The drawn copy. Labels on a card; no endpoint serves them and none is expected to. */
@@ -159,6 +168,16 @@ const COPY = {
   captionArrivedAt: 'Arrived at',
   captionTimeLeft: 'Time left',
   badgeConfirmed: 'Confirmed!',
+  /**
+   * `assigned`, but the server reports no travel evidence for this cook.
+   *
+   * "Confirmed!" claims the booking is settled AND that a named cook is coming. With
+   * `dispatchReady: false` the platform cannot say when, or whether, anybody will arrive — on
+   * 2026-08-30 a customer watched precisely that state for an hour under a confident badge.
+   * The design draws no card for it, so the smallest honest change is the badge word: the
+   * booking IS placed; what is not yet true is that a cook is on the way.
+   */
+  badgeAssigning: 'Assigning cook',
   attention: 'Booking needs attention',
   badgeAttention: 'Needs attention',
   badgeCompleted: 'Completed!',
@@ -166,6 +185,32 @@ const COPY = {
   badgeArrived: 'Arrived',
   badgeUnknown: '—',
 } as const;
+
+/**
+ * The badge for a placed booking, in descending order of urgency.
+ *
+ * Attention outranks everything — a booking in support handoff has a bigger problem than an
+ * unproven cook. Below that, readiness decides whether "Confirmed!" is a true statement.
+ */
+function placedBadge(input: HomeBannerInput): string {
+  if (input.recoveryHandoff === true) return COPY.badgeAttention;
+  /*
+   * `Assigning cook` only when there is genuinely no cook.
+   *
+   * `dispatchReady: false` means the platform could not compute a DEPARTURE PLAN -- on
+   * 2026-09-01 the plan for a 5:00 AM booking existed with `travel_source: 'unavailable'` and a
+   * null `required_start_at`, because the cook had no position to route from. That is a statement
+   * about the ETA, not about whether anybody is coming.
+   *
+   * Treating it as the latter put "Assigning cook" directly above a card naming Test Cook, with
+   * her photograph, her cuisines and a `Call Cook` button. The two cannot both be true, and the
+   * customer is left to guess which half to believe. Where a cook IS named the booking is
+   * confirmed and says so; what stays absent is the arrival time, which this banner does not
+   * promise in the placed state anyway.
+   */
+  if (input.dispatchReady === false && (input.cookName ?? '') === '') return COPY.badgeAssigning;
+  return COPY.badgeConfirmed;
+}
 
 function minutesBadge(minutes: number | null | undefined, fallback: string): string {
   return minutes === null || minutes === undefined ? fallback : `${minutes} mins`;
@@ -217,7 +262,7 @@ export function homeBannerFor(input: HomeBannerInput): HomeBannerViewModel | nul
         ...identity,
         variant,
         title: input.recoveryHandoff === true ? COPY.attention : COPY.confirmed,
-        badgeValue: input.recoveryHandoff === true ? COPY.badgeAttention : COPY.badgeConfirmed,
+        badgeValue: placedBadge(input),
       };
 
     case 'reassignedConfirmed':
@@ -225,7 +270,7 @@ export function homeBannerFor(input: HomeBannerInput): HomeBannerViewModel | nul
         ...identity,
         variant,
         title: input.recoveryHandoff === true ? COPY.attention : COPY.reassigned,
-        badgeValue: input.recoveryHandoff === true ? COPY.badgeAttention : COPY.badgeConfirmed,
+        badgeValue: placedBadge(input),
       };
 
     case 'arriving':

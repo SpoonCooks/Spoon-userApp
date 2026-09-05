@@ -128,10 +128,13 @@ export function useRefundHistoryData(): ScreenQuery<BookingListViewModel> {
             : `Refund • ${formatPaise(refund.amountPaise)}`,
           ...cookFieldsFrom(refund.cook),
           amount: formatPaise(refund.amountPaise),
+          // `71:615` separates the two halves with a MIDDLE DOT, not a hyphen. A hyphen between
+          // a status and a date reads as a range ("complete - 17th Apr"), which is the one
+          // meaning it does not have.
           subtitle:
             refund.completedAt !== null
-              ? `Refund complete - ${outcomeDay}`
-              : `Refund processing - ${outcomeDay}`,
+              ? `Refund complete · ${outcomeDay}`
+              : `Refund processing · ${outcomeDay}`,
           ...(presentation === undefined
             ? {}
             : { statusLabel: presentation.label, statusTone: presentation.tone }),

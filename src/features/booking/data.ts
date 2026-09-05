@@ -565,21 +565,34 @@ export function useExtensionData(
     const published =
       catalogue.state.status === 'ready' ? (catalogue.state.data.extension?.options ?? null) : null;
 
-    // Neither source has answered. The sheet keeps its designed copy, and every price on it is
-    // withheld rather than transcribed — `options: []` draws the fallback block, not a price list.
-    if (live === null && published === null) {
+    /**
+     * A REAL booking is priced by its own read, and by nothing else.
+     *
+     * The catalogue publishes SKUs — the lengths Spoon sells and what they cost. It cannot know
+     * whether the cook standing in this customer's kitchen can stay another ten minutes, which is
+     * what `GET /extension-options` answers by simulating her remaining day.
+     *
+     * Falling back to the catalogue for a booking made the sheet lie. Observed on device: a live
+     * service showed "10 mins" at a transcribed ₹15.75 with the CTA enabled, the customer pressed
+     * it, and the server refused with `EXTENSION_CONFLICT` — "That extension is no longer
+     * available." It had never been available. The per-booking read had not answered, so the sheet
+     * borrowed prices from a source with no view of the cook's schedule and sold against them.
+     *
+     * So the catalogue now prices the sheet ONLY where there is no booking to price against — the
+     * review route, which opens the sheet to show what extensions cost. For a booking, an
+     * unanswered read means nothing is offered, which is the truthful reading of "we do not yet
+     * know that she can stay".
+     */
+    const forBooking = selection.bookingId !== null && selection.bookingId !== undefined;
+    const source = forBooking ? live : published;
+
+    // Nothing to sell. The sheet keeps its designed copy and every price on it is withheld rather
+    // than transcribed — `options: []` draws the fallback block, not a price list.
+    if (source === null) {
       return ready<ExtensionViewModel>(unofferedExtension());
     }
 
-    /**
-     * The per-booking read wins wherever it exists.
-     *
-     * Both sources publish `pricePaise` (the tile amount) and `totalAmountPaise` (the tax-inclusive
-     * CTA amount), so either can price the sheet honestly. The per-booking read is preferred
-     * because it prices THIS service — it also states each option's `newExpectedEnd` and omits any
-     * option the assigned cook's schedule cannot absorb, neither of which a catalogue can know.
-     */
-    const options = (live ?? published ?? []).map((option) => ({
+    const options = source.map((option) => ({
       minutes: option.minutes,
       pricePaise: option.pricePaise,
       totalAmountPaise: option.totalAmountPaise,
@@ -618,7 +631,7 @@ export function useExtensionData(
         ? withoutCtaPrice(base)
         : { ...base, ctaLabel: `Extend • ${formatPaise(chosen.totalAmountPaise)}` },
     );
-  }, [catalogue.state, bookingOptions.state, optionId]);
+  }, [catalogue.state, bookingOptions.state, optionId, selection.bookingId]);
 
   return {
     state,
@@ -750,7 +763,13 @@ export function useBookingDetailData(bookingId: string): ScreenQuery<BookingDeta
     });
 
     const withTracking =
-      tracked === null ? detail : trackingDetailFrom({ base: detail, dto: tracked });
+      tracked === null
+        ? detail
+        : trackingDetailFrom({
+            base: detail,
+            dto: tracked,
+            scheduledStartIso: dto.scheduledStart,
+          });
 
     // Until the catalogue is in, the sheet keeps its designed copy rather than showing an empty
     // amount row — and it cannot be opened to a wrong figure, because the amounts only appear

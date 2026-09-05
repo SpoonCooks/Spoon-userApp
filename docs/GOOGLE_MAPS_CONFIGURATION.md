@@ -73,15 +73,24 @@ restriction (or given its own key) before a release build can render a map.
 
 ### Application identities
 
-The Android package and the iOS bundle identifier are the same string in development and staging,
-and **deliberately differ in production**: the Apple App ID registered for release is
-`com.spoonhelp.customer`, while Android stays on `com.spoonhelp.userapp`.
+The Android package and the iOS bundle identifier are **the same string in every environment**.
 
 | Environment | `android.package` | `ios.bundleIdentifier` |
 | --- | --- | --- |
 | development | `com.spoonhelp.userapp.dev` | `com.spoonhelp.userapp.dev` |
 | staging | `com.spoonhelp.userapp.staging` | `com.spoonhelp.userapp.staging` |
-| production | `com.spoonhelp.userapp` | `com.spoonhelp.customer` |
+| production | `com.spoonhelp.customer` | `com.spoonhelp.customer` |
+
+> **Changed 2026-09-02.** Production used to differ — Android on `com.spoonhelp.userapp`, iOS on
+> `com.spoonhelp.customer` — because the latter is the Apple App ID registered for App Store
+> Connect app 6803578695. Two names for one app meant every external registration keyed on the
+> identity had to be done twice and kept in step: the Maps key restrictions below, the Firebase
+> Android app entry, the push sender identity. Each is a silent failure when it drifts — a grey
+> map, or a device token no push can reach.
+>
+> Android moved to Apple's name rather than the reverse, because the Apple App ID cannot change.
+> It was done before the Android app was published: a Play package name is permanent once
+> uploaded, so this was the last moment the two could be aligned at all.
 
 Both values are carried in `extra` as well (`extra.androidPackage`, `extra.iosBundleIdentifier`) and
 sent as `X-Android-Package` / `X-Ios-Bundle-Identifier`, so each key's application restriction must

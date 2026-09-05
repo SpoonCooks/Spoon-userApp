@@ -101,7 +101,8 @@ describe('Auto cancelled — `201:278`', () => {
     expect(screen.getByTestId('auto-cancelled-summary')).toBeTruthy();
     expect(screen.getByTestId('auto-cancelled-apology')).toBeTruthy();
     expect(screen.getByTestId('auto-cancelled-refund')).toBeTruthy();
-    expect(screen.getByText('This booking has been cancelled')).toBeTruthy();
+    // `201:278`'s own heading. It read "This booking has been cancelled" before v16.
+    expect(screen.getByText('Sorry, this booking is cancelled')).toBeTruthy();
   });
 
   it('renders the SUPPLIED refund amount and never derives it', () => {

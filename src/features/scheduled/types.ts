@@ -102,6 +102,13 @@ export interface ScheduleViewModel {
    * `267:3521`. See the audit for the Meal Brief entry-point consequence.
    */
   readonly paymentDetailsLabel?: string;
+  /**
+   * `25:1585` — the taxes/fee explainer the payment line opens, identical to the Instant sheet's.
+   *
+   * Present in book mode only. Its presence is what makes `paymentDetailsLabel` a live control:
+   * a link with no sheet behind it is the dead control §11 forbids.
+   */
+  readonly taxesInfo?: { readonly title: string; readonly body: string };
   /** Set when the server says this booking may no longer be rescheduled (ruling R-3). */
   readonly blockedMessage?: string;
   /**

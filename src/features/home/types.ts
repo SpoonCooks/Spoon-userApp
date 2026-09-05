@@ -102,10 +102,22 @@ export interface HomeViewModel {
   /** @deprecated Not present in Page 3a. See `HomeTrustItemViewModel`. */
   readonly trust?: readonly HomeTrustItemViewModel[];
   /**
-   * Present → the booking-banner variant of Home (`381:511`). Absent → the pre-booking Home
-   * (`1:455`). ONE screen either way; see `state/homeBannerView.ts` for how the variant is chosen.
+   * Every booking the customer currently has, most urgent first.
+   *
+   * NON-EMPTY → the booking-banner variant of Home (`381:511`). Empty or absent → the pre-booking
+   * Home (`1:455`). ONE screen either way; see `state/homeBannerView.ts` for how the variant is
+   * chosen. Ruling R-2 is unchanged — it now reads "has a booking" as "the list is not empty".
+   *
+   * A LIST, because customers really do hold more than one at a time and Home used to hide the
+   * rest: `GET /v1/me/bookings/active` returns up to 20, and this screen sorted them, took the
+   * first and dropped the others on the floor. A customer with an 11:30 and a 2:00 booking saw one
+   * card and no hint the second existed.
+   *
+   * Order is the server's ranking (`cooking` → `arrived` → `en_route` → `assigned` → `created` →
+   * `completed` → `cancelled`, then by time), so index 0 is the one that matters now. Nothing here
+   * re-ranks it.
    */
-  readonly activeBooking?: HomeBannerViewModel;
+  readonly activeBookings?: readonly HomeBannerViewModel[];
   /** Present on the pre-booking variant only. */
   readonly marketing?: HomeMarketingViewModel;
 }

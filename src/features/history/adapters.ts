@@ -2,7 +2,7 @@ import { formatPaise } from '@core/format';
 import type { BookingSummaryCookDto, BookingSummaryDto } from '@features/booking';
 import { formatServiceDate, serviceDateIn } from '@features/scheduled';
 import type { BookingCardViewModel, StatusTone } from '@ui';
-import { cookCardContentFor } from '@ui/components/cookCardContent';
+import { cookPhotoFor } from '@ui/components/cookPhoto';
 
 import type { BookingListViewModel } from './types';
 
@@ -84,14 +84,48 @@ export function headlineFor(
  *
  * The photograph resolves exactly as the live cook card resolves it: a hosted `profileImageUrl`
  * wins, else the bundled per-`profileCode` photograph, else no photo and the card draws its
- * initials disc. The rating is the COOK's own published average — the same figure the live card
- * shows — never the rating this customer gave the booking.
+ * initials disc.
+ *
+ * The rating here is the COOK's published average. That is right on a LIVE card, where it is
+ * what the customer is being told about the person coming, and wrong on a finished row, where a
+ * customer reads a star beside their own booking as the score they gave it.
+ *
+ * So Past bookings no longer draws it at all: {@link givenRatingFor} supplies the score the
+ * customer actually gave, and a row with no score shows no star rather than borrowing hers.
  */
+/** The cook's name and face without her score, for a row that scores the service, not the cook. */
+function withoutRating(
+  cook: BookingSummaryCookDto | null | undefined,
+): Pick<BookingCardViewModel, 'cookName' | 'cookPhotoUrl'> {
+  const { rating: _rating, ...rest } = cookFieldsFrom(cook);
+  return rest;
+}
+
+/**
+ * The star on a Past-bookings row: what the CUSTOMER gave, or nothing.
+ *
+ * Three cases, and only the first draws a star:
+ *
+ *  - rated → their own score, which is the only number that belongs on their own row;
+ *  - completed but never rated → no star. The card has a rating prompt for that, and a
+ *    placeholder number here would be indistinguishable from a real answer;
+ *  - cancelled → no star. Nobody cooked, so there was nothing to rate. Four cancelled bookings
+ *    in a row each read "5" because the cook's average was standing in for a score that never
+ *    existed.
+ */
+function givenRatingFor(dto: BookingSummaryDto): Pick<BookingCardViewModel, 'rating'> {
+  const given = dto.ratingStars;
+  return given === null || given === undefined ? {} : { rating: given };
+}
+
 export function cookFieldsFrom(
   cook: BookingSummaryCookDto | null | undefined,
 ): Pick<BookingCardViewModel, 'cookName' | 'cookPhotoUrl' | 'rating'> {
   if (cook === null || cook === undefined) return {};
-  const photoUrl = cook.profileImageUrl ?? cookCardContentFor(cook.profileCode)?.photoUrl;
+  // Was `cook.profileImageUrl ?? ...` here and `cook.photoUrl ?? ...` in the booking adapter --
+  // two spellings of one server field, so whichever surface read the wrong one silently drew
+  // nothing. The resolver accepts both.
+  const photoUrl = cookPhotoFor(cook) ?? undefined;
   return {
     cookName: cook.displayName,
     ...(photoUrl === undefined ? {} : { cookPhotoUrl: photoUrl }),
@@ -106,6 +140,7 @@ export function bookingCardFrom(
   timeZone?: string | undefined,
 ): BookingCardViewModel {
   const presentation = STATUS_PRESENTATION[dto.status];
+  const subtitle = bookingSubtitleFor(dto, timeZone);
 
   return {
     id: dto.id,
@@ -114,11 +149,44 @@ export function bookingCardFrom(
       ? {}
       : { statusLabel: presentation.label, statusTone: presentation.tone }),
     amount: formatPaise(dto.price.totalAmountPaise),
-    ...cookFieldsFrom(dto.cook),
-    ...(dto.addressLabel === null || dto.addressLabel === undefined
-      ? {}
-      : { subtitle: dto.addressLabel }),
+    /*
+     * Her name and face, never her average — the star on this row is the customer's own.
+     *
+     * The card is about a service that has already happened (or did not), so the question it
+     * answers is "how did that go", not "how is this cook rated". Those were one number, which is
+     * why a booking the customer scored 3 could show 5.
+     */
+    ...withoutRating(dto.cook),
+    ...givenRatingFor(dto),
+    ...(subtitle === undefined ? {} : { subtitle }),
   };
+}
+
+/**
+ * `6:227` — the line under the cook's name: `Scheduled · 4:00 PM`, or a bare `Instant`.
+ *
+ * It used to be the ADDRESS label, so every row read "Home". That is the least distinguishing
+ * fact on the card — a customer's bookings are nearly all at the same address — while HOW and
+ * WHEN the booking ran is what tells two rows apart. An instant booking carries no start time in
+ * the frame because it had none to promise: it was whenever a cook could get there.
+ */
+function bookingSubtitleFor(
+  dto: Pick<BookingSummaryDto, 'slotType' | 'scheduledStart'>,
+  timeZone?: string | undefined,
+): string | undefined {
+  if (dto.slotType === 'instant') return 'Instant';
+  if (dto.scheduledStart === null) return 'Scheduled';
+  const instant = new Date(dto.scheduledStart);
+  if (Number.isNaN(instant.getTime())) return 'Scheduled';
+  const time = new Intl.DateTimeFormat('en-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    ...(timeZone === undefined ? {} : { timeZone }),
+  })
+    .format(instant)
+    .toUpperCase();
+  return `Scheduled · ${time}`;
 }
 
 export function bookingListFrom(input: {

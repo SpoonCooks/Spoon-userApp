@@ -48,15 +48,44 @@ export function toServiceDate(date: Date, timeZone?: string): string {
   return serviceDateIn(timeZone, date);
 }
 
-/** The day strip, sized by the published horizon. */
+/**
+ * The day strip, sized by the published horizon — and rolled PAST today the moment today's last
+ * bookable start has gone by.
+ *
+ * The boundary is `max(latestStartLocalMinute)` across the published durations: the last minute
+ * at which ANY slot can still start today, published by the catalogue and derived from the
+ * operating window, so a change to the cooks' hours moves it without a release (founder ruling
+ * 2026-08-29: "8 PM khatam hote hi it should default to tomorrow; if we have cooks till 9 PM,
+ * it should automatically be 9 PM"). Until this, the strip led with a TODAY whose every slot was
+ * `SLOT_IN_PAST` and only midnight fixed it.
+ *
+ * ## The horizon is an END, not a length
+ *
+ * The strip SHORTENS when it rolls. `horizonDays` counts days from TODAY — the scheduler rejects
+ * anything at `dayOffset >= horizonDays` with `OUTSIDE_BOOKING_WINDOW` — so once today is dropped
+ * there are only `horizonDays - 1` sellable days left. Keeping the chip COUNT instead of the
+ * horizon's end drew a third chip at today+3 every evening after the last start, and tapping it
+ * asked the server for a date it always refuses. Two real chips beat three with a trap in the last
+ * one.
+ */
 export function daysFrom(
   catalogue: Catalogue,
   now: Date = new Date(),
 ): readonly ScheduleDayOption[] {
   const timeZone = catalogue.operatingWindow.timeZone;
   const today = serviceDateIn(timeZone, now);
+  // A catalogue with no published latest starts cannot say when today ends, so it keeps the old
+  // midnight behaviour rather than guessing today away.
+  const lastStartMinute = Math.max(
+    0,
+    ...catalogue.durations.map((duration) => duration.latestStartLocalMinute),
+  );
+  const todayExhausted = lastStartMinute > 0 && localMinuteIn(timeZone, now) >= lastStartMinute;
+  const firstOffset = todayExhausted ? 1 : 0;
+  const length = Math.max(0, catalogue.scheduled.horizonDays - firstOffset);
 
-  return Array.from({ length: catalogue.scheduled.horizonDays }, (_unused, offset) => {
+  return Array.from({ length }, (_unused, index) => {
+    const offset = firstOffset + index;
     // Stepped on the DATE, not on an instant: adding days to a local `Date` can be dragged across
     // a boundary by the device's offset, and the strip would then offer a day the server does not
     // recognise as today+n.
@@ -282,6 +311,25 @@ export function scheduleFrom(input: {
     }),
     // Reschedule moves WHEN, never HOW LONG — so it publishes no duration tiles.
     ...(base.mode === 'reschedule' ? {} : { durations: durationsFrom(catalogue) }),
+    /*
+     * `275:4180` — the underlined "Check payment details" line beneath Book NOW.
+     *
+     * This was withheld as FIGMA_PENDING on the reading that no breakdown sheet was drawn for
+     * Scheduled. The founder confirmed against frame 5d (2026-08-31) that the line IS on the
+     * Scheduled screen and opens the same taxes sheet the Instant sheet raises. Book mode only:
+     * a reschedule is free and takes no payment, so it has no breakdown to open.
+     */
+    ...(base.mode === 'reschedule'
+      ? {}
+      : {
+          paymentDetailsLabel: 'Check payment details',
+          taxesInfo: {
+            title: 'What is Taxes and Fee?',
+            body:
+              'Taxes levied as per Govt. regulations, subject to change basis final service ' +
+              'value. This includes a 5% GST.',
+          },
+        }),
     slotsByPeriod: slotsByPeriodFrom({
       catalogue,
       availability: pending ? null : input.availability,

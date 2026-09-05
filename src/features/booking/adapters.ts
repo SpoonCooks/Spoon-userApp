@@ -1,6 +1,7 @@
-import { formatPaise } from '@core/format';
+import { formatPaise, promisedArrivalAt } from '@core/format';
 import type { CookViewModel, DetailRow } from '@ui';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
+import { cookPhotoFor } from '@ui/components/cookPhoto';
 
 import { currentSkewMs } from '@core/time';
 
@@ -9,6 +10,7 @@ import { viewForBooking } from './state/bookingStatusView';
 import type {
   BookingDetailViewModel,
   BookingSummaryViewModel,
+  InServiceViewModel,
   TipSheetViewModel,
   TrackingViewModel,
 } from './types';
@@ -42,7 +44,32 @@ import type { BookingDetailsViewModel } from './components/BookingDetailsSheet';
 /** `3:1095` — Date / Start time / Duration / End Time, formatted from server instants. */
 export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
   const start = dto.scheduledStart === null ? null : new Date(dto.scheduledStart);
-  const end = dto.timing.expectedEnd === null ? null : new Date(dto.timing.expectedEnd);
+  const scheduledEnd =
+    dto.timing.scheduledEnd === null || dto.timing.scheduledEnd === undefined
+      ? start === null || Number.isNaN(start.getTime())
+        ? null
+        : new Date(start.getTime() + dto.durationMinutes * 60_000)
+      : new Date(dto.timing.scheduledEnd);
+  // Before the Start OTP the session has no `expectedEnd`; show the booking's planned end in the
+  // details sheet. Once the session exists, `expectedEnd` remains the authoritative actual end.
+  const end = dto.timing.expectedEnd === null ? scheduledEnd : new Date(dto.timing.expectedEnd);
+
+  /**
+   * ONE CLOCK for both ends of the row.
+   *
+   * `End Time` switches to the real end the moment the Start OTP is verified, while `Start time`
+   * stayed on the booked slot — so a service booked for 2:00 that actually began at 1:54 read
+   * "2:00 PM ... 2:24 PM" beside "Duration 30 mins". Twenty-four minutes labelled thirty: the two
+   * rows were measuring from different starts, and the arithmetic on the customer's screen did
+   * not add up.
+   *
+   * Once cooking has begun, `actualStart` is what `expectedEnd` was computed from, so reading
+   * both from it makes the three rows agree. Before it, there is no actual start and the booked
+   * time is the only honest answer — which is also what the customer is waiting for.
+   */
+  const actualStart = dto.timing.actualStart === null ? null : new Date(dto.timing.actualStart);
+  const displayStart =
+    actualStart !== null && !Number.isNaN(actualStart.getTime()) ? actualStart : start;
 
   const time = (date: Date | null) =>
     date === null || Number.isNaN(date.getTime())
@@ -62,7 +89,7 @@ export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
           ? '—'
           : start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
     },
-    { label: 'Start time', value: time(start) },
+    { label: 'Start time', value: time(displayStart) },
     { label: 'Duration', value: duration },
     { label: 'End Time', value: time(end) },
   ];
@@ -122,11 +149,27 @@ export function summaryFrom(input: {
 }): BookingSummaryViewModel {
   const recoveryHandoff = input.dto.recovery?.state === 'support_handoff';
 
+  /**
+   * `687:92` — the Rescheduled flow's own confirmation, which is the same frame as the confirmed
+   * one with a different word in the banner.
+   *
+   * Read from the SERVER's `rescheduleCount`, never inferred from having just come through the
+   * reschedule screen: reopening the booking later must still say what happened to it, and a
+   * navigation flag would forget. A pre-revision deployment omits the field, and the banner then
+   * reads "Booking confirmed!" exactly as before.
+   *
+   * The handoff banner still wins — a booking that needs attention has something more urgent to
+   * say than how it was last moved.
+   */
+  const rescheduled = (input.dto.rescheduleCount ?? 0) > 0;
+
   return {
     ...input.base,
     scheduleLine: scheduleLineFrom(input.dto),
     rows: bookingRowsFrom(input.dto),
     rescheduleAllowed: input.dto.allowedActions.canReschedule,
+    ...blockedNotesFrom(input.dto.allowedActions),
+    ...(rescheduled ? { bannerTitle: 'Rescheduled!' } : {}),
     ...(recoveryHandoff
       ? { bannerTitle: 'This booking needs attention', tone: 'warning' as const }
       : {}),
@@ -195,7 +238,7 @@ function cookViewModelFrom(
   bookingId: string,
 ): CookViewModel {
   const content = cookCardContentFor(cook.profileCode);
-  const photoUrl = cook.photoUrl ?? content?.photoUrl;
+  const photoUrl = cookPhotoFor(cook);
   const languages = cook.languages ?? [];
   const cuisine = cook.cuisines?.[0];
   const anyBadge =
@@ -331,6 +374,7 @@ export function bookingDetailFrom(input: {
     ...surface,
     bannerTitle: withCookName(surface.bannerTitle, cookName),
     rescheduleAllowed: dto.allowedActions.canReschedule,
+    ...blockedNotesFrom(dto.allowedActions),
   });
 
   /**
@@ -384,14 +428,33 @@ export function bookingDetailFrom(input: {
      * code back; leaving the fixture's `111` here would show the customer a code that ends
      * nothing — and would show it in the one place they are being asked to read digits aloud.
      */
+    /*
+     * 12a `101:1812`, and 12b `292:1197` when the server reports an extension.
+     *
+     * The notice used to be unreachable: the detail carried no extension field, so nothing could
+     * populate it, and the fixture's copy was deliberately not inherited. It is a SERVER report --
+     * `extension.minutes` -- and never inferred from a moved `expectedEnd`, which also moves when
+     * a service merely starts late and would have apologised for an extension nobody bought.
+     *
+     * Dropped when absent rather than left in place, the same rule `omitReassignNotice` applies:
+     * a screen rendered from designed copy must not announce something that never happened.
+     */
     ...(base.inService === undefined
       ? {}
       : {
           inService: {
-            ...base.inService,
+            ...omitExtendedNotice(base.inService),
             endsAtMs: expectedEndMsFrom(dto.timing.expectedEnd),
             clockSkewMs: currentSkewMs(),
             otpCode: '',
+            ...(dto.extension == null
+              ? {}
+              : {
+                  extendedNotice: {
+                    title: 'Booking extended!',
+                    body: `End time extended by ${dto.extension.minutes} mins`,
+                  },
+                }),
           },
         }),
     // Arrival is backend-confirmed state. The customer message and displayed clock time must not
@@ -461,6 +524,16 @@ export function bookingDetailFrom(input: {
   };
 }
 
+/**
+ * Exact-optional-safe removal, so a designed screen's own extension notice cannot survive onto a
+ * booking that was never extended. The sibling of `omitReassignNotice`, for the same reason.
+ */
+function omitExtendedNotice(inService: InServiceViewModel): InServiceViewModel {
+  if (inService.extendedNotice === undefined) return inService;
+  const { extendedNotice: _dropped, ...rest } = inService;
+  return rest;
+}
+
 /** Exact-optional-safe removal: the key is dropped, never set to `undefined`. */
 function omitReassignNotice(summary: BookingSummaryViewModel): BookingSummaryViewModel {
   if (summary.reassignNotice === undefined) return summary;
@@ -503,12 +576,14 @@ function omitReassignNotice(summary: BookingSummaryViewModel): BookingSummaryVie
 export function trackingDetailFrom(input: {
   readonly base: BookingDetailViewModel;
   readonly dto: TrackingDto;
+  /** The booking's own start. The arrival shown to a customer is never earlier than this. */
+  readonly scheduledStartIso?: string | null;
 }): BookingDetailViewModel {
   const { base, dto } = input;
 
   const start = dto.serviceOtp?.start;
   const end = dto.serviceOtp?.end;
-  const etaLabel = etaLabelFrom(dto.eta.estimatedArrivalAt);
+  const etaLabel = etaLabelFrom(dto.eta.estimatedArrivalAt, input.scheduledStartIso);
   const arrivedAtLabel = arrivedAtLabelFrom(dto.arrivedAt);
   const late = isLateVerdict(dto.timingVerdict);
   const knownVerdict = dto.timingVerdict === 'ON_TIME' || dto.timingVerdict === 'LATE';
@@ -569,11 +644,64 @@ export function trackingDetailFrom(input: {
  * The arrival instant as the banner draws it. `null` when the server has no ETA, which leaves the
  * designed copy in place instead of rendering an empty or invented time.
  */
-function etaLabelFrom(estimatedArrivalAt: string | null): string | null {
+function etaLabelFrom(
+  estimatedArrivalAt: string | null,
+  scheduledStartIso?: string | null,
+): string | null {
   if (estimatedArrivalAt === null) return null;
-  const at = new Date(estimatedArrivalAt);
-  if (Number.isNaN(at.getTime())) return null;
-  return at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const projected = new Date(estimatedArrivalAt);
+  if (Number.isNaN(projected.getTime())) return null;
+
+  /*
+   * Never earlier than the booking itself.
+   *
+   * The projection answers "when would she get there if she left now", and a cook who sets off
+   * early gets there early: at 11:06 for an 11:30 booking the customer was told the cook arrives
+   * in 2 MINUTES. True about the walk, and useless as a promise -- nobody is at the door at 11:08,
+   * and a customer who believes it goes and waits.
+   *
+   * The booking is what the customer was sold, so the soonest they are told to expect anyone is
+   * the time they chose. A LATE arrival is unaffected: it is after the start, so the projection
+   * still wins and the delay is reported honestly.
+   */
+  // The clamp lives in `core/format/arrival` because Home draws the same number, and the two
+  // disagreed on screen when only this one applied it.
+  const at = promisedArrivalAt(projected, scheduledStartIso);
+
+  /*
+   * MINUTES REMAINING, because that is what the label above it promises.
+   *
+   * `9a` reads "Cook is arriving in" over "16 mins". This returned a clock time, so the screen
+   * said "Cook Test Cook is arriving in / 7:38 AM" -- the wrong quantity, and a sentence that does
+   * not finish. Seen on the handset on 2026-09-02.
+   *
+   * `Date.now() + currentSkewMs()` is the SERVER's clock as this device best knows it, the same
+   * correction the in-service countdown uses. A handset minutes out would otherwise report a
+   * remaining time nobody else agrees with, off one correct arrival instant.
+   */
+  const remainingMs = at.getTime() - (Date.now() + currentSkewMs());
+  /*
+   * ROUNDED, because the Home banner (`minutesUntil`) and the Cook App both round, and a customer
+   * comparing the two screens must not see different numbers for one arrival. This briefly used
+   * `Math.ceil`, which is why the booking page said "3 mins" while Home and the cook's own card
+   * both said 2.
+   */
+  const minutes = Math.round(remainingMs / 60_000);
+
+  /*
+   * FIGMA_PENDING: the frames draw only a positive number, because a projected arrival is normally
+   * still ahead. An ETA that has passed without an arrival is reachable — a stalled cook, a late
+   * refresh — and printing "0 mins" or a negative reads as broken rather than imminent. The
+   * banner's own late copy carries the story; this says only that the wait is short.
+   *
+   * It must also FIT. `94:1097` is a fixed 122pt panel and the label is `numberOfLines={1}`, so
+   * anything wider than about "16 mins" is silently ellipsised — which is exactly what happened to
+   * the "Any moment" this used to return: the banner read "Any mo…", which says nothing at all.
+   * Seven characters is the working budget, and this stays inside it while keeping the minutes
+   * register the positive case uses.
+   */
+  if (minutes <= 0) return '< 1 min';
+  return `${minutes} ${minutes === 1 ? 'min' : 'mins'}`;
 }
 
 /** The persisted backend arrival instant, never a handset detection time or an ETA. */
@@ -639,6 +767,18 @@ export function extensionMinutesFrom(optionId: string | null): number | null {
  */
 const DRAWN_DEFAULT_TIP_PAISE = 5000;
 
+/**
+ * `306:3060` — the tip CTA names the amount it will charge.
+ *
+ * Exported because the SHEET has to rebuild it: the label was composed once here from the
+ * preselected amount and then rendered verbatim, so choosing ₹20 left the button reading
+ * "Tip • ₹50" — and pressing it charged ₹20, which is worse than the wrong number alone. Both
+ * sides now format through this, so the button and the selection cannot name different prices.
+ */
+export function tipCtaLabelFor(amountLabel: string): string {
+  return `Tip • ${amountLabel}`;
+}
+
 export function tipSheetFrom(input: {
   readonly base: TipSheetViewModel;
   readonly suggestedAmountsPaise: readonly number[];
@@ -662,6 +802,73 @@ export function tipSheetFrom(input: {
     ...(preselected === null ? {} : { defaultOptionId: tipIdFor(preselected) }),
     // `306:3060` — the CTA carries the amount. Recomputed from the SAME server figure the
     // preselection uses, so the button can never name a price the sheet does not offer.
-    ...(preselected === null ? {} : { ctaLabel: `Tip • ${formatAmount(preselected)}` }),
+    ...(preselected === null ? {} : { ctaLabel: tipCtaLabelFor(formatAmount(preselected)) }),
+  };
+}
+
+/**
+ * The one line that explains a Reschedule button the customer cannot see.
+ *
+ * The button is hidden rather than disabled, so when cancellation is closed too the whole action
+ * row disappears and the screen accounts for none of it. Only the two reasons a customer cannot
+ * work out for themselves get a line. COOK_DISPATCHED and the terminal states do not: the banner
+ * above already says the cook has arrived, or that the booking is over.
+ */
+/**
+ * The line that explains a Cancel button the customer cannot see.
+ *
+ * An instant booking is the only kind the pilot places, and it closes to cancellation the
+ * moment it has a cook — so without this the control simply disappears and the screen offers
+ * no account of itself. WhatsApp is named because something has usually gone wrong by the
+ * time somebody is looking for this, and the support handoff is the real next step.
+ */
+export function cancelBlockedNoteFrom(reason: string | null | undefined): string | undefined {
+  if (reason === 'INSTANT_CONFIRMED') {
+    return 'An instant booking sends a cook out straight away, so it cannot be cancelled or moved to another time. Message us on WhatsApp if something has gone wrong.';
+  }
+  if (reason === 'COOK_DISPATCHED') {
+    return 'Your cook has arrived, so this can no longer be cancelled here. Message us on WhatsApp if something has gone wrong.';
+  }
+  return undefined;
+}
+
+export function rescheduleBlockedNoteFrom(reason: string | null | undefined): string | undefined {
+  if (reason === 'INSTANT_NOT_RESCHEDULABLE') {
+    return 'An instant booking brings a cook out now, so it cannot be moved to another time. Message us on WhatsApp if something has gone wrong.';
+  }
+  if (reason === 'ALREADY_RESCHEDULED') {
+    return 'This booking has already been moved once. Cancel it and book again if the time no longer works.';
+  }
+  return undefined;
+}
+
+/**
+ * The two notes together, so one fact is never stated twice.
+ *
+ * Cancel and Reschedule are separate rulings with separate reasons, and for an instant booking
+ * BOTH are refused for the same reason: the cook is already on her way. Each note was built
+ * independently, so the screen printed two paragraphs that said the same thing in slightly
+ * different words -- "cannot be cancelled or moved to another time" directly above "cannot be
+ * moved to another time". Seen on the handset on 2026-09-04; it reads like a rendering fault.
+ *
+ * The cancel sentence already covers both, so it wins and the reschedule one is dropped. Where
+ * the two reasons are genuinely different -- an already-rescheduled booking that is also past
+ * its cancellation point -- both still appear, because then there really are two things to say.
+ */
+export function blockedNotesFrom(actions: {
+  readonly cancelBlockedReason?: string | null | undefined;
+  readonly rescheduleBlockedReason?: string | null | undefined;
+}): { cancelBlockedNote?: string; rescheduleBlockedNote?: string } {
+  const cancel = cancelBlockedNoteFrom(actions.cancelBlockedReason);
+  const reschedule = rescheduleBlockedNoteFrom(actions.rescheduleBlockedReason);
+
+  // One booking, one explanation: the instant sentence names both refusals itself.
+  const sameFact =
+    actions.cancelBlockedReason === 'INSTANT_CONFIRMED' &&
+    actions.rescheduleBlockedReason === 'INSTANT_NOT_RESCHEDULABLE';
+
+  return {
+    ...(cancel === undefined ? {} : { cancelBlockedNote: cancel }),
+    ...(reschedule === undefined || sameFact ? {} : { rescheduleBlockedNote: reschedule }),
   };
 }

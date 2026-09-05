@@ -8,6 +8,7 @@ import {
   NoteCard,
   NoticeCard,
   StatusBanner,
+  Text,
   lightTheme,
 } from '@ui';
 import type { CookViewModel } from '@ui';
@@ -204,11 +205,29 @@ export function ConfirmationBody({
           ) : null}
         </View>
       ) : null}
+      {summary.cancelBlockedNote === undefined ? null : (
+        <Text variant="caption" style={styles.rescheduleNote} testID="confirmation-cancel-note">
+          {summary.cancelBlockedNote}
+        </Text>
+      )}
+      {summary.rescheduleBlockedNote === undefined ? null : (
+        <Text variant="caption" style={styles.rescheduleNote} testID="confirmation-reschedule-note">
+          {summary.rescheduleBlockedNote}
+        </Text>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  /**
+   * The note sits where the Reschedule button would have been, indented to the same gutter as the
+   * action bars so it reads as a replacement for the missing control rather than a page footnote.
+   */
+  rescheduleNote: {
+    color: lightTheme.colors.textMuted,
+    paddingHorizontal: lightTheme.space.xs,
+  },
   /** `3:1042` — the section BOXES sit 16pt apart; each inserts its own 4/6 inset. */
   container: { gap: SERVICE_SECTION_GAP },
   /**

@@ -45,13 +45,26 @@ export interface HomePromiseProps {
 }
 
 const styles = StyleSheet.create({
-  /** `144:438` — a 304pt row: the mark, 10pt, then the line. */
+  /**
+   * `144:438` — a 304pt row: the mark, 10pt, then the line.
+   *
+   * CENTRED as a group (founder instruction, 2026-08-31). It was `alignSelf: 'stretch'` with the
+   * line on `flex: 1`, so the pair filled the full width and sat hard against the left edge while
+   * the "Spoon's promise" heading directly above it was centred — the mark ended up under the
+   * start of the heading rather than under its middle, and the section read as misaligned on the
+   * device. The row now sizes to its content and centres, so mark and line stay a single centred
+   * unit under the title.
+   *
+   * The line keeps the frame's 254pt measure and may shrink below it on a narrow screen; it no
+   * longer GROWS to fill, which is what pushed the group off-centre.
+   */
   vision: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'stretch',
+    alignSelf: 'center',
+    justifyContent: 'center',
     gap: HOME_DESIGN.promise.gap,
   },
   logo: { width: HOME_DESIGN.promise.logo, height: HOME_DESIGN.promise.logo },
-  line: { flex: 1, minWidth: 0 },
+  line: { flexShrink: 1, minWidth: 0, maxWidth: HOME_DESIGN.promise.lineWidth },
 });

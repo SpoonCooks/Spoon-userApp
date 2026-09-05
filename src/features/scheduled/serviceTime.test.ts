@@ -135,6 +135,32 @@ describe('the calendar day is the service day', () => {
     expect(days[2]?.caption).toBe('TUESDAY');
     expect(days[2]?.label).toContain('25');
   });
+
+  it('rolls the strip to tomorrow once today’s last published start has passed', () => {
+    // The shortest duration may start until 21:30 IST — the catalogue's own latest start.
+    const catalogue = {
+      ...catalogueIn('Asia/Kolkata'),
+      durations: [{ latestStartLocalMinute: 21 * 60 + 30 }, { latestStartLocalMinute: 20 * 60 }],
+    } as unknown as Parameters<typeof daysFrom>[0];
+
+    // 21:29 IST — one bookable minute left, so today still leads the strip.
+    const before = daysFrom(catalogue, new Date('2026-08-23T15:59:00.000Z'));
+    expect(before[0]?.id).toBe('2026-08-23');
+    expect(before[0]?.caption).toBe('TODAY');
+
+    // 21:30 IST — today's slots are finished; the strip leads with tomorrow, captioned as such.
+    const after = daysFrom(catalogue, new Date('2026-08-23T16:00:00.000Z'));
+    expect(after[0]?.caption).toBe('TOMORROW');
+
+    /*
+     * And it SHORTENS rather than sliding. `horizonDays` counts from today, and the scheduler
+     * rejects `dayOffset >= horizonDays` as OUTSIDE_BOOKING_WINDOW, so dropping today leaves two
+     * sellable days — not three. Keeping the count drew a third chip at 2026-08-26 (today+3)
+     * every evening, and tapping it asked for a date the server always refuses.
+     */
+    expect(after.map((day) => day.id)).toEqual(['2026-08-24', '2026-08-25']);
+    expect(after.map((day) => day.id)).not.toContain('2026-08-26');
+  });
 });
 
 /**

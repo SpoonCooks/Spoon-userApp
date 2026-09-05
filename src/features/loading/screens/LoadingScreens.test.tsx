@@ -4,7 +4,7 @@ import { ready } from '@core/data';
 import { DEMO_PROFILE } from '@/demo/fixtures/screens';
 import { ProfileView } from '@features/profile';
 
-import { IntroLoading, SplashLoading } from './LoadingScreens';
+import { ConfirmationLoading, IntroLoading, SplashLoading } from './LoadingScreens';
 
 describe('Designed loading states (73:1036, 71:747)', () => {
   it('renders the splash with the brand logo, not a spinner', () => {
@@ -24,6 +24,14 @@ describe('Designed loading states (73:1036, 71:747)', () => {
   it('takes its headline from the caller', () => {
     render(<IntroLoading headline="Finding your cook" />);
     expect(screen.getByText('Finding your cook')).toBeTruthy();
+  });
+
+  it('keeps the confirmation mark fixed rather than rotating the supplied artwork', () => {
+    render(<ConfirmationLoading />);
+
+    const mark = screen.getByTestId('confirmation-loading-mark');
+    expect(mark.props.style).toEqual(expect.objectContaining({ width: 220.66, height: 216.32 }));
+    expect(mark.props.style).not.toEqual(expect.objectContaining({ transform: expect.anything() }));
   });
 
   describe('the splash never advances the app on its own', () => {

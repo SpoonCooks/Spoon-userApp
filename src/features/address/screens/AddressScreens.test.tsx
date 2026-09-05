@@ -145,6 +145,59 @@ describe('Select service location (53:31)', () => {
     expect(screen.getByTestId('address-search').props.value).toBe('Indira');
   });
 
+  /**
+   * Clearing a long address should not be twenty taps on backspace.
+   *
+   * FIGMA_PENDING: `53:64` draws the field with a leading search glyph and nothing trailing, so
+   * the control appears only when there is something to clear and an empty field stays as drawn.
+   */
+  describe('the search field can be cleared in one tap', () => {
+    it('shows no clear control while the field is empty', () => {
+      render(
+        <AddressLocationView
+          state={ready(DEMO_ADDRESS_LOCATION)}
+          {...props}
+          map={{ ...mapProps, coordinates: POINT, query: '' }}
+        />,
+      );
+
+      expect(screen.queryByTestId('address-search-clear')).toBeNull();
+    });
+
+    it('empties the field and tells the parent, so the predictions go with it', () => {
+      const onSearch = jest.fn();
+      render(
+        <AddressLocationView
+          state={ready(DEMO_ADDRESS_LOCATION)}
+          {...props}
+          map={{ ...mapProps, coordinates: POINT, query: 'Indiranagar 100ft Road', onSearch }}
+        />,
+      );
+
+      fireEvent.press(screen.getByTestId('address-search-clear'));
+
+      expect(screen.getByTestId('address-search').props.value).toBe('');
+      // Not just the input: an empty field over the last query's results is the worse state.
+      expect(onSearch).toHaveBeenCalledWith('');
+    });
+
+    it('appears as soon as something is typed, and goes once it is gone', () => {
+      render(
+        <AddressLocationView
+          state={ready(DEMO_ADDRESS_LOCATION)}
+          {...props}
+          map={{ ...mapProps, coordinates: POINT, query: '' }}
+        />,
+      );
+
+      fireEvent.changeText(screen.getByTestId('address-search'), 'Indira');
+      expect(screen.getByTestId('address-search-clear')).toBeTruthy();
+
+      fireEvent.press(screen.getByTestId('address-search-clear'));
+      expect(screen.queryByTestId('address-search-clear')).toBeNull();
+    });
+  });
+
   it('draws NO map until a point exists — a map has to be centred on something real', () => {
     render(
       <AddressLocationView

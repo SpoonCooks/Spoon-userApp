@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import type { ImageSourcePropType, KeyboardTypeOptions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
@@ -744,7 +744,13 @@ function AddressSearchResults({
       {suggestions.map((suggestion) => (
         <Pressable
           key={suggestion.placeId}
-          onPress={() => onChoose(suggestion.placeId)}
+          onPress={() => {
+            // Choosing a prediction IS the end of searching. Leaving the keyboard up after it
+            // covered the CTA the customer now wants, on the one screen whose whole purpose is
+            // to end with Confirm.
+            Keyboard.dismiss();
+            onChoose(suggestion.placeId);
+          }}
           accessibilityRole="button"
           accessibilityLabel={`${suggestion.primary}. ${suggestion.secondary}`}
           style={({ pressed }) => [styles.suggestionRow, pressed ? styles.pressed : null]}
@@ -806,6 +812,7 @@ function SearchInput({
 }) {
   const [text, setText] = useState(value);
   const [seen, setSeen] = useState(value);
+  const inputRef = useRef<TextInput>(null);
 
   // Derived during render rather than in an effect: an effect would draw the stale text for one
   // frame first, and the flash is visible on the handset.
@@ -814,20 +821,67 @@ function SearchInput({
     if (value !== text) setText(value);
   }
 
+  const clear = () => {
+    // `seen` is deliberately NOT touched. It records the last value the PARENT sent, and the
+    // reconciliation above resets the field whenever that changes -- so writing `''` into it here
+    // made the next render see `value !== seen` and snap the old query straight back. Clearing is
+    // the customer typing an empty string, and it takes exactly the path typing takes.
+    setText('');
+    // Announced to the parent so the Places predictions clear with the text. Clearing only the
+    // input would leave the last query's results hanging under an empty field.
+    onChange?.('');
+    // Focus is kept deliberately: the reason to clear a search is to type a different one, and
+    // dropping the keyboard here would cost a second tap to do the obvious next thing.
+    inputRef.current?.focus();
+  };
+
   return (
-    <TextInput
-      value={text}
-      onChangeText={(next) => {
-        setText(next);
-        onChange?.(next);
-      }}
-      placeholder={placeholder}
-      placeholderTextColor={lightTheme.colors.textPlaceholder}
-      accessibilityLabel={placeholder}
-      style={styles.searchInput}
-      returnKeyType="search"
-      testID="address-search"
-    />
+    <>
+      <TextInput
+        ref={inputRef}
+        value={text}
+        onChangeText={(next) => {
+          setText(next);
+          onChange?.(next);
+        }}
+        placeholder={placeholder}
+        placeholderTextColor={lightTheme.colors.textPlaceholder}
+        accessibilityLabel={placeholder}
+        style={styles.searchInput}
+        returnKeyType="search"
+        /*
+         * The search key has to end the search.
+         *
+         * `returnKeyType="search"` only labels the key; with no `onSubmitEditing` behind it, tapping
+         * it did nothing and the keyboard stayed up over `Confirm` — so a customer who had already
+         * found their address had no way to get to the button without guessing at a tap on the map.
+         * Dismissing explicitly rather than relying on `blurOnSubmit` because the field sits inside
+         * a sticky bar over the map, where a blur alone does not always retract the keyboard.
+         */
+        onSubmitEditing={() => Keyboard.dismiss()}
+        testID="address-search"
+      />
+      {/*
+        Clearing a long address should not be twenty taps on backspace.
+        FIGMA_PENDING: `53:64` draws the field with a leading search glyph and nothing trailing.
+        The control appears only when there is something to clear, so an empty field is drawn
+        exactly as the frame does.
+      */}
+      {text === '' ? null : (
+        <Pressable
+          onPress={clear}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search"
+          // The glyph is 16pt inside a 24pt box; `hitSlop` carries it to the 44pt target without
+          // widening the field the frame specifies.
+          hitSlop={12}
+          style={styles.searchClear}
+          testID="address-search-clear"
+        >
+          <Icon name="close" size={16} color="textSecondary" />
+        </Pressable>
+      )}
+    </>
   );
 }
 
@@ -1186,16 +1240,8 @@ function AddressDetailsForm({
                     resizeMode="cover"
                     accessibilityIgnoresInvertColors
                   />
-                  <Image
-                    source={ADDRESS_MAP_PIN}
-                    style={styles.changeAreaPin}
-                    resizeMode="contain"
-                    accessibilityIgnoresInvertColors
-                  />
-                  {/* `63:808` — Livvic SemiBold 11/16.5 at 70% black, centred on y 40. */}
-                  <Text variant="label" color="textSecondary" style={styles.changeAreaLabel}>
-                    {details.changeLabel}
-                  </Text>
+                  {/* `change-area.png` already contains the designed pin and Change label. Do not
+                      paint them a second time: the duplicate layers made both look hazy on-device. */}
                 </Pressable>
               </View>
             </View>
@@ -1521,6 +1567,8 @@ const styles = StyleSheet.create({
     backgroundColor: lightTheme.colors.surface,
     ...lightTheme.elevation.badge,
   },
+  /** A 24pt tap box for the 16pt glyph; `hitSlop` does the rest. */
+  searchClear: { alignItems: 'center', justifyContent: 'center', width: 24, height: 24 },
   searchInput: {
     flex: 1,
     minWidth: 0,
@@ -1681,8 +1729,6 @@ const styles = StyleSheet.create({
     height: 59,
     borderRadius: lightTheme.radius.xs,
   },
-  changeAreaPin: { position: 'absolute', left: 19, top: 12, width: 22, height: 22 },
-  changeAreaLabel: { position: 'absolute', left: 8, top: 31 },
   /** `60:710` — four chips, 8pt apart, wrapping on a narrow column. */
   labelChips: { flexDirection: 'row', flexWrap: 'wrap', gap: lightTheme.space.sm },
   /**

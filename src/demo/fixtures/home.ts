@@ -215,7 +215,7 @@ export const DEMO_ACTIVE_BOOKING_RATE: HomeBannerViewModel = {
 export const DEMO_HOME_ACTIVE_BOOKING: HomeViewModel = {
   header: HEADER,
   tiles: TILES,
-  activeBooking: DEMO_ACTIVE_BOOKING_ARRIVING,
+  activeBookings: [DEMO_ACTIVE_BOOKING_ARRIVING],
   // Page 3b is Page 3a plus the active-booking card — the marketing stack remains.
   marketing: MARKETING,
 };

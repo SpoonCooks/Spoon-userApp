@@ -3,6 +3,7 @@ import type { ImageSourcePropType } from 'react-native';
 
 import { BottomSheet, Button, HelpPill, NoticeCard, Text, lightTheme } from '@ui';
 
+import { tipCtaLabelFor } from '../adapters';
 import type { TipSheetViewModel } from '../types';
 
 /**
@@ -60,6 +61,8 @@ export function TipSheet({
   helpLabel = 'Help',
   testID = 'tip-sheet',
 }: TipSheetProps) {
+  const selectedLabel = tip.options.find((option) => option.id === selectedOptionId)?.label ?? null;
+
   return (
     <BottomSheet
       visible={visible}
@@ -131,8 +134,16 @@ export function TipSheet({
       </View>
 
       {/* `306:3042` — `#CFFF04`, not the `#FFD600` primary bar. The lift is the node's own. */}
+      {/*
+        The label follows the SELECTION, not the preselection.
+
+        `tip.ctaLabel` is composed once from the amount the sheet opens on, so rendering it
+        verbatim left the button reading "Tip • ₹50" after the customer chose ₹20 — while pressing
+        it charged ₹20. A button naming a price it will not take is worse than a wrong number.
+        The fallback is the composed label, for the moment before anything is chosen.
+      */}
       <Button
-        label={tip.ctaLabel}
+        label={selectedLabel === null ? tip.ctaLabel : tipCtaLabelFor(selectedLabel)}
         onPress={() => onConfirm?.()}
         variant="bright"
         size="bar"

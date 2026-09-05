@@ -121,7 +121,7 @@ export const DEMO_ADDRESS_DETAILS: AddressDetailsViewModel = {
     { id: 'others', label: 'Others' },
   ],
   saveAsPlaceholder: 'Save as',
-  receiverTitle: "Receiver's details",
+  receiverTitle: "Receiver's details (Optional)",
   receiverOptionalLabel: '(Optional)',
   receiverNamePlaceholder: 'Name',
   receiverPhonePlaceholder: 'Phone no.',
@@ -308,8 +308,9 @@ export const DEMO_BOOKING_HISTORY: BookingListViewModel = {
     DEMO_BOOKING_UNFULFILLED,
     { ...DEMO_BOOKING_COMPLETED, id: 'demo-booking-3' },
   ],
-  emptyTitle: 'No past bookings yet',
-  emptyDescription: 'Your completed bookings will appear here.',
+  // `683:68` — the designed line, verbatim. It was an invented "No past bookings yet" over a
+  // second explanatory line, from when this screen had no empty state drawn for it at all.
+  emptyTitle: 'Your bookings will appear here',
 };
 
 export const DEMO_BOOKING_HISTORY_EMPTY: BookingListViewModel = {
@@ -320,8 +321,8 @@ export const DEMO_BOOKING_HISTORY_EMPTY: BookingListViewModel = {
 export const DEMO_REFUND_HISTORY: BookingListViewModel = {
   title: 'Refunds',
   bookings: [DEMO_REFUND_PROCESSING, DEMO_REFUND_COMPLETED],
-  emptyTitle: 'No refunds yet',
-  emptyDescription: 'Refunds for cancelled bookings will appear here.',
+  // `684:73`, same as above.
+  emptyTitle: 'Your refunds will appear here',
 };
 
 /* ----------------------------------------------------------------- cancellation */
@@ -346,7 +347,21 @@ export const DEMO_CANCELLATION: CancellationViewModel = {
     {
       id: 'reschedule-once',
       title: 'Cancellation on rescheduled bookings',
-      body: 'An original booking can be rescheduled only once',
+      /*
+       * TWO sentences, and the second is `687:1069`'s, not `6:2`'s.
+       *
+       * `6:2` ends "Instant bookings can not be cancelled"; `687:1069` — the same sheet reached
+       * from a booking that has already been moved — ends "Cancellation fee shall be applicable
+       * as per original booking". The second is the one that states a FEE RULE, and it is the one
+       * the engine now follows: a cancellation is priced against the original booking, so a
+       * customer cannot move a slot an hour out to next week and cancel into the free band.
+       *
+       * The instant sentence is not lost by dropping it here — an instant booking draws no Cancel
+       * control at all, so the sheet it appears on is unreachable for one.
+       */
+      body:
+        'An original booking can be rescheduled only once. Cancellation fee shall be ' +
+        'applicable as per original booking.',
     },
   ],
   reasonTitle: 'Why do you want to cancel?',
@@ -364,12 +379,13 @@ export const DEMO_CANCELLATION: CancellationViewModel = {
   continueLabel: 'Continue',
   refundTitle: 'Refund details',
   refundRows: [
-    { label: 'Original Booking Paid', value: '₹135' },
+    // `104:2336` names this row "Original Amount Paid".
+    { label: 'Original Amount Paid', value: '₹135' },
     { label: 'Cancellation Processing Fee', value: '₹0' },
     { label: 'Refund Amount', value: '₹135', emphasis: 'total' },
   ],
   refundMethodTitle: 'Refund to original payment source',
-  refundMethodBody: 'Takes 3-5 business days',
+  refundMethodBody: 'Takes 5-6 business days',
   cancelCtaLabel: 'Cancel',
   confirmedTitle: 'Your booking has been cancelled',
   bookAgainTitle: 'Would you like to make another booking?',

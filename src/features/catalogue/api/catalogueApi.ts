@@ -8,8 +8,15 @@ export const CATALOGUE_PATH = '/v1/catalogue';
 
 export function createCatalogueApi(api: ApiClient) {
   return {
-    async get(signal?: AbortSignal): Promise<Catalogue> {
-      return api.request(CATALOGUE_PATH, {
+    async get(
+      input: { readonly addressId?: string | null | undefined } = {},
+      signal?: AbortSignal,
+    ): Promise<Catalogue> {
+      const path =
+        input.addressId === undefined || input.addressId === null
+          ? CATALOGUE_PATH
+          : `${CATALOGUE_PATH}?addressId=${encodeURIComponent(input.addressId)}`;
+      return api.request(path, {
         parse: (data) => catalogueSchema.parse(data),
         ...(signal === undefined ? {} : { signal }),
       });

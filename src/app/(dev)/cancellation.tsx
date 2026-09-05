@@ -8,13 +8,17 @@ import { QueryBoundary, RouteScaffold, Screen } from '@ui';
 /**
  * Cancellation sheet — DEVELOPMENT ONLY. Reachable at `spoon://cancellation`.
  *
- * The four-step sheet (`6:2` → `104:2260` → `104:2336` → `115:2703`) is fully designed and fully
- * built, but blocker B-11 means **no live-booking screen draws a Cancel control**, so the flow has
- * no product entry point and could not be opened on a device at all. That made it the one built
- * surface that could never be compared against its frames.
+ * The four-step sheet (`6:2` → `104:2260` → `104:2336` → `115:2703`) is designed, built, and now
+ * REACHABLE in the product: `booking/[id]` draws Cancel and opens this same sheet at `policy`.
+ * Blocker B-11 — "no live-booking screen draws a Cancel control" — is closed, and the note that
+ * said so was left behind when the control landed. It mattered: read literally it told a reviewer
+ * this flow could not be opened on a device, which would justify either skipping it in testing or
+ * building a second entry point beside the one that already exists.
  *
- * This route is the review path and nothing more: it invents no entry point in the product, and it
- * refuses to render outside `__DEV__`. `?step=` opens any of the four steps directly.
+ * The route survives its blocker because it is still the only way to open a given STEP directly.
+ * `?step=` jumps to any of the four without arranging a booking in the matching state, which is
+ * what makes the frames comparable one at a time. It invents no entry point in the product and
+ * refuses to render outside `__DEV__`.
  */
 const DEV_STEPS: readonly CancellationStep[] = ['policy', 'reason', 'refund', 'confirmed'];
 

@@ -5,7 +5,9 @@ import {
   AddressEditSheet,
   SavedAddressesView,
   useAddressEditData,
+  useAddresses,
   useDeleteAddress,
+  useSetDefaultAddress,
   useSavedAddressesData,
 } from '@features/address';
 import { getUserMessage, isAppError } from '@core/errors';
@@ -35,6 +37,11 @@ export default function SavedAddressesRoute() {
   );
   const { edit: editModel } = useAddressEditData(selectedId);
   const remove = useDeleteAddress();
+  const setDefault = useSetDefaultAddress();
+  // The raw rows, because switching address replays the whole saved address (the API has no
+  // partial update) and the list view model carries only what the list DRAWS.
+  const addresses = useAddresses();
+  const addressRows = addresses.state.status === 'ready' ? addresses.state.data : [];
   const [error, setError] = useState<string | null>(null);
 
   /**
@@ -66,7 +73,37 @@ export default function SavedAddressesRoute() {
         onRetry={refetch}
         onBack={goBack}
         onAdd={() => router.push('/address/location')}
-        onSelect={setSelectedId}
+        /**
+         * `68:214` — a tap on a ROW switches the booking address and returns to Home.
+         *
+         * It used to call `setSelectedId`, which is what the `...` overflow does: both gestures
+         * opened the edit sheet, so the list could rename addresses but never choose between
+         * them. Every downstream read (header ETA, quote, availability) resolves `isDefault`, so
+         * with nothing able to move that flag a second saved address was unreachable.
+         *
+         * Home is the destination rather than `goBack` because switching address is a decision
+         * ABOUT booking, and Home is where booking starts — and its header is the confirmation
+         * that the switch took effect. The list is invalidated by the mutation, so Home re-reads
+         * rather than being handed a value from here.
+         */
+        onSelect={(id) => {
+          if (setDefault.isPending) return;
+          const chosen = addressRows.find((address) => address.id === id);
+          if (chosen === undefined || chosen.isDefault) {
+            router.replace('/home');
+            return;
+          }
+          setDefault
+            .mutateAsync(chosen)
+            .then(() => router.replace('/home'))
+            .catch((thrown: unknown) => {
+              setError(
+                isAppError(thrown)
+                  ? getUserMessage(thrown)
+                  : 'We could not switch to this address.',
+              );
+            });
+        }}
         onOpenActions={setSelectedId}
       />
 

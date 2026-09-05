@@ -21,7 +21,15 @@ export const palette = {
   /** Photo scrim over the "what's not included" thumbnails (`156:38`). */
   black40: 'rgba(0,0,0,0.4)',
   /** `44:5632` — the Instant unavailable veil. Plain white at 45 %, NOT a blur. */
-  white45: 'rgba(255,255,255,0.45)',
+  /**
+   * The blocked-sheet veil. `44:5632` specifies 45 %, and this sat at 0.45 to match it.
+   *
+   * Raised to 0.72 on founder instruction (2026-08-31): at 45 % the duration grid and prices
+   * behind the "no cook available" message stayed legible enough to read and reach for, so the
+   * refusal looked like a decoration over a live sheet. React Native has no backdrop blur without
+   * a native module, so opacity is the only lever here that does not require an APK rebuild.
+   */
+  white45: 'rgba(255,255,255,0.72)',
   /**
    * `3:2002` — the ground behind a bottom sheet. Read off the node: plain black at 80%, which is
    * also `color/black/-80%`. The previous `rgba(15,23,43,0.55)` was authored, not measured.

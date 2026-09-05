@@ -24,6 +24,37 @@ import { addServiceDays, serviceDateIn } from './serviceTime';
  */
 
 const TIME_ZONE = 'Asia/Kolkata';
+
+/**
+ * The clock is FROZEN for this file, at a mid-morning IST instant.
+ *
+ * `SERVICE_DATE` is resolved once, at module load, from the same clock the screen resolves "today"
+ * from. Left on the real clock those two reads straddle midnight for a few minutes each night: the
+ * module computes one date, the screen computes the next, and `stays on an unsellable day` sees
+ * TWO dates asked for and calls it an advance. Reproduced at 23:46 IST, and it would have failed
+ * every night in the same window while passing every daytime run.
+ *
+ * Fixed rather than merely tolerated, because the assertion under test is exactly "how many dates
+ * were asked for", and a test that cannot distinguish a real advance from a date rollover is not
+ * testing the thing it claims to.
+ */
+jest.useFakeTimers({
+  now: Date.parse('2026-08-23T10:00:00+05:30'),
+  // Timers themselves stay real: the cases await effects and network settling, and faking those
+  // would deadlock the waits rather than steady them.
+  doNotFake: [
+    'setTimeout',
+    'setInterval',
+    'clearTimeout',
+    'clearInterval',
+    'setImmediate',
+    'clearImmediate',
+    'nextTick',
+    'queueMicrotask',
+    'performance',
+  ],
+});
+
 /** Two days out, resolved the way the day strip resolves it. Tuesday 25 Aug in the report. */
 const SERVICE_DATE = addServiceDays(serviceDateIn(TIME_ZONE, new Date()), 2);
 const DURATION_MINUTES = 120;
@@ -227,29 +258,74 @@ describe('every candidate the server evaluated is drawn', () => {
     await waitFor(() => expect(cards()).toHaveLength(16));
     expect(cards().every((card) => card.props.accessibilityState.disabled === false)).toBe(true);
   });
+
+  /**
+   * A day with nothing bookable is shown, not skipped.
+   *
+   * The auto-selection used to advance to the next offered day when the answered one held no
+   * bookable start anywhere. On 30 Aug that opened the app on 1 Sep — today answered
+   * `NO_PRESENT_COOK`, the screen walked two days forward on its own, and it read as a broken
+   * date rather than a full day. It also hid the outage: nobody could see that today was
+   * unsellable, because nobody was ever shown today.
+   *
+   * Asserted on the DATES ASKED FOR rather than on a rendered chip, because that is the thing a
+   * silent advance cannot hide — moving the day re-asks the server. One date asked means the
+   * screen stayed where it opened.
+   */
+  it('stays on an unsellable day rather than walking the customer to another date', async () => {
+    const { recorded } = renderSchedule((params) =>
+      allUnavailable(params.get('date') ?? SERVICE_DATE),
+    );
+
+    const askedDates = () =>
+      new Set(
+        recorded.paths
+          .filter((path) => path.startsWith('/v1/availability/scheduled?'))
+          .map((path) => new URLSearchParams(path.split('?')[1] ?? '').get('date')),
+      );
+
+    // The screen auto-selects and asks once, unprompted.
+    await waitFor(() => expect(askedDates().size).toBeGreaterThan(0));
+    // Let every effect the answer triggers settle; an advance would land here.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(askedDates().size).toBe(1);
+  });
 });
 
 describe('only a start time the server offered can become a booking', () => {
-  it('keeps Book Now grey until a start time is chosen, then lights it', async () => {
+  it('completes the chosen daypart with its first bookable start time on its own', async () => {
     renderSchedule(() => allAvailable());
     await selectNoonTwoHours();
     await waitFor(() => expect(cards()).toHaveLength(16));
 
-    expect(ctaDisabled()).toBe(true);
-    fireEvent.press(screen.getByTestId(slotTestId(0)));
+    // Auto-selection: once the server has answered, the first bookable start time is already
+    // chosen and the CTA is live — the customer books the nearest slot with a single tap.
     await waitFor(() => expect(ctaDisabled()).toBe(false));
+    expect(screen.getByTestId(slotTestId(0)).props.accessibilityState.selected).toBe(true);
+
+    // A different card is still an ordinary choice on top of the auto-selection.
+    fireEvent.press(screen.getByTestId(slotTestId(2)));
+    await waitFor(() =>
+      expect(screen.getByTestId(slotTestId(2)).props.accessibilityState.selected).toBe(true),
+    );
+    expect(screen.getByTestId(slotTestId(0)).props.accessibilityState.selected).toBe(false);
   });
 
-  it('ignores a press on an unavailable card and leaves Book Now grey', async () => {
+  it('ignores a press on an unavailable card and keeps the auto-selected start', async () => {
     renderSchedule(() => mixed());
     await selectNoonTwoHours();
     await waitFor(() => expect(cards()).toHaveLength(16));
+    await waitFor(() => expect(ctaDisabled()).toBe(false));
 
-    // Index 1 is unavailable in the mixed payload.
+    // Index 1 is unavailable in the mixed payload; index 0 is the auto-selected first bookable.
     fireEvent.press(screen.getByTestId(slotTestId(1)));
 
     expect(screen.getByTestId(slotTestId(1)).props.accessibilityState.selected).toBe(false);
-    expect(ctaDisabled()).toBe(true);
+    expect(screen.getByTestId(slotTestId(0)).props.accessibilityState.selected).toBe(true);
+    expect(ctaDisabled()).toBe(false);
   });
 });
 
@@ -259,15 +335,23 @@ describe('a selection never outlives the answer that justified it', () => {
     await selectNoonTwoHours();
     await waitFor(() => expect(cards()).toHaveLength(16));
 
-    fireEvent.press(screen.getByTestId(slotTestId(0)));
-    await waitFor(() => expect(ctaDisabled()).toBe(false));
+    fireEvent.press(screen.getByTestId(slotTestId(3)));
+    await waitFor(() =>
+      expect(screen.getByTestId(slotTestId(3)).props.accessibilityState.selected).toBe(true),
+    );
 
     fireEvent.press(screen.getByTestId('schedule-duration-dur-60'));
 
-    await waitFor(() => expect(ctaDisabled()).toBe(true));
+    // The old choice does not outlive its answer: the server is re-asked for the new duration,
+    // and what ends up selected is the NEW answer's first bookable start — auto-selection — not
+    // the start chosen against the old one.
     await waitFor(() =>
       expect(recorded.paths.some((path) => path.includes('durationMinutes=60'))).toBe(true),
     );
+    await waitFor(() =>
+      expect(screen.getByTestId(slotTestId(0)).props.accessibilityState.selected).toBe(true),
+    );
+    expect(screen.getByTestId(slotTestId(3)).props.accessibilityState.selected).toBe(false);
   });
 
   it('clears the chosen start time when the DAY changes', async () => {

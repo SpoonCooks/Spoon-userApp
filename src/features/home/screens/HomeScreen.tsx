@@ -5,9 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
 import { QueryBoundary, lightTheme } from '@ui';
-import type { RatingSelection } from '@ui';
 
-import { HomeBookingBanner } from '../components/HomeBookingBanner';
+import { HomeBookingCarousel } from '../components/HomeBookingCarousel';
 import { HomeBookingTiles } from '../components/HomeBookingTiles';
 import { HomeMarketing } from '../components/HomeMarketing';
 import { HomePromoCarousel } from '../components/HomePromoCarousel';
@@ -31,7 +30,7 @@ import type { HomeViewModel } from '../types';
  *   top banner (sticky)
  *   → promo carousel
  *   → Instant + Schedule tiles
- *   → [HomeBookingBanner]          ← conditional, data-driven, MOVED below the tiles
+ *   → [HomeBookingCarousel]        ← conditional, data-driven, MOVED below the tiles
  *   → cuisine mosaic
  *   → reasons grid
  *   → duration matrix
@@ -62,18 +61,6 @@ export interface HomeActions {
    * from disagreeing — and stops the host issuing a second copy of every Home query (§3).
    */
   readonly onOpenActiveBooking: (destination: HomeBannerDestination) => void;
-  /**
-   * `336:4235` — only the rate presentation raises this. Reports a choice; persists nothing.
-   *
-   * Carries the banner's OWN destination for the same reason `onOpenActiveBooking` does: the host
-   * must not have to re-read Home to learn which booking the card was about. A second copy of
-   * every Home query is the cost, and a host and a banner disagreeing about which booking is
-   * being rated is the risk (§3).
-   */
-  readonly onRateActiveBooking?: (
-    value: RatingSelection,
-    destination: HomeBannerDestination,
-  ) => void;
 }
 
 export interface HomeViewProps extends HomeActions {
@@ -122,11 +109,10 @@ export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps)
                     CONDITIONAL INSERT — never a second Home, never a replacement. Everything
                     below this point renders identically whether or not the card is present.
                   */}
-                  {home.activeBooking === undefined ? null : (
-                    <HomeBookingBanner
-                      booking={home.activeBooking}
-                      onOpen={bannerOpener(home.activeBooking, actions.onOpenActiveBooking)}
-                      {...bannerRater(home.activeBooking, actions.onRateActiveBooking)}
+                  {home.activeBookings === undefined ? null : (
+                    <HomeBookingCarousel
+                      bookings={home.activeBookings}
+                      onOpen={actions.onOpenActiveBooking}
                     />
                   )}
 
@@ -141,34 +127,6 @@ export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps)
       </QueryBoundary>
     </SafeAreaView>
   );
-}
-
-/**
- * Binds the banner to its own destination.
- *
- * Extracted so the JSX carries no non-null assertion: narrowing `home.activeBooking` inside the
- * conditional does not survive into the arrow function's body, and asserting it there would be
- * asserting the one thing the conditional already proved.
- */
-function bannerOpener(
-  booking: NonNullable<HomeViewModel['activeBooking']>,
-  onOpen: HomeActions['onOpenActiveBooking'],
-): () => void {
-  return () => onOpen(booking.destination);
-}
-
-/**
- * The same binding for the rating chips.
- *
- * Returns NO `onRate` when the host wires none, which is what leaves `RatingWidget` disabled —
- * the designed inert state — rather than drawing live chips over a handler that does not exist.
- */
-function bannerRater(
-  booking: NonNullable<HomeViewModel['activeBooking']>,
-  onRate: HomeActions['onRateActiveBooking'],
-): { onRate?: (value: RatingSelection) => void } {
-  if (onRate === undefined) return {};
-  return { onRate: (value) => onRate(value, booking.destination) };
 }
 
 export function HomeScreen(actions: HomeActions) {

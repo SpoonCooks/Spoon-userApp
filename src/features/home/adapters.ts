@@ -1,3 +1,5 @@
+import { minutesToPromisedArrival } from '@core/format';
+
 import type { HomeBannerViewModel } from './state/homeBannerView';
 import type { HomeViewModel } from './types';
 
@@ -77,6 +79,25 @@ export function minutesUntil(
 }
 
 /**
+ * Minutes until the cook arrives, under the rule EVERY screen uses.
+ *
+ * `minutesUntil` above is raw arithmetic over an instant and stays that way -- the in-service
+ * countdown legitimately wants exactly that. An ARRIVAL is different: it is never promised before
+ * the booking it belongs to, which is why the clamp lives in `core/format/arrival` and both this
+ * banner and the booking detail read it from there.
+ */
+export function etaMinutesFor(
+  etaIso: string | null | undefined,
+  scheduledStartIso: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (etaIso === null || etaIso === undefined) return null;
+  const projected = new Date(etaIso);
+  if (Number.isNaN(projected.getTime())) return null;
+  return minutesToPromisedArrival(projected, now.getTime(), scheduledStartIso);
+}
+
+/**
  * Composes the Home view model.
  *
  * `base` is the STATIC screen definition — the promo panels, the two booking tiles, the cuisine
@@ -90,10 +111,10 @@ export function homeFrom(input: {
   readonly base: HomeViewModel;
   readonly addressLabel?: string | null;
   readonly addressLine?: string | null;
-  readonly activeBooking?: HomeBannerViewModel | undefined;
+  readonly activeBookings?: readonly HomeBannerViewModel[] | undefined;
 }): HomeViewModel {
   const { base } = input;
-  const { activeBooking: _ignored, ...rest } = base;
+  const { activeBookings: _ignored, ...rest } = base;
 
   return {
     ...rest,
@@ -106,6 +127,12 @@ export function homeFrom(input: {
       addressLabel: input.addressLabel ?? null,
       addressLine: input.addressLine ?? null,
     },
-    ...(input.activeBooking === undefined ? {} : { activeBooking: input.activeBooking }),
+    /*
+     * An EMPTY list is the same as none: Home draws its pre-booking variant either way, and
+     * carrying `[]` would make every consumer check both shapes for one meaning.
+     */
+    ...(input.activeBookings === undefined || input.activeBookings.length === 0
+      ? {}
+      : { activeBookings: input.activeBookings }),
   };
 }

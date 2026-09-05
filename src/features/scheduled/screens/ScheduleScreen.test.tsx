@@ -37,12 +37,22 @@ function renderBook() {
 }
 
 describe('Schedule — progressive disclosure (C-1)', () => {
-  it('starts with Day only', () => {
+  it('opens with the nearest bookable choice already made', () => {
     renderBook();
 
+    // Auto-selection: the server's first non-disabled day, daypart and duration are pre-chosen
+    // and the first bookable start time follows, so every section is already revealed and the
+    // screen opens on the complete `34:3035` state rather than the empty `275:4488` one.
     expect(screen.getByTestId('schedule-days')).toBeTruthy();
-    expect(screen.queryByTestId('schedule-periods')).toBeNull();
-    expect(screen.queryByTestId('schedule-slots')).toBeNull();
+    expect(screen.getByTestId('schedule-periods')).toBeTruthy();
+    expect(
+      screen.getByTestId(`schedule-days-${COMPLETE_SELECTION.dayId}`).props.accessibilityState
+        .selected,
+    ).toBe(true);
+    expect(
+      screen.getByTestId(`schedule-slots-${COMPLETE_SELECTION.slotId}`).props.accessibilityState
+        .selected,
+    ).toBe(true);
   });
 
   it('reveals Day → Time → Duration → Start time as selections are made', () => {
@@ -99,19 +109,29 @@ describe('Schedule — server data, not client rules', () => {
     const soldOut = screen.getByTestId('schedule-slots-am-0500AM');
     expect(soldOut.props.accessibilityState.disabled).toBe(true);
 
+    // The press is refused: the sold-out card never becomes the selection, and the
+    // auto-selected first BOOKABLE start (05:30) stays exactly where it was.
     fireEvent.press(soldOut);
-    expect(screen.getByTestId('schedule-submit').props.accessibilityState.disabled).toBe(true);
+    expect(soldOut.props.accessibilityState.selected).toBe(false);
+    expect(screen.getByTestId('schedule-slots-am-0530AM').props.accessibilityState.selected).toBe(
+      true,
+    );
+    expect(screen.getByTestId('schedule-submit').props.accessibilityState.disabled).toBe(false);
   });
 
-  it('keeps the CTA disabled until the selection is complete', () => {
+  it('re-completes after a change, and the CTA is grey only while the chain is broken', () => {
     renderBook();
+    // Auto-selection opens the screen complete, so the CTA is already live.
+    expect(screen.getByTestId('schedule-submit').props.accessibilityState.disabled).toBe(false);
+
+    // A manual day change clears the chain: grey until the person has rebuilt it.
+    fireEvent.press(screen.getByTestId('schedule-days-day-3'));
     expect(screen.getByTestId('schedule-submit').props.accessibilityState.disabled).toBe(true);
-
-    fireEvent.press(screen.getByTestId('schedule-days-day-1'));
     fireEvent.press(screen.getByTestId('schedule-periods-morning'));
+    expect(screen.getByTestId('schedule-submit').props.accessibilityState.disabled).toBe(true);
     fireEvent.press(screen.getByTestId('schedule-duration-dur-60'));
-    fireEvent.press(screen.getByTestId('schedule-slots-am-0530AM'));
 
+    // The first bookable start time completes on its own; the person's own picks are kept.
     expect(screen.getByTestId('schedule-submit').props.accessibilityState.disabled).toBe(false);
     fireEvent.press(screen.getByTestId('schedule-submit'));
     expect(actions.onSubmit).toHaveBeenCalled();
@@ -163,12 +183,40 @@ describe('Schedule — finalized footer (275:4177)', () => {
   });
 
   /**
-   * Task §11 — no clickable dead controls. `275:4180` has no designed breakdown sheet for
-   * Scheduled, so the route wires no handler and the line must not be drawn: a link that absorbs a
-   * press and opens nothing reads as the app having failed.
+   * Frame 5d draws "Check payment details" under Book NOW and it opens the SAME taxes explainer
+   * the Instant sheet raises (`25:1585`). The line was withheld entirely on the reading that no
+   * such sheet existed for Scheduled, so a customer on the Schedule screen had no way to see what
+   * they were being charged. The screen now owns the sheet, with no host seam required.
    */
-  it('omits the payment-details line when the host opens no breakdown', () => {
-    renderBook();
+  it('opens the taxes explainer from the payment line with no host handler wired', () => {
+    render(<ScheduleView state={ready(DEMO_SCHEDULE_BOOK)} {...actions} />);
+
+    const link = screen.getByTestId('schedule-payment-details');
+    expect(link).toBeTruthy();
+
+    fireEvent.press(link);
+    expect(screen.getByTestId('schedule-taxes')).toBeTruthy();
+  });
+
+  /** A reschedule is free, so it must offer neither the line nor a breakdown to open. */
+  it('draws no payment line in reschedule mode', () => {
+    render(<ScheduleView state={ready(DEMO_SCHEDULE_RESCHEDULE)} {...actions} />);
+
+    expect(screen.queryByTestId('schedule-payment-details')).toBeNull();
+  });
+
+  /**
+   * Task §11 — no clickable dead controls, still enforced, but the test of "dead" has moved.
+   *
+   * This used to assert the line was ABSENT whenever the host wired no handler, because the
+   * reading then was that Scheduled had no designed breakdown sheet. Frame 5d says otherwise
+   * (founder, 2026-08-31), and the screen now owns the explainer itself — so a book-mode screen
+   * with no host handler draws a line that DOES open something, which is the rule being kept
+   * rather than broken. What must still never appear is a line with no sheet behind it at all.
+   */
+  it('draws no payment line when there is no breakdown to open', () => {
+    const { taxesInfo: _none, ...withoutBreakdown } = DEMO_SCHEDULE_BOOK;
+    render(<ScheduleView state={ready(withoutBreakdown)} {...actions} />);
 
     expect(screen.getByTestId('schedule-submit')).toBeTruthy();
     expect(screen.queryByTestId('schedule-payment-details')).toBeNull();
@@ -204,6 +252,10 @@ describe('the CTA amount is the quote’s, or absent', () => {
         primaryCtaAmountLabel="₹198"
       />,
     );
+
+    // Auto-selection completes an untouched screen, so incompleteness is now a person
+    // mid-change: a day tap clears the chain and the CTA drops the amount with the state.
+    fireEvent.press(screen.getByTestId('schedule-days-day-3'));
 
     const cta = screen.getByTestId('schedule-submit');
     expect(cta.props.accessibilityState.disabled).toBe(true);
@@ -253,10 +305,10 @@ describe('Book Now is disabled until every required selection is made', () => {
   const disabled = () =>
     screen.getByTestId('schedule-submit').props.accessibilityState.disabled === true;
 
-  it('is disabled with nothing selected at all (275:4488)', () => {
+  it('is enabled on open: auto-selection completes the chain (34:3035)', () => {
     renderBook();
 
-    expect(disabled()).toBe(true);
+    expect(disabled()).toBe(false);
   });
 
   it('is disabled with only a DAY selected (275:4488)', () => {
@@ -274,13 +326,19 @@ describe('Book Now is disabled until every required selection is made', () => {
     expect(disabled()).toBe(true);
   });
 
-  it('is STILL disabled once a duration is chosen but no start time is (275:4938)', () => {
+  it('re-enables the moment a duration completes the chain: the first start auto-selects', () => {
     renderBook();
 
     fireEvent.press(screen.getByTestId('schedule-days-day-1'));
     fireEvent.press(screen.getByTestId('schedule-periods-morning'));
     fireEvent.press(screen.getByTestId('schedule-duration-dur-60'));
-    expect(disabled()).toBe(true);
+    // With the grid already answered, the duration was the last open question: the first
+    // bookable start time is selected on its own and `34:3035`'s live CTA follows. The bare
+    // `275:4938` state exists only while a NEW grid is in flight, which `slotsPending` covers.
+    expect(disabled()).toBe(false);
+    expect(screen.getByTestId('schedule-slots-am-0530AM').props.accessibilityState.selected).toBe(
+      true,
+    );
   });
 
   it('presses through to nothing while it is disabled', () => {

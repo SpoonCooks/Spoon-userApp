@@ -46,7 +46,6 @@ export function useScheduleData(
   mode: ScheduleMode,
   selection: { date?: string | null; durationMinutes?: number | null } = {},
 ): ScreenQuery<ScheduleViewModel> {
-  const catalogue = useCatalogue();
   const addresses = useAddresses();
 
   const addressId = useMemo(() => {
@@ -54,6 +53,10 @@ export function useScheduleData(
     const list = addresses.state.data;
     return (list.find((address) => address.isDefault) ?? list[0])?.id ?? null;
   }, [addresses.state]);
+
+  // The staging Delhi business-time override is published only from an address-scoped
+  // catalogue response. All other app surfaces continue to use the global catalogue.
+  const catalogue = useCatalogue({ addressId });
 
   // Default to today and the first published duration, so the grid is populated on arrival
   // rather than empty until the customer taps something.

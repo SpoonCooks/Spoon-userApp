@@ -91,7 +91,15 @@ export default function BookingRoute() {
         onBack={goBack}
         onReschedule={() => router.push(`/reschedule/${bookingId}`)}
         onHelp={() => {
-          openHelp(`Hi Spoon, I need help with my booking ${bookingId}.`);
+          /*
+           * No booking id in the message.
+           *
+           * A customer opening WhatsApp is handed a draft they can read, edit and forward, and a
+           * UUID in it is noise to them and an identifier to anyone the chat is shared with. Ops
+           * can find the booking from the phone number the message arrives on, which they have to
+           * verify against anyway before acting on a request.
+           */
+          openHelp('Hi Spoon, I need help with my booking.');
         }}
         onCallCook={() => {
           void callCook.call();
@@ -120,6 +128,14 @@ export default function BookingRoute() {
           })
         }
         extending={extend.isPending}
+        /*
+         * A refused extension has to say so. The server declines for real reasons — the
+         * session is not running, the length is no longer available, the payment did not
+         * complete — and without this the sheet just sat there, which reads as a broken
+         * button rather than an answer.
+         */
+        extendError={extend.error === null ? null : getUserMessage(normalizeError(extend.error))}
+        onDismissExtendError={() => extend.reset()}
         /**
          * `201:93` / `201:96` — the auto-cancelled rebook prompt.
          *
@@ -130,11 +146,16 @@ export default function BookingRoute() {
          */
         onRebook={() => router.replace('/home')}
         onDeclineRebook={goBack}
-        /* `383:748` — the same Spoon line as every other WhatsApp control (task §15). */
+        /*
+         * `383:748` — the same Spoon line as every other WhatsApp control (task §15).
+         *
+         * The booking id is deliberately NOT carried (founder instruction, 2026-08-31). It was a
+         * raw UUID pasted into the customer's own outgoing message: meaningless to the person
+         * typing it, and it made the prefilled text long enough to look broken in the WhatsApp
+         * composer. Support identifies the booking from the phone number that is writing to them.
+         */
         onShareRecipe={() => {
-          openHelp(
-            `Hi Spoon, I'd like to share a recipe or a special request for booking ${bookingId}.`,
-          );
+          openHelp("Hi Spoon, I'd like to share a recipe or a special request for my booking.");
         }}
         /**
          * `306:2885` — the tip sheet's CTA (task §14).
@@ -244,7 +265,8 @@ export default function BookingRoute() {
                 router.replace('/home');
               }}
               onHelp={() => {
-                openHelp(`Hi Spoon, I need help cancelling my booking ${bookingId}.`);
+                // No booking id — see the note on the help draft above.
+                openHelp('Hi Spoon, I need help cancelling my booking.');
               }}
             />
           )}

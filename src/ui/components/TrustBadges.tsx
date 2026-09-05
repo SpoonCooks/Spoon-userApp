@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
 import { Text } from '@ui/primitives/Text';
@@ -49,7 +50,7 @@ export function TrustBadges({ badges, testID = 'trust-badges' }: TrustBadgesProp
   return (
     <View style={styles.row} testID={testID}>
       {earned.map((definition, index) => (
-        <View key={definition.key} style={styles.slot}>
+        <Fragment key={definition.key}>
           {index === 0 ? null : <View style={styles.dot} />}
           <View
             style={styles.item}
@@ -65,11 +66,11 @@ export function TrustBadges({ badges, testID = 'trust-badges' }: TrustBadgesProp
                 accessibilityIgnoresInvertColors
               />
             </View>
-            <Text variant="labelUpperQuiet" color="textTrust" align="center" numberOfLines={2}>
+            <Text variant="labelUpperQuiet" color="textTrust" align="center" numberOfLines={1}>
               {definition.label}
             </Text>
           </View>
-        </View>
+        </Fragment>
       ))}
     </View>
   );
@@ -78,8 +79,15 @@ export function TrustBadges({ badges, testID = 'trust-badges' }: TrustBadgesProp
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    /**
+     * `flex-start`, not `center`.
+     *
+     * The three items are unequal heights — "Background Verified" is the only label that can
+     * wrap — and centring made each one float to its own vertical position, so the discs sat
+     * on three different lines. Aligning to the top puts every disc on one line and lets the
+     * labels hang below it, which is what the row is drawn as.
+     */
+    alignItems: 'flex-start',
     alignSelf: 'stretch',
     paddingHorizontal: lightTheme.space.s15,
     paddingVertical: 9.889,
@@ -91,8 +99,16 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
     elevation: 1,
   },
-  slot: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 11 },
-  item: { alignItems: 'center', gap: 1, flexShrink: 1 },
+  /**
+   * One equal share of the row each, so the discs land on thirds.
+   *
+   * They were previously distributed with `space-between` over slots that carried their own
+   * separator, which meant each slot's width was its label's width plus a dot — and the labels
+   * differ by more than a factor of two. The first badge was pinned to the left edge, the last
+   * to the right, and the middle one sat wherever its own width left it: three discs at three
+   * arbitrary positions. Equal flex removes the label width from the question entirely.
+   */
+  item: { flex: 1, alignItems: 'center', gap: 1 },
   /** `289:7622` — an 18pt `rgba(0,0,0,0.8)` disc, with 2pt of clearance beneath it. */
   disc: {
     width: 18,
@@ -103,11 +119,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: lightTheme.colors.surfaceTrustDisc,
   },
-  /** `94:1020` — a 3.3pt `rgba(0,0,0,0.8)` separator dot. */
+  /**
+   * `94:1020` — a 3.3pt `rgba(0,0,0,0.8)` separator dot.
+   *
+   * `marginTop` rather than `alignItems: center` on a parent: the dot belongs beside the DISC,
+   * and centring it against an item that is disc-plus-label parks it against the text instead.
+   * 18/2 − 3.3/2 puts it on the disc's own centre line.
+   */
   dot: {
     width: 3.3,
     height: 3.3,
     borderRadius: 3.3 / 2,
+    marginTop: (18 - 3.3) / 2,
+    marginHorizontal: 4,
     backgroundColor: lightTheme.colors.textSeparator,
   },
 });

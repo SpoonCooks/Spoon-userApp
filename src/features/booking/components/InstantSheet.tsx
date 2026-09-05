@@ -249,21 +249,26 @@ export function InstantSheet({
       >
         {/*
           `1:751` — "Arriving in" + a canary pill.
-          The blocked frames keep BOTH: `44:5378`'s sheet draws `267:3703` as a 338 x 32 row
-          holding `267:3704` (the caption) and `267:3706` (a 109 x 32 pill), and the white 45 %
-          veil is what dims them. Collapsing the line to one word was a reading of the superseded
-          file.
+
+          FOUNDER DECISION (2026-08-31): the row is REMOVED outright when the sheet is blocked,
+          not dimmed. `44:5378` does draw `267:3703` behind the white 45 % veil, and this
+          component used to follow that literally — but a dimmed "Arriving in 30 mins" is still a
+          promise on a sheet whose whole purpose in that state is to say no cook is coming. The
+          veil made it quieter, not less wrong. When Spoon cannot deliver, the arrival line does
+          not appear at all.
         */}
-        <View style={styles.etaRow}>
-          <Text variant="titleLead" color="textPrimary" numberOfLines={1} style={styles.shrink}>
-            {instant.etaCaption}
-          </Text>
-          <View style={styles.etaPill} testID={`${testID}-eta`}>
-            <Text variant="headingScreen" color="textStrong" align="center" numberOfLines={1}>
-              {instant.etaLabel}
+        {blocked !== undefined ? null : (
+          <View style={styles.etaRow}>
+            <Text variant="titleLead" color="textPrimary" numberOfLines={1} style={styles.shrink}>
+              {instant.etaCaption}
             </Text>
+            <View style={styles.etaPill} testID={`${testID}-eta`}>
+              <Text variant="headingScreen" color="textStrong" align="center" numberOfLines={1}>
+                {instant.etaLabel}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/*
           `381:285` — the Duration label row, which this sheet did not draw at all before: a

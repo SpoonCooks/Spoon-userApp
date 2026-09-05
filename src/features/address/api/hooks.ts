@@ -86,6 +86,55 @@ export function useUpdateAddress() {
   });
 }
 
+/**
+ * Make one saved address the one Spoon books against.
+ *
+ * `68:214` says a tap on a row "sets active address, returns to caller". The list had no such
+ * path at all: BOTH the row and its `...` overflow opened the edit sheet, so a customer with two
+ * saved addresses could rename either one and switch to neither. Every downstream read — the
+ * Home header, the instant ETA, the quote, availability — resolves `isDefault`, so with no way
+ * to move that flag the second address was decorative.
+ *
+ * The API has no dedicated "set default" verb: `PUT /v1/me/addresses/:id` takes the WHOLE
+ * address (`AddressRequest` requires label, street, pincode and the point). So the row's own
+ * saved values are replayed verbatim with the one field changed — this is a re-save of the same
+ * address, not an edit, and it must never become a way to silently alter one.
+ */
+export function useSetDefaultAddress() {
+  const { api } = useRuntime();
+  const queryClient = useQueryClient();
+  const addresses = createAddressApi(api);
+
+  return useMutation<AddressWriteResponse, Error, AddressDto>({
+    mutationFn: (address) =>
+      addresses.update(address.id, {
+        label: address.label,
+        street: address.street,
+        pincode: address.pincode,
+        latitude: address.latitude,
+        longitude: address.longitude,
+        // Optional fields are carried only when the row HAS them: sending `undefined` would drop
+        // a saved flat number on a screen the customer only tapped to switch address.
+        ...(address.flat === null ? {} : { flat: address.flat }),
+        ...(address.tower === null ? {} : { tower: address.tower }),
+        ...(address.society === null ? {} : { society: address.society }),
+        ...(address.city === null ? {} : { city: address.city }),
+        ...(address.state === null ? {} : { state: address.state }),
+        ...(address.receiverName === null ? {} : { receiverName: address.receiverName }),
+        ...(address.receiverPhone === null ? {} : { receiverPhone: address.receiverPhone }),
+        ...(address.placeId === null || address.placeId === undefined
+          ? {}
+          : { placeId: address.placeId }),
+        isDefault: true,
+      }),
+    onSuccess() {
+      // Everything that reads an address id is now stale: the list itself, and every screen that
+      // resolved the previous default.
+      void queryClient.invalidateQueries({ queryKey: addressKeys.all() });
+    },
+  });
+}
+
 export function useDeleteAddress() {
   const { api } = useRuntime();
   const queryClient = useQueryClient();

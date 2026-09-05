@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { DataState } from '@core/data';
@@ -6,6 +6,7 @@ import {
   Button,
   ChipGroup,
   HelpMePickSheet,
+  InfoDialog,
   NoteCard,
   PriceTile,
   QueryBoundary,
@@ -129,12 +130,112 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
    * holds, so it starts no read and shows no loading state (task §3).
    */
   const [helpOpen, setHelpOpen] = useState(false);
+  const [taxesOpen, setTaxesOpen] = useState(false);
   const [selection, setSelection] = useState<ScheduleSelection>({
     dayId: initialSelection?.dayId ?? null,
     periodId: initialSelection?.periodId ?? null,
     durationId: initialSelection?.durationId ?? null,
     slotId: initialSelection?.slotId ?? null,
   });
+
+  /**
+   * Whether the CUSTOMER has made any choice on this screen yet.
+   *
+   * The auto-selection below may re-route a choice (advance the period when the pre-selected one
+   * holds no bookable start) only while this is false: once a person has tapped anything, the
+   * screen completes forward from their choice but never overrides it.
+   */
+  const userTouched = useRef(false);
+
+  /**
+   * Auto-selection: the screen opens with the nearest bookable choice already made.
+   *
+   * Everything selected here is the SERVER's own first offer — the first non-disabled day (which
+   * is today whenever today is still bookable), the first non-disabled time of day (the server
+   * disables elapsed periods, so this is "now"), and the first duration. No clock is read and no
+   * availability is evaluated client-side; the server encoded both in the `disabled` flags.
+   *
+   * Runs only while the whole selection is empty and untouched, so it can never overwrite a
+   * choice, and never under a DEV seed.
+   */
+  useEffect(() => {
+    if (state.status !== 'ready' || userTouched.current || initialSelection !== undefined) return;
+    setSelection((current) => {
+      if (
+        current.dayId !== null ||
+        current.periodId !== null ||
+        current.durationId !== null ||
+        current.slotId !== null
+      ) {
+        return current;
+      }
+      const schedule = state.data;
+      const dayId = schedule.days.find((day) => day.disabled !== true)?.id ?? null;
+      if (dayId === null) return current;
+      const periodId = schedule.periods.find((period) => period.disabled !== true)?.id ?? null;
+      const durationId = schedule.durations?.find((option) => option.disabled !== true)?.id ?? null;
+      return { dayId, periodId, durationId, slotId: null };
+    });
+  }, [state, initialSelection]);
+
+  /**
+   * The second half of auto-selection: once the server has ANSWERED with the grid, the first
+   * bookable start time in the selected period is selected. When nothing in that period is
+   * bookable and the customer has not chosen it themselves, the selection advances to the first
+   * period on the SAME DAY that does hold one. Applies equally after a manual day or duration
+   * change, so every step keeps completing the next one.
+   *
+   * ## It does not change the DAY (founder ruling, 2026-08-30)
+   *
+   * It used to: a day with nothing bookable moved the selection to the next offered day, so the
+   * screen would open on the first day Spoon could actually sell instead of on a wall of grey.
+   * That turned out to be the worse failure. On 30 Aug the customer app opened showing 1 Sep —
+   * because today answered `NO_PRESENT_COOK` and the screen had quietly walked two days forward
+   * — and it read as a broken date, not as a full day. It also hid the real outage: nobody could
+   * tell that today was unsellable, because nobody was ever shown today.
+   *
+   * A day the customer did not pick is a worse answer than an honest empty one. The grey grid is
+   * the truth, and the day chips are right there to move it. Advancing the PERIOD stays, because
+   * that moves within the day the customer is already looking at and cannot misrepresent a date.
+   */
+  useEffect(() => {
+    if (state.status !== 'ready' || state.data.slotsPending || initialSelection !== undefined) {
+      return;
+    }
+    setSelection((current) => {
+      if (current.slotId !== null || current.dayId === null) return current;
+      const schedule = state.data;
+      const hasDurations = schedule.durations !== undefined && schedule.durations.length > 0;
+      if (hasDurations && current.durationId === null) return current;
+
+      // A manual day change clears the daypart; refill it from the NEW day's answer (elapsed
+      // dayparts arrive disabled, so this stays "now" on today and "first" on a future day).
+      let periodId = current.periodId;
+      if (periodId === null) {
+        if (userTouched.current) return current;
+        periodId = schedule.periods.find((period) => period.disabled !== true)?.id ?? null;
+        if (periodId === null) return current;
+      }
+
+      const firstBookable = (id: string): string | null =>
+        (schedule.slotsByPeriod[id] ?? []).find((slot) => slot.disabled !== true)?.id ?? null;
+      const own = firstBookable(periodId);
+      if (own !== null) return { ...current, periodId, slotId: own };
+      if (userTouched.current) return current;
+      for (const period of schedule.periods) {
+        if (period.disabled === true) continue;
+        const slotId = firstBookable(period.id);
+        if (slotId !== null) return { ...current, periodId: period.id, slotId };
+      }
+      // The answered day holds nothing bookable at all. STAY on it: the customer sees the grey
+      // grid for the day they are actually looking at, and moves it with the day chips.
+      return periodId === current.periodId ? current : { ...current, periodId };
+    });
+    // `selection` is a dependency because a manual day or duration change clears the slot
+    // WITHOUT changing `state` when the grid for it is already held; the completion must follow
+    // the selection, not only the read. The updater returns the same reference whenever there is
+    // nothing to complete, so this can never loop.
+  }, [state, initialSelection, selection]);
 
   const { dayId, periodId, durationId, slotId } = selection;
 
@@ -272,9 +373,10 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                     for Scheduled, and a link that opens nothing is the dead control §11 forbids —
                     so the seam decides, not the label's presence. */}
                 {schedule.paymentDetailsLabel === undefined ||
-                actions.onOpenPaymentDetails === undefined ? null : (
+                (actions.onOpenPaymentDetails === undefined &&
+                  schedule.taxesInfo === undefined) ? null : (
                   <Pressable
-                    onPress={actions.onOpenPaymentDetails}
+                    onPress={actions.onOpenPaymentDetails ?? ((): void => setTaxesOpen(true))}
                     accessibilityRole="button"
                     accessibilityLabel={schedule.paymentDetailsLabel}
                     hitSlop={16}
@@ -302,9 +404,10 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
               <ChipGroup
                 options={toChipOptions(schedule.days)}
                 selectedId={selection.dayId}
-                onSelect={(dayId) =>
-                  setSelection({ dayId, periodId: null, durationId: null, slotId: null })
-                }
+                onSelect={(dayId) => {
+                  userTouched.current = true;
+                  setSelection({ dayId, periodId: null, durationId: null, slotId: null });
+                }}
                 columns={3}
                 accessibilityLabel={schedule.sectionTitles.day}
                 testID="schedule-days"
@@ -335,6 +438,7 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                     ) {
                       return;
                     }
+                    userTouched.current = true;
                     setSelection((current) => ({
                       ...current,
                       periodId,
@@ -382,13 +486,14 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                         {...(duration.badge === undefined ? {} : { badge: duration.badge })}
                         selected={selection.durationId === duration.id}
                         disabled={duration.disabled ?? false}
-                        onPress={() =>
+                        onPress={() => {
+                          userTouched.current = true;
                           setSelection((current) => ({
                             ...current,
                             durationId: duration.id,
                             slotId: null,
-                          }))
-                        }
+                          }));
+                        }}
                         testID={`schedule-duration-${duration.id}`}
                       />
                     </View>
@@ -436,6 +541,7 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                       if (slots.some((slot) => slot.id === slotId && slot.disabled === true)) {
                         return;
                       }
+                      userTouched.current = true;
                       setSelection((current) => ({ ...current, slotId }));
                     }}
                     columns={4}
@@ -445,6 +551,15 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                   />
                 )}
               </View>
+            )}
+            {schedule.taxesInfo === undefined ? null : (
+              <InfoDialog
+                visible={taxesOpen}
+                onClose={() => setTaxesOpen(false)}
+                title={schedule.taxesInfo.title}
+                body={schedule.taxesInfo.body}
+                testID="schedule-taxes"
+              />
             )}
             {schedule.durationHelp === undefined ? null : (
               <HelpMePickSheet

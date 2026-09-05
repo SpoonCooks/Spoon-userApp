@@ -42,6 +42,15 @@ const BUNDLE_SUFFIX: Record<AppEnv, string> = {
 const SPLASH_BACKGROUND = '#FFFDF5';
 
 /**
+ * The brand yellow, Figma `#ffd600`.
+ *
+ * Used as the notification accent: Android tints the silhouette with it, so it has to be a
+ * colour that reads against a light tray. The splash background is a near-white and would
+ * have drawn the mark invisibly.
+ */
+const BRAND_YELLOW = '#FFD600';
+
+/**
  * The deployed API, used when no `EXPO_PUBLIC_API_BASE_URL` is supplied in development.
  *
  * A developer who has not written a `.env` gets the real staging deployment rather than an
@@ -71,12 +80,26 @@ const DEV_FALLBACK_API_BASE_URL = 'https://spoon-api-kalc.onrender.com';
  * working. The iOS key's restriction must therefore list `com.spoonhelp.customer` before a release
  * build can render a map — see docs/GOOGLE_MAPS_CONFIGURATION.md.
  */
-const ANDROID_PACKAGE = `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
-
+/**
+ * ONE identity per environment, on both platforms.
+ *
+ * Production used to differ: iOS carried `com.spoonhelp.customer` because that is the Apple App ID
+ * registered for release, while Android stayed on `com.spoonhelp.userapp`. Two names for one app
+ * meant every external registration keyed on it had to be done twice and kept in step -- the Maps
+ * key restrictions, the Firebase app entries, the push sender identity -- and each one is a silent
+ * failure when it drifts: a grey map, or a device token that no push can reach.
+ *
+ * Android moves to Apple's name rather than the reverse, because the Apple App ID is the one that
+ * cannot change: App Store Connect app 6803578695 is registered under it. Done on 2026-09-02,
+ * BEFORE the Android app is published -- a Play package name is permanent once uploaded, so this
+ * was the last moment it could be aligned at all.
+ */
 const IOS_BUNDLE_IDENTIFIER =
   APP_ENV === 'production'
     ? 'com.spoonhelp.customer'
     : `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
+
+const ANDROID_PACKAGE = IOS_BUNDLE_IDENTIFIER;
 
 const BUILD_PROVENANCE_RELEASE_SHA =
   process.env.SPOON_RELEASE_SHA ?? process.env.GIT_COMMIT_SHA ?? 'unknown';
@@ -152,7 +175,27 @@ const ANDROID_SIGNING_SHA1 = (process.env.ANDROID_SIGNING_SHA1 ?? '')
  * iOS needs an APNs key uploaded to EAS instead; there is no file to reference here, which is why
  * only Android has one.
  */
-const GOOGLE_SERVICES_JSON = process.env.GOOGLE_SERVICES_JSON ?? '';
+/*
+ * Defaulted to the repo root as of 2026-09-02, when the founder registered com.spoonhelp.customer
+ * in Firebase project august-dev-3b4bf and the file landed there.
+ *
+ * It stayed empty-by-default while no such file existed, and the note above is right that an
+ * absent value should still build. But "still builds" quietly meant "ships with no push", and the
+ * env var was never set on any build machine -- so the fail-closed path was the only path anyone
+ * ever took. A default that finds the file is the difference between opt-in and opt-out, and push
+ * silently not working is not a state worth defaulting to.
+ */
+const GOOGLE_SERVICES_JSON = process.env.GOOGLE_SERVICES_JSON ?? './google-services.json';
+
+/**
+ * Firebase iOS config, the plist counterpart of the JSON above.
+ *
+ * `@react-native-firebase/app`'s config plugin THROWS without it — "Path to
+ * GoogleService-Info.plist is not defined" — so an iOS build simply stops rather than shipping an
+ * app whose analytics silently never report. That is the right failure and the reason this is not
+ * optional the way it might look: the plugin will not let the two platforms drift.
+ */
+const GOOGLE_SERVICES_PLIST = process.env.GOOGLE_SERVICES_PLIST ?? './GoogleService-Info.plist';
 
 /**
  * Production refuses to build without them, for the same reason it refuses without an API base
@@ -189,6 +232,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   ios: {
     bundleIdentifier: IOS_BUNDLE_IDENTIFIER,
+    googleServicesFile: GOOGLE_SERVICES_PLIST,
     supportsTablet: false,
     infoPlist: {
       NSPhotoLibraryUsageDescription:
@@ -201,8 +245,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
     ...(GOOGLE_SERVICES_JSON === '' ? {} : { googleServicesFile: GOOGLE_SERVICES_JSON }),
 
+    /*
+     * Three layers, because an adaptive icon is three layers.
+     *
+     * These files were Expo's blue chevron template until 2026-09-04 -- the app shipped with no
+     * Spoon branding at all, on the home screen or in the tray. They are generated now by
+     * `scripts/build-app-icons.py` from the brand wordmark, which is also where the safe-zone
+     * arithmetic lives: a launcher may mask away everything outside the centre 66 of 108dp, so
+     * the foreground is sized and optically centred for that and nothing else.
+     *
+     * The background is an IMAGE rather than a colour because the designed tile is a yellow to
+     * lime diagonal, and `backgroundColor` can only be flat. It is drawn full bleed, so whatever
+     * shape a launcher cuts out of it there is no seam and no corner of the old cream showing.
+     */
     adaptiveIcon: {
-      backgroundColor: SPLASH_BACKGROUND,
+      backgroundImage: './assets/images/android-icon-background.png',
       foregroundImage: './assets/images/android-icon-foreground.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
@@ -211,10 +268,36 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
 
   plugins: [
+    /*
+     * Firebase, for Analytics. Declared before anything that depends on it, which is the order
+     * `@react-native-firebase` documents.
+     *
+     * The plugin is what makes this work under `prebuild`: it applies the google-services Gradle
+     * plugin on Android and copies the plist into the Xcode project on iOS. Hand-editing either
+     * would survive exactly until the next `prebuild --clean`, which deletes both native folders.
+     *
+     * Analytics only. Crashlytics and Performance are deliberately absent — each is a separate
+     * package and a separate Data Safety declaration, and neither was asked for.
+     */
+    /*
+     * `disableSPM` is the library's OWN supported option, and replaces the hand-written Podfile
+     * edit that first got past this. From RN 0.75 these pods resolve the Firebase iOS SDK through
+     * Swift Package Manager, whose products are automatic libraries -- so under static linkage
+     * each pod embeds its own copy and they collide as duplicate symbols. `pod install` refuses
+     * rather than emitting a binary that fails later and less legibly.
+     *
+     * Taking the upstream option rather than editing the Podfile ourselves means the placement
+     * stays right if the library changes where the flag has to sit. It writes the same
+     * `$RNFirebaseDisableSPM = true`, anchored after `prepare_react_native_project!`.
+     */
+    ['@react-native-firebase/app', { ios: { disableSPM: true } }],
+    '@react-native-firebase/analytics',
     // Pins the Android NDK. `expo-root-project` defaults to 27.1.12297006, whose copy on the
     // build machine is a damaged package shipping clang 17 — which cannot compile
     // react-native-reanimated's constrained partial specialisations, nor React Native's own
     // `std::format`. See plugins/withNdkVersion.js for the measurements behind the choice.
+    './plugins/withPodModularHeaders',
+    './plugins/withGradleHeap',
     './plugins/withNdkVersion',
     './plugins/withStagingSigning',
 
@@ -230,10 +313,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      * one of them needs the NATIVE module, and on iOS the plugin is also what adds the
      * `aps-environment` entitlement and the remote-notification background mode.
      *
-     * No icon or colour is configured, deliberately: the design does not specify a notification
-     * icon, and choosing one here would be a visual decision made in a build file.
+     * The icon is the monochrome app mark, and it has to be that one. Android draws a
+     * notification icon as an alpha silhouette — every coloured pixel is discarded and what
+     * remains is filled with the accent colour — so handing it the full-colour launcher icon
+     * produces a white blob. `android-icon-monochrome.png` already exists for the themed-icon
+     * slot and is exactly the shape this needs.
+     *
+     * Without any of this Android substitutes its own default mark, which is what was showing
+     * in the tray.
      */
-    'expo-notifications',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/images/android-icon-monochrome.png',
+        color: BRAND_YELLOW,
+      },
+    ],
 
     [
       'expo-splash-screen',

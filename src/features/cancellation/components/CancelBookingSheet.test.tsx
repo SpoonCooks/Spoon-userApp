@@ -69,7 +69,7 @@ describe('Cancellation sheet (6:2 → 104:2260 → 104:2336 → 115:2703)', () =
   it('displays all three refund figures without computing the subtraction', () => {
     render(<Harness initial="refund" />);
 
-    expect(screen.getByText('Original Booking Paid')).toBeTruthy();
+    expect(screen.getByText('Original Amount Paid')).toBeTruthy();
     expect(screen.getByText('Cancellation Processing Fee')).toBeTruthy();
     expect(screen.getByText('Refund Amount')).toBeTruthy();
     expect(screen.getAllByText('₹135')).toHaveLength(2);
@@ -168,7 +168,7 @@ describe('Cancellation sheet (6:2 → 104:2260 → 104:2336 → 115:2703)', () =
         cancellation={{
           ...DEMO_CANCELLATION,
           refundRows: [
-            { label: 'Original Booking Paid', value: '₹135' },
+            { label: 'Original Amount Paid', value: '₹135' },
             { label: 'Cancellation Processing Fee', value: '₹34' },
             // Deliberately NOT 135 − 34. A computing client could not produce this.
             { label: 'Refund Amount', value: '₹95', emphasis: 'total' },

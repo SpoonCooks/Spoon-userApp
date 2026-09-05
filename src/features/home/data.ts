@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActiveBookings, useBookingDetail, useTracking } from '@features/booking';
 import { addressLineOf, useAddresses } from '@features/address';
 import { useCatalogue } from '@features/catalogue';
+import { useInstantAvailability } from '@features/availability';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 import { currentSkewMs } from '@core/time';
@@ -12,9 +13,10 @@ import {
   formatDateLabel,
   formatTimeLabel,
   homeFrom,
+  etaMinutesFor,
   minutesUntil,
 } from './adapters';
-import { cookCardContentFor } from '@ui/components/cookCardContent';
+import { cookPhotoFor } from '@ui/components/cookPhoto';
 
 import { homeBannerFor } from './state/homeBannerView';
 import { DEMO_HOME_ACTIVE_BOOKING } from '@/demo/fixtures/home';
@@ -23,13 +25,18 @@ import type { HomeViewModel } from './types';
 import type { BookingSummaryDto } from '@features/booking';
 
 /**
- * Picks the one booking Home should project when the server returns more than one active row.
+ * Orders the customer's active bookings the way Home draws them, most urgent first.
+ *
  * Live/actionable work outranks a completed unrated item; within a state the nearest upcoming
  * service start wins, and the id tie-breaker makes equal timestamps deterministic.
+ *
+ * This used to return only the winner, and Home drew that one card. Every other booking the
+ * customer held was discarded here -- silently, with nothing on screen to say so. It returns the
+ * whole ORDER now; `[0]` is still the one Home leads with and fetches a detail for.
  */
-export function selectHomeBooking(
+export function sortHomeBookings(
   bookings: readonly BookingSummaryDto[],
-): BookingSummaryDto | null {
+): readonly BookingSummaryDto[] {
   const rank: Readonly<Record<BookingSummaryDto['status'], number>> = {
     cook_en_route: 0,
     cook_arrived: 1,
@@ -40,23 +47,36 @@ export function selectHomeBooking(
     cancelled: 6,
   };
 
-  return (
-    bookings
-      .filter((booking) => booking.status !== 'cancelled')
-      .slice()
-      .sort((left, right) => {
-        const stateOrder = rank[left.status] - rank[right.status];
-        if (stateOrder !== 0) return stateOrder;
-        const leftStart =
-          left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
-        const rightStart =
-          right.scheduledStart === null
-            ? Number.POSITIVE_INFINITY
-            : Date.parse(right.scheduledStart);
-        if (leftStart !== rightStart) return leftStart - rightStart;
-        return left.id.localeCompare(right.id);
-      })[0] ?? null
-  );
+  /*
+   * Cancelled bookings are no longer filtered out.
+   *
+   * They were, and that quietly disabled a card the design draws and this app already fully
+   * implements: `393:1072`, the apology leading to page 8c. A booking Spoon cancelled went
+   * straight into Past bookings and Refunds while Home said nothing, so the customer's first news
+   * of it was a refund line.
+   *
+   * The SERVER decides which cancellations qualify — its own, where money was actually taken, and
+   * only while they are recent — so nothing here re-derives that. `rank` still puts them last,
+   * because a live booking always outranks an apology, and `homeBannerFor` refuses to draw one
+   * for a cancellation the customer made themselves.
+   */
+  return bookings.slice().sort((left, right) => {
+    const stateOrder = rank[left.status] - rank[right.status];
+    if (stateOrder !== 0) return stateOrder;
+    const leftStart =
+      left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
+    const rightStart =
+      right.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(right.scheduledStart);
+    if (leftStart !== rightStart) return leftStart - rightStart;
+    return left.id.localeCompare(right.id);
+  });
+}
+
+/** The single booking Home leads with. Kept for callers that only want the winner. */
+export function selectHomeBooking(
+  bookings: readonly BookingSummaryDto[],
+): BookingSummaryDto | null {
+  return sortHomeBookings(bookings)[0] ?? null;
 }
 
 /**
@@ -88,8 +108,10 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   const active = useActiveBookings();
   const catalogue = useCatalogue();
 
-  const activeSummary =
-    active.state.status === 'ready' ? selectHomeBooking(active.state.data) : null;
+  const activeSummaries =
+    active.state.status === 'ready' ? sortHomeBookings(active.state.data) : null;
+  // The one Home leads with, and the only one it fetches a detail for.
+  const activeSummary = activeSummaries?.[0] ?? null;
 
   // The summary carries no cook, no timing and no allowed actions, so the banner's cook, its
   // countdown and its rateability all come from the DETAIL. Fetched only when there IS a booking.
@@ -119,8 +141,41 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   const tracking = useTracking(enRoute && activeSummary !== null ? activeSummary.id : null);
   const trackingData = tracking.state.status === 'ready' ? tracking.state.data : null;
 
+  /**
+   * Can Spoon deliver an instant booking AT ALL right now?
+   *
+   * `3:684` promises "Spoon in 30 mins" in the header and again on the Instant tile. Both were
+   * drawn unconditionally from the catalogue's arrival promise, so at 1 AM — with every cook off
+   * shift and the Instant sheet about to refuse — Home still advertised a cook in 30 minutes.
+   * The promise has to be answerable before it is made.
+   *
+   * The probe asks about the SHORTEST duration in the catalogue deliberately: it is the most
+   * permissive question available, so a `false` here means no duration could be served, not that
+   * one particular length was too long. Availability is a question about a specific duration, so
+   * some duration has to be named; the shortest is the one that cannot produce a false negative.
+   */
+  const defaultAddressId =
+    addresses.state.status === 'ready'
+      ? ((addresses.state.data.find((address) => address.isDefault) ?? addresses.state.data[0])
+          ?.id ?? null)
+      : null;
+  const shortestDurationMinutes =
+    catalogue.state.status === 'ready' && catalogue.state.data.durations.length > 0
+      ? Math.min(...catalogue.state.data.durations.map((duration) => duration.durationMinutes))
+      : null;
+  const instantAvailability = useInstantAvailability({
+    addressId: defaultAddressId,
+    durationMinutes: shortestDurationMinutes,
+  });
+
   const state = useMemo(() => {
     if (addresses.state.status !== 'ready') return addresses.state;
+
+    // Only a SETTLED refusal suppresses the promise. While the probe is still in flight the
+    // header keeps the catalogue's wording, because flickering "Spoon in 30 mins" -> "Spoon" on
+    // every cold start would be worse than a promise that is briefly optimistic.
+    const instantUnavailable =
+      instantAvailability.state.status === 'ready' && !instantAvailability.state.data.available;
 
     const defaultAddress =
       addresses.state.data.find((address) => address.isDefault) ?? addresses.state.data[0] ?? null;
@@ -133,7 +188,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
      * service starts late or is extended. `scheduledStart + duration` is deliberately not used
      * for either.
      */
-    const activeBooking =
+    const leadBooking =
       activeSummary === null || detailData === null || serverNowMs === null
         ? undefined
         : ((() => {
@@ -142,16 +197,25 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
               bookingId: activeSummary.id,
               status: detailData.status,
               cookName: detailData.cook?.name ?? null,
-              // The banner draws the TRANSPARENT cut-out over its `#FFF7CC` panel (`337:4364`).
-              // A hosted photo wins; otherwise the cook's stable profileCode resolves the
-              // bundled cut-out, and a cook with neither renders the banner without a photo.
-              cookPhotoUrl:
-                detailData.cook?.photoUrl ??
-                cookCardContentFor(detailData.cook?.profileCode)?.cutoutPhotoUrl ??
-                null,
+              // The banner draws over its `#FFF7CC` panel (`337:4364`), and every bundled export
+              // is already transparent. It used to resolve a SEPARATE `cutoutPhotoUrl`, which was
+              // one shared picture of Rekha for all four cooks -- so this banner drew her over
+              // every booking while the screen one tap inside drew the right person.
+              cookPhotoUrl: cookPhotoFor(detailData.cook),
               dateLabel: formatDateLabel(detailData.scheduledStart, serverNow),
               timeLabel: formatTimeLabel(detailData.scheduledStart, detailData.durationMinutes),
-              etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),
+              /*
+               * The SAME arrival rule the booking page uses.
+               *
+               * `minutesUntil` was raw arithmetic over the ETA, so this banner promised an
+               * arrival before the booking it belonged to. On 2026-09-02 Home read "Arriving in
+               * 2 mins" while the booking page read "6 mins", for one cook on one booking.
+               */
+              etaMinutes: etaMinutesFor(
+                trackingData?.eta.estimatedArrivalAt,
+                detailData?.scheduledStart,
+                serverNow,
+              ),
               minutesLeft:
                 detailData.status === 'cooking'
                   ? minutesUntil(detailData.timing.expectedEnd, serverNow)
@@ -161,6 +225,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
               cancelledBy: detailData.cancellation?.cancelledBy ?? null,
               reassigned: detailData.reassignment?.occurred === true,
               recoveryHandoff: detailData.recovery?.state === 'support_handoff',
+              dispatchReady: detailData.dispatchReady ?? true,
             });
           })() ?? undefined);
 
@@ -169,6 +234,43 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
       catalogue.state.status === 'ready'
         ? catalogue.state.data.instant.arrivalPromiseMinutes
         : null;
+
+    /**
+     * Every OTHER booking the customer holds, drawn from its summary alone.
+     *
+     * Home used to take the highest-ranked booking and drop the rest on the floor, so a customer
+     * with an 11:30 and a 2:00 booking saw one card and no hint the second existed. The payload
+     * always had them: `GET /v1/me/bookings/active` returns up to 20.
+     *
+     * The LEAD card keeps the full treatment -- detail plus tracking -- because it is the one with
+     * a live ETA and a rating prompt on it. The rest are built from the summary, which already
+     * carries the status, the time and the cook. That is a deliberate limit rather than a gap:
+     * a per-card detail read cannot be written as a hook (the count is not fixed), and the only
+     * field the summary lacks is the ETA, which belongs to the booking a cook is travelling to --
+     * and the server's own ranking puts that one first.
+     */
+    const followers =
+      activeSummaries === null || serverNowMs === null
+        ? []
+        : activeSummaries
+            .filter((summary) => summary.id !== activeSummary?.id)
+            .map((summary) => {
+              const serverNow = new Date(serverNowMs);
+              return homeBannerFor({
+                bookingId: summary.id,
+                status: summary.status,
+                cookName: summary.cook?.displayName ?? null,
+                cookPhotoUrl: cookPhotoFor(summary.cook),
+                dateLabel: formatDateLabel(summary.scheduledStart, serverNow),
+                timeLabel: formatTimeLabel(summary.scheduledStart, summary.durationMinutes),
+                ...(summary.reassignment?.occurred === undefined
+                  ? {}
+                  : { reassigned: summary.reassignment.occurred }),
+              });
+            })
+            .filter((banner): banner is NonNullable<typeof banner> => banner !== null);
+
+    const activeBookings = leadBooking === undefined ? followers : [leadBooking, ...followers];
 
     return ready(
       homeFrom({
@@ -186,8 +288,29 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
          * future payload that puts Schedule first must not rewrite Schedule's subtitle.
          */
         base:
-          promiseMinutes === null
-            ? base
+          instantUnavailable || promiseMinutes === null
+            ? {
+                ...base,
+                // No promise can be kept, so none is made: the header is the brand alone, and
+                // the Instant tile drops its emphasised " 30 mins" run rather than shrinking it
+                // to a smaller lie.
+                ...(instantUnavailable
+                  ? {
+                      header: { ...base.header, etaHeadline: 'Spoon' },
+                      tiles: base.tiles.map((tile) => {
+                        if (tile.id !== 'instant') return tile;
+                        // "Get a cook in" is a sentence with its minutes torn off — it reads as
+                        // truncated, not as restraint. With no promise to make, the tile says
+                        // what it still honestly offers: "Get a cook".
+                        const { subtitleEmphasis: _dropped, ...withoutPromise } = tile;
+                        return {
+                          ...withoutPromise,
+                          subtitle: tile.subtitle.replace(/\s+in$/, ''),
+                        };
+                      }),
+                    }
+                  : {}),
+              }
             : {
                 ...base,
                 header: { ...base.header, etaHeadline: `Spoon in ${promiseMinutes} mins` },
@@ -202,10 +325,19 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
           defaultAddress === undefined || defaultAddress === null
             ? null
             : addressLineOf(defaultAddress),
-        activeBooking,
+        activeBookings,
       }),
     );
-  }, [addresses.state, activeSummary, detailData, trackingData, catalogue.state, serverNowMs]);
+  }, [
+    addresses.state,
+    activeSummary,
+    activeSummaries,
+    detailData,
+    trackingData,
+    catalogue.state,
+    instantAvailability.state,
+    serverNowMs,
+  ]);
 
   const refetchers = useRef({
     addresses: addresses.refetch,

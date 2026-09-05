@@ -185,11 +185,8 @@ export default function ShowcaseRoute() {
         <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_ARRIVED} onOpen={noop} />
         <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_TIME_LEFT} onOpen={noop} />
         <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_CANCELLED} onOpen={noop} />
-        <HomeBookingBanner
-          booking={DEMO_ACTIVE_BOOKING_RATE}
-          onOpen={noop}
-          onRate={(value: RatingSelection) => setRating(value)}
-        />
+        {/* The rate card's strip is presentational — it opens 14a; it does not rate here. */}
+        <HomeBookingBanner booking={DEMO_ACTIVE_BOOKING_RATE} onOpen={noop} />
       </Section>
 
       <Section title="Rating">

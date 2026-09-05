@@ -32,6 +32,30 @@ const IST = 'Asia/Kolkata';
 
 const at = (over: Partial<BookingSummaryDto>): BookingSummaryDto => ({ ...BASE, ...over });
 
+/**
+ * `6:227` draws `Scheduled · 4:00 PM` under the cook's name — how the booking was made and
+ * when it ran. The card used to print the ADDRESS label there instead, so every row read "Home":
+ * the least distinguishing fact available, since a customer's bookings are nearly all at one
+ * address.
+ */
+describe('the line under the cook name says how and when', () => {
+  it('names the slot type and the start time for a scheduled booking', () => {
+    expect(bookingCardFrom(at({}), IST).subtitle).toBe('Scheduled · 10:00 AM');
+  });
+
+  it('reads the start time in the published timezone, not the device one', () => {
+    expect(bookingCardFrom(at({}), 'UTC').subtitle).toBe('Scheduled · 4:30 AM');
+  });
+
+  it('says only Instant for an instant booking, which promised no start time', () => {
+    expect(bookingCardFrom(at({ slotType: 'instant' }), IST).subtitle).toBe('Instant');
+  });
+
+  it('falls back to the bare word when the server carries no start', () => {
+    expect(bookingCardFrom(at({ scheduledStart: null }), IST).subtitle).toBe('Scheduled');
+  });
+});
+
 describe('the status pill states what actually happened', () => {
   it('calls a paid, cook-assigned booking Confirmed', () => {
     expect(bookingCardFrom(at({ status: 'assigned' }), IST).statusLabel).toBe('Confirmed');
@@ -115,5 +139,63 @@ describe('the date is read on the service clock, not the device', () => {
 
   it('falls back to the duration alone for an instant booking with no scheduled start', () => {
     expect(headlineFor(at({ scheduledStart: null, durationMinutes: 60 }), IST)).toBe('1 hr');
+  });
+});
+
+/*
+ * The star on a Past-bookings row is the CUSTOMER's score, never the cook's average.
+ *
+ * It was the average. Four cancelled bookings in a row each showed "5 ★" — nobody had cooked and
+ * nobody had rated — and a booking the customer had scored 3 showed 5, because the number came
+ * from the cook rather than from them. A customer reads a star on their own row as the score they
+ * gave it, so these check that the two numbers never stand in for each other again.
+ */
+describe('the star on a history card', () => {
+  const cook = {
+    cookId: 'cook-1',
+    displayName: 'Cook Sanchita',
+    profileImageUrl: null,
+    // The boundary has already flattened the server's { average, count } by this point.
+    ratingAverage: 5,
+  };
+
+  it('is dropped from a cancelled booking', () => {
+    const card = bookingCardFrom(
+      at({ status: 'cancelled', cook, ratingStars: null } as never),
+      IST,
+    );
+
+    expect(card.rating).toBeUndefined();
+    // Her name and face stay: the row is still about who it was going to be.
+    expect(card.cookName).toBe('Cook Sanchita');
+  });
+
+  it('shows what the customer gave, not what the cook averages', () => {
+    const card = bookingCardFrom(at({ status: 'completed', cook, ratingStars: 3 } as never), IST);
+
+    // 3, not her 5. This is the defect the founder reported: "in past booking we should be able
+    // to see whats the booking we gave her not her actuall current rating".
+    expect(card.rating).toBe(3);
+    expect(card.cookName).toBe('Cook Sanchita');
+  });
+
+  /*
+   * No placeholder for an unrated booking. The card carries its own rating prompt, and a number
+   * here would be indistinguishable from an answer the customer never gave.
+   */
+  it('shows no star on a completed booking nobody rated', () => {
+    const card = bookingCardFrom(
+      at({ status: 'completed', cook, ratingStars: null } as never),
+      IST,
+    );
+
+    expect(card.rating).toBeUndefined();
+  });
+
+  /* An older deployment sends no field at all; absent must behave exactly as unrated. */
+  it('treats a missing field as unrated rather than falling back to her average', () => {
+    const card = bookingCardFrom(at({ status: 'completed', cook } as never), IST);
+
+    expect(card.rating).toBeUndefined();
   });
 });

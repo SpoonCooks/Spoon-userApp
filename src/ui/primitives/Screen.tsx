@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import type { PropsWithChildren, ReactNode, RefObject } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent, ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -104,6 +104,26 @@ export interface KeyboardAwareScroll {
   readonly onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   /** Attach to every `TextInput` inside the scroll area. */
   readonly onInputFocus: () => void;
+  /**
+   * Scroll an arbitrary view clear of the keyboard.
+   *
+   * For a control that is TALLER than the input the customer is typing in: a search field that
+   * opens a list of options beneath itself is one control from the customer's point of view and
+   * two views from the layout's, and revealing only the input leaves the list — the entire
+   * reason they tapped — under the IME.
+   *
+   * Call it from the taller view's own `onLayout`, for the same reason `onViewportLayout` exists:
+   * the list is laid out one commit after the focus that opened it, so a measurement taken at
+   * focus time is a measurement of something that is not on screen yet.
+   */
+  readonly revealView: (node: MeasurableNode | null) => void;
+}
+
+/** Anything that can report its own window rectangle — a `View` ref, or the focused input. */
+interface MeasurableNode {
+  measureInWindow(
+    callback: (x: number, y: number, width: number, height: number) => void,
+  ): void;
 }
 
 export function useKeyboardAwareScroll(
@@ -123,23 +143,50 @@ export function useKeyboardAwareScroll(
     offset.current = event.nativeEvent.contentOffset.y;
   }, []);
 
-  const reveal = useCallback(() => {
-    // No keyboard, or nothing focused, means there is nothing to be covered by.
-    if (keyboardHeight === 0) return;
-    const input = TextInput.State.currentlyFocusedInput();
-    const viewport = viewportRef.current;
-    if (input == null || viewport == null) return;
+  /**
+   * Scrolls until `target`'s bottom edge clears the keyboard, or does nothing if it already does.
+   *
+   * Both rectangles are read in the SAME window coordinates, and nothing is derived from
+   * `Dimensions` or from the IME's own frame — under the edge-to-edge window those two disagree
+   * about where the bottom of the screen is, and that disagreement is what this exists to avoid.
+   */
+  const revealNode = useCallback(
+    (target: MeasurableNode | null) => {
+      // No keyboard means there is nothing to be covered by.
+      if (keyboardHeight === 0) return;
+      const viewport = viewportRef.current;
+      if (target == null || viewport == null) return;
 
-    viewport.measureInWindow((_x, viewportY, _width, viewportHeight) => {
-      input.measureInWindow((_inputX, inputY, _inputWidth, inputHeight) => {
-        // How far the field's bottom edge (plus the breathing room the frames leave under a
-        // control) falls past the bottom of what the customer can still see.
-        const covered = inputY + inputHeight + gap - (viewportY + viewportHeight);
-        if (covered <= 0) return;
-        scrollRef.current?.scrollTo({ y: offset.current + covered, animated: true });
+      viewport.measureInWindow((_x, viewportY, _width, viewportHeight) => {
+        target.measureInWindow((_targetX, targetY, _targetWidth, targetHeight) => {
+          // How far the target's bottom edge (plus the breathing room the frames leave under a
+          // control) falls past the bottom of what the customer can still see.
+          const covered = targetY + targetHeight + gap - (viewportY + viewportHeight);
+          if (covered <= 0) return;
+
+          /**
+           * Never scroll the target's own TOP out of view.
+           *
+           * A control taller than the space left above the keyboard cannot be revealed whole, and
+           * chasing its bottom edge would push the field being typed in off the top of the screen
+           * — trading one invisible thing for a worse one. The grown-up-food search is exactly
+           * that shape once its list is open: a label, a field, and up to 200pt of options.
+           * Showing the top of the control and as much of the list as fits is the honest maximum.
+           */
+          const headroom = Math.max(0, targetY - viewportY);
+          const scrollBy = Math.min(covered, headroom);
+          if (scrollBy <= 0) return;
+
+          scrollRef.current?.scrollTo({ y: offset.current + scrollBy, animated: true });
+        });
       });
-    });
-  }, [keyboardHeight, gap]);
+    },
+    [keyboardHeight, gap],
+  );
+
+  const reveal = useCallback(() => {
+    revealNode(TextInput.State.currentlyFocusedInput());
+  }, [revealNode]);
 
   return {
     scrollRef,
@@ -147,6 +194,7 @@ export function useKeyboardAwareScroll(
     onViewportLayout: reveal,
     onScroll,
     onInputFocus: reveal,
+    revealView: revealNode,
   };
 }
 
@@ -181,6 +229,8 @@ export function Screen({
 }: PropsWithChildren<ScreenProps>) {
   const content = padded ? styles.padded : undefined;
   const keyboardHeight = useKeyboardHeight();
+  const { scrollRef, viewportRef, onViewportLayout, onScroll, onInputFocus } =
+    useKeyboardAwareScroll(keyboardHeight);
   const footerGutter = useBottomGutter(lightTheme.space.lg);
 
   return (
@@ -192,13 +242,32 @@ export function Screen({
       {header ?? null}
 
       {scroll ? (
-        <ScrollView
-          style={keyboardHeight === 0 ? undefined : { marginBottom: keyboardHeight }}
-          contentContainerStyle={[styles.scrollContent, content, contentStyle]}
-          keyboardShouldPersistTaps="handled"
+        <View
+          ref={viewportRef}
+          onLayout={onViewportLayout}
+          onFocus={onInputFocus}
+          style={[
+            styles.flex,
+            Platform.OS === 'ios' || keyboardHeight === 0 ? null : { marginBottom: keyboardHeight },
+          ]}
         >
-          {children}
-        </ScrollView>
+          <ScrollView
+            ref={scrollRef}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            /*
+             * Shrinking for the keyboard is not the same as scrolling to the field being typed in.
+             * Android uses the measured viewport and focus handlers above. iOS owns the equivalent
+             * inset and first-responder reveal through `automaticallyAdjustKeyboardInsets`, so the
+             * two platforms do not double-count the keyboard.
+             */
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            contentContainerStyle={[styles.scrollContent, content, contentStyle]}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+        </View>
       ) : (
         <View style={[styles.flex, content]}>{children}</View>
       )}

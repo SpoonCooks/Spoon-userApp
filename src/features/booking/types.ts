@@ -95,6 +95,10 @@ export interface BookingSummaryViewModel {
    * say", which hides the action.
    */
   readonly rescheduleAllowed?: boolean;
+  /** Why Cancel is absent, when the reason is not evident from the banner. */
+  readonly cancelBlockedNote?: string;
+  /** Why Reschedule is absent, when the reason is not evident from the banner. */
+  readonly rescheduleBlockedNote?: string;
   /**
    * `292:201` — Confirm reassign (`289:6607`) inserts ONE notice between the banner and the cook
    * card. Its PRESENCE is the server reporting a reassignment; the client never decides that one
@@ -118,6 +122,10 @@ export interface TrackingViewModel {
   readonly rescheduleLabel: string;
   /** Ruling R-3: absent means "the server did not say", which hides Reschedule. */
   readonly rescheduleAllowed?: boolean;
+  /** Why Cancel is absent, when the reason is not evident from the banner. */
+  readonly cancelBlockedNote?: string;
+  /** Why Reschedule is absent, when the reason is not evident from the banner. */
+  readonly rescheduleBlockedNote?: string;
 }
 
 /**
@@ -251,9 +259,18 @@ export interface CompletionViewModel {
   readonly ratingCaption: string;
   /** `319:3228` — what the legend says once one is. */
   readonly ratedCaption: string;
+  /** `143:288` on `299:1424` — the heading while the field is still open. */
   readonly feedbackTitle: string;
+  /**
+   * `319:3191` — what that same heading becomes once it IS submitted.
+   *
+   * The two frames differ here: 14a asks for feedback, 14b reports that it landed. The screen
+   * used to keep the asking headline above the acknowledgement, so a customer who had just
+   * submitted was still being invited to submit.
+   */
+  readonly feedbackSubmittedTitle: string;
   readonly feedbackPlaceholder: string;
-  /** `319:3252` — "Thanks for sharing your feedback!". */
+  /** `319:3252` — the line under that heading once submitted. */
   readonly feedbackAcknowledgement: string;
   readonly submitLabel: string;
   /** `308:3125` — "Would you like to tip the cook?". */
