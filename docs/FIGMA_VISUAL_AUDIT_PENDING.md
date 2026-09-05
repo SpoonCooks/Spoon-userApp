@@ -160,8 +160,8 @@ component identification; not sufficient for sub-pixel spacing measurement.
 
   | Field | Type | Notes |
   |---|---|---|
-  | Flat no./ House no. | text | |
-  | Building/ Tower name or Plot no. | text | |
+  |  Flat no. / House No. + Tower | text | |
+  |  Building + Plot no. | text | |
   | Area | text (prefilled from 16b) | paired with a **map thumbnail + "Change"** → returns to 16b |
   | Add label | chip select | **Home · Parents · Friends · Others** |
   | Receiver's name | text | under "Receiver's details" |

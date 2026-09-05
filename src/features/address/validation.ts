@@ -16,8 +16,8 @@ import type { AddressLabelOption } from './types';
  *
  * ## The field contract, read off `60:655` and the V7 founder comment
  *
- * REQUIRED    `60:697`   Flat no./ House no.
- *             `63:789`   Building/ Tower name or Plot no.  (ONE field — the frame's label is
+ * REQUIRED    `60:697`   Flat no. / House No. + Tower
+ *             `63:789`   Building + Plot no.  (ONE field — the frame's label is
  *                        "or", so a plot number satisfies it)
  *             `339:4600` Label as — one of Home · Parents · Friends · Others
  * CONDITIONAL `339:4609` Save as — drawn ONLY under Others, and REQUIRED there. Selecting a named

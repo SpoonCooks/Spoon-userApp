@@ -108,8 +108,8 @@ export const DEMO_ADDRESS_OUT_OF_SERVICE: AddressOutOfServiceViewModel = {
  */
 export const DEMO_ADDRESS_DETAILS: AddressDetailsViewModel = {
   title: 'Complete address',
-  flatPlaceholder: 'Flat no./ House no.',
-  buildingPlaceholder: 'Building/ Tower name or Plot no.',
+  flatPlaceholder: 'Flat no. / House No. + Tower',
+  buildingPlaceholder: 'Building + Plot no',
   areaTitle: 'Area',
   areaValue: 'Street name, Area 124, subarea xyz, city',
   changeLabel: 'Change',

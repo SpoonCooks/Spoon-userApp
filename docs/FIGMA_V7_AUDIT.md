@@ -183,8 +183,8 @@ the same question rather than a grey chosen here.
 
 | Field | Node | Class |
 | --- | --- | --- |
-| Flat no./ House no. | `60:697` | REQUIRED |
-| Building/ Tower name or Plot no. | `63:789` | REQUIRED (one field; the label's "or" means a plot number satisfies it) |
+|  Flat no. / House No. + Tower | `60:697` | REQUIRED |
+| Building + Plot no. | `63:789` | REQUIRED (one field; the label's "or" means a plot number satisfies it) |
 | Label as | `339:4600` | REQUIRED |
 | Save as | `339:4609` | CONDITIONAL — shown and required **only** under Others |
 | Receiver's name / phone | `222:1559` / `64:27` | OPTIONAL — `64:6` marks the block "(Optional)" |
