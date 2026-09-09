@@ -37,6 +37,12 @@ export interface HomeTopBannerProps {
   readonly header: HomeHeaderViewModel;
   readonly onPressAddress: () => void;
   readonly onPressProfile: () => void;
+  /**
+   * The device's top safe-area inset, folded into the banner's own top padding so its
+   * background/shadow reach the screen's top edge as ONE box — see `HomeScreen.tsx` for why this
+   * isn't a separate spacer sibling.
+   */
+  readonly topInset?: number;
 }
 
 /**
@@ -51,13 +57,21 @@ export interface HomeTopBannerProps {
 const NO_ADDRESS_LABEL = 'Add address';
 const NO_ADDRESS_LINE = 'Set your delivery location';
 
-export function HomeTopBanner({ header, onPressAddress, onPressProfile }: HomeTopBannerProps) {
+export function HomeTopBanner({
+  header,
+  onPressAddress,
+  onPressProfile,
+  topInset = 0,
+}: HomeTopBannerProps) {
   const hasAddress = header.addressLabel !== null && header.addressLine !== null;
   const addressLabel = header.addressLabel ?? NO_ADDRESS_LABEL;
   const addressLine = header.addressLine ?? NO_ADDRESS_LINE;
 
   return (
-    <View style={styles.container} testID="home-header">
+    <View
+      style={[styles.container, { paddingTop: DESIGN.paddingTop + topInset }]}
+      testID="home-header"
+    >
       <View style={styles.headline}>
         <Image
           source={HOME_ICON_BOLT}

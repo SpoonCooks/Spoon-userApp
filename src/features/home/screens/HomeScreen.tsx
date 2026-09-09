@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
 import { QueryBoundary, lightTheme } from '@ui';
@@ -89,13 +89,21 @@ export interface HomeViewProps extends HomeActions {
 }
 
 export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps) {
+  const { top } = useSafeAreaInsets();
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']} testID="home-screen">
+    <SafeAreaView style={styles.safe} edges={['left', 'right']} testID="home-screen">
       <QueryBoundary state={state} {...(onRetry === undefined ? {} : { onRetry })}>
         {(home) => (
           <>
+            {/*
+              `topInset` extends the banner's OWN padding/background/shadow up through the status
+              bar area, rather than a separate sibling box sitting above it — two adjacent boxes
+              left a visible seam where the banner's shadow bled across the shared edge. A single
+              box has no seam, and its shadow's top edge is simply clipped by the screen edge.
+            */}
             <HomeTopBanner
               header={home.header}
+              topInset={top}
               onPressAddress={actions.onPressAddress}
               onPressProfile={actions.onPressProfile}
             />
