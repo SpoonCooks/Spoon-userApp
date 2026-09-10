@@ -171,6 +171,10 @@ export default function AddressLocationRoute() {
             longitude: outcome.coordinates.longitude,
             placeId: outcome.geocoded?.placeId ?? null,
             serviceable: true,
+            // Tags this point as belonging to THIS edit (or to no address, while adding), so
+            // `60:655` can tell a point just picked here apart from a leftover from an unrelated
+            // attempt — see `AddressDraft.editingId`.
+            editingId,
             street: outcome.geocoded?.street ?? null,
             city: outcome.geocoded?.city ?? null,
             state: outcome.geocoded?.region ?? null,

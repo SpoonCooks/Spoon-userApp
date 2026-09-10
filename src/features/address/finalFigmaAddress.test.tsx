@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
 import { createStubApi, createTestRuntime, renderWithRuntime } from '@/test/renderWithRuntime';
+import { useAddressDraftStore } from '@core/store/addressDraftStore';
 import { useAddressDetailsData, useAddressGate } from './data';
 
 /**
@@ -87,12 +88,17 @@ function DetailsProbe({ addressId }: { readonly addressId: string | null }) {
       <Text testID="receiver">{state.data.receiverName ?? ''}</Text>
       <Text testID="phone">{state.data.receiverPhone ?? ''}</Text>
       <Text testID="saveAs">{state.data.saveAsValue ?? ''}</Text>
+      <Text testID="area">{state.data.areaValue}</Text>
       <Text testID="point">{savedPoint === null ? 'none' : `${savedPoint.latitude}`}</Text>
     </>
   );
 }
 
 describe('useAddressDetailsData — editing opens PREFILLED (§5)', () => {
+  beforeEach(() => {
+    useAddressDraftStore.getState().clear();
+  });
+
   it('fills the form from the saved record, and carries its point for the update', async () => {
     renderWithRuntime(<DetailsProbe addressId="addr-7" />, { runtime: runtimeWith([SAVED]) });
 
@@ -120,5 +126,57 @@ describe('useAddressDetailsData — editing opens PREFILLED (§5)', () => {
     });
 
     await waitFor(() => expect(screen.getByTestId('saveAs').props.children).toBe("Simran's pg"));
+  });
+
+  /**
+   * "Change area" re-pins THIS record and returns to this exact form (task: address-edit back
+   * navigation fix) — the Area text has to follow that re-pin rather than keep showing the
+   * address's original, now-superseded location.
+   */
+  it('shows the freshly re-pinned area after "Change area", tagged for this exact address', async () => {
+    useAddressDraftStore.getState().setPoint({
+      latitude: 12.9,
+      longitude: 77.6,
+      serviceable: true,
+      editingId: 'addr-7',
+      street: 'New Ring Road',
+      city: 'Bengaluru',
+      state: 'KA',
+      pincode: '560099',
+    });
+
+    renderWithRuntime(<DetailsProbe addressId="addr-7" />, { runtime: runtimeWith([SAVED]) });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('area').props.children).toBe(
+        'New Ring Road, Bengaluru, KA, 560099',
+      ),
+    );
+  });
+
+  /**
+   * The store persists until a save succeeds, so an abandoned attempt on a DIFFERENT address can
+   * leave a draft behind. It must not leak into an unrelated edit just because one happens to be
+   * open — the saved record's own area still wins.
+   */
+  it('ignores a leftover draft tagged for a different address', async () => {
+    useAddressDraftStore.getState().setPoint({
+      latitude: 12.9,
+      longitude: 77.6,
+      serviceable: true,
+      editingId: 'addr-9',
+      street: 'Some Other Road',
+      city: 'Bengaluru',
+      state: 'KA',
+      pincode: '560001',
+    });
+
+    renderWithRuntime(<DetailsProbe addressId="addr-7" />, { runtime: runtimeWith([SAVED]) });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('area').props.children).toBe(
+        'Indiranagar 100ft Road, Bengaluru, KA, 560038',
+      ),
+    );
   });
 });
