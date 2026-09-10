@@ -50,12 +50,14 @@ export default function AddressLocationRoute() {
    * walked back here from an EDIT — it keeps the edit addressed to the same record. `from` is
    * `68:214`'s own entry-point tag (Home or Profile), carried through so this whole sub-flow's
    * REPLACE-based back controls can still return the customer to the list's correct destination
-   * once they eventually land back on it — see `address/index.tsx`.
+   * once they eventually land back on it — see `address/index.tsx`. `resume=1` marks THIS visit
+   * as a "Change area" digression from an already-open `60:655` — see the Confirm handler below.
    */
-  const { onboarding, addressId, from } = useLocalSearchParams<{
+  const { onboarding, addressId, from, resume } = useLocalSearchParams<{
     onboarding?: string;
     addressId?: string;
     from?: string;
+    resume?: string;
   }>();
   const firstRun = onboarding === '1';
   const editingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
@@ -132,6 +134,7 @@ export default function AddressLocationRoute() {
               firstRun ? 'onboarding=1' : null,
               editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
               from === undefined ? null : `from=${from}`,
+              resume === undefined ? null : `resume=${resume}`,
             ]
               .filter((part): part is string => part !== null)
               .join('&');
@@ -173,6 +176,21 @@ export default function AddressLocationRoute() {
             state: outcome.geocoded?.region ?? null,
             pincode: outcome.geocoded?.pincode ?? null,
           });
+          /**
+           * `resume=1` means this visit was a "Change area" DIGRESSION from an already-open
+           * `60:655` (`address/details.tsx` pushed here, rather than the customer arriving via
+           * the ordinary add/edit flow) — that Details screen is still sitting right underneath,
+           * still holding whatever the customer had already typed, and it already reads the
+           * point `setPoint` just wrote above. Popping back to it is what "Confirm should return
+           * to the screen Change area was pressed from" means; pushing a SECOND, blank Details
+           * on top of the first would both lose that typed state and leave a stray screen behind
+           * `60:655`'s own back control.
+           */
+          if (resume !== undefined) {
+            router.back();
+            return;
+          }
+
           /**
            * `60:655`, carrying the SAME context this screen was entered with.
            *

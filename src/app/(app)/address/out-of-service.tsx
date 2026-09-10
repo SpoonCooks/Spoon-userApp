@@ -20,10 +20,11 @@ import { useSafeBack } from '@core/navigation';
  * effect left that could bounce the customer straight back to this screen.
  */
 export default function AddressOutOfServiceRoute() {
-  const { onboarding, addressId, from } = useLocalSearchParams<{
+  const { onboarding, addressId, from, resume } = useLocalSearchParams<{
     onboarding?: string;
     addressId?: string;
     from?: string;
+    resume?: string;
   }>();
   const { state, refetch } = useAddressOutOfServiceData();
 
@@ -31,7 +32,8 @@ export default function AddressOutOfServiceRoute() {
    * A genuine pop in every reachable case. The fallback covers only the unreachable one — a deep
    * link straight to this route — and it goes to the MAP, because "choose another location" has to
    * lead somewhere a location can be chosen. `onboarding` is preserved so a first-run customer
-   * still finishes at Home rather than at the saved-address list.
+   * still finishes at Home rather than at the saved-address list; `resume` likewise, so the map's
+   * own Confirm still knows to pop back to an open `60:655` rather than pushing a new one.
    */
   const goBack = useSafeBack(
     [
@@ -40,6 +42,7 @@ export default function AddressOutOfServiceRoute() {
         ? `addressId=${encodeURIComponent(addressId)}`
         : null,
       from === undefined ? null : `from=${from}`,
+      resume === undefined ? null : `resume=${resume}`,
     ]
       .filter((part): part is string => part !== null)
       .reduce<string>(

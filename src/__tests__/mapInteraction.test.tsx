@@ -283,6 +283,24 @@ describe('confirm is the only thing that asks the server', () => {
     });
   });
 
+  /**
+   * `resume=1` marks this visit as a "Change area" digression from an already-open Details
+   * screen (`address/details.tsx`), which is still sitting right underneath. Popping back to it
+   * is what returns the customer to the exact screen — with whatever they had already typed —
+   * that "Change area" was pressed from; pushing a second, blank Details would both lose that
+   * and leave a stray screen behind it.
+   */
+  it('pops back to an open Details screen after a "Change area" digression, instead of pushing a new one', async () => {
+    mockSearchParams = { resume: '1', addressId: 'addr-1' };
+    render();
+    await pin();
+
+    fireEvent.press(screen.getByTestId('address-confirm'));
+
+    await waitFor(() => expect(mockRouter.back).toHaveBeenCalledTimes(1));
+    expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
   it('sends the coordinate the map SETTLED on, not the one the screen opened on', async () => {
     render();
     await pin();

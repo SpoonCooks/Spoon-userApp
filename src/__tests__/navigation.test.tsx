@@ -204,26 +204,12 @@ const POPPING_BACK_ROUTES = [
   // applies to both.
   ['history', HistoryRoute, 'screen-header-back', '/profile'],
   ['refunds', RefundsRoute, 'screen-header-back', '/profile'],
-] as const;
-
-/**
- * Routes whose back control lands on ONE named screen whatever the stack looks like.
- *
- * These are the founder's V7 routing matrix (task §5, §11, §14, §15), and each destination is a
- * product decision rather than a consequence of history:
- *
- *   `60:655` Complete address -> `53:31`, including on an edit
- *
- * They are asserted on a stack that CAN pop, because that is the shape where "deterministic" and
- * "pop" disagree — and where the old behaviour silently did the wrong thing.
- *
- * `address/details` stays here rather than joining the popping table above: an EDIT reaches it by
- * pushing straight from `68:214`, skipping `53:31` entirely, so a pop from an edit would land on
- * the wrong screen. The founder's ruling — back always lands on `53:31`, edit or not — is the
- * genuine product decision `useDeterministicBack` exists for.
- */
-const DETERMINISTIC_BACK_ROUTES = [
-  ['address/details', AddressDetailsRoute, 'address-header-back', '/address/location'],
+  // `60:655`'s header back NO LONGER forces `53:31` on an edit (reversed product decision — see
+  // "address edit now returns to the list" below): it has two genuinely different predecessors
+  // (the map's confirm, or `68:214`'s "Edit" pushing here directly), and a plain pop resolves to
+  // whichever is actually true — which is also what fixes the same "opening" animation defect
+  // fixed everywhere else in this file. No `?from=` here, so `/address` is the un-tagged default.
+  ['address/details', AddressDetailsRoute, 'address-header-back', '/address'],
 ] as const;
 
 describe('back is always handled', () => {
@@ -252,30 +238,26 @@ describe('back is always handled', () => {
   );
 });
 
-describe('the V7 routing matrix is deterministic', () => {
-  it.each(DETERMINISTIC_BACK_ROUTES)(
-    '%s goes to its named destination even when the stack COULD pop',
-    async (_name, Route, backId, destination) => {
-      render(<Route />);
+/**
+ * `60:655`'s "Change area" is a forward DIGRESSION, not a back control — it belongs in neither
+ * table above. It always PUSHES (never replaces) to `53:31`, tagged `resume=1` so the map's own
+ * Confirm knows to pop back to this exact screen instead of pushing a second, blank one — see
+ * `location.tsx` and "the map pops back to an open Details screen after Change area" below. The
+ * old `dismissAll` + `replace` destroyed this screen outright, which is what made both back AND
+ * Confirm land somewhere other than "the screen Change area was pressed from" (the reported bug).
+ */
+describe('address details "Change area" is a push, not a replace', () => {
+  it('pushes the map, tagged to resume this exact screen, even on an edit', async () => {
+    mockSearchParams = { addressId: 'addr-1' };
 
-      fireEvent.press(await screen.findByTestId(backId));
+    render(<AddressDetailsRoute />);
 
-      expect(mockRouter.back).not.toHaveBeenCalled();
-      expect(mockRouter.replace).toHaveBeenCalledWith(destination);
-    },
-  );
+    fireEvent.press(await screen.findByTestId('address-change-area'));
 
-  it.each(DETERMINISTIC_BACK_ROUTES)(
-    '%s reaches the same destination with NO history',
-    async (_name, Route, backId, destination) => {
-      mockRouter = makeRouter(false);
-      render(<Route />);
-
-      fireEvent.press(await screen.findByTestId(backId));
-
-      expect(mockRouter.replace).toHaveBeenCalledWith(destination);
-    },
-  );
+    expect(mockRouter.push).toHaveBeenCalledWith('/address/location?resume=1&addressId=addr-1');
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(mockRouter.dismissAll).not.toHaveBeenCalled();
+  });
 });
 
 /**
@@ -425,34 +407,33 @@ describe('first-run address flow', () => {
   });
 });
 
-describe('address edit keeps its identity', () => {
+describe('address edit now returns to the list', () => {
   /**
-   * `60:655` back -> `53:31`, unconditionally (V7 routing matrix, task §5/§15/§28).
-   *
-   * The superseded behaviour sent an EDIT to `68:214` instead, on the reasoning that an edit never
-   * went through the map. The founder's matrix overrides that, and the chain it produces is
-   * coherent — list -> form (prefilled) -> map -> list — provided the map step is told WHICH
-   * record is in play. `addressId` therefore travels with it, which is what keeps a round trip
-   * through the map an UPDATE rather than a second address.
+   * `60:655` back -> `68:214` directly on an edit (product decision REVERSED — see `goBack`'s
+   * comment in `address/details.tsx`). An edit is pushed straight from the list, skipping the
+   * map entirely, so a pop lands correctly on the list without any special-casing.
    */
-  it('backs an edit out to the map, carrying the address id', async () => {
+  it('pops an edit straight back to the list', async () => {
     mockSearchParams = { addressId: 'addr-1' };
 
     render(<AddressDetailsRoute />);
 
     fireEvent.press(await screen.findByTestId('address-header-back'));
 
-    expect(mockRouter.replace).toHaveBeenCalledWith('/address/location?addressId=addr-1');
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
-  it('carries the saved-address list entry point back to the map too', async () => {
+  it('falls back to the correct list entry point with no history to pop', async () => {
+    mockRouter = makeRouter(false);
     mockSearchParams = { addressId: 'addr-1', from: 'home' };
 
     render(<AddressDetailsRoute />);
 
     fireEvent.press(await screen.findByTestId('address-header-back'));
 
-    expect(mockRouter.replace).toHaveBeenCalledWith('/address/location?addressId=addr-1&from=home');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/address?from=home');
   });
 
   it('opens Edit with the id of the row that was tapped', async () => {
