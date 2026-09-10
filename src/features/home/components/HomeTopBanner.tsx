@@ -66,12 +66,17 @@ export function HomeTopBanner({
   const hasAddress = header.addressLabel !== null && header.addressLine !== null;
   const addressLabel = header.addressLabel ?? NO_ADDRESS_LABEL;
   const addressLine = header.addressLine ?? NO_ADDRESS_LINE;
+  /**
+   * `DESIGN.paddingTop` (22) is a FLOOR, not an addend — the same shape `useBottomGutter` uses
+   * for the bottom safe area (`src/ui/primitives/Screen.tsx`). The inset already clears the
+   * status bar on notch/island devices, so summing the design gap on top of it would double up
+   * the clearance the design never asked for; on a device with a smaller inset, the design gap
+   * still wins.
+   */
+  const paddingTop = Math.max(DESIGN.paddingTop, topInset);
 
   return (
-    <View
-      style={[styles.container, { paddingTop: DESIGN.paddingTop + topInset }]}
-      testID="home-header"
-    >
+    <View style={[styles.container, { paddingTop }]} testID="home-header">
       <View style={styles.headline}>
         <Image
           source={HOME_ICON_BOLT}
