@@ -199,6 +199,11 @@ const POPPING_BACK_ROUTES = [
   // reasoning applies once more — a right-to-left "opening" animation on the way back out was the
   // exact defect reported here.
   ['address/location', AddressLocationRoute, 'address-header-back', '/address'],
+  // `6:227` and `71:615` are each pushed only from Profile's tile grid — their rows draw no
+  // secondary navigation of their own — so the same pop-gets-the-closing-animation reasoning
+  // applies to both.
+  ['history', HistoryRoute, 'screen-header-back', '/profile'],
+  ['refunds', RefundsRoute, 'screen-header-back', '/profile'],
 ] as const;
 
 /**
@@ -207,8 +212,6 @@ const POPPING_BACK_ROUTES = [
  * These are the founder's V7 routing matrix (task §5, §11, §14, §15), and each destination is a
  * product decision rather than a consequence of history:
  *
- *   `6:227`  Past bookings    -> Profile, never Home
- *   `71:615` Refunds          -> Profile, never Home
  *   `60:655` Complete address -> `53:31`, including on an edit
  *
  * They are asserted on a stack that CAN pop, because that is the shape where "deterministic" and
@@ -220,8 +223,6 @@ const POPPING_BACK_ROUTES = [
  * genuine product decision `useDeterministicBack` exists for.
  */
 const DETERMINISTIC_BACK_ROUTES = [
-  ['history', HistoryRoute, 'screen-header-back', '/profile'],
-  ['refunds', RefundsRoute, 'screen-header-back', '/profile'],
   ['address/details', AddressDetailsRoute, 'address-header-back', '/address/location'],
 ] as const;
 

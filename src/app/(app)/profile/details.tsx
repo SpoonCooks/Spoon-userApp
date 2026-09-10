@@ -3,7 +3,7 @@ import type { Href } from 'expo-router';
 
 import { QueryBoundary } from '@ui';
 import { getUserMessage, normalizeError } from '@core/errors';
-import { useAndroidBackHandler, useDeterministicBack } from '@core/navigation';
+import { useAndroidBackHandler, useSafeBack } from '@core/navigation';
 import { useAddressGate } from '@features/address';
 import {
   ProfileDetailsView,
@@ -64,10 +64,14 @@ export default function ProfileDetailsRoute() {
   const addressGate = useAddressGate();
 
   /**
-   * Edit returns to `6:663` deterministically — the founder's "back → Page 16", and correct for a
-   * deep link too, where there is nothing to pop.
+   * Edit returns to `6:663` — the founder's "back → Page 16".
+   *
+   * `useSafeBack`, not `useDeterministicBack`: the EDIT context (`onboarding` false) is only ever
+   * reached by a push from Profile's completion card, so a pop always lands correctly there —
+   * and gets the platform's reverse-of-push closing animation, where `dismissAll` + `replace`
+   * played none. A deep link straight into the edit context still falls back to `/profile`.
    */
-  const goBack = useDeterministicBack('/profile');
+  const goBack = useSafeBack('/profile');
 
   /**
    * FIRST RUN: hardware back is swallowed.
