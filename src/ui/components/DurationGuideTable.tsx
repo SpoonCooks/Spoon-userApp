@@ -8,9 +8,14 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 /**
  * "How to choose a duration?" — Figma `135:79`, table `135:93`.
  *
- * A 21pt `#FFE666` header row over 18pt data rows alternating `#FFF7CC` / `#FFEF99`, each at a
- * 5pt radius with a 6pt gap. Header type is Livvic SemiBold 10/15 uppercase at +0.5 tracking;
- * cells are Livvic Regular 10/15, centred. Columns are 84 / 84 / 85 at a 40pt gutter.
+ * A 25pt `#FFE666` header row over 22pt data rows alternating `#FFF7CC` / `#FFEF99`, each at a
+ * 5pt radius with an 8pt gap. Header type is Livvic SemiBold 11/16.5 uppercase at +0.5 tracking;
+ * cells are Livvic Regular 11/16.5, centred. Columns are 84 / 84 / 85 at a 40pt gutter.
+ *
+ * ROW/TYPE SIZE IS A DELIBERATE DEVIATION from `135:93`'s literal 21/18pt rows and 10/15pt type
+ * — product feedback was that the exact spec read too small on-device. One rung up the type
+ * scale (`labelUpperLarge` / `captionLarge` in `tokens/semantic.ts`, 10/15 → 11/16.5) and a
+ * matching bump to the row heights below; nothing else about the design changes.
  *
  * ## Why this lives in `@ui`
  *
@@ -49,10 +54,10 @@ export interface DurationGuideTableProps {
   readonly testID?: string;
 }
 
-/** `135:93` — the drawn geometry. */
-const ROW_GAP = 6;
-const HEADER_HEIGHT = 21;
-const ROW_HEIGHT = 18;
+/** `135:93` — the drawn geometry, one rung larger than spec (see the file comment above). */
+const ROW_GAP = 8;
+const HEADER_HEIGHT = 25;
+const ROW_HEIGHT = 22;
 const COLUMN_GAP = 40;
 const MIN_COLUMN_GAP = 10;
 /** 84 + 84 + 85 — the three tracks, without gutters. */
@@ -83,7 +88,7 @@ export function DurationGuideTable({
         {columns.map((column) => (
           <Text
             key={column}
-            variant="labelUpper"
+            variant="labelUpperLarge"
             color="textOnAccent"
             align="center"
             numberOfLines={1}
@@ -109,7 +114,7 @@ export function DurationGuideTable({
           {[row.people, row.dish, row.time].map((value, cellIndex) => (
             <Text
               key={value + String(cellIndex)}
-              variant="caption"
+              variant="captionLarge"
               color="textOnAccent"
               align="center"
               numberOfLines={1}

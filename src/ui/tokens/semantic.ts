@@ -442,6 +442,18 @@ export const typography = {
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
+  /**
+   * `135:93` duration-matrix data cells, one rung larger than `caption` (10/15 → 11/16.5) — the
+   * literal Figma spec read too small on-device, so the shared table intentionally departs from
+   * it here. A separate token, not `bodySmall` (its numeric twin), so the matrix's sizing stays
+   * independent of the recipe-card copy it happens to share values with.
+   */
+  captionLarge: {
+    fontSize: fontSize.sm,
+    lineHeight: lineHeight.md,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
   /** `101:1861` "Need more food prepared?" — Livvic SemiBold 11/14.67. */
   promptStrong: {
     fontSize: fontSize.sm,
@@ -535,6 +547,18 @@ export const typography = {
   labelUpper: {
     fontSize: fontSize.xs,
     lineHeight: lineHeight.xs,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.wide,
+    textTransform: 'uppercase',
+  },
+  /**
+   * `135:96` duration-matrix header cells, one rung larger than `labelUpper` (10/15 → 11/16.5) —
+   * same deliberate on-device legibility deviation as `captionLarge`, same reason to keep it a
+   * separate token.
+   */
+  labelUpperLarge: {
+    fontSize: fontSize.sm,
+    lineHeight: lineHeight.md,
     fontFamily: fontFamily.semibold,
     letterSpacing: letterSpacing.wide,
     textTransform: 'uppercase',
