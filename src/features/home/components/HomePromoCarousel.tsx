@@ -1,23 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  AppState,
-  Image,
-  ScrollView,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from 'react-native';
-import type {
-  AppStateStatus,
-  LayoutChangeEvent,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-} from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Image, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import type { LayoutChangeEvent } from 'react-native';
 
 import { lightTheme } from '@ui';
 
 import { HOME_USECASE_SLIDES } from '../assets';
+import { useLoopingCarousel } from '../hooks/useLoopingCarousel';
 import { HOME_DESIGN } from '../layout';
 import type { HomePromoViewModel } from '../types';
 
@@ -100,282 +88,44 @@ export interface HomePromoCarouselProps {
   readonly testID?: string;
 }
 
-const AUTO_ADVANCE_MS = 4000;
-
-/** Cards repeated at each end so both peeks stay real at the wrap. See the note above. */
-const CLONES = 2;
-
-/**
- * How long to allow a programmatic step to finish before re-anchoring off a clone.
- *
- * `scrollTo` animates for about 300 ms and reports completion through `onMomentumScrollEnd` —
- * but that event is not guaranteed for a PROGRAMMATIC scroll on every platform, and a wrap that
- * depended on it would strand the track on a clone and stop advancing. The settle handler and
- * this timeout both perform the same idempotent re-anchor, whichever arrives first.
- */
-const WRAP_SETTLE_MS = 450;
-
-/**
- * How long after the finger lifts to settle anyway.
- *
- * A release normally hands over to momentum, and `onMomentumScrollEnd` settles it. But a release
- * that produces no momentum — and, on Android, a snap that is interrupted — fires no such event,
- * and the carousel would then sit with `interacting` latched true and its autoplay dead for as
- * long as the customer stayed on Home. Measured on the handset: five deliberate swipes and the
- * carousel never moved again. This is the backstop that makes the latch temporary.
- */
-const SETTLE_FALLBACK_MS = 600;
-
-/**
- * Whether the app counts as on-screen for autoplay.
- *
- * Tested against the states that mean PAUSED rather than for `'active'`. Android reports
- * `'unknown'` for a moment at startup, and on iOS the state during a system prompt is `'inactive'`
- * — checking for `'active'` would leave the carousel frozen until the first change event arrived,
- * which on a launch straight onto Home may be never.
- */
-function isForeground(status: AppStateStatus | string): boolean {
-  return status !== 'background' && status !== 'inactive';
-}
-
 export function HomePromoCarousel({
-  autoAdvanceMs = AUTO_ADVANCE_MS,
+  autoAdvanceMs,
   focused = true,
   testID = 'home-promo',
 }: HomePromoCarouselProps) {
   const slides = HOME_USECASE_SLIDES;
   const count = slides.length;
-  /** A single slide cannot loop, and must not be cloned into a track that pretends it can. */
-  const looping = count > 1;
 
   const { width: windowWidth } = useWindowDimensions();
-
-  const track = useMemo(
-    () =>
-      looping ? [...slides.slice(-CLONES), ...slides, ...slides.slice(0, CLONES)] : [...slides],
-    [slides, looping],
-  );
-  /** Where the real slides begin in the rendered track. */
-  const firstReal = looping ? CLONES : 0;
-
-  const toLogical = useCallback(
-    (position: number) => (looping ? (((position - CLONES) % count) + count) % count : 0),
-    [looping, count],
-  );
-
-  const scroller = useRef<ScrollView>(null);
   const [viewport, setViewport] = useState(windowWidth);
-  /** The LOGICAL slide on screen. Drives the dots; never a clone. */
-  const [index, setIndex] = useState(0);
-  /** Bumped when a MANUAL swipe settles, which is what restarts the dwell. */
-  const [cycle, setCycle] = useState(0);
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const [appActive, setAppActive] = useState(() => isForeground(AppState.currentState));
-
-  /** The card's position in the RENDERED track, clones included. */
-  const position = useRef(firstReal);
-  /**
-   * Set while a finger is down. Auto-advance reads it rather than clearing the interval, so a
-   * gesture that ends without its matching end event cannot freeze the carousel permanently.
-   */
-  const interacting = useRef(false);
-  /** True only for a customer-driven scroll, so an automatic step never restarts its own clock. */
-  const dragged = useRef(false);
-  const wrapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** The most recent scroll offset, so the fallback below can settle without an event to read. */
-  const lastOffset = useRef(0);
-  const didInit = useRef(false);
 
   /** One card plus one gutter — the distance between two consecutive resting positions. */
   const stride = DESIGN.centre.width + DESIGN.gap;
   /** Centres a card in whatever width the row is given, which is what produces the peek. */
   const sidePadding = Math.max(0, (viewport - DESIGN.centre.width) / 2);
 
-  useEffect(() => {
-    let cancelled = false;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (!cancelled) setReduceMotion(enabled);
-    });
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
-    return () => {
-      cancelled = true;
-      subscription.remove();
-    };
-  }, []);
-
-  /**
-   * Foreground/background.
-   *
-   * Android re-emits 'active' many times a second while the app is ALREADY foreground. Storing a
-   * BOOLEAN rather than acting on the event is what makes that harmless: React bails out of a
-   * set-state to the same value, so the interval effect below never re-runs.
-   */
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (status) => {
-      setAppActive(isForeground(status));
-    });
-    return () => subscription.remove();
-  }, []);
-
-  const clearWrapTimer = useCallback(() => {
-    if (wrapTimer.current !== null) {
-      clearTimeout(wrapTimer.current);
-      wrapTimer.current = null;
-    }
-  }, []);
-
-  const clearSettleTimer = useCallback(() => {
-    if (settleTimer.current !== null) {
-      clearTimeout(settleTimer.current);
-      settleTimer.current = null;
-    }
-  }, []);
-
-  useEffect(
-    () => () => {
-      clearWrapTimer();
-      clearSettleTimer();
-    },
-    [clearWrapTimer, clearSettleTimer],
-  );
-
-  const anchor = useCallback(
-    (trackPosition: number, animated: boolean) => {
-      scroller.current?.scrollTo({ x: trackPosition * stride, y: 0, animated });
-    },
-    [stride],
-  );
-
-  /**
-   * Bring the track back onto a REAL card showing the same artwork. Idempotent: running it twice,
-   * or running it when the card is already real, changes nothing.
-   */
-  const normalize = useCallback(
-    (landed: number) => {
-      clearWrapTimer();
-      const logical = toLogical(landed);
-      const real = firstReal + logical;
-      position.current = real;
-      setIndex(logical);
-      if (real !== landed) anchor(real, false);
-      return logical;
-    },
-    [anchor, clearWrapTimer, firstReal, toLogical],
-  );
-
-  /** One step forward, wrapping through the clone rather than rewinding across the track. */
-  const advance = useCallback(() => {
-    if (!looping) return;
-    const next = position.current + 1;
-    position.current = next;
-    setIndex(toLogical(next));
-    anchor(next, true);
-
-    if (next >= firstReal + count) {
-      clearWrapTimer();
-      wrapTimer.current = setTimeout(() => {
-        wrapTimer.current = null;
-        normalize(next);
-      }, WRAP_SETTLE_MS);
-    }
-  }, [anchor, clearWrapTimer, count, firstReal, looping, normalize, toLogical]);
-
-  /**
-   * The single autoplay interval.
-   *
-   * Every reason to stop is a DEPENDENCY rather than a branch inside the tick, so stopping is the
-   * effect being torn down — there is no path that leaves an interval running with nothing to do.
-   */
-  useEffect(() => {
-    if (!looping || !focused || !appActive || reduceMotion || autoAdvanceMs <= 0) return;
-
-    const timer = setInterval(() => {
-      if (interacting.current) return;
-      advance();
-    }, autoAdvanceMs);
-
-    return () => clearInterval(timer);
-  }, [looping, focused, appActive, reduceMotion, autoAdvanceMs, advance, cycle]);
+  const scrollRef = useRef<ScrollView>(null);
+  const { recenter, ...carousel } = useLoopingCarousel({
+    itemCount: count,
+    stride,
+    scrollRef,
+    ...(autoAdvanceMs === undefined ? {} : { autoAdvanceMs }),
+    focused,
+  });
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     setViewport(event.nativeEvent.layout.width);
   }, []);
 
-  /**
-   * Start on the first REAL card, not on the leading clone.
-   *
-   * Content size is the signal rather than layout: on Android a `scrollTo` issued before the row
-   * has measured its children is silently dropped, and the carousel would open on `s6`.
-   */
-  const onContentSizeChange = useCallback(() => {
-    if (didInit.current) return;
-    didInit.current = true;
-    anchor(firstReal, false);
-  }, [anchor, firstReal]);
-
   /** A rotation changes the padding, so the current card has to be re-centred under it. */
   useEffect(() => {
-    if (!didInit.current || interacting.current) return;
-    anchor(position.current, false);
-  }, [anchor, viewport]);
-
-  const settle = useCallback(
-    (offsetX: number) => {
-      clearSettleTimer();
-      const landed = Math.round(offsetX / stride);
-      normalize(landed);
-      interacting.current = false;
-      if (dragged.current) {
-        dragged.current = false;
-        // Restart the dwell from where the customer landed.
-        setCycle((previous) => previous + 1);
-      }
-    },
-    [clearSettleTimer, normalize, stride],
-  );
-
-  const onMomentumEnd = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      settle(event.nativeEvent.contentOffset.x);
-    },
-    [settle],
-  );
-
-  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    lastOffset.current = event.nativeEvent.contentOffset.x;
-  }, []);
-
-  /**
-   * The finger lifted.
-   *
-   * A release already AT a resting position produces no momentum, so it is settled here and now.
-   * A release mid-snap is still in flight, and settling it immediately would re-anchor the track
-   * out from under the animation — so it is left to `onMomentumScrollEnd`, with a timer as the
-   * backstop for the case where that event never comes. Either way the settle happens, which is
-   * what guarantees `interacting` is released and autoplay resumes.
-   */
-  const onEndDrag = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const offsetX = event.nativeEvent.contentOffset.x;
-      lastOffset.current = offsetX;
-      if (Math.abs(offsetX - Math.round(offsetX / stride) * stride) < 1) {
-        settle(offsetX);
-        return;
-      }
-      clearSettleTimer();
-      settleTimer.current = setTimeout(() => {
-        settleTimer.current = null;
-        settle(lastOffset.current);
-      }, SETTLE_FALLBACK_MS);
-    },
-    [clearSettleTimer, settle, stride],
-  );
+    recenter();
+  }, [viewport, recenter]);
 
   return (
     <View style={styles.block} testID={testID}>
       <ScrollView
-        ref={scroller}
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         // Snapping to the STRIDE, not to the page width, is what lets both neighbours peek while
@@ -385,23 +135,20 @@ export function HomePromoCarousel({
         decelerationRate="fast"
         disableIntervalMomentum
         onLayout={onLayout}
-        onContentSizeChange={onContentSizeChange}
-        onScrollBeginDrag={() => {
-          interacting.current = true;
-          dragged.current = true;
-          clearWrapTimer();
-        }}
-        onScroll={onScroll}
+        onContentSizeChange={carousel.scrollViewProps.onContentSizeChange}
+        onScrollBeginDrag={carousel.scrollViewProps.onScrollBeginDrag}
+        onScroll={carousel.scrollViewProps.onScroll}
         scrollEventThrottle={16}
-        onMomentumScrollEnd={onMomentumEnd}
-        onScrollEndDrag={onEndDrag}
+        onMomentumScrollEnd={carousel.scrollViewProps.onMomentumScrollEnd}
+        onScrollEndDrag={carousel.scrollViewProps.onScrollEndDrag}
         contentContainerStyle={[styles.track, { paddingHorizontal: sidePadding }]}
         style={styles.row}
         testID={`${testID}-scroll`}
       >
-        {track.map((slide, trackPosition) => {
-          const isReal = trackPosition >= firstReal && trackPosition < firstReal + count;
-          const logical = toLogical(trackPosition);
+        {carousel.track.map((logical, trackPosition) => {
+          const slide = slides[logical];
+          if (slide === undefined) return null;
+          const isReal = carousel.isRealTrackPosition(trackPosition);
           return (
             <Image
               // Clones repeat a slide id, so position is what makes the key unique.
@@ -415,7 +162,7 @@ export function HomePromoCarousel({
               accessibilityRole="image"
               accessibilityLabel={slide.label}
               // A clone is the same picture twice; only the real card on screen is announced.
-              accessibilityElementsHidden={!isReal || logical !== index}
+              accessibilityElementsHidden={!isReal || logical !== carousel.index}
               accessibilityIgnoresInvertColors
               testID={`${testID}-slide-${trackPosition}`}
             />
@@ -427,13 +174,13 @@ export function HomePromoCarousel({
         style={styles.dots}
         accessible
         accessibilityRole="adjustable"
-        accessibilityLabel={`Slide ${index + 1} of ${count}`}
+        accessibilityLabel={`Slide ${carousel.index + 1} of ${count}`}
         testID={`${testID}-dots`}
       >
         {slides.map((slide, position_) => (
           <View
             key={slide.id}
-            style={[styles.dot, position_ === index ? styles.dotActive : styles.dotIdle]}
+            style={[styles.dot, position_ === carousel.index ? styles.dotActive : styles.dotIdle]}
           />
         ))}
       </View>

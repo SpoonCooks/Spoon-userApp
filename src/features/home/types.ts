@@ -3,9 +3,10 @@ import type { HomeBannerViewModel } from './state/homeBannerView';
 /**
  * Home view models — UI shape only.
  *
- * Ruling R-2: ONE Home with booking-state variants. `activeBooking` being present is what
- * selects the active variant (`59:520`); its absence renders the pre-booking Home (`1:455`).
- * The client does not decide whether a booking is active — it renders what it is given.
+ * Ruling R-2: ONE Home with booking-state variants. `activeBookings` being non-empty is what
+ * selects the active variant (`59:520`); an empty array renders the pre-booking Home (`1:455`).
+ * The client does not decide which bookings are active — it renders what it is given, in the
+ * order it is given (ascending by date/time — see `data.ts`).
  *
  * TODO(backend-contract): every field below awaits a real payload. Nothing here is computed.
  */
@@ -102,10 +103,12 @@ export interface HomeViewModel {
   /** @deprecated Not present in Page 3a. See `HomeTrustItemViewModel`. */
   readonly trust?: readonly HomeTrustItemViewModel[];
   /**
-   * Present → the booking-banner variant of Home (`381:511`). Absent → the pre-booking Home
-   * (`1:455`). ONE screen either way; see `state/homeBannerView.ts` for how the variant is chosen.
+   * Non-empty → the booking-banner variant of Home (`381:511`), one card per booking in a
+   * carousel. Empty → the pre-booking Home (`1:455`). ONE screen either way; see
+   * `state/homeBannerView.ts` for how each booking's own variant is chosen, and `data.ts`'s
+   * `selectHomeBookings` for the set and its order (ascending by date/time).
    */
-  readonly activeBooking?: HomeBannerViewModel;
+  readonly activeBookings: readonly HomeBannerViewModel[];
   /** Present on the pre-booking variant only. */
   readonly marketing?: HomeMarketingViewModel;
 }

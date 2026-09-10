@@ -31,10 +31,11 @@ const { activeBooking: DESIGN } = HOME_DESIGN;
  * `0 1 0 rgba(0,0,0,0.05)` lift, plus `336:4235` — the "5+" legend and the 9-chip scale — below
  * the body. Its badge is the caption-less form ("Completed!").
  *
- * `393:1072` "Cancelled" is the exception to all of it: it draws NO cook block and NO badge —
- * just the title, the chevron and one 305 x 57 apology row (`393:1202`) on a white ground with
- * the same `#FFD600` hairline at r16, carrying the 32pt Sad Cloud mark 10 from a Livvic Medium
- * 10/13.33 line in `#1D293D`. It is 129 tall where every other card is 154.
+ * "Cancelled" DEVIATES from `393:1072`'s literal drawing (which had no cook block and no badge)
+ * per explicit product reference: it keeps the normal cook block and a caption-less "Cancelled"
+ * badge — the same shapes every other card uses — and APPENDS the apology row (`393:1202`, the
+ * 305 x 57 white panel with the `#FFD600` hairline, the 32pt Sad Cloud mark and the Livvic Medium
+ * 10/13.33 apology line in `#1D293D`) below them, rather than replacing them with it.
  *
  * WHICH card is drawn is decided in `state/homeBannerView.ts` from the server's payload, never
  * here. This component renders a view model; it does not know what "arriving" means.
@@ -61,7 +62,6 @@ export function HomeBookingBanner({
   testID = 'home-upcoming-booking',
 }: HomeBookingBannerProps) {
   const rate = booking.variant === 'rate';
-  const cancelled = booking.variant === 'cancelled';
 
   const header = (
     <View style={styles.header}>
@@ -72,7 +72,7 @@ export function HomeBookingBanner({
     </View>
   );
 
-  /** `393:1202` — the apology row. The cancelled card's entire body. */
+  /** `393:1202` — the apology row, appended below the normal cook block and badge. */
   const notice =
     booking.notice === undefined ? null : (
       <View style={styles.notice} testID={`${testID}-notice`}>
@@ -151,7 +151,8 @@ export function HomeBookingBanner({
   const content = (
     <>
       {header}
-      {cancelled ? notice : body}
+      {body}
+      {notice}
       {rating}
     </>
   );
@@ -177,6 +178,7 @@ export function HomeBookingBanner({
         booking.cookName,
         booking.badgeCaption,
         booking.badgeValue,
+        booking.notice,
       ]
         .filter((part): part is string => part !== undefined)
         .join('. ')}

@@ -132,7 +132,7 @@ describe.each(HEIGHTS)('on a %s viewport', (_label, height) => {
         'home-header',
         'home-promo',
         'home-tiles',
-        'home-upcoming-booking',
+        'home-booking-carousel',
         'home-cuisines',
         'home-reasons',
         'home-duration-guide',

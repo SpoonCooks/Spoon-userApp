@@ -90,6 +90,7 @@ const TILES: HomeViewModel['tiles'] = [
 export const DEMO_HOME_PRE_BOOKING: HomeViewModel = {
   header: HEADER,
   tiles: TILES,
+  activeBookings: [],
   marketing: MARKETING,
 };
 
@@ -170,11 +171,14 @@ export const DEMO_ACTIVE_BOOKING_TIME_LEFT: HomeBannerViewModel = {
   destination: destinationFor('live'),
 };
 
-/** `393:1072` — Spoon cancelled it. No cook block, no badge; one apology row. */
+/** `393:1072` — Spoon cancelled it. Keeps the normal cook block and a "Cancelled" badge, with the
+ * apology row appended below (see `HomeBookingBanner`'s doc comment for the deliberate deviation
+ * from `393:1072`'s literal drawing). */
 export const DEMO_ACTIVE_BOOKING_CANCELLED: HomeBannerViewModel = {
-  bookingId: 'demo-booking-active',
+  ...ACTIVE_BOOKING_BASE,
   variant: 'cancelled',
   title: 'Cancelled',
+  badgeValue: 'Cancelled',
   notice: 'We sincerely apologize for cancelling this booking',
   destination: destinationFor('cancelled'),
 };
@@ -215,7 +219,7 @@ export const DEMO_ACTIVE_BOOKING_RATE: HomeBannerViewModel = {
 export const DEMO_HOME_ACTIVE_BOOKING: HomeViewModel = {
   header: HEADER,
   tiles: TILES,
-  activeBooking: DEMO_ACTIVE_BOOKING_ARRIVING,
+  activeBookings: [DEMO_ACTIVE_BOOKING_ARRIVING],
   // Page 3b is Page 3a plus the active-booking card — the marketing stack remains.
   marketing: MARKETING,
 };

@@ -99,9 +99,10 @@ describe('state mapping — `367:71`', () => {
     const system = homeBannerFor(at({ status: 'cancelled', cancelledBy: 'system' }));
     expect(system).toMatchObject({ variant: 'cancelled', title: 'Cancelled' });
     expect(system?.notice).toContain('sincerely apologize');
-    // `393:1072` draws no cook and no badge.
-    expect(system?.cookName).toBeUndefined();
-    expect(system?.badgeValue).toBeUndefined();
+    // Deliberate deviation from `393:1072`'s literal drawing: the cook block and a caption-less
+    // "Cancelled" badge are kept alongside the apology row, per explicit product reference.
+    expect(system?.cookName).toBeDefined();
+    expect(system?.badgeValue).toBe('Cancelled');
 
     // A customer's own cancellation must not apologise to them for their decision.
     expect(homeBannerFor(at({ status: 'cancelled', cancelledBy: 'customer' }))).toBeNull();

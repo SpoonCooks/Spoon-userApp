@@ -631,7 +631,8 @@ describe('Home banner destinations', () => {
     });
     renderWithRuntime(<HomeRoute />, { runtime: createTestRuntime({ api }) });
 
-    const banner = await screen.findByTestId('home-upcoming-booking');
+    // One booking in the stub, so the carousel draws exactly one card, at track position 0.
+    const banner = await screen.findByTestId('home-booking-carousel-card-0');
     fireEvent.press(banner);
 
     expect(mockRouter.push).toHaveBeenCalledWith('/booking/bk-live-1');

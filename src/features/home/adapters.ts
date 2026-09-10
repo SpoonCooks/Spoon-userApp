@@ -90,10 +90,10 @@ export function homeFrom(input: {
   readonly base: HomeViewModel;
   readonly addressLabel?: string | null;
   readonly addressLine?: string | null;
-  readonly activeBooking?: HomeBannerViewModel | undefined;
+  readonly activeBookings?: readonly HomeBannerViewModel[];
 }): HomeViewModel {
   const { base } = input;
-  const { activeBooking: _ignored, ...rest } = base;
+  const { activeBookings: _ignored, ...rest } = base;
 
   return {
     ...rest,
@@ -106,6 +106,9 @@ export function homeFrom(input: {
       addressLabel: input.addressLabel ?? null,
       addressLine: input.addressLine ?? null,
     },
-    ...(input.activeBooking === undefined ? {} : { activeBooking: input.activeBooking }),
+    // Same UNCONDITIONAL rule as the address above: `base.activeBookings` is the static screen
+    // definition's value (the demo fixture's), which must never leak through for a real account
+    // simply because this read hasn't resolved to a real list yet.
+    activeBookings: input.activeBookings ?? [],
   };
 }
