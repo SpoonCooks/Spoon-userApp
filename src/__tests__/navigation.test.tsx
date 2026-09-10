@@ -194,6 +194,11 @@ const POPPING_BACK_ROUTES = [
   // pop-gets-the-closing-animation reasoning as `address` above applies here too. The `spoon://`
   // deep-link case has no history, which is exactly what the fallback below covers.
   ['profile', ProfileRoute, 'screen-header-back', '/home'],
+  // `53:31`'s only push site is `68:214`'s "Add a new address" (the first-run case reaches it by
+  // a `<Redirect>` and draws no back control at all), so the same pop-gets-the-closing-animation
+  // reasoning applies once more — a right-to-left "opening" animation on the way back out was the
+  // exact defect reported here.
+  ['address/location', AddressLocationRoute, 'address-header-back', '/address'],
 ] as const;
 
 /**
@@ -204,16 +209,19 @@ const POPPING_BACK_ROUTES = [
  *
  *   `6:227`  Past bookings    -> Profile, never Home
  *   `71:615` Refunds          -> Profile, never Home
- *   `53:31`  Address location -> Saved addresses (repeat customer; a first-run one has NO control)
  *   `60:655` Complete address -> `53:31`, including on an edit
  *
  * They are asserted on a stack that CAN pop, because that is the shape where "deterministic" and
  * "pop" disagree — and where the old behaviour silently did the wrong thing.
+ *
+ * `address/details` stays here rather than joining the popping table above: an EDIT reaches it by
+ * pushing straight from `68:214`, skipping `53:31` entirely, so a pop from an edit would land on
+ * the wrong screen. The founder's ruling — back always lands on `53:31`, edit or not — is the
+ * genuine product decision `useDeterministicBack` exists for.
  */
 const DETERMINISTIC_BACK_ROUTES = [
   ['history', HistoryRoute, 'screen-header-back', '/profile'],
   ['refunds', RefundsRoute, 'screen-header-back', '/profile'],
-  ['address/location', AddressLocationRoute, 'address-header-back', '/address'],
   ['address/details', AddressDetailsRoute, 'address-header-back', '/address/location'],
 ] as const;
 
@@ -385,26 +393,33 @@ describe('first-run address flow', () => {
    * The other half of the same rule: a REPEAT customer adding an address reached `53:31` from
    * `68:214` and gets the disc, which goes back to that list. The same route must not render one
    * affordance and perform the other, so both halves are asserted against the same component.
+   *
+   * This is a POP (see the popping table above), not a replace: `53:31`'s only push site is
+   * `68:214` itself, so there is always a history to pop, and popping is what gets the platform's
+   * reverse-of-push closing animation rather than the "opening" animation a bare `replace` played.
    */
-  it('draws a back control for a repeat customer, and it returns to the saved list', async () => {
+  it('draws a back control for a repeat customer, and it pops to the saved list', async () => {
     render(<AddressLocationRoute />);
 
     fireEvent.press(await screen.findByTestId('address-header-back'));
 
-    expect(mockRouter.replace).toHaveBeenCalledWith('/address');
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
   /**
-   * Backing out of the map is a REPLACE (see the routing matrix above), which would otherwise
-   * discard the `from` tag `68:214` needs to send its OWN back control to the right place —
-   * see "Saved addresses back target follows its entry point".
+   * With no history to pop — a deep link straight to this route — the `from` tag `68:214` needs
+   * for its OWN back control still has to survive the fallback replace, or a trip that started at
+   * Home would silently lose it. See "Saved addresses back target follows its entry point".
    */
-  it('returns to the correct list entry point for a repeat customer backing out of the map', async () => {
+  it('falls back to the correct list entry point with no history to pop', async () => {
+    mockRouter = makeRouter(false);
     mockSearchParams = { from: 'home' };
     render(<AddressLocationRoute />);
 
     fireEvent.press(await screen.findByTestId('address-header-back'));
 
+    expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/address?from=home');
   });
 });

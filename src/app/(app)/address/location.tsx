@@ -3,7 +3,7 @@ import type { Href } from 'expo-router';
 
 import { AddressLocationView, useAddressLocationData } from '@features/address';
 import { useAddressDraftStore } from '@core/store/addressDraftStore';
-import { useAndroidBackHandler, useDeterministicBack } from '@core/navigation';
+import { useAndroidBackHandler, useSafeBack } from '@core/navigation';
 
 /**
  * Select service location - Figma `53:31`.
@@ -71,10 +71,14 @@ export default function AddressLocationRoute() {
    * It is now absent rather than inert.
    *
    * REPEAT / ADD ADDRESS: back goes to `68:214`, the saved-address list this screen was opened
-   * from. Deterministic rather than a pop, so the same route cannot show one affordance and
-   * perform another.
+   * from. `useSafeBack`, not `useDeterministicBack`: this route's only push site is `68:214`'s
+   * "Add a new address" (the first-run case above reaches it by a `<Redirect>` and draws no back
+   * control at all, and nothing else in the app pushes here), so a pop always lands on the same
+   * screen the fallback below names — and gets the platform's reverse-of-push closing animation
+   * (left-to-right, matching Scheduled's / `68:214`'s own back), where `dismissAll` + `replace`
+   * played none.
    */
-  const goBackToList = useDeterministicBack(
+  const goBackToList = useSafeBack(
     (from === undefined ? '/address' : `/address?from=${from}`) as Href,
   );
   const goBack = firstRun ? undefined : goBackToList;
