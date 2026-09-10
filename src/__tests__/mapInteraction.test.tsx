@@ -266,6 +266,23 @@ describe('confirm is the only thing that asks the server', () => {
     });
   });
 
+  /**
+   * `68:214`'s own entry-point tag rides through the same way `addressId` and `onboarding` do, so
+   * the form's eventual SAVE can still return the customer to the list's correct destination —
+   * see "Saved addresses back target follows its entry point" in `navigation.test.tsx`.
+   */
+  it('carries the saved-address list entry point straight through to the form', async () => {
+    mockSearchParams = { from: 'home' };
+    render();
+    await pin();
+
+    fireEvent.press(screen.getByTestId('address-confirm'));
+
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith('/address/details?from=home');
+    });
+  });
+
   it('sends the coordinate the map SETTLED on, not the one the screen opened on', async () => {
     render();
     await pin();
@@ -339,6 +356,19 @@ describe('confirm is the only thing that asks the server', () => {
 
     await waitFor(() => {
       expect(mockRouter.push).toHaveBeenCalledWith('/address/out-of-service?onboarding=1');
+    });
+  });
+
+  it('carries the saved-address list entry point onto the out-of-service screen', async () => {
+    verdict = { status: 'outside_service_area' };
+    mockSearchParams = { from: 'home' };
+    render();
+    await pin();
+
+    fireEvent.press(screen.getByTestId('address-confirm'));
+
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith('/address/out-of-service?from=home');
     });
   });
 

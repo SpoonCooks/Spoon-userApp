@@ -37,9 +37,10 @@ import { InfoDialog } from '@ui';
  */
 export default function AddressDetailsRoute() {
   const router = useRouter();
-  const { addressId, onboarding } = useLocalSearchParams<{
+  const { addressId, onboarding, from } = useLocalSearchParams<{
     addressId?: string;
     onboarding?: string;
+    from?: string;
   }>();
   const editingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
   const { state, refetch, savedPoint, savedPlaceId, locationReady } =
@@ -68,6 +69,7 @@ export default function AddressDetailsRoute() {
     [
       onboarding === '1' ? 'onboarding=1' : null,
       editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
+      from === undefined ? null : `from=${from}`,
     ]
       .filter((part): part is string => part !== null)
       .reduce<string>(
@@ -199,8 +201,16 @@ export default function AddressDetailsRoute() {
               if (router.canDismiss()) router.dismissAll();
               // Section 4: the first-run flow ends at HOME, because the customer came from Home
               // and wanted to book - not to administer a list. Reached from `68:214` instead,
-              // the same save returns to that list, which is where they were.
-              router.replace(onboarding === '1' ? '/home' : '/address');
+              // the same save returns to that list, which is where they were — carrying `from`
+              // forward so THAT screen's own back control still knows which entry point this
+              // whole trip started from, rather than losing it the moment this REPLACE fires.
+              router.replace(
+                (onboarding === '1'
+                  ? '/home'
+                  : from === undefined
+                    ? '/address'
+                    : `/address?from=${from}`) as Href,
+              );
             })
             .catch((thrown: unknown) => {
               // The backend refuses an unserviceable point here too; its own message is shown

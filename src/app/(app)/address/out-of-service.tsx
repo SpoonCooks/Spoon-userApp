@@ -20,9 +20,10 @@ import { useSafeBack } from '@core/navigation';
  * effect left that could bounce the customer straight back to this screen.
  */
 export default function AddressOutOfServiceRoute() {
-  const { onboarding, addressId } = useLocalSearchParams<{
+  const { onboarding, addressId, from } = useLocalSearchParams<{
     onboarding?: string;
     addressId?: string;
+    from?: string;
   }>();
   const { state, refetch } = useAddressOutOfServiceData();
 
@@ -38,6 +39,7 @@ export default function AddressOutOfServiceRoute() {
       typeof addressId === 'string' && addressId !== ''
         ? `addressId=${encodeURIComponent(addressId)}`
         : null,
+      from === undefined ? null : `from=${from}`,
     ]
       .filter((part): part is string => part !== null)
       .reduce<string>(

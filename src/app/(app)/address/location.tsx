@@ -47,11 +47,15 @@ export default function AddressLocationRoute() {
   /**
    * `onboarding=1` is the FLOW CONTEXT the founder's rule turns on (task §4), set by Home's
    * address gate and carried through every step. `addressId` is present only when the customer
-   * walked back here from an EDIT — it keeps the edit addressed to the same record.
+   * walked back here from an EDIT — it keeps the edit addressed to the same record. `from` is
+   * `68:214`'s own entry-point tag (Home or Profile), carried through so this whole sub-flow's
+   * REPLACE-based back controls can still return the customer to the list's correct destination
+   * once they eventually land back on it — see `address/index.tsx`.
    */
-  const { onboarding, addressId } = useLocalSearchParams<{
+  const { onboarding, addressId, from } = useLocalSearchParams<{
     onboarding?: string;
     addressId?: string;
+    from?: string;
   }>();
   const firstRun = onboarding === '1';
   const editingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
@@ -70,7 +74,9 @@ export default function AddressLocationRoute() {
    * from. Deterministic rather than a pop, so the same route cannot show one affordance and
    * perform another.
    */
-  const goBackToList = useDeterministicBack('/address');
+  const goBackToList = useDeterministicBack(
+    (from === undefined ? '/address' : `/address?from=${from}`) as Href,
+  );
   const goBack = firstRun ? undefined : goBackToList;
 
   /**
@@ -121,6 +127,7 @@ export default function AddressLocationRoute() {
             const query = [
               firstRun ? 'onboarding=1' : null,
               editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
+              from === undefined ? null : `from=${from}`,
             ]
               .filter((part): part is string => part !== null)
               .join('&');
@@ -172,6 +179,7 @@ export default function AddressLocationRoute() {
           const forward = [
             firstRun ? 'onboarding=1' : null,
             editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
+            from === undefined ? null : `from=${from}`,
           ]
             .filter((part): part is string => part !== null)
             .join('&');

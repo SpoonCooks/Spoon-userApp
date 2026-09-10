@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
 
 import {
   AddressEditSheet,
@@ -9,7 +10,7 @@ import {
   useSavedAddressesData,
 } from '@features/address';
 import { getUserMessage, isAppError } from '@core/errors';
-import { useAndroidBackHandler, useDeterministicBack } from '@core/navigation';
+import { useAndroidBackHandler, useSafeBack } from '@core/navigation';
 import { InfoDialog } from '@ui';
 
 /**
@@ -29,7 +30,7 @@ export default function SavedAddressesRoute() {
   const router = useRouter();
   const { state, refetch } = useSavedAddressesData();
   // `?edit=<id>` opens the sheet directly, so `228:1801` is reachable without a tap in review builds.
-  const { edit } = useLocalSearchParams<{ edit?: string }>();
+  const { edit, from } = useLocalSearchParams<{ edit?: string; from?: string }>();
   const [selectedId, setSelectedId] = useState<string | null>(
     __DEV__ && typeof edit === 'string' && edit !== '' ? edit : null,
   );
@@ -38,14 +39,25 @@ export default function SavedAddressesRoute() {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * `68:214` back -> `6:663` PROFILE (V7 founder comment, task §5/§15).
+   * `68:214` back -> `6:663` PROFILE (V7 founder comment, task §5/§15) — UNLESS `?from=home`,
+   * in which case back -> HOME directly. `home.tsx` and `profile/index.tsx` each tag their
+   * `push('/address')` with which one they are, so the two entry points keep their own correct
+   * destination instead of one entry point silently inheriting the other's.
    *
-   * Deterministic, so the destination is the one the routing matrix names rather than whichever
-   * screen happens to sit underneath. This list is also reachable from Home's serving-at banner;
-   * that entry now returns to Profile too, which is the founder's stated mapping and one tap from
-   * Home either way.
+   * `useSafeBack`, not `useDeterministicBack`: this screen is always pushed directly on top of
+   * whichever of the two entries sent it, so `backTarget` is exactly the screen underneath, not a
+   * fallback for one — popping to it is correct AND gets the platform's reverse-of-push closing
+   * animation (left-to-right, matching Scheduled's), where `dismissAll` + `replace` played no
+   * such animation. The fallback path only fires with no history to pop (a bare deep link).
+   *
+   * `from` also rides along into `onAdd`/`onEdit` below: the add/edit sub-flow (`location.tsx`,
+   * `details.tsx`) ends by collapsing itself and REPLACING back onto this route, which discards
+   * real history the same way `useDeterministicBack` does — so without carrying `from` through
+   * every step, a trip that started at Home and detoured through "add a new address" would land
+   * back here with no `from`, and `backTarget` would silently fall to `/profile` again.
    */
-  const goBack = useDeterministicBack('/profile');
+  const backTarget: Href = from === 'home' ? '/home' : '/profile';
+  const goBack = useSafeBack(backTarget);
 
   /**
    * The `228:1801` sheet is a native modal and closes itself on Android back. The DELETE FAILURE
@@ -65,7 +77,14 @@ export default function SavedAddressesRoute() {
         state={state}
         onRetry={refetch}
         onBack={goBack}
-        onAdd={() => router.push('/address/location')}
+        // `from` rides along so the add flow's own back controls, and the SAVE that collapses it
+        // back to this screen, can still tell which entry point this trip started from — see the
+        // matching comment on `goBack` above.
+        onAdd={() =>
+          router.push(
+            (from === undefined ? '/address/location' : `/address/location?from=${from}`) as Href,
+          )
+        }
         onSelect={setSelectedId}
         onOpenActions={setSelectedId}
       />
@@ -79,7 +98,11 @@ export default function SavedAddressesRoute() {
           onEdit={() => {
             const id = selectedId;
             setSelectedId(null);
-            router.push(`/address/details?addressId=${id ?? ''}`);
+            router.push(
+              (from === undefined
+                ? `/address/details?addressId=${id ?? ''}`
+                : `/address/details?addressId=${id ?? ''}&from=${from}`) as Href,
+            );
           }}
           onDelete={() => {
             if (remove.isPending || selectedId === null) return;
