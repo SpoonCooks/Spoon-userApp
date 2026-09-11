@@ -12,6 +12,7 @@ import {
   razorpayCheckoutLauncher,
   usePayForBooking,
 } from '@features/payment';
+import type { CheckoutLauncher } from '@features/payment';
 
 import {
   bookingDetailFrom,
@@ -421,6 +422,21 @@ export interface BookingSubmissionResult {
   readonly payment: PaymentOutcome;
 }
 
+/**
+ * Where a payment attempt's outcome sends the customer next.
+ *
+ * One mapping, shared by every screen that submits a booking (Instant and Scheduled today), so
+ * the three destinations — Page 21, Payment Failed, and the ordinary hold screen — cannot drift
+ * out of sync between callers the way two independently hand-written copies of this logic could.
+ */
+export function destinationForPayment(payment: PaymentOutcome, bookingId: string): string {
+  if (payment === 'verified') return `/booking/confirming?id=${bookingId}`;
+  if (payment === 'failed') return `/booking/payment-failed?id=${bookingId}`;
+  // `cancelled` and `processing` both have nothing to confirm and nothing to explain: dismissing
+  // checkout is a choice, not a fault, and an order that was not ready is not a failure either.
+  return `/booking/${bookingId}`;
+}
+
 export interface BookingSubmission {
   /** The live quote for the current selection: the CTA amount and its expiry. */
   readonly quote: ScreenQuery<QuoteResponse>;
@@ -499,29 +515,60 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
     // The booking now exists on HOLD. Payment is a SEPARATE operation against it, which is why
     // a failure below does not unmake the booking and is not thrown: the hold is real, the
     // server will expire it if nothing pays, and the customer is entitled to see that state.
-    try {
-      const order = await pay.mutateAsync({
-        bookingId: booking.booking.id,
-        description: 'Spoon cooking service',
-      });
-
-      // `usePayForBooking` returns the order without opening checkout when the upstream order is
-      // not ready. Nothing was charged and the same idempotency key retries the SAME order.
-      if (order.status === 'processing' || order.providerOrderId === null) {
-        return { booking, payment: 'processing' };
-      }
-      return { booking, payment: 'verified' };
-    } catch (error) {
-      // Dismissing checkout is a choice, not a fault. It is separated here only so the caller
-      // can avoid showing an error for something the customer did on purpose.
-      return {
-        booking,
-        payment: error instanceof CheckoutCancelledError ? 'cancelled' : 'failed',
-      };
-    }
+    const payment = await payAndClassify(pay, booking.booking.id);
+    return { booking, payment };
   }, [create, pay, addressId, durationMinutes, scheduledStart, selection.slotType]);
 
   return { quote, canSubmit, submitting: create.isPending || pay.isPending, submit };
+}
+
+/**
+ * Pay for an already-created booking, and turn whatever happens into a `PaymentOutcome` rather
+ * than letting the SDK's success/failure speak for itself (ruling R-1: the client never infers a
+ * payment from a callback). Shared by `useBookingSubmission` (paying for the booking it just
+ * created) and `usePaymentRetry` (paying again for one that already exists), because the classify
+ * step neither knows nor cares which caller it was.
+ */
+async function payAndClassify(
+  pay: ReturnType<typeof usePayForBooking>,
+  bookingId: string,
+): Promise<PaymentOutcome> {
+  try {
+    const order = await pay.mutateAsync({ bookingId, description: 'Spoon cooking service' });
+
+    // `usePayForBooking` returns the order without opening checkout when the upstream order is
+    // not ready. Nothing was charged and the same idempotency key retries the SAME order.
+    if (order.status === 'processing' || order.providerOrderId === null) {
+      return 'processing';
+    }
+    return 'verified';
+  } catch (error) {
+    // Dismissing checkout is a choice, not a fault. It is separated here only so the caller
+    // can avoid showing an error for something the customer did on purpose.
+    return error instanceof CheckoutCancelledError ? 'cancelled' : 'failed';
+  }
+}
+
+/**
+ * Retry payment on a booking that already exists and is still on HOLD.
+ *
+ * Used by the Payment Failed screen: the booking was created once, checkout failed or was
+ * cancelled, and the customer is trying again against the SAME booking. `usePayForBooking`'s
+ * idempotency scopes are keyed by `bookingId` alone, so this reuses the original order rather
+ * than creating a second one — the same guarantee the `'processing'` outcome already relies on.
+ *
+ * `launcher` defaults to the real Razorpay checkout, same as `usePayForBooking` itself; a test
+ * substitutes a stub the same way.
+ */
+export function usePaymentRetry(
+  bookingId: string,
+  launcher: CheckoutLauncher = razorpayCheckoutLauncher,
+): {
+  readonly retrying: boolean;
+  readonly retry: () => Promise<PaymentOutcome>;
+} {
+  const pay = usePayForBooking(launcher);
+  return { retrying: pay.isPending, retry: () => payAndClassify(pay, bookingId) };
 }
 
 /**

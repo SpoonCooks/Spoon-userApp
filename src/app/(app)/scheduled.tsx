@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useBookingSubmission } from '@features/booking';
+import { destinationForPayment, useBookingSubmission } from '@features/booking';
 import { formatPaise } from '@core/format';
 import { useSafeBack } from '@core/navigation';
 import { ScheduleView, devScheduleSelection, useScheduleData } from '@features/scheduled';
@@ -91,15 +91,14 @@ export default function ScheduledRoute() {
              * second booking of a time the customer already has.
              *
              * A VERIFIED payment goes to `433:2290`, Page 21, which waits on the SERVER and then
-             * moves to Home (V7 founder comment, task §9/§10). Anything else has no confirmation
-             * to wait for and goes to the booking screen, which shows the hold as it stands. See
-             * `app/(app)/home.tsx` for the same split on the Instant path.
+             * moves to Home (V7 founder comment, task §9/§10). A genuine FAILURE goes to the
+             * Payment Failed screen for a retry against the same held booking. A dismissal or an
+             * order that was not ready has no confirmation to wait for and nothing to explain, so
+             * it goes straight to the booking screen, which shows the hold as it stands.
+             * `destinationForPayment` is shared with `app/(app)/home.tsx` so this mapping is
+             * decided in exactly one place.
              */
-            router.replace(
-              created.payment === 'verified'
-                ? `/booking/confirming?id=${bookingId}`
-                : `/booking/${bookingId}`,
-            );
+            router.replace(destinationForPayment(created.payment, bookingId));
           })
           .catch(() => {
             // Already normalized and surfaced by the mutation; the selection is left intact so a

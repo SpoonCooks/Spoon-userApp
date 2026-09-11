@@ -3,6 +3,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   InstantSheet,
+  destinationForPayment,
   useBookingSubmission,
   useInstantData,
   useRateBooking,
@@ -169,17 +170,19 @@ export default function HomeRoute() {
                  * a lifecycle view built from a booking that is still on hold. Page 21 polls the
                  * server and moves to Home once the booking has actually moved.
                  *
-                 * Anything else — a dismissed checkout, a failure, an order that was not ready —
-                 * has nothing to confirm, so it goes to the booking screen, which shows the
-                 * SERVER's state including the hold the customer can still pay off. Sending
-                 * those to a "Confirmation in progress" screen would be this app asserting a
-                 * payment it does not have.
+                 * A genuine FAILURE goes to the Payment Failed screen, which offers a retry
+                 * against the same held booking rather than leaving the customer to discover the
+                 * hold on the ordinary lifecycle view with no explanation.
+                 *
+                 * A dismissed checkout or an order that was not ready has nothing to confirm and
+                 * nothing to explain — dismissing checkout is a choice, not a fault — so both go
+                 * straight to the booking screen, which shows the SERVER's state including the
+                 * hold the customer can still pay off.
+                 *
+                 * `destinationForPayment` is shared with the Scheduled flow so this mapping is
+                 * decided in exactly one place.
                  */
-                if (created.payment === 'verified') {
-                  router.push(`/booking/confirming?id=${bookingId}`);
-                  return;
-                }
-                router.push(`/booking/${bookingId}`);
+                router.push(destinationForPayment(created.payment, bookingId));
               })
               .catch(() => {
                 // The error is already normalized and surfaced by the mutation; the sheet stays

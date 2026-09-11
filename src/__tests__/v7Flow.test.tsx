@@ -20,6 +20,7 @@ import {
 
 import SavedAddressesRoute from '@/app/(app)/address/index';
 import BookingConfirmingRoute from '@/app/(app)/booking/confirming';
+import PaymentFailedRoute from '@/app/(app)/booking/payment-failed';
 import BookingRoute from '@/app/(app)/booking/[id]';
 import HomeRoute from '@/app/(app)/home';
 
@@ -212,6 +213,115 @@ describe('`433:2290` Page 21 — payment, then the SERVER (task §9, §10)', () 
       runtime: createTestRuntime({
         api: createStubApi({
           ...DEFAULT_API_STUBS,
+          'GET /v1/bookings/bk-1': () => {
+            throw new Error('offline');
+          },
+        }),
+      }),
+    });
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/home'));
+  });
+});
+
+/* --------------------------------------------------------- Payment Failed */
+
+describe('Payment Failed — retry against the same hold, or leave once the server disagrees', () => {
+  const CANCELLATION_STUBS = {
+    'GET /v1/bookings/bk-1/cancellation-preview': () => ({
+      bookingId: 'bk-1',
+      cancellable: true,
+      band: null,
+      refundPercent: null,
+      minutesToStart: null,
+      serviceAmountPaise: 12900,
+      capturedAmountPaise: 0,
+      refundAmountPaise: 0,
+      chargeAmountPaise: 0,
+      policyVersion: 'cancellation-policy-v0',
+    }),
+    'GET /v1/bookings/bk-1/reschedule-options': () => ({
+      bookingId: 'bk-1',
+      durationMinutes: 60,
+      currentServiceStart: '2026-08-18T12:00:00.000Z',
+      rescheduleCount: 0,
+      maxReschedules: 2,
+      reschedulable: false,
+    }),
+  };
+
+  function renderPaymentFailed(overrides: Record<string, unknown> = {}) {
+    mockSearchParams = { id: 'bk-1' };
+    return renderWithRuntime(<PaymentFailedRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({ booking: bookingWith({ status: 'created', ...overrides }) }),
+        }),
+      }),
+    });
+  }
+
+  it('shows the price snapshot and a retry CTA while the hold is still `created`', async () => {
+    renderPaymentFailed();
+
+    expect(await screen.findByTestId('payment-failed-retry')).toBeTruthy();
+    expect(screen.getByText(/Retry payment • ₹135.45/)).toBeTruthy();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  it('offers Cancel booking only when the server authorises it', async () => {
+    renderPaymentFailed({
+      allowedActions: {
+        canCancel: false,
+        canReschedule: false,
+        canExtend: false,
+        canRate: false,
+        canTip: false,
+        canCallCook: false,
+      },
+    });
+
+    await screen.findByTestId('payment-failed-retry');
+    expect(screen.queryByTestId('payment-failed-cancel')).toBeNull();
+  });
+
+  it('leaves for the real booking screen once the server settles the hold — paid after all', async () => {
+    renderPaymentFailed({ status: 'assigned' });
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/booking/bk-1'));
+  });
+
+  it('leaves for the real booking screen once the hold is gone — cancelled', async () => {
+    renderPaymentFailed({ status: 'cancelled' });
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/booking/bk-1'));
+  });
+
+  it('goes Home when opened with no booking id', async () => {
+    mockSearchParams = {};
+    renderWithRuntime(<PaymentFailedRoute />, {
+      runtime: createTestRuntime({ api: createStubApi(DEFAULT_API_STUBS) }),
+    });
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/home'));
+    expect(mockRouter.dismissAll).toHaveBeenCalled();
+  });
+
+  /**
+   * A read that keeps failing is not a reason to hold the customer on an error screen forever —
+   * the same call `confirming.tsx` makes for the identical situation. Without this, a booking
+   * that actually settled while the device was offline would leave the customer stuck on a dead
+   * end instead of at Home, where the next successful read reports the truth.
+   */
+  it('goes Home when the booking cannot be read at all', async () => {
+    mockSearchParams = { id: 'bk-1' };
+    renderWithRuntime(<PaymentFailedRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
           'GET /v1/bookings/bk-1': () => {
             throw new Error('offline');
           },
