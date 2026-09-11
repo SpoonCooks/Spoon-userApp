@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 
@@ -604,21 +605,37 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
   /**
    * Leaving the screen gives the slot back.
    *
-   * Deliberately here rather than on the dismissal itself: the hold is what the retry above
-   * reuses, so releasing it the moment checkout closes would cancel the very booking the next
-   * press needs. Once the customer navigates away there is nothing left to reuse it for, and
-   * leaving it would block the slot — their own — until the server's sweep expires it.
+   * Deliberately not on the dismissal itself: the hold is what the retry above reuses, so
+   * releasing it the moment checkout closes would cancel the very booking the next press needs.
+   * Once the customer has navigated away there is nothing left to reuse it for, and leaving it
+   * would block the slot — their own — until the server's sweep expires it.
    *
-   * Fire-and-forget through the api directly, not the mutation hook, because the hook is
-   * unmounting alongside this. The query client outlives both, so the grid still gets told.
+   * ## Why focus and not unmount
+   *
+   * An unmount cleanup fires only if the route is actually torn down, and a navigator that keeps
+   * the screen mounted underneath would never run it — the hold would survive a trip to Home and
+   * go on blocking the slot, which is exactly the symptom this is here to prevent. `useFocusEffect`
+   * cleans up on BLUR as well as unmount, so it covers both without depending on which one the
+   * navigator does.
+   *
+   * The held booking is cleared with it: coming back must create a fresh booking, not try to pay
+   * for one that has just been cancelled.
+   *
+   * Fire-and-forget through the api directly rather than the mutation hook, which may be going
+   * away alongside this. The query client outlives both, so the grid still gets told.
    */
-  useEffect(() => {
-    return () => {
-      const held = heldRef.current;
-      if (held === null) return;
-      void releaseAbandonedHold(createBookingApi(api), queryClient, held.response.booking.id);
-    };
-  }, [api, queryClient]);
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        const held = heldRef.current;
+        if (held === null) return;
+
+        heldRef.current = null;
+        setHeldBooking(null);
+        void releaseAbandonedHold(createBookingApi(api), queryClient, held.response.booking.id);
+      };
+    }, [api, queryClient]),
+  );
 
   const canSubmit =
     addressId !== null &&

@@ -96,6 +96,19 @@ function preview(
 }
 
 /**
+ * `useBookingSubmission` releases an abandoned hold when the screen loses focus, so it reaches
+ * for navigation. These tests render the hook directly, with no navigator above it — the mock
+ * runs the effect and its cleanup on unmount, which is the moment being asserted.
+ */
+jest.mock('expo-router', () => ({
+  __esModule: true,
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('react').useEffect(effect, [effect]);
+  },
+}));
+
+/**
  * The submission's payment step reaches the REAL Razorpay launcher, which has no native module
  * under Jest. Standing that ONE module in for a launcher that refuses the way a dismissal does is
  * what makes the `'cancelled'` branch reachable at all — mocked at its own file rather than at
