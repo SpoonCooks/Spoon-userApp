@@ -1,3 +1,5 @@
+import { getLogger } from '@core/logging';
+
 import type { CheckoutLauncher } from './paymentApi';
 import type { RazorpayCheckoutResult } from './schemas';
 
@@ -7,8 +9,28 @@ import type { RazorpayCheckoutResult } from './schemas';
  * From the Android SDK's `Checkout` constants, which the wrapper forwards verbatim as `code`.
  * Treated as a HINT for messaging only — if Razorpay renumbers it, the worst case is that a
  * cancellation reads as a generic failure, never that an unpaid booking reads as paid.
+ *
+ * That "worst case" turned out to be real: a device dismissal was observed landing here as a
+ * `CheckoutFailedError` rather than a `CheckoutCancelledError`, which means either the platform
+ * SDK in use does not send `2` for a dismissal, or sends `code` in a shape `readRejection` was
+ * not reading. The classification below no longer trusts the numeric code alone —
+ * `mentionsCancellation` is the fallback for whichever of those it turns out to be.
  */
 const RAZORPAY_PAYMENT_CANCELLED = 2;
+
+/**
+ * Razorpay's own wording for a closed sheet, seen across `description` and `reason` depending on
+ * platform and SDK version — a case-insensitive SUBSTRING match, not an enum, because the exact
+ * string is not part of any published contract either.
+ */
+const CANCELLATION_WORDS = ['cancel', 'dismiss'];
+
+function mentionsCancellation(...values: readonly (string | null)[]): boolean {
+  return values.some(
+    (value) =>
+      value !== null && CANCELLATION_WORDS.some((word) => value.toLowerCase().includes(word)),
+  );
+}
 
 export class CheckoutCancelledError extends Error {
   constructor() {
@@ -31,12 +53,21 @@ export class CheckoutFailedError extends Error {
 }
 
 /** Narrows the SDK's rejection, which is a plain object rather than an `Error`. */
-function readRejection(error: unknown): { code: number | null; description: string | null } {
-  if (typeof error !== 'object' || error === null) return { code: null, description: null };
+function readRejection(error: unknown): {
+  code: number | null;
+  description: string | null;
+  reason: string | null;
+} {
+  if (typeof error !== 'object' || error === null) {
+    return { code: null, description: null, reason: null };
+  }
   const record = error as Record<string, unknown>;
   return {
     code: typeof record['code'] === 'number' ? record['code'] : null,
     description: typeof record['description'] === 'string' ? record['description'] : null,
+    // Present on the documented `PaymentErrorData` shape alongside `code`/`description`; not
+    // read before now, so a dismissal worded only here had nothing to be recognised by.
+    reason: typeof record['reason'] === 'string' ? record['reason'] : null,
   };
 }
 
@@ -125,8 +156,19 @@ export const razorpayCheckoutLauncher: CheckoutLauncher = {
         ...(input.prefill === undefined ? {} : { prefill: input.prefill }),
       });
     } catch (error) {
-      const { code, description } = readRejection(error);
-      if (code === RAZORPAY_PAYMENT_CANCELLED) throw new CheckoutCancelledError();
+      const { code, description, reason } = readRejection(error);
+      if (code === RAZORPAY_PAYMENT_CANCELLED || mentionsCancellation(description, reason)) {
+        throw new CheckoutCancelledError();
+      }
+      // Logged for every OTHER rejection, not just an unrecognised code: a real decline and a
+      // dismissal this heuristic still failed to catch both need to be visible in the one place
+      // that ever sees the SDK's raw rejection — nothing upstream of this file sees it again.
+      getLogger('payment').warn('Razorpay checkout rejected', {
+        code,
+        description,
+        reason,
+        raw: error,
+      });
       throw new CheckoutFailedError(code, description);
     }
 
