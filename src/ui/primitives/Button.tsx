@@ -19,6 +19,9 @@ import type { ColorToken, TypographyToken } from '@ui/tokens/semantic';
  *  - `secondary` — white/outlined ("No" on the cancellation confirmation).
  *  - `link`      — text-only row action ("Reschedule Booking", "Share your requests →").
  *  - `danger`    — the red-on-pink destructive treatment proved by Profile's Log Out.
+ *  - `dangerSolid` — a SOLID `#FF0404` fill with a white label. The delete-account confirmation
+ *                  sheet's "Yes" draws this, not `danger`: that mock is a saturated red pill with
+ *                  a white label, distinct from Log Out's pale-pink-and-red-text treatment.
  *
  * The Figma "Cancel" CTA uses primary yellow for a destructive action (defect D-9); the variant
  * exists so screens can adopt the correct treatment the moment design confirms it. Nothing here
@@ -34,7 +37,8 @@ export type ButtonVariant =
   | 'outlineSoft'
   | 'subtle'
   | 'link'
-  | 'danger';
+  | 'danger'
+  | 'dangerSolid';
 /**
  * The file draws three distinct CTA geometries, so `size` is not decoration:
  *  - `lg`  `37:3908` — px 20 / py 14, 12pt radius, Livvic Black 14/20. The standard screen bar.
@@ -109,6 +113,7 @@ const SURFACE: Record<ButtonVariant, ViewStyle> = {
   subtle: { backgroundColor: lightTheme.colors.surfaceSubtle },
   link: { backgroundColor: 'transparent' },
   danger: { backgroundColor: lightTheme.colors.dangerSurface },
+  dangerSolid: { backgroundColor: lightTheme.colors.danger },
 };
 
 const LABEL_COLOR: Record<ButtonVariant, ColorToken> = {
@@ -121,6 +126,9 @@ const LABEL_COLOR: Record<ButtonVariant, ColorToken> = {
   subtle: 'textSecondaryStrong',
   link: 'danger',
   danger: 'danger',
+  // `textOnAccent` is BLACK (it labels the yellow/lime CTAs) — wrong on a solid red fill. The
+  // mock's "Yes" is white, i.e. `textInverse`.
+  dangerSolid: 'textInverse',
 };
 
 export function Button({

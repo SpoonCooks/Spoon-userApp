@@ -200,6 +200,8 @@ export const palette = {
   amber700: '#BB4D00',
   /** `3:1151` — "Cancel Booking & Refund"; also the destructive ink across the file. */
   rose600: '#EC003F',
+  /** The delete-account confirmation prompt's rose block — `rose600` at 30%, Figma inspector. */
+  rose600Surface: 'rgba(236,0,63,0.3)',
   /** `6:22` — the "Free" fee value on the cancellation policy, NEW in the current Figma file. */
   emerald: '#01CF8F',
 
@@ -213,6 +215,8 @@ export const palette = {
   danger: '#FF0404',
   /** `239:2294` — the digit boxes on the error frame swap `#FFEF99` for this red tint. */
   dangerSurface: 'rgba(255,4,4,0.07)',
+  /** The Account screen's Delete Account row — `#FF0404` at 30%, read off the Figma inspector. */
+  dangerSurfaceStrong: 'rgba(255,4,4,0.3)',
 } as const;
 
 /**

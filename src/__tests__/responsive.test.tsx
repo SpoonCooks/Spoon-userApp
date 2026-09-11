@@ -235,7 +235,7 @@ describe.each(HEIGHTS)('on a %s viewport', (_label, height) => {
 
     /* --------------------------------------------------------------- profile */
 
-    /** `6:663`'s legal/logout panel is PINNED to the foot, so it must survive both extremes. */
+    /** `6:663`'s Manage account/logout footer is PINNED to the foot, so it must survive both extremes. */
     it('renders Profile with its pinned footer', () => {
       render(
         <ProfileView
@@ -244,7 +244,7 @@ describe.each(HEIGHTS)('on a %s viewport', (_label, height) => {
           onBack={noop}
           onSelectTile={noop}
           onOpenProfileDetails={noop}
-          onOpenLink={noop}
+          onOpenManageAccount={noop}
           onLogout={noop}
         />,
       );
@@ -267,7 +267,7 @@ describe.each(HEIGHTS)('on a %s viewport', (_label, height) => {
           onBack={noop}
           onSelectTile={noop}
           onOpenProfileDetails={noop}
-          onOpenLink={noop}
+          onOpenManageAccount={noop}
           onLogout={noop}
         />,
       );

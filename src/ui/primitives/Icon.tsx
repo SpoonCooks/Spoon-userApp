@@ -69,6 +69,8 @@ const REGISTRY = {
   edit: 'edit-2',
   logout: 'log-out',
   externalLink: 'external-link',
+  /** The Manage account row's leading mark on Profile. No Figma frame id available for this pass. */
+  folder: 'folder',
   /** `6:768` — the live-site row's leading mark is a PAGE, not a globe. */
   file: 'file-text',
   globe: 'globe',

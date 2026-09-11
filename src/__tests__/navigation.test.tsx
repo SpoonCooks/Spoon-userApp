@@ -28,6 +28,7 @@ import {
  * which router METHOD each control reaches and with what, which is exactly what a mock records.
  */
 
+import AccountRoute from '@/app/(app)/account';
 import AddressDetailsRoute from '@/app/(app)/address/details';
 import SavedAddressesRoute from '@/app/(app)/address/index';
 import AddressLocationRoute from '@/app/(app)/address/location';
@@ -204,6 +205,9 @@ const POPPING_BACK_ROUTES = [
   // applies to both.
   ['history', HistoryRoute, 'screen-header-back', '/profile'],
   ['refunds', RefundsRoute, 'screen-header-back', '/profile'],
+  // Account (V9) is reached only from Profile's "Manage account" row — same reasoning as
+  // History and Refunds above.
+  ['account', AccountRoute, 'screen-header-back', '/profile'],
   // `60:655`'s header back NO LONGER forces `53:31` on an edit (reversed product decision — see
   // "address edit now returns to the list" below): it has two genuinely different predecessors
   // (the map's confirm, or `68:214`'s "Edit" pushing here directly), and a plain pop resolves to
@@ -514,31 +518,30 @@ describe('profile children', () => {
   });
 
   /**
-   * §11 — the legal row has no published URL anywhere in the contract, so it is drawn as the
-   * underlined label it already is rather than as a control that swallows a press. See
-   * `docs/FRONTEND_BACKEND_PENDING.md`.
+   * V9 — the legal footer row is gone from Profile. "Manage account" opens `@features/account`
+   * instead, which is the screen that now carries both documents (and Delete Account).
    */
-  /**
-   * The legal footer is TWO live controls that open IN THE APP.
-   *
-   * It used to be one combined "Terms of Service & Privacy Policy" row, deliberately drawn as
-   * inert text because no endpoint published a legal URL — so the control both under-described
-   * itself (one button, two documents) and went nowhere. The documents now ship with the app, so
-   * each is its own button with its own route.
-   */
-  it.each([
-    ['terms', '/legal/terms'],
-    ['privacy', '/legal/privacy'],
-  ])('opens %s in the app rather than an external browser', async (id, href) => {
+  it('opens Account from Manage account', async () => {
     render(<ProfileRoute />);
 
-    const row = await screen.findByTestId(`profile-link-${id}`);
-    expect(row.props.accessibilityRole).toBe('link');
+    fireEvent.press(await screen.findByTestId('profile-manage-account'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/account');
+  });
+});
 
-    fireEvent.press(row);
+describe('account children', () => {
+  /**
+   * Terms of Service and Privacy Policy open IN THE APP, same as they did from Profile before
+   * V9 moved them here — never handed to `Linking`, which would eject the customer into Chrome to
+   * read the terms they are being asked to accept.
+   */
+  it.each([
+    ['account-terms', '/legal/terms'],
+    ['account-privacy', '/legal/privacy'],
+  ])('%s opens %s', async (testId, href) => {
+    render(<AccountRoute />);
 
-    // PUSHED, so Back returns to Profile — and never handed to `Linking`, which would eject the
-    // customer into Chrome to read the terms they are being asked to accept.
+    fireEvent.press(await screen.findByTestId(testId));
     expect(mockRouter.push).toHaveBeenCalledWith(href);
   });
 });

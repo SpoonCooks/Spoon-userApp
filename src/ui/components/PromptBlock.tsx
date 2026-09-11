@@ -16,12 +16,18 @@ import type { TypographyToken } from '@ui/tokens/semantic';
  *
  * `115:2748` and `201:91` carry a single Livvic Bold 15/24 line instead of the 12/16 pair,
  * which is why the title's variant is a prop rather than a constant.
+ *
+ * The delete-account confirmation sheet draws a SIXTH instance of this shape, but rose rather
+ * than lime — a destructive confirmation, not a positive suggestion — hence `tone`. No Figma
+ * frame id available for that instance.
  */
 export interface PromptBlockProps {
   readonly title: string;
   readonly body?: string;
   /** `6:65` uses Bold 12/16; `115:2748` and `201:91` use Bold 15/24. */
   readonly titleVariant?: Extract<TypographyToken, 'bodyBold' | 'titleRebook'>;
+  /** `positive` (default) is every audited frame's lime. `critical` is the delete-account rose. */
+  readonly tone?: 'positive' | 'critical';
   /** The CTA drawn inside the block (`6:68`, `104:2384`, `143:364`). */
   readonly children?: ReactNode;
   readonly testID?: string;
@@ -31,11 +37,12 @@ export function PromptBlock({
   title,
   body,
   titleVariant = 'bodyBold',
+  tone = 'positive',
   children,
   testID = 'prompt-block',
 }: PromptBlockProps) {
   return (
-    <View style={styles.block} testID={testID}>
+    <View style={[styles.block, tone === 'critical' ? styles.blockCritical : null]} testID={testID}>
       <View style={styles.text}>
         <Text variant={titleVariant} color="textPrimary" align="center">
           {title}
@@ -60,6 +67,7 @@ const styles = StyleSheet.create({
     borderRadius: lightTheme.radius.r24,
     backgroundColor: lightTheme.colors.surfacePositive,
   },
+  blockCritical: { backgroundColor: lightTheme.colors.surfaceCritical },
   /** `103:2258` — a 44pt area; the second line starts 22pt down, i.e. 6pt clear of the first. */
   text: {
     alignSelf: 'stretch',

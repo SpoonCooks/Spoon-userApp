@@ -1,9 +1,9 @@
-import { Fragment } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
 import {
+  ListRow,
   PROFILE_AVATAR_GLYPH,
   PROFILE_CHEVRON_GLYPH,
   PROFILE_TILE_ART,
@@ -28,13 +28,16 @@ import type { ProfileViewModel } from '../types';
  *   tiles     `69:423` — a 2 × 2 grid of 161 × 97 `#FFF7CC` tiles at a 15pt radius with an INSET
  *                        `0 0 2 rgba(0,0,0,0.1)` shadow: a 32pt disc, then Livvic Bold 14/20 over
  *                        Livvic Regular 9/13.5, with a 32pt chevron on the right.
- *   footer    `6:765`  — `rgba(255,247,204,0.7)` at a 24pt radius lifted UPWARDS by
- *                        `0 -1 4 rgba(0,0,0,0.15)`: the live-site link, the legal link, and the
- *                        `#FFF1F2` Log Out row in Livvic Bold 12/16 `#C70036`.
+ *   footer    `6:765`  — V9 redraws this panel: the legal-links row is GONE, replaced by a
+ *                        bordered "Manage account" row (folder mark, trailing chevron) above the
+ *                        `#FFF1F2` Log Out row in Livvic Bold 12/16 `#C70036`. No Figma frame id
+ *                        is available for the new row in this pass — geometry is a best-effort
+ *                        read of the supplied mock, not a verified export.
  *
  * Ruling R-1: there is deliberately NO "Payment methods" tile — payment opens Razorpay directly,
  * so the app has no payment-management surface. Nothing is added beyond what the frame draws.
- * Ruling R-6: Terms & Privacy live here and nowhere else.
+ * Ruling R-6 is SUPERSEDED for V9: Terms & Privacy no longer live here — "Manage account" opens
+ * `@features/account`, which now carries both documents plus Delete Account.
  *
  * Logout clears SecureStore, the query cache and session status — all three are wired in
  * `@core/auth` + `@core/runtime`; this screen only raises the intent.
@@ -48,7 +51,8 @@ export interface ProfileActions {
    * founder's ruling: the same `338:4508` page, blank on the first visit and prefilled after.
    */
   readonly onOpenProfileDetails: () => void;
-  readonly onOpenLink: (linkId: string) => void;
+  /** Opens `@features/account` — Terms of Service, Privacy Policy, Delete Account. */
+  readonly onOpenManageAccount: () => void;
   readonly onLogout: () => void;
 }
 
@@ -146,53 +150,23 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
                 ))}
               </View>
 
-              {/* `71:614` is a 354pt frame holding the 154pt panel at its BOTTOM — the legal card
-                  is pinned to the foot of the screen, not stacked under the grid. */}
-              <View style={styles.footerSpacer} />
-
               <View style={styles.footer} testID="profile-footer">
-                {/* A row with no `url` has nowhere to go, so it is drawn as the text it already
-                    is rather than as a button that absorbs a press and does nothing. The frame is
-                    identical either way — `6:779` is an underlined label — so this costs no
-                    pixels and removes a dead control. */}
-                {/*
-                  `6:779` verbatim — ONE line reading "Terms of Service & Privacy Policy", in the
-                  frame's own Livvic Bold 11/14.67, underlined.
-
-                  The line is unchanged; what changed is that each HALF is now its own control.
-                  It was previously a single label standing for two separate legal instruments,
-                  so it could only ever open one of them — and in practice opened neither,
-                  because no endpoint publishes a legal URL. "Terms of Service" now opens the
-                  Terms and "Privacy Policy" opens the Policy, with the frame's "&" sitting
-                  inert between them.
-
-                  Nested `Text` rather than two buttons, because the frame draws a sentence and a
-                  sentence is what this has to stay: two `Pressable`s side by side could not keep
-                  the "&" on the same baseline or wrap as one line on a narrow handset. It is the
-                  same construction `LoginScreen` already uses for the identical pair.
-                */}
-                <View style={styles.legalRow} testID="profile-legal">
-                  <Text variant="profileLegal" color="textPrimary" align="center">
-                    {profile.links.map((link, index) => (
-                      <Fragment key={link.id}>
-                        {index === 0 || profile.linksSeparator === undefined
-                          ? null
-                          : profile.linksSeparator}
-                        <Text
-                          variant="profileLegal"
-                          color="textPrimary"
-                          style={styles.linkUnderline}
-                          onPress={() => actions.onOpenLink(link.id)}
-                          accessibilityRole="link"
-                          accessibilityLabel={link.title}
-                          testID={`profile-link-${link.id}`}
-                        >
-                          {link.title}
-                        </Text>
-                      </Fragment>
-                    ))}
-                  </Text>
+                {/* V9 — replaces the legal-links row. Opens `@features/account`, which now hosts
+                    Terms of Service, Privacy Policy and Delete Account (superseded Ruling R-6).
+                    Sits directly under the grid, NOT pinned to the foot — only Log Out is. */}
+                <View style={styles.manageAccountRow}>
+                  <ListRow
+                    title={profile.manageAccountLabel}
+                    icon="folder"
+                    onPress={actions.onOpenManageAccount}
+                    testID="profile-manage-account"
+                  />
                 </View>
+
+                {/* `71:614` is a 354pt frame holding the panel at its BOTTOM — Log Out is pinned
+                    to the foot of the screen, clear of "Manage account" above it, not stacked
+                    directly under it. */}
+                <View style={styles.footerSpacer} />
 
                 {/* `6:784` — the one confirmed destructive treatment in the design (defect D-9). */}
                 <Pressable
@@ -236,7 +210,10 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.xl,
     backgroundColor: lightTheme.colors.surface,
   },
-  /** Absorbs the slack so the footer sits at the foot of the viewport, as `71:614` draws it. */
+  /**
+   * Absorbs the slack so Log Out sits at the foot of the viewport, as `71:614` draws it — the
+   * spacer lives INSIDE `footer`, between the two controls, not above "Manage account".
+   */
   footerSpacer: { flexGrow: 1 },
   /** `6:667` — white, 1pt `#FFDE33`, 24pt radius, 15.889pt padding, 16pt gap. */
   /** `6:667` — radius **20**, a 12pt gap, 1pt `#FFDE33`, `0 1 0 rgba(0,0,0,0.05)`. */
@@ -279,44 +256,34 @@ const styles = StyleSheet.create({
   tileText: { flex: 1, minWidth: 0 },
   /** `69:419` — a 32pt chevron. The export is already the rotated (right-pointing) mark. */
   tileChevron: { width: 32, height: 32 },
-  /** `6:765` — `rgba(255,247,204,0.7)`, 24pt radius, 15.889pt padding, 8pt gap, lifted upwards. */
-  footer: {
-    gap: lightTheme.space.sm,
-    padding: 15.889,
-    borderRadius: lightTheme.radius.r24,
-    backgroundColor: lightTheme.colors.surfaceTileIdle,
-    shadowColor: lightTheme.colors.textPrimary,
-    shadowOffset: { width: 0, height: -1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 3,
+  /**
+   * V9 — the tinted, lifted `6:765` panel is gone; Manage account and Log Out now sit directly on
+   * the screen's own surface as two standalone controls. Best-effort read of the supplied mock.
+   *
+   * `flex: 1` so `footerSpacer` (below) has slack to absorb — without it the spacer's own
+   * `flexGrow: 1` has nothing to grow INTO, since `footer` itself would size to its content.
+   */
+  footer: { flex: 1, gap: lightTheme.space.md },
+  /** Bordered like the identity card (`6:667`'s `#FFDE33` edge), no Figma frame id for this row. */
+  manageAccountRow: {
+    borderWidth: lightTheme.stroke.thin,
+    borderColor: lightTheme.colors.borderCtaSoft,
+    borderRadius: lightTheme.radius.r20,
+    paddingHorizontal: lightTheme.space.md,
+    backgroundColor: lightTheme.colors.surface,
   },
-  /** `6:766` — 10pt padding at a 12pt radius. */
-  /** `6:779` — a 28pt bar, px 4 / py 6, radius 12. The label is its only child. */
-  /** `6:779` — the 28pt legal bar, centred on the panel's own axis like the Log Out row. */
-  legalRow: {
-    minHeight: 28,
-    justifyContent: 'center',
-    paddingHorizontal: lightTheme.space.xs,
-    paddingVertical: lightTheme.space.s6,
-  },
-  /** `6:781` — Livvic Bold 11/14.67, underlined. */
-  linkUnderline: { textDecorationLine: 'underline' },
-  /** `6:784` — `#FFF1F2`, centred, 6pt gap, 10pt padding at a 12pt radius. */
-  /** `6:784` — 306 x 25 on `#FFF1F2` at a **20pt** radius, px 12 / py 6. No glyph. */
+  /**
+   * `6:784` — `#FFF1F2` at a 20pt radius. V8 drew this as a tight 25pt bar with NO vertical
+   * padding; the V9 mock draws a taller, properly-padded pill instead (closer in weight to
+   * "Manage account" above it), so the fixed 25pt height is retired in favour of real padding.
+   */
   logout: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 25,
     gap: lightTheme.space.s6,
     paddingHorizontal: lightTheme.space.md,
-    /*
-     * NO vertical padding. `6:784` is 25 tall around a 16pt line; adding the node's nominal `py-6`
-     * on top leaves a 13pt box and Android clipped the descender — "Log Out" rendered "Loa Out" on
-     * the handset. Figma's autolayout lets the label overflow its padding; RN clips, so the drawn
-     * height wins and the line is centred inside it.
-     */
+    paddingVertical: lightTheme.space.md,
     borderRadius: 20,
     backgroundColor: lightTheme.colors.surfaceLogout,
   },

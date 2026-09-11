@@ -108,6 +108,25 @@ first-run gate now reads. Re-verify after deployment.
 
 ## 3. Still open
 
+### `BACKEND_GAP_ACCOUNT_DELETE` — blocks Delete Account
+
+The Profile → Account screen (`@features/account`) ships a full "Delete Account" UI: a
+destructive row that opens a bottom-sheet confirmation ("Are you sure you want to delete?" /
+No / Yes). No endpoint exists for the "Yes" action — no `DELETE /v1/me` or equivalent anywhere in
+the audited contract.
+
+`useDeleteAccount` (`src/features/account/data.ts`) is wired but its `mutationFn` throws
+`AccountDeletionUnavailableError` without making a network call: a guessed endpoint could 404
+silently or hit the wrong resource, either of which would misrepresent whether the account was
+actually deleted. The sheet surfaces the failure inline and stays open — it never claims success.
+
+Also unresolved: the bundled Privacy Policy copy already promises "Account deletion requests are
+processed within 30 days", which reads as a queued request rather than an immediate delete. Which
+of the two this is is a product/contract decision, not something the frontend can infer.
+
+*Minimal change:* add the endpoint (immediate or queued) and point `mutationFn` at it; the sheet,
+loading state and error surface need no further frontend change.
+
 ### `BACKEND_GAP_EXTENSION_KEY_ID` — blocks extension checkout
 
 `POST /v1/bookings/:id/payments/order` and `POST /v1/bookings/:id/tips` both attach the PUBLIC
