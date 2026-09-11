@@ -9,6 +9,7 @@ import {
   useTipCheckout,
 } from '@features/booking';
 import { useCancelFlow } from '@features/cancellation';
+import { paymentErrorMessage } from '@features/payment';
 import { useWhatsAppHelp } from '@features/support';
 import { ErrorBoundary, isNumericRating } from '@ui';
 import { useDeterministicBack } from '@core/navigation';
@@ -105,6 +106,7 @@ export default function BookingRoute() {
           })
         }
         extending={extend.isPending}
+        extendError={paymentErrorMessage(extend.error)}
         /**
          * `201:93` / `201:96` — the auto-cancelled rebook prompt.
          *
@@ -140,6 +142,7 @@ export default function BookingRoute() {
           return tip.mutateAsync({ bookingId, amountPaise, scope: `booking.tip:${bookingId}` });
         }}
         tipping={tip.isPending}
+        tipError={paymentErrorMessage(tip.error)}
         /**
          * `143:292` -> `319:3191`. Submit sends the rating AND the words in one call, because
          * `299:1424` draws one Submit for both, and then the booking is refetched: the thank-you

@@ -54,6 +54,18 @@ export interface ExtensionSheetProps {
   readonly onExtend?: () => void;
   /** `POST /extensions` is in flight. The CTA's OWN state — the sheet keeps its content (§7). */
   readonly submitting?: boolean;
+  /**
+   * An extension the SERVER did not grant, in the customer's words.
+   *
+   * Worth more here than on the tip sheet: a silent failure during a LIVE service leaves the
+   * customer believing they bought the cook another twenty minutes, and finding out only when
+   * the cook packs up on the original schedule. The sheet stays open with the option still
+   * selected, so this says what happened and the same CTA retries it. A DISMISSED checkout is
+   * not a failure and passes null.
+   *
+   * FIGMA_PENDING — `275:4189` draws no error state; the treatment follows `CancelBookingSheet`.
+   */
+  readonly errorMessage?: string | null;
   readonly onBookAnother: () => void;
   /** `143:322` — the sheet draws the Help pill too. Unwired until B-10 names a destination. */
   readonly onHelp?: () => void;
@@ -77,6 +89,7 @@ export function ExtensionSheet({
   onClose,
   onExtend,
   submitting = false,
+  errorMessage = null,
   onBookAnother,
   onHelp,
   helpLabel = 'Help',
@@ -181,6 +194,18 @@ export function ExtensionSheet({
         loading={submitting}
         testID="extension-submit"
       />
+
+      {errorMessage === null ? null : (
+        <Text
+          variant="body"
+          color="textSecondary"
+          align="center"
+          accessibilityRole="alert"
+          testID="extension-error"
+        >
+          {errorMessage}
+        </Text>
+      )}
 
       {/* `275:4267` — Livvic Regular 9/13.5, underlined, centred. Not a button in the frame. */}
       {extension.paymentDetailsLabel === undefined || taxes === undefined ? null : (

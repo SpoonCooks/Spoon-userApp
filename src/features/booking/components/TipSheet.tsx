@@ -43,6 +43,18 @@ export interface TipSheetProps {
   readonly onConfirm?: () => void;
   /** `POST /tips` is in flight. The CTA's own state; the sheet keeps its options (§7). */
   readonly submitting?: boolean;
+  /**
+   * A tip the SERVER did not take, in the customer's words.
+   *
+   * The sheet stays open on a failure and the chosen amount stays selected, so this says what
+   * happened rather than leaving a sheet that simply stopped responding — which is what it did
+   * before: the CTA's spinner ended and nothing else changed. A DISMISSED checkout is not a
+   * failure and passes null, the same rule the booking flow follows.
+   *
+   * FIGMA_PENDING — `306:2885` draws no error state, so this reuses the wording treatment
+   * `CancelBookingSheet` already uses for the same situation.
+   */
+  readonly errorMessage?: string | null;
   readonly onHelp?: () => void;
   readonly helpLabel?: string;
   readonly testID?: string;
@@ -56,6 +68,7 @@ export function TipSheet({
   onClose,
   onConfirm,
   submitting = false,
+  errorMessage = null,
   onHelp,
   helpLabel = 'Help',
   testID = 'tip-sheet',
@@ -141,6 +154,18 @@ export function TipSheet({
         loading={submitting}
         testID={`${testID}-confirm`}
       />
+
+      {errorMessage === null ? null : (
+        <Text
+          variant="body"
+          color="textSecondary"
+          align="center"
+          accessibilityRole="alert"
+          testID={`${testID}-error`}
+        >
+          {errorMessage}
+        </Text>
+      )}
     </BottomSheet>
   );
 }

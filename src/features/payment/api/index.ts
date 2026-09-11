@@ -11,5 +11,6 @@ export {
   CheckoutFailedError,
   razorpayCheckoutLauncher,
 } from './razorpayLauncher';
+export { paymentErrorMessage } from './checkoutMessage';
 export { paymentOrderSchema } from './schemas';
 export type { PaymentOrderDto, RazorpayCheckoutResult } from './schemas';
