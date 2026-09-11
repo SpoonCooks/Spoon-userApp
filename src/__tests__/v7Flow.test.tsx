@@ -313,6 +313,50 @@ describe('Payment Failed — retry against the same hold, or leave once the serv
   });
 
   /**
+   * Observed on device: cancelling from this screen showed `115:2703` ("Your booking has been
+   * cancelled") for a single frame and then jumped away.
+   *
+   * The cancellation invalidates the booking read, so the very next poll saw `cancelled`, the
+   * settled-and-leave effect fired, and it replaced the sheet's own receipt before the customer
+   * could read it. The sheet owns the screen until they answer its "book again?" prompt.
+   */
+  it('does not navigate out from under the cancel sheet when the cancellation settles', async () => {
+    mockSearchParams = { id: 'bk-1' };
+    // The booking goes `cancelled` the moment the POST lands — which is exactly what the real
+    // mutation causes, by invalidating the booking read it has just changed.
+    let status = 'created';
+    renderWithRuntime(<PaymentFailedRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({ booking: bookingWith({ status }) }),
+          'POST /v1/bookings/bk-1/cancel': () => {
+            status = 'cancelled';
+            return {};
+          },
+        }),
+      }),
+    });
+
+    fireEvent.press(await screen.findByTestId('payment-failed-cancel'));
+    fireEvent.press(await screen.findByTestId('cancel-continue-policy'));
+    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
+    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
+    fireEvent.press(await screen.findByTestId('cancel-confirm'));
+
+    // `115:2703` is the customer's receipt. It has to still be on screen once the refetch the
+    // cancellation triggered has come back saying `cancelled`.
+    expect(await screen.findByTestId('cancel-step-confirmed')).toBeTruthy();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(screen.getByTestId('cancel-step-confirmed')).toBeTruthy();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  /**
    * A read that keeps failing is not a reason to hold the customer on an error screen forever —
    * the same call `confirming.tsx` makes for the identical situation. Without this, a booking
    * that actually settled while the device was offline would leave the customer stuck on a dead

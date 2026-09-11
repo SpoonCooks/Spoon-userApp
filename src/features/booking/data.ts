@@ -1,15 +1,20 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 
 import { formatPaise } from '@core/format';
 import { useApiQuery, ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
+import { getUserMessage, normalizeError } from '@core/errors';
+import { getLogger } from '@core/logging';
 import { assertNever } from '@core/render';
 import { useRuntime } from '@core/runtimeContext';
 import { useAddresses } from '@features/address';
-import { useInstantAvailability } from '@features/availability';
+import { availabilityKeys, useInstantAvailability } from '@features/availability';
 import { useCatalogue } from '@features/catalogue';
 import {
   CheckoutCancelledError,
+  CheckoutFailedError,
   razorpayCheckoutLauncher,
   usePayForBooking,
 } from '@features/payment';
@@ -413,10 +418,24 @@ export type PaymentOutcome =
   | 'verified'
   /** The customer dismissed checkout. An ordinary choice, not an error to report at them. */
   | 'cancelled'
-  /** Checkout or verification failed. The booking stays on hold until it expires. */
+  /**
+   * Checkout RAN and the payment or its verification failed — a declined card, a refused
+   * signature. This is the only outcome that has earned the words "your payment failed", and the
+   * only one the Payment Failed screen is for.
+   */
   | 'failed'
   /** The order is not ready upstream yet; checkout never opened. Retry is safe and idempotent. */
-  | 'processing';
+  | 'processing'
+  /**
+   * Checkout never opened, because something before it did not work — the order could not be
+   * created, the device is offline, the SDK is missing from the build.
+   *
+   * Deliberately NOT `failed`: no payment was attempted, so nothing about it failed. Telling a
+   * customer their payment failed when the app never got as far as asking them for one is a
+   * false report, and it sent them to a screen offering to retry a payment that had not
+   * happened.
+   */
+  | 'unavailable';
 
 export interface BookingSubmissionResult {
   readonly booking: BookingCreateResponse;
@@ -424,24 +443,57 @@ export interface BookingSubmissionResult {
 }
 
 /**
- * Where a payment attempt's outcome sends the customer next.
+ * A booking a dismissed checkout left on hold, and the selection it was made for.
+ *
+ * The key is what stops it being paid against the wrong slot: it carries the address, the slot
+ * type, the duration and the exact start, so a customer who changes any of those gets a new
+ * booking rather than paying for the one they have moved off.
+ */
+interface HeldBooking {
+  readonly key: string;
+  readonly response: BookingCreateResponse;
+}
+
+/**
+ * Where a payment attempt's outcome sends the customer next, or `null` to stay put.
  *
  * One mapping, shared by every screen that submits a booking (Instant and Scheduled today), so
- * the three destinations — Page 21, Payment Failed, and the ordinary hold screen — cannot drift
- * out of sync between callers the way two independently hand-written copies of this logic could.
+ * the destinations cannot drift out of sync between callers the way two independently
+ * hand-written copies of this logic could.
+ *
+ * ## Why nothing unpaid is sent to `/booking/:id`
+ *
+ * A booking that has not been paid for is still `created`, and `created` renders the CONFIRMATION
+ * view — the one headed "Booking confirmed!". Sending an unpaid hold there told customers who had
+ * just backed out of checkout that their booking was confirmed and a cook was coming. That is the
+ * worst thing this flow can say, and it is why only `verified` may ever reach a screen that
+ * asserts anything.
  */
-export function destinationForPayment(payment: PaymentOutcome, bookingId: string): string {
+export function destinationForPayment(payment: PaymentOutcome, bookingId: string): string | null {
   switch (payment) {
     case 'verified':
       return `/booking/confirming?id=${bookingId}`;
     case 'failed':
       return `/booking/payment-failed?id=${bookingId}`;
-    // `cancelled` and `processing` both have nothing to confirm and nothing to explain:
-    // dismissing checkout is a choice, not a fault, and an order that was not ready is not a
-    // failure either.
-    case 'cancelled':
+    /**
+     * Checkout never opened, so no payment was attempted and none of it failed.
+     *
+     * These briefly went to Payment Failed, on the reasoning that it was at least honest about
+     * being unpaid. It is not: it says "Your payment failed" and offers to retry a payment that
+     * never happened. The customer stays where they are and the CTA reports why, the same way a
+     * refused booking now does.
+     */
     case 'processing':
-      return `/booking/${bookingId}`;
+    case 'unavailable':
+      return null;
+    /**
+     * They closed checkout on purpose. There is nothing to tell them and nowhere they asked to
+     * go, so both callers leave them exactly where they were: `home.tsx` closes the sheet onto
+     * Home, `scheduled.tsx` stays on the grid with the selection intact. Either way the CTA is
+     * one press away, which is the whole point of not having moved them.
+     */
+    case 'cancelled':
+      return null;
     default:
       // Exhaustive by construction: a `PaymentOutcome` this app does not yet know how to route
       // is a defect at the CALL SITE, not a reason to guess a destination.
@@ -455,6 +507,19 @@ export interface BookingSubmission {
   /** False while the selection is incomplete — the CTA has nothing to submit. */
   readonly canSubmit: boolean;
   readonly submitting: boolean;
+  /**
+   * The last `POST /v1/bookings` REFUSAL, as customer copy, or null.
+   *
+   * `submit()` rejects when the booking cannot be created, and both hosts used to discard that
+   * rejection entirely — the comment even claimed it was "surfaced by the mutation", which was
+   * true of nothing: neither the Instant sheet nor the Schedule screen had anywhere to put one.
+   * The visible result was a live CTA that did nothing when pressed, on repeat attempts where
+   * the server had started declining (a slot gone, an expired quote, a hold already held).
+   *
+   * PAYMENT failures are not reported here — those come back as a `PaymentOutcome` and have
+   * their own screen.
+   */
+  readonly submitError: string | null;
   /**
    * Creates the booking, then opens checkout for it.
    *
@@ -497,6 +562,63 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
   // The REAL launcher. `unavailableCheckoutLauncher` (the fail-closed default) stays the export
   // for hosts with no native module, but the app itself now has one.
   const pay = usePayForBooking(razorpayCheckoutLauncher);
+  const { api } = useRuntime();
+  const queryClient = useQueryClient();
+  /**
+   * What to say when checkout never opened.
+   *
+   * `create.error` covers a REFUSED booking, but `processing` and `unavailable` are not errors —
+   * they resolve normally — so there is nothing on any mutation to read them off. Without this
+   * they are the silent case all over again: the customer presses Book Now, no sheet appears,
+   * and the screen says nothing at all.
+   */
+  const [couldNotStart, setCouldNotStart] = useState<string | null>(null);
+
+  /**
+   * The booking a dismissed checkout left behind, kept so the NEXT press can pay for it instead
+   * of creating a second one.
+   *
+   * `POST /v1/bookings` puts a row in `created` and takes the capacity, and the server's
+   * `bookings_customer_active_no_overlap` constraint counts that as live — so a customer who
+   * backs out and presses again is refused for overlapping THEMSELVES. Reusing the hold they
+   * already have is what makes the retry work; the payment side is idempotent per booking, so
+   * reopening checkout returns the same provider order rather than a second one.
+   *
+   * Held in a ref as well as state: the unmount cleanup below has to read the LATEST value, and
+   * a cleanup closed over the first render's state would release nothing.
+   */
+  const [heldBooking, setHeldBooking] = useState<HeldBooking | null>(null);
+  const heldRef = useRef<HeldBooking | null>(null);
+  useEffect(() => {
+    heldRef.current = heldBooking;
+  }, [heldBooking]);
+
+  const selectionKey = [
+    'booking.create',
+    addressId ?? 'no-address',
+    selection.slotType,
+    String(durationMinutes),
+    scheduledStart ?? 'now',
+  ].join(':');
+
+  /**
+   * Leaving the screen gives the slot back.
+   *
+   * Deliberately here rather than on the dismissal itself: the hold is what the retry above
+   * reuses, so releasing it the moment checkout closes would cancel the very booking the next
+   * press needs. Once the customer navigates away there is nothing left to reuse it for, and
+   * leaving it would block the slot — their own — until the server's sweep expires it.
+   *
+   * Fire-and-forget through the api directly, not the mutation hook, because the hook is
+   * unmounting alongside this. The query client outlives both, so the grid still gets told.
+   */
+  useEffect(() => {
+    return () => {
+      const held = heldRef.current;
+      if (held === null) return;
+      void releaseAbandonedHold(createBookingApi(api), queryClient, held.response.booking.id);
+    };
+  }, [api, queryClient]);
 
   const canSubmit =
     addressId !== null &&
@@ -508,30 +630,157 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
       throw new Error('Booking submitted without a complete selection');
     }
 
-    const booking = await create.mutateAsync({
-      input: {
-        addressId,
-        slotType: selection.slotType,
-        durationMinutes,
-        ...(scheduledStart === null ? {} : { scheduledStart }),
-      },
-      scope: [
-        'booking.create',
-        addressId,
-        selection.slotType,
-        String(durationMinutes),
-        scheduledStart ?? 'now',
-      ].join(':'),
-    });
+    // A fresh attempt is not still carrying the last one's complaint.
+    setCouldNotStart(null);
+
+    /**
+     * The hold from a dismissed checkout is REUSED rather than duplicated — but only for the
+     * selection it was actually made against.
+     *
+     * `selectionKey` carries the address, the slot type, the duration and the exact start, so a
+     * different day, time, length or address can never pay for the booking made for another one.
+     * Anything that does not match is a different intent and gets its own booking; the hold that
+     * no longer matches is released when this screen goes away.
+     */
+    const booking =
+      heldBooking !== null && heldBooking.key === selectionKey
+        ? heldBooking.response
+        : await create.mutateAsync({
+            input: {
+              addressId,
+              slotType: selection.slotType,
+              durationMinutes,
+              ...(scheduledStart === null ? {} : { scheduledStart }),
+            },
+            scope: selectionKey,
+          });
 
     // The booking now exists on HOLD. Payment is a SEPARATE operation against it, which is why
     // a failure below does not unmake the booking and is not thrown: the hold is real, the
     // server will expire it if nothing pays, and the customer is entitled to see that state.
     const payment = await payAndClassify(pay.mutateAsync, booking.booking.id);
-    return { booking, payment };
-  }, [create, pay, addressId, durationMinutes, scheduledStart, selection.slotType]);
 
-  return { quote, canSubmit, submitting: create.isPending || pay.isPending, submit };
+    /**
+     * What survives this attempt.
+     *
+     * A dismissal keeps the booking so the next press pays for THIS one instead of being refused
+     * for overlapping it. Anything else lets it go: `verified` has moved on, and `failed` hands
+     * the customer to a screen that owns the booking and offers its own retry. The hold itself
+     * is released when the screen is left — see the effect above.
+     */
+    setHeldBooking(payment === 'cancelled' ? { key: selectionKey, response: booking } : null);
+
+    /**
+     * Checkout never opened, and neither outcome navigates anywhere — so unless the screen says
+     * something, the customer is looking at a live CTA that did nothing when they pressed it.
+     * The hold stays and can still be paid for; what they need is to know to try again.
+     */
+    if (payment === 'processing' || payment === 'unavailable') {
+      setCouldNotStart('We could not start the payment just now. Please try again.');
+    }
+
+    return { booking, payment };
+  }, [
+    create,
+    pay,
+    addressId,
+    durationMinutes,
+    scheduledStart,
+    selection.slotType,
+    selectionKey,
+    heldBooking,
+  ]);
+
+  return {
+    quote,
+    canSubmit,
+    submitting: create.isPending || pay.isPending,
+    // A refused BOOKING takes precedence: it is the more specific of the two, and the server
+    // supplied the wording for it.
+    submitError:
+      create.error === null ? couldNotStart : getUserMessage(normalizeError(create.error)),
+    submit,
+  };
+}
+
+/**
+ * The reason a released hold is recorded under.
+ *
+ * BACKEND_PENDING: `GET /v1/catalogue` publishes exactly ONE cancellation reason today — `OTHER`,
+ * which requires a detail — and none that means "the customer abandoned checkout". `OTHER` plus
+ * an explicit detail is the honest use of what exists; borrowing a reason like "Booked by
+ * mistake" would put words in the customer's mouth, and inventing a code the catalogue never
+ * published is the client-side invention this app's boundary forbids. Replace both the moment a
+ * dedicated code exists, so these releases stop counting as customer cancellations.
+ */
+const ABANDONED_HOLD_REASON = 'OTHER';
+const ABANDONED_HOLD_DETAIL = 'Released automatically: checkout was closed without paying.';
+
+/**
+ * Give back the slot a dismissed checkout left held.
+ *
+ * ## It may never cost the customer anything
+ *
+ * `POST /cancel` is a FEE-BEARING endpoint — the captured fixture shows one charging the full
+ * amount — and nothing here was asked for by the customer, so the preview is read first.
+ *
+ * What makes a release safe is that NOTHING WAS CAPTURED: a card that was never charged cannot
+ * be charged by cancelling. That is the condition checked, and it is not the same as the
+ * preview's quoted fee — `chargeAmountPaise` can carry a notional band figure computed off the
+ * service amount for a booking that has paid nothing at all. Vetoing on that figure is what left
+ * every abandoned hold in place, silently, and with it the customer's own slot.
+ *
+ * ## It never throws, and it says so when it gives up
+ *
+ * Every failure — an unreadable preview, a refused cancel, an offline device — leaves the hold
+ * exactly where it was, which is the behaviour that existed before this and which the server's
+ * own `holdExpiresAt` resolves on its own. It is logged rather than swallowed, because a hold
+ * left behind is invisible from the screen: the only symptom is the customer's own start time
+ * quietly going missing from the grid a few seconds later.
+ *
+ * A booking is never reported cancelled here either: the caller's outcome is still `cancelled`,
+ * meaning the PAYMENT was, and the booking's real state is whatever the next read says.
+ */
+async function releaseAbandonedHold(
+  bookings: ReturnType<typeof createBookingApi>,
+  queryClient: QueryClient,
+  bookingId: string,
+): Promise<void> {
+  const log = getLogger('booking-release');
+  // Logged on the way IN as well as on every exit, so "nothing in the log" can be told apart
+  // from "it ran and worked" — the two were indistinguishable while only failures were recorded.
+  log.warn('Releasing an abandoned hold', { bookingId });
+
+  try {
+    const preview = await bookings.cancellationPreview(bookingId);
+    const tookNoMoney = preview.capturedAmountPaise === 0 && preview.refundAmountPaise === 0;
+
+    if (!preview.cancellable || !tookNoMoney) {
+      log.warn('Left an abandoned hold in place', {
+        bookingId,
+        cancellable: preview.cancellable,
+        capturedAmountPaise: preview.capturedAmountPaise,
+        chargeAmountPaise: preview.chargeAmountPaise,
+        refundAmountPaise: preview.refundAmountPaise,
+      });
+      return;
+    }
+
+    await bookings.cancel(
+      bookingId,
+      { reasonCode: ABANDONED_HOLD_REASON, reasonDetail: ABANDONED_HOLD_DETAIL },
+      `booking.release:${bookingId}`,
+    );
+
+    log.warn('Released an abandoned hold', { bookingId });
+
+    // The slot is the server's again; the grid and any booking list have to be told, or the
+    // screen the customer returns to is still drawing the hold that no longer exists.
+    void queryClient.invalidateQueries({ queryKey: bookingKeys.all() });
+    void queryClient.invalidateQueries({ queryKey: availabilityKeys.all() });
+  } catch (error) {
+    log.warn('Could not release an abandoned hold', { bookingId, error });
+  }
 }
 
 /**
@@ -557,9 +806,32 @@ async function payAndClassify(
     }
     return 'verified';
   } catch (error) {
-    // Dismissing checkout is a choice, not a fault. It is separated here only so the caller
-    // can avoid showing an error for something the customer did on purpose.
-    return error instanceof CheckoutCancelledError ? 'cancelled' : 'failed';
+    /**
+     * Classified by HOW FAR this got, not merely by the fact it threw.
+     *
+     * `CheckoutCancelledError` — the customer dismissed the sheet. A choice, not a fault.
+     * `CheckoutFailedError`    — checkout OPENED and the payment or its verification failed.
+     *                            The only case that has earned the words "payment failed".
+     * anything else            — the order call, the SDK load, the network: checkout never
+     *                            opened, so no payment was attempted and none of it failed.
+     *
+     * That last branch used to fall in with `failed`, which is how a booking whose ORDER could
+     * not be created ended up on a screen telling the customer their payment had failed.
+     */
+    const outcome =
+      error instanceof CheckoutCancelledError
+        ? 'cancelled'
+        : error instanceof CheckoutFailedError
+          ? 'failed'
+          : 'unavailable';
+
+    /**
+     * Logged because `cancelled` is the one outcome that shows the customer NOTHING — the screen
+     * simply stays put — so a rejection wrongly read as a dismissal is indistinguishable on the
+     * device from a button that did not work. This line is what tells the two apart.
+     */
+    getLogger('booking-payment').warn('Checkout did not complete', { bookingId, outcome, error });
+    return outcome;
   }
 }
 

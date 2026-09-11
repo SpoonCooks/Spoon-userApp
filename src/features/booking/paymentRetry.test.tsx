@@ -150,6 +150,49 @@ describe('usePaymentRetry', () => {
     await waitFor(() => expect(outcomes).toEqual(['failed']));
   });
 
+  /**
+   * Observed on device: a second attempt went straight to "Your payment failed" without Razorpay
+   * ever appearing. The ORDER call had failed, and every pre-checkout error was being reported
+   * as a failed payment — a payment the app had not yet got as far as asking for.
+   *
+   * `unavailable` is that case, and it is deliberately not `failed`: nothing was attempted, so
+   * nothing about it failed, and it does not belong on a screen offering to retry a payment.
+   */
+  it('resolves unavailable when the ORDER call fails — checkout never opened', async () => {
+    const outcomes: PaymentOutcome[] = [];
+    const opened: unknown[] = [];
+    const api = createStubApi({
+      'POST /v1/bookings/bk-1/payments/order': () => {
+        throw new Error('order could not be created');
+      },
+    });
+    const launcher = stubLauncher(async (input) => {
+      opened.push(input);
+      throw new Error('checkout must never have been opened');
+    });
+
+    const { getByTestId } = renderRetry(launcher, outcomes, api);
+    fireEvent.press(getByTestId('retry'));
+
+    await waitFor(() => expect(outcomes).toEqual(['unavailable']));
+    expect(opened).toEqual([]);
+  });
+
+  it('resolves unavailable when the checkout SDK is missing from the build', async () => {
+    const outcomes: PaymentOutcome[] = [];
+    const api = createStubApi({
+      'POST /v1/bookings/bk-1/payments/order': () => ORDER_CREATED,
+    });
+    const launcher = stubLauncher(async () => {
+      throw new Error('Native module RNRazorpayCheckout is not available');
+    });
+
+    const { getByTestId } = renderRetry(launcher, outcomes, api);
+    fireEvent.press(getByTestId('retry'));
+
+    await waitFor(() => expect(outcomes).toEqual(['unavailable']));
+  });
+
   it('resolves processing without opening checkout when the order is not ready yet', async () => {
     const outcomes: PaymentOutcome[] = [];
     const opened: unknown[] = [];

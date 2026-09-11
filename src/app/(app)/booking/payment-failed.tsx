@@ -58,20 +58,32 @@ export default function PaymentFailedRoute() {
 
   const cancelFlow = useCancelFlow(bookingId, {
     onCancelled: () => {
-      // Guarded like `onRetry` below: the poll can already have moved the customer on (the
-      // cancel mutation itself invalidates the booking read) while the "book again?" prompt was
-      // still on screen, and a late navigation here must not fight whichever one got there first.
-      if (left.current || bookingId === null) return;
-      // PRODUCT_DESIGN_CONFLICT (§37), same answer `[id].tsx` gives: a cancellation flow creates
-      // no booking. Either choice leaves this hold behind, so both hand off to the real host,
-      // which now shows the cancelled state.
+      if (left.current) return;
+      /**
+       * HOME, the same answer `[id].tsx` gives after a cancellation, and for a second reason
+       * here: `/booking/:id` has no view for a customer-cancelled booking — `cancelled` falls
+       * through to the "This booking is being updated" fallback — so sending them there after
+       * they had just been told the booking was cancelled contradicted the receipt they had
+       * only now read. PRODUCT_DESIGN_CONFLICT (§37) still applies: this flow creates no
+       * booking, so both answers to "book again?" land in the same place.
+       */
       left.current = true;
-      router.replace(`/booking/${bookingId}`);
+      goHome();
     },
   });
 
   useEffect(() => {
     if (left.current) return;
+    /**
+     * The cancel sheet owns the screen while it is open, and must be allowed to finish.
+     *
+     * Confirming a cancellation invalidates the booking read, so the next poll sees `cancelled`
+     * and `settled` flips true — which used to navigate immediately, replacing `115:2703` ("Your
+     * booking has been cancelled") with another screen after a single frame. The customer saw
+     * their receipt blink and vanish. Nothing here needs to race the sheet: `onCancelled` above
+     * is what leaves, once they have answered its own prompt.
+     */
+    if (cancelFlow.isOpen) return;
     if (nothingToWaitFor || unreadable) {
       left.current = true;
       goHome();
@@ -81,7 +93,7 @@ export default function PaymentFailedRoute() {
 
     left.current = true;
     router.replace(`/booking/${bookingId}`);
-  }, [settled, unreadable, nothingToWaitFor, bookingId, goHome, router]);
+  }, [settled, unreadable, nothingToWaitFor, bookingId, goHome, router, cancelFlow.isOpen]);
 
   return (
     <ErrorBoundary scope="payment-failed">

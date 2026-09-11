@@ -65,10 +65,28 @@ function readRejection(error: unknown): {
   return {
     code: typeof record['code'] === 'number' ? record['code'] : null,
     description: typeof record['description'] === 'string' ? record['description'] : null,
-    // Present on the documented `PaymentErrorData` shape alongside `code`/`description`; not
-    // read before now, so a dismissal worded only here had nothing to be recognised by.
-    reason: typeof record['reason'] === 'string' ? record['reason'] : null,
+    /**
+     * Razorpay nests this one level DEEPER than its own published type suggests. A real
+     * rejection captured from a device reads:
+     *
+     *   { code, description, details: { code, description, reason, source, step, metadata } }
+     *
+     * so reading `reason` off the top level found nothing, every time — the fallback added to
+     * catch a dismissal Razorpay worded rather than numbered was never actually armed. Both
+     * positions are read, because the documented shape is flat and the observed one is not.
+     */
+    reason: readReason(record),
   };
+}
+
+function readReason(record: Record<string, unknown>): string | null {
+  if (typeof record['reason'] === 'string') return record['reason'];
+
+  const details = record['details'];
+  if (typeof details !== 'object' || details === null) return null;
+
+  const nested = (details as Record<string, unknown>)['reason'];
+  return typeof nested === 'string' ? nested : null;
 }
 
 /** The SDK is absent from this build. Distinct from a failed payment: nothing was attempted. */

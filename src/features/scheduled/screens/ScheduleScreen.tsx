@@ -78,6 +78,14 @@ export interface ScheduleActions {
    */
   readonly canSubmit?: boolean;
   /**
+   * A booking the SERVER refused, in the customer's words.
+   *
+   * `POST /v1/bookings` can decline — a slot taken since the grid was drawn, a quote that has
+   * expired, a hold the customer already has — and this screen used to discard every one of
+   * those, leaving a live yellow CTA that did nothing when pressed. The host owns the wording.
+   */
+  readonly submitError?: string | null;
+  /**
    * `275:4180` — opens the payment breakdown, the same seam the Instant sheet uses. Optional
    * because reschedule mode takes no payment and therefore draws no such line.
    */
@@ -268,6 +276,21 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                   loading={actions.submitting ?? false}
                   testID="schedule-submit"
                 />
+
+                {/* A refused booking used to end here, silently: the CTA stayed live and lit,
+                    a press did nothing visible, and the customer had no way to tell a dead
+                    button from a server that had just turned them down. */}
+                {actions.submitError === undefined || actions.submitError === null ? null : (
+                  <Text
+                    variant="body"
+                    color="textSecondary"
+                    align="center"
+                    accessibilityRole="alert"
+                    testID="schedule-submit-error"
+                  >
+                    {actions.submitError}
+                  </Text>
+                )}
                 {/* Drawn only when there is a breakdown to OPEN. `275:4180` has no designed sheet
                     for Scheduled, and a link that opens nothing is the dead control §11 forbids —
                     so the seam decides, not the label's presence. */}
