@@ -22,9 +22,10 @@ export { useScheduleData } from './data';
  * Service-clock helpers, published because the service timezone is not the Schedule screen's
  * private concern. Any surface that prints a booking's calendar day — the history list, for one —
  * has to read it on the same clock the backend published, or the same instant is drawn as two
- * different dates on two devices.
+ * different dates on two devices. `formatServiceTime` is the same rule for a clock TIME, not just
+ * a calendar day — My bookings' "Scheduled • 4:00 PM" line reads it for the same reason.
  */
-export { formatServiceDate, serviceDateIn } from './serviceTime';
+export { formatServiceDate, formatServiceTime, serviceDateIn } from './serviceTime';
 export { devScheduleSelection } from './devSteps';
 export { ScheduleView } from './screens/ScheduleScreen';
 export type { ScheduleActions, ScheduleViewProps } from './screens/ScheduleScreen';

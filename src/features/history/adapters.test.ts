@@ -138,6 +138,19 @@ describe('bookingCardFrom', () => {
 
     expect(card.rating).toBeUndefined();
   });
+
+  it('reads the subtitle as "Scheduled • <time>" for a scheduled booking, on the service clock', () => {
+    // BASE.scheduledStart is 10:00 IST — asserting the IST reading, not the runner's own zone.
+    expect(bookingCardFrom(BASE, IST).subtitle).toBe('Scheduled • 10:00 AM');
+  });
+
+  it('reads the subtitle as plain "Instant" for an instant booking, never a time', () => {
+    expect(bookingCardFrom(at({ slotType: 'instant' }), IST).subtitle).toBe('Instant');
+  });
+
+  it('falls back to "Scheduled" alone when a scheduled booking has no start time', () => {
+    expect(bookingCardFrom(at({ scheduledStart: null }), IST).subtitle).toBe('Scheduled');
+  });
 });
 
 describe('the date is read on the service clock, not the device', () => {

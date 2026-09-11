@@ -1,6 +1,6 @@
 import { formatPaise } from '@core/format';
 import type { BookingSummaryCookDto, BookingSummaryDto } from '@features/booking';
-import { formatServiceDate, serviceDateIn } from '@features/scheduled';
+import { formatServiceDate, formatServiceTime, serviceDateIn } from '@features/scheduled';
 import type { BookingCardViewModel, StatusTone } from '@ui';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
 
@@ -111,6 +111,23 @@ export function cookFieldsFrom(
   };
 }
 
+/**
+ * The card's second line — "Scheduled • 4:00 PM" or "Instant". `slotType` decides which; for a
+ * scheduled booking the clock half is read on the SERVICE timezone (`formatServiceTime`), the
+ * same rule `headlineFor`'s calendar day already follows, so a booking near midnight reads the
+ * same time on every handset regardless of the reader's own timezone.
+ */
+function slotSubtitleFor(
+  dto: Pick<BookingSummaryDto, 'slotType' | 'scheduledStart'>,
+  timeZone?: string | undefined,
+): string {
+  if (dto.slotType === 'instant') return 'Instant';
+  if (dto.scheduledStart === null) return 'Scheduled';
+  const instant = new Date(dto.scheduledStart);
+  if (Number.isNaN(instant.getTime())) return 'Scheduled';
+  return `Scheduled • ${formatServiceTime(timeZone, instant)}`;
+}
+
 export function bookingCardFrom(
   dto: BookingSummaryDto,
   timeZone?: string | undefined,
@@ -128,9 +145,7 @@ export function bookingCardFrom(
     ...(dto.ratingStars === null || dto.ratingStars === undefined
       ? {}
       : { rating: dto.ratingStars }),
-    ...(dto.addressLabel === null || dto.addressLabel === undefined
-      ? {}
-      : { subtitle: dto.addressLabel }),
+    subtitle: slotSubtitleFor(dto, timeZone),
   };
 }
 

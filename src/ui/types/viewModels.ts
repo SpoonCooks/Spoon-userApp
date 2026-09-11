@@ -93,7 +93,8 @@ export interface BookingCardViewModel {
   readonly id: string;
   /** Pre-formatted card header, e.g. "12th April • 1 hr". TODO(backend-contract). */
   readonly headline: string;
-  /** Secondary line: "12:30 PM - 01:45 PM", or "Refund expected by 15th Apr". */
+  /** Secondary line: "Scheduled • 4:00 PM" or "Instant" on My bookings, "Refund expected by 15th
+   * Apr" on Refunds. */
   readonly subtitle?: string;
   /**
    * Display text for the status pill — "Completed", "Cancelled", "Unfulfilled", "Confirmed",
