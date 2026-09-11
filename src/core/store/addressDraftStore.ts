@@ -32,6 +32,16 @@ export interface AddressDraft {
   readonly city: string | null;
   readonly state: string | null;
   readonly pincode: string | null;
+  /**
+   * WHICH address this point belongs to — `null` while adding, the record's id while editing.
+   *
+   * This store persists across an entire add/edit round trip and is cleared only on a successful
+   * save, so a customer who abandons one attempt and later opens an unrelated address can find
+   * this draft still holding a point from that earlier attempt. `editingId` is what lets a reader
+   * tell "a point I just picked for THIS address" apart from "a leftover from something else
+   * entirely" — see `useAddressDetailsData` in `features/address/data.ts`.
+   */
+  readonly editingId: string | null;
 }
 
 export const EMPTY_ADDRESS_DRAFT: AddressDraft = {
@@ -43,6 +53,7 @@ export const EMPTY_ADDRESS_DRAFT: AddressDraft = {
   city: null,
   state: null,
   pincode: null,
+  editingId: null,
 };
 
 interface AddressDraftState {

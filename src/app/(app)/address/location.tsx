@@ -3,7 +3,7 @@ import type { Href } from 'expo-router';
 
 import { AddressLocationView, useAddressLocationData } from '@features/address';
 import { useAddressDraftStore } from '@core/store/addressDraftStore';
-import { useAndroidBackHandler, useDeterministicBack } from '@core/navigation';
+import { useAndroidBackHandler, useSafeBack } from '@core/navigation';
 
 /**
  * Select service location - Figma `53:31`.
@@ -47,11 +47,17 @@ export default function AddressLocationRoute() {
   /**
    * `onboarding=1` is the FLOW CONTEXT the founder's rule turns on (task §4), set by Home's
    * address gate and carried through every step. `addressId` is present only when the customer
-   * walked back here from an EDIT — it keeps the edit addressed to the same record.
+   * walked back here from an EDIT — it keeps the edit addressed to the same record. `from` is
+   * `68:214`'s own entry-point tag (Home or Profile), carried through so this whole sub-flow's
+   * REPLACE-based back controls can still return the customer to the list's correct destination
+   * once they eventually land back on it — see `address/index.tsx`. `resume=1` marks THIS visit
+   * as a "Change area" digression from an already-open `60:655` — see the Confirm handler below.
    */
-  const { onboarding, addressId } = useLocalSearchParams<{
+  const { onboarding, addressId, from, resume } = useLocalSearchParams<{
     onboarding?: string;
     addressId?: string;
+    from?: string;
+    resume?: string;
   }>();
   const firstRun = onboarding === '1';
   const editingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
@@ -67,10 +73,16 @@ export default function AddressLocationRoute() {
    * It is now absent rather than inert.
    *
    * REPEAT / ADD ADDRESS: back goes to `68:214`, the saved-address list this screen was opened
-   * from. Deterministic rather than a pop, so the same route cannot show one affordance and
-   * perform another.
+   * from. `useSafeBack`, not `useDeterministicBack`: this route's only push site is `68:214`'s
+   * "Add a new address" (the first-run case above reaches it by a `<Redirect>` and draws no back
+   * control at all, and nothing else in the app pushes here), so a pop always lands on the same
+   * screen the fallback below names — and gets the platform's reverse-of-push closing animation
+   * (left-to-right, matching Scheduled's / `68:214`'s own back), where `dismissAll` + `replace`
+   * played none.
    */
-  const goBackToList = useDeterministicBack('/address');
+  const goBackToList = useSafeBack(
+    (from === undefined ? '/address' : `/address?from=${from}`) as Href,
+  );
   const goBack = firstRun ? undefined : goBackToList;
 
   /**
@@ -121,6 +133,8 @@ export default function AddressLocationRoute() {
             const query = [
               firstRun ? 'onboarding=1' : null,
               editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
+              from === undefined ? null : `from=${from}`,
+              resume === undefined ? null : `resume=${resume}`,
             ]
               .filter((part): part is string => part !== null)
               .join('&');
@@ -157,11 +171,30 @@ export default function AddressLocationRoute() {
             longitude: outcome.coordinates.longitude,
             placeId: outcome.geocoded?.placeId ?? null,
             serviceable: true,
+            // Tags this point as belonging to THIS edit (or to no address, while adding), so
+            // `60:655` can tell a point just picked here apart from a leftover from an unrelated
+            // attempt — see `AddressDraft.editingId`.
+            editingId,
             street: outcome.geocoded?.street ?? null,
             city: outcome.geocoded?.city ?? null,
             state: outcome.geocoded?.region ?? null,
             pincode: outcome.geocoded?.pincode ?? null,
           });
+          /**
+           * `resume=1` means this visit was a "Change area" DIGRESSION from an already-open
+           * `60:655` (`address/details.tsx` pushed here, rather than the customer arriving via
+           * the ordinary add/edit flow) — that Details screen is still sitting right underneath,
+           * still holding whatever the customer had already typed, and it already reads the
+           * point `setPoint` just wrote above. Popping back to it is what "Confirm should return
+           * to the screen Change area was pressed from" means; pushing a SECOND, blank Details
+           * on top of the first would both lose that typed state and leave a stray screen behind
+           * `60:655`'s own back control.
+           */
+          if (resume !== undefined) {
+            router.back();
+            return;
+          }
+
           /**
            * `60:655`, carrying the SAME context this screen was entered with.
            *
@@ -172,6 +205,7 @@ export default function AddressLocationRoute() {
           const forward = [
             firstRun ? 'onboarding=1' : null,
             editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
+            from === undefined ? null : `from=${from}`,
           ]
             .filter((part): part is string => part !== null)
             .join('&');

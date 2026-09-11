@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
-import { useDeterministicBack } from '@core/navigation';
+import { useSafeBack } from '@core/navigation';
 import { useSignOut } from '@features/auth';
 import { ProfileView, useProfileData } from '@features/profile';
 import { useWhatsAppHelp } from '@features/support';
@@ -16,10 +16,13 @@ export default function ProfileRoute() {
    * `6:663` back -> HOME, always (V7 founder comment, task §14/§15).
    *
    * Profile is reachable from Home's banner and from a `spoon://profile` deep link, and both are
-   * meant to end at the same place. Deterministic rather than a pop so the destination is the
-   * product decision it was written as, not a consequence of how the customer got here.
+   * meant to end at the same place — which is also exactly where a pop lands, since the only
+   * push to `/profile` in the app is Home's. `useSafeBack`, not `useDeterministicBack`: popping
+   * gets the platform's reverse-of-push closing animation (matching Scheduled's), where
+   * `dismissAll` + `replace` played none; the deep-link case still falls back to `/home` when
+   * there is nothing to pop.
    */
-  const goBack = useDeterministicBack('/home');
+  const goBack = useSafeBack('/home');
 
   return (
     <ProfileView
@@ -36,7 +39,7 @@ export default function ProfileRoute() {
       onOpenProfileDetails={() => router.push('/profile/details' as Href)}
       onSelectTile={(tileId) => {
         if (tileId === 'orders') router.push('/history');
-        if (tileId === 'addresses') router.push('/address');
+        if (tileId === 'addresses') router.push('/address?from=profile');
         if (tileId === 'refunds') router.push('/refunds');
         /*
          * `69:502` — the Help tile. Blocker B-10 ("no destination anywhere in the file") is

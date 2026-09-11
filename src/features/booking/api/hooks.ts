@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { idempotency } from '@core/api';
-import { useApiQuery } from '@core/data';
+import { useApiQueries, useApiQuery } from '@core/data';
 import { observeServerTime } from '@core/time';
 import { isAwaitingConfirmation } from '../state/bookingStatusView';
 import type { ScreenQuery } from '@core/data';
@@ -67,6 +67,37 @@ export function useBookingDetail(
     staleTime: 10_000,
     refetchInterval: options.poll === true ? LIVE_POLL_MS : false,
   });
+}
+
+/**
+ * `useBookingDetail`'s plural sibling — one detail per id, for the Home booking carousel, where
+ * the number of active bookings varies per customer. Built on `useApiQueries` rather than calling
+ * `useBookingDetail` in a loop, since hooks cannot be called a variable number of times.
+ *
+ * Shares `bookingKeys.detail` with `useBookingDetail`, deliberately, for the same reason that
+ * hook already shares it with `useBookingConfirmation`: it is the SAME booking, so a customer who
+ * has this id open elsewhere (a detail screen, a confirmation screen) reads the same cache entry
+ * rather than a second, possibly older one.
+ */
+export function useBookingDetails(
+  bookingIds: readonly string[],
+  options: { poll?: boolean } = {},
+): readonly ScreenQuery<BookingDetailDto>[] {
+  const { api } = useRuntime();
+  const bookings = createBookingApi(api);
+
+  return useApiQueries<BookingDetailDto>(
+    bookingIds.map((bookingId) => ({
+      queryKey: bookingKeys.detail(bookingId),
+      queryFn: async ({ signal }) => {
+        const response = await bookings.detail(bookingId, signal);
+        observeServerTime(response.serverTime);
+        return response.booking;
+      },
+      staleTime: 10_000,
+      refetchInterval: options.poll === true ? LIVE_POLL_MS : false,
+    })),
+  );
 }
 
 /**
@@ -212,6 +243,35 @@ export function useTracking(
               ? LIVE_POLL_MS
               : data.refreshAfterSeconds * 1000,
   });
+}
+
+/**
+ * `useTracking`'s plural sibling, for the same reason `useBookingDetails` exists: the Home
+ * carousel needs tracking for however many of its bookings are currently `cook_en_route`, which
+ * is a variable count. Ids for a booking NOT currently being tracked are simply omitted by the
+ * caller — this hook fetches tracking for exactly the ids it is given.
+ */
+export function useTrackings(
+  bookingIds: readonly string[],
+  options: { poll?: boolean } = {},
+): readonly ScreenQuery<TrackingDto>[] {
+  const { api } = useRuntime();
+  const service = createServiceApi(api);
+
+  return useApiQueries<TrackingDto>(
+    bookingIds.map((bookingId) => ({
+      queryKey: bookingKeys.tracking(bookingId),
+      queryFn: ({ signal }) => service.tracking(bookingId, signal),
+      staleTime: 10_000,
+      refetchInterval:
+        options.poll === false
+          ? false
+          : (data) =>
+              data?.refreshAfterSeconds === undefined || data.refreshAfterSeconds === null
+                ? LIVE_POLL_MS
+                : data.refreshAfterSeconds * 1000,
+    })),
+  );
 }
 
 export function useExtensionOptions(bookingId: string | null) {

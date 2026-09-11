@@ -559,7 +559,13 @@ describe('saving (task §7, §10, §12)', () => {
     expect(screen.queryByTestId('profile-grown-up-chips')).toBeNull();
   });
 
-  /** Test 12 + 15 — an EDIT returns to Page 16 and never enters the address flow. */
+  /**
+   * Test 12 + 15 — an EDIT returns to Page 16 and never enters the address flow.
+   *
+   * A POP, not a replace: this context is only ever reached by a push from Profile, so
+   * `useSafeBack` pops rather than falling back — and gets the platform's reverse-of-push
+   * closing animation, where `dismissAll` + `replace` played none.
+   */
   it('returns to Profile after an edit, and never diverts to Address', async () => {
     mockSearchParams = {};
     const put = jest.fn(() => savedProfile({ name: 'Rekha S' }));
@@ -577,9 +583,37 @@ describe('saving (task §7, §10, §12)', () => {
     await waitFor(() =>
       expect(put).toHaveBeenCalledWith({ ...MANDATORY_ONLY_PAYLOAD, name: 'Rekha S' }),
     );
+    await waitFor(() => expect(mockRouter.back).toHaveBeenCalledTimes(1));
+
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The no-history half of the same rule: a deep link straight into the edit context still has
+   * to land somewhere real.
+   */
+  it('falls back to Profile after an edit with no history to pop', async () => {
+    mockSearchParams = {};
+    mockRouter.canGoBack = jest.fn(() => false);
+    mockRouter.canDismiss = jest.fn(() => false);
+    const put = jest.fn(() => savedProfile({ name: 'Rekha S' }));
+
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({ 'GET /v1/me': () => ME_COMPLETE, 'PUT /v1/me/profile': put }),
+    });
+
+    await screen.findByTestId('profile-name');
+    fireEvent.changeText(screen.getByTestId('profile-name'), 'Rekha S');
+    fireEvent.press(screen.getByTestId('profile-meal-structure-daily-cook-1x'));
+    fireEvent.press(screen.getByTestId('profile-dietary-vegetarian'));
+    fireEvent.press(screen.getByTestId('profile-details-submit'));
+
+    await waitFor(() =>
+      expect(put).toHaveBeenCalledWith({ ...MANDATORY_ONLY_PAYLOAD, name: 'Rekha S' }),
+    );
     await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/profile'));
 
-    expect(mockRouter.replace).not.toHaveBeenCalledWith('/address/location?onboarding=1');
+    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
   /**

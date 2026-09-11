@@ -266,6 +266,41 @@ describe('confirm is the only thing that asks the server', () => {
     });
   });
 
+  /**
+   * `68:214`'s own entry-point tag rides through the same way `addressId` and `onboarding` do, so
+   * the form's eventual SAVE can still return the customer to the list's correct destination —
+   * see "Saved addresses back target follows its entry point" in `navigation.test.tsx`.
+   */
+  it('carries the saved-address list entry point straight through to the form', async () => {
+    mockSearchParams = { from: 'home' };
+    render();
+    await pin();
+
+    fireEvent.press(screen.getByTestId('address-confirm'));
+
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith('/address/details?from=home');
+    });
+  });
+
+  /**
+   * `resume=1` marks this visit as a "Change area" digression from an already-open Details
+   * screen (`address/details.tsx`), which is still sitting right underneath. Popping back to it
+   * is what returns the customer to the exact screen — with whatever they had already typed —
+   * that "Change area" was pressed from; pushing a second, blank Details would both lose that
+   * and leave a stray screen behind it.
+   */
+  it('pops back to an open Details screen after a "Change area" digression, instead of pushing a new one', async () => {
+    mockSearchParams = { resume: '1', addressId: 'addr-1' };
+    render();
+    await pin();
+
+    fireEvent.press(screen.getByTestId('address-confirm'));
+
+    await waitFor(() => expect(mockRouter.back).toHaveBeenCalledTimes(1));
+    expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
   it('sends the coordinate the map SETTLED on, not the one the screen opened on', async () => {
     render();
     await pin();
@@ -339,6 +374,19 @@ describe('confirm is the only thing that asks the server', () => {
 
     await waitFor(() => {
       expect(mockRouter.push).toHaveBeenCalledWith('/address/out-of-service?onboarding=1');
+    });
+  });
+
+  it('carries the saved-address list entry point onto the out-of-service screen', async () => {
+    verdict = { status: 'outside_service_area' };
+    mockSearchParams = { from: 'home' };
+    render();
+    await pin();
+
+    fireEvent.press(screen.getByTestId('address-confirm'));
+
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith('/address/out-of-service?from=home');
     });
   });
 

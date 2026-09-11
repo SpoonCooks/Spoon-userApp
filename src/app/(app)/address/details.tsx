@@ -12,7 +12,7 @@ import {
 import type { AddressFormDraft } from '@features/address';
 import { useAddressDraftStore } from '@core/store/addressDraftStore';
 import { getUserMessage, isAppError } from '@core/errors';
-import { useDeterministicBack } from '@core/navigation';
+import { useSafeBack } from '@core/navigation';
 import { InfoDialog } from '@ui';
 
 /**
@@ -37,9 +37,10 @@ import { InfoDialog } from '@ui';
  */
 export default function AddressDetailsRoute() {
   const router = useRouter();
-  const { addressId, onboarding } = useLocalSearchParams<{
+  const { addressId, onboarding, from } = useLocalSearchParams<{
     addressId?: string;
     onboarding?: string;
+    from?: string;
   }>();
   const editingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
   const { state, refetch, savedPoint, savedPlaceId, locationReady } =
@@ -51,30 +52,51 @@ export default function AddressDetailsRoute() {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Back and "Change area" are the SAME action, and both go to `53:31` — including on an EDIT.
+   * BACK and "Change area" are NO LONGER the same action (product decision reversed — see
+   * below); the two are now separate handlers with separate reasoning.
    *
-   * The founder's V7 routing matrix is explicit and unconditional: "Page 18b Complete address ->
-   * Page 18a on back" (task §5, §15, §28). The superseded behaviour sent an edit to `68:214`
-   * instead, reasoning that an edit never went through the map; the product decision overrides
-   * that, and the chain it produces is coherent —
+   * `onChangeArea`'s job never changes: it is a deliberate DIGRESSION to `53:31`, unconditional
+   * regardless of how this screen was reached — an edit that never went through the map still
+   * needs to be able to.
    *
-   *   `68:214` -> `60:655` (prefilled) -> back -> `53:31` -> back -> `68:214`
-   *
-   * — provided the map step knows which record is in play. `addressId` therefore travels with it,
-   * so walking back to the map and forward again is still an UPDATE of the same address and never
-   * a second one (task §28, "must not duplicate records").
+   * PUSH, not the old `dismissAll` + `replace`: replacing destroyed THIS screen outright, so
+   * there was nothing left to return to — back landed on the list instead of resuming the form,
+   * and Confirm on the map pushed a SECOND, blank Details rather than the one being edited. A
+   * push keeps this exact screen (with whatever the customer had already typed) alive
+   * underneath, and `resume=1` tells the map's Confirm handler to pop back to it directly
+   * instead of pushing a new one — see `location.tsx`. `addressId` still travels with it so the
+   * round trip stays an UPDATE of the same address rather than a second one (task §28).
    */
-  const goBack = useDeterministicBack(
-    [
-      onboarding === '1' ? 'onboarding=1' : null,
-      editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
-    ]
-      .filter((part): part is string => part !== null)
-      .reduce<string>(
-        (href, part, index) => `${href}${index === 0 ? '?' : '&'}${part}`,
-        '/address/location',
-      ) as Href,
-  );
+  const goToLocation = () => {
+    router.push(
+      [
+        'resume=1',
+        onboarding === '1' ? 'onboarding=1' : null,
+        editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
+        from === undefined ? null : `from=${from}`,
+      ]
+        .filter((part): part is string => part !== null)
+        .reduce<string>(
+          (href, part, index) => `${href}${index === 0 ? '?' : '&'}${part}`,
+          '/address/location',
+        ) as Href,
+    );
+  };
+
+  /**
+   * BACK — reverses the founder's V7 ruling that forced it through `53:31` even on an edit
+   * (explicit product decision; the prior ruling is quoted in `goToLocation`'s sibling comment
+   * for history). Product now wants an edit's back to return to `68:214` directly, the way it
+   * did before that ruling.
+   *
+   * `useSafeBack`, not a fixed target: this screen has TWO genuinely different predecessors —
+   * `location.tsx`'s confirm (add flow, or a "Change area" digression) really does sit under it,
+   * while `address/index.tsx`'s "Edit" pushes here DIRECTLY, skipping the map. A plain pop
+   * resolves to whichever one is actually true each time, which is exactly what's wanted now —
+   * and, as a side effect, fixes the same "opening" animation defect fixed elsewhere on this
+   * branch, since a real pop was never possible under the old unconditional replace.
+   */
+  const goBack = useSafeBack((from === undefined ? '/address' : `/address?from=${from}`) as Href);
 
   return (
     <>
@@ -82,7 +104,7 @@ export default function AddressDetailsRoute() {
         state={state}
         onRetry={refetch}
         onBack={goBack}
-        onChangeArea={goBack}
+        onChangeArea={goToLocation}
         /**
          * The founder's rule, applied at its two ends: `locationReady` is the CONTEXT half of the
          * gate (a confirmed, server-approved point exists) and the form owns the FIELD half. Both
@@ -199,8 +221,16 @@ export default function AddressDetailsRoute() {
               if (router.canDismiss()) router.dismissAll();
               // Section 4: the first-run flow ends at HOME, because the customer came from Home
               // and wanted to book - not to administer a list. Reached from `68:214` instead,
-              // the same save returns to that list, which is where they were.
-              router.replace(onboarding === '1' ? '/home' : '/address');
+              // the same save returns to that list, which is where they were — carrying `from`
+              // forward so THAT screen's own back control still knows which entry point this
+              // whole trip started from, rather than losing it the moment this REPLACE fires.
+              router.replace(
+                (onboarding === '1'
+                  ? '/home'
+                  : from === undefined
+                    ? '/address'
+                    : `/address?from=${from}`) as Href,
+              );
             })
             .catch((thrown: unknown) => {
               // The backend refuses an unserviceable point here too; its own message is shown

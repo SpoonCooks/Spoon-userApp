@@ -1,20 +1,20 @@
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
 import { QueryBoundary, lightTheme } from '@ui';
 import type { RatingSelection } from '@ui';
 
-import { HomeBookingBanner } from '../components/HomeBookingBanner';
+import { HomeBookingCarousel } from '../components/HomeBookingCarousel';
 import { HomeBookingTiles } from '../components/HomeBookingTiles';
 import { HomeMarketing } from '../components/HomeMarketing';
 import { HomePromoCarousel } from '../components/HomePromoCarousel';
 import { HomeTopBanner } from '../components/HomeTopBanner';
 import { useHomeData } from '../data';
 import { HOME_DESIGN } from '../layout';
-import type { HomeBannerDestination } from '../state/homeBannerView';
+import type { HomeBannerDestination, HomeBannerViewModel } from '../state/homeBannerView';
 import type { HomeViewModel } from '../types';
 
 /**
@@ -31,7 +31,7 @@ import type { HomeViewModel } from '../types';
  *   top banner (sticky)
  *   → promo carousel
  *   → Instant + Schedule tiles
- *   → [HomeBookingBanner]          ← conditional, data-driven, MOVED below the tiles
+ *   → [HomeBookingCarousel]        ← conditional, data-driven, MOVED below the tiles
  *   → cuisine mosaic
  *   → reasons grid
  *   → duration matrix
@@ -42,9 +42,10 @@ import type { HomeViewModel } from '../types';
  * head and tail of the scroll. (Page 3a places the same body 55pt lower on its artboard; see
  * `layout.ts` for why 3b's rhythm is the one taken.)
  *
- * Ruling R-2: the variant is selected SOLELY by the presence of `activeBooking` in the server
+ * Ruling R-2: the variant is selected SOLELY by `activeBookings` being non-empty in the server
  * payload — never by a client guess, a timer, a local flag, or any inference about the booking
- * lifecycle. Ruling R-5: the active booking surfaces here; there is no Upcoming Bookings screen.
+ * lifecycle. Ruling R-5: this carousel is the at-a-glance, live-tracking surface; the full listing
+ * of every booking lives on My bookings (`@features/history`), a separate, complete screen.
  *
  * The frame's phone chrome — the 9.78pt bezel, the 44pt device radius, the status bar (`1:615`),
  * the notch (`1:630`) and the grey home indicator (`156:48`) — is MOCKUP, not app UI, and is
@@ -89,13 +90,21 @@ export interface HomeViewProps extends HomeActions {
 }
 
 export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps) {
+  const { top } = useSafeAreaInsets();
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']} testID="home-screen">
+    <SafeAreaView style={styles.safe} edges={['left', 'right']} testID="home-screen">
       <QueryBoundary state={state} {...(onRetry === undefined ? {} : { onRetry })}>
         {(home) => (
           <>
+            {/*
+              `topInset` extends the banner's OWN padding/background/shadow up through the status
+              bar area, rather than a separate sibling box sitting above it — two adjacent boxes
+              left a visible seam where the banner's shadow bled across the shared edge. A single
+              box has no seam, and its shadow's top edge is simply clipped by the screen edge.
+            */}
             <HomeTopBanner
               header={home.header}
+              topInset={top}
               onPressAddress={actions.onPressAddress}
               onPressProfile={actions.onPressProfile}
             />
@@ -120,13 +129,19 @@ export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps)
 
                   {/*
                     CONDITIONAL INSERT — never a second Home, never a replacement. Everything
-                    below this point renders identically whether or not the card is present.
+                    below this point renders identically whether or not the carousel is present.
                   */}
-                  {home.activeBooking === undefined ? null : (
-                    <HomeBookingBanner
-                      booking={home.activeBooking}
-                      onOpen={bannerOpener(home.activeBooking, actions.onOpenActiveBooking)}
-                      {...bannerRater(home.activeBooking, actions.onRateActiveBooking)}
+                  {home.activeBookings.length === 0 ? null : (
+                    <HomeBookingCarousel
+                      bookings={home.activeBookings}
+                      onOpen={(booking) => actions.onOpenActiveBooking(booking.destination)}
+                      {...(actions.onRateActiveBooking === undefined
+                        ? {}
+                        : {
+                            onRate: (value: RatingSelection, booking: HomeBannerViewModel) =>
+                              actions.onRateActiveBooking?.(value, booking.destination),
+                          })}
+                      {...(focused === undefined ? {} : { focused })}
                     />
                   )}
 
@@ -141,34 +156,6 @@ export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps)
       </QueryBoundary>
     </SafeAreaView>
   );
-}
-
-/**
- * Binds the banner to its own destination.
- *
- * Extracted so the JSX carries no non-null assertion: narrowing `home.activeBooking` inside the
- * conditional does not survive into the arrow function's body, and asserting it there would be
- * asserting the one thing the conditional already proved.
- */
-function bannerOpener(
-  booking: NonNullable<HomeViewModel['activeBooking']>,
-  onOpen: HomeActions['onOpenActiveBooking'],
-): () => void {
-  return () => onOpen(booking.destination);
-}
-
-/**
- * The same binding for the rating chips.
- *
- * Returns NO `onRate` when the host wires none, which is what leaves `RatingWidget` disabled —
- * the designed inert state — rather than drawing live chips over a handler that does not exist.
- */
-function bannerRater(
-  booking: NonNullable<HomeViewModel['activeBooking']>,
-  onRate: HomeActions['onRateActiveBooking'],
-): { onRate?: (value: RatingSelection) => void } {
-  if (onRate === undefined) return {};
-  return { onRate: (value) => onRate(value, booking.destination) };
 }
 
 export function HomeScreen(actions: HomeActions) {

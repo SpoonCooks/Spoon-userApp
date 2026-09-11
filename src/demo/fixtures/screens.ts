@@ -12,7 +12,10 @@ import type { MealBriefViewModel } from '@features/mealBrief';
 import type { ProfileViewModel } from '@features/profile';
 
 import {
+  DEMO_BOOKING_CANCELLED,
   DEMO_BOOKING_COMPLETED,
+  DEMO_BOOKING_CONFIRMED,
+  DEMO_BOOKING_RESCHEDULED,
   DEMO_BOOKING_UNFULFILLED,
   DEMO_REFUND_COMPLETED,
   DEMO_REFUND_PROCESSING,
@@ -314,6 +317,19 @@ export const DEMO_BOOKING_HISTORY: BookingListViewModel = {
 
 export const DEMO_BOOKING_HISTORY_EMPTY: BookingListViewModel = {
   ...DEMO_BOOKING_HISTORY,
+  bookings: [],
+};
+
+/** My bookings — Upcoming tab. `GET /v1/me/bookings/active`; see `useUpcomingBookingsData`. */
+export const DEMO_UPCOMING_BOOKINGS: BookingListViewModel = {
+  title: 'My bookings',
+  bookings: [DEMO_BOOKING_CONFIRMED, DEMO_BOOKING_RESCHEDULED, DEMO_BOOKING_CANCELLED],
+  emptyTitle: 'No upcoming bookings',
+  emptyDescription: 'Bookings scheduled for today or later will appear here.',
+};
+
+export const DEMO_UPCOMING_BOOKINGS_EMPTY: BookingListViewModel = {
+  ...DEMO_UPCOMING_BOOKINGS,
   bookings: [],
 };
 

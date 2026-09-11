@@ -93,7 +93,7 @@ export default function HomeRoute() {
       <HomeScreen
         onPressInstant={() => setInstantOpen(true)}
         onPressSchedule={() => router.push('/scheduled')}
-        onPressAddress={() => router.push('/address')}
+        onPressAddress={() => router.push('/address?from=home')}
         onPressProfile={() => router.push('/profile')}
         /**
          * This route previously pushed `/booking/enRoute` — a DEV fixture id — so every banner

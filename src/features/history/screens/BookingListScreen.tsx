@@ -5,18 +5,26 @@ import type { DataState } from '@core/data';
 import { BookingCard, EmptyState, QueryBoundary, ScreenHeader, lightTheme } from '@ui';
 import type { BookingCardVariant } from '@ui';
 
+import { BookingTabSwitcher } from '../components/BookingTabSwitcher';
+import type { BookingTabOption } from '../components/BookingTabSwitcher';
 import type { BookingListViewModel } from '../types';
 
+const BOOKING_TABS: readonly BookingTabOption[] = [
+  { id: 'upcoming', label: 'Upcoming' },
+  { id: 'past', label: 'Past' },
+];
+
 /**
- * Booking history (`6:227`) and Refunds (`71:615`).
+ * My bookings (`6:227`, redesigned with an Upcoming/Past switcher) and Refunds (`71:615`).
  *
  * One screen with a card `variant`, because the audit found both frames use the same card with a
  * different subtitle line and status set. Refunds is a separate top-level destination reached
- * from Profile — not a filter of history.
+ * from Profile — not a filter of history, and never receives `tabs`.
  *
- * Ruling R-5: history is PAST bookings only; anything active lives on Home.
- * TODO(product B-15): cancelled bookings have nowhere to appear — no `Cancelled` status is drawn,
- * and a cancelled booking is not active either. Nothing is invented here to cover the gap.
+ * `tabs` is the only thing that distinguishes the two screens beyond `variant`: passing it renders
+ * the Upcoming/Past switcher and titles the header "My bookings"; omitting it (Refunds, and any
+ * caller that hasn't opted in) renders exactly as before — `list.title`, no switcher. Additive by
+ * construction, so Refunds needed no changes here.
  */
 export interface BookingListViewProps {
   readonly state: DataState<BookingListViewModel>;
@@ -24,6 +32,8 @@ export interface BookingListViewProps {
   readonly onBack: () => void;
   readonly onSelect?: (bookingId: string) => void;
   readonly variant?: BookingCardVariant;
+  /** Present only for the My bookings screen — renders the Upcoming/Past switcher. */
+  readonly tabs?: { readonly active: string; readonly onChange: (id: string) => void };
   readonly testID?: string;
 }
 
@@ -33,6 +43,7 @@ export function BookingListView({
   onBack,
   onSelect,
   variant = 'history',
+  tabs,
   testID = 'booking-list-screen',
 }: BookingListViewProps) {
   return (
@@ -51,10 +62,19 @@ export function BookingListView({
               The 16pt lead is therefore unconditional.
             */}
             <ScreenHeader
-              title={list.title}
+              title={tabs === undefined ? list.title : 'My bookings'}
               onBack={onBack}
               density={variant === 'refund' ? 'default' : 'band'}
             />
+
+            {tabs === undefined ? null : (
+              <BookingTabSwitcher
+                options={BOOKING_TABS}
+                selectedId={tabs.active}
+                onSelect={tabs.onChange}
+                testID={`${testID}-tabs`}
+              />
+            )}
 
             {/* `6:239` / `71:621` — px 4 / py 6, 16pt between cards. */}
             <View style={styles.list}>

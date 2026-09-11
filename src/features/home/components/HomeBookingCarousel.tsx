@@ -1,0 +1,167 @@
+import { useMemo, useRef } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+
+import { lightTheme } from '@ui';
+import type { RatingSelection } from '@ui';
+
+import { useLoopingCarousel } from '../hooks/useLoopingCarousel';
+import { HOME_DESIGN, useHomeContentWidth } from '../layout';
+import type { HomeBannerViewModel } from '../state/homeBannerView';
+import { HomeBookingBanner } from './HomeBookingBanner';
+
+const { dot: DOT, dotsGap: DOTS_GAP, gap: CARD_GAP } = HOME_DESIGN.promo;
+
+/**
+ * The Home booking carousel — one `HomeBookingBanner` per active booking, ascending by date/time
+ * (see `selectHomeBookings` in `data.ts`), swiped exactly like `HomePromoCarousel` because both
+ * are built on the same `useLoopingCarousel` (same 4s auto-advance, same infinite loop, same
+ * pause-on-drag, same focus/foreground/reduce-motion gating).
+ *
+ * The one geometry difference from the promo carousel: `HomeBookingBanner` already stretches to
+ * the FULL content column width (`alignSelf: 'stretch'`, matching the single-card design this
+ * replaces) rather than the promo carousel's narrower 217px gallery cards, so there is no side
+ * padding and no peek — one full card fills the viewport per page.
+ *
+ * A card is still followed by `CARD_GAP` (the promo carousel's own inter-card gap, reused rather
+ * than a new value) before the next one, so a card never touches its neighbour mid-swipe. The
+ * gap sits OUTSIDE the viewport at rest — the stride each snap position advances by is the card's
+ * width PLUS the gap — so a settled card still reads as edge-to-edge; the gap is only visible
+ * while actively dragging between two cards.
+ */
+export interface HomeBookingCarouselProps {
+  readonly bookings: readonly HomeBannerViewModel[];
+  readonly onOpen: (booking: HomeBannerViewModel) => void;
+  /** Raised when the user picks a value on a `rate` card. Reports; never persists. */
+  readonly onRate?: (value: RatingSelection, booking: HomeBannerViewModel) => void;
+  /** Overridden in tests so a 4 s timer never gates a test run. */
+  readonly autoAdvanceMs?: number;
+  readonly focused?: boolean;
+  readonly testID?: string;
+}
+
+export function HomeBookingCarousel({
+  bookings,
+  onOpen,
+  onRate,
+  autoAdvanceMs,
+  focused = true,
+  testID = 'home-booking-carousel',
+}: HomeBookingCarouselProps) {
+  const contentWidth = useHomeContentWidth();
+  const count = bookings.length;
+
+  // Signature, not the array itself: `bookings` is a fresh array every render regardless of
+  // whether the actual set/order changed, so a naive `.map` here would give `useLoopingCarousel`
+  // a new `keys` reference every render. The hook compares `keys` by CONTENT internally, so an
+  // unstable reference is not a correctness bug there — just a wasted comparison and a wasted
+  // effect run on every render. Joining and re-splitting keeps `keys` referentially the SAME
+  // across renders where the ids and their order truly haven't changed, which is what avoids
+  // that waste.
+  const bookingIdsSignature = bookings.map((booking) => booking.bookingId).join('\0');
+  const keys = useMemo(
+    () => (bookingIdsSignature === '' ? [] : bookingIdsSignature.split('\0')),
+    [bookingIdsSignature],
+  );
+
+  const stride = contentWidth + CARD_GAP;
+
+  const scrollRef = useRef<ScrollView>(null);
+  const carousel = useLoopingCarousel({
+    itemCount: count,
+    stride,
+    scrollRef,
+    ...(autoAdvanceMs === undefined ? {} : { autoAdvanceMs }),
+    focused,
+    // Home never unmounts while a booking is open on top of it, so a reschedule that reorders
+    // this list must re-anchor on the booking the user was viewing rather than its old slot.
+    keys,
+  });
+
+  if (count === 0) return null;
+
+  return (
+    <View style={styles.block} testID={testID}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={stride}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        disableIntervalMomentum
+        onContentSizeChange={carousel.scrollViewProps.onContentSizeChange}
+        onScrollBeginDrag={carousel.scrollViewProps.onScrollBeginDrag}
+        onScroll={carousel.scrollViewProps.onScroll}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={carousel.scrollViewProps.onMomentumScrollEnd}
+        onScrollEndDrag={carousel.scrollViewProps.onScrollEndDrag}
+        style={styles.row}
+        testID={`${testID}-scroll`}
+      >
+        {carousel.track.map((logical, trackPosition) => {
+          const booking = bookings[logical];
+          if (booking === undefined) return null;
+          const isReal = carousel.isRealTrackPosition(trackPosition);
+          // A clone is the same booking twice; only the real card on screen is announced.
+          const hidden = !isReal || logical !== carousel.index;
+
+          return (
+            <View
+              // Clones repeat a booking id, so position is what makes the key unique.
+              key={`${booking.bookingId}-${trackPosition}`}
+              style={{ width: contentWidth, marginRight: CARD_GAP }}
+              accessibilityElementsHidden={hidden}
+              testID={`${testID}-slide-${trackPosition}`}
+            >
+              <HomeBookingBanner
+                booking={booking}
+                onOpen={() => onOpen(booking)}
+                {...(onRate === undefined
+                  ? {}
+                  : { onRate: (value: RatingSelection) => onRate(value, booking) })}
+                testID={`${testID}-card-${trackPosition}`}
+              />
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {count > 1 ? (
+        <View
+          style={styles.dots}
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel={`Booking ${carousel.index + 1} of ${count}`}
+          testID={`${testID}-dots`}
+        >
+          {bookings.map((booking, position_) => (
+            <View
+              key={booking.bookingId}
+              style={[styles.dot, position_ === carousel.index ? styles.dotActive : styles.dotIdle]}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  block: { alignSelf: 'stretch', gap: DOTS_GAP },
+  row: { alignSelf: 'stretch' },
+  dots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: DOT.gap,
+    height: 12,
+  },
+  dot: {
+    width: DOT.size,
+    height: DOT.size,
+    borderRadius: DOT.size / 2,
+    opacity: DOT.opacity,
+  },
+  dotActive: { backgroundColor: lightTheme.colors.borderCtaSoft },
+  dotIdle: { backgroundColor: lightTheme.colors.surfaceAccentStrong },
+});

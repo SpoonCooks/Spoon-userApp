@@ -1,12 +1,11 @@
-import { bookingCardFrom, headlineFor } from './adapters';
+import { bookingCardFrom, headlineFor, myBookingPresentationFor } from './adapters';
 import type { BookingSummaryDto } from '@features/booking';
 
 /**
  * What a booking card is allowed to claim.
  *
- * Two defects lived here, and both were visible on a real device. A booking whose payment had not
- * been finalized was labelled "Confirmed", and the date was read on the DEVICE clock, so the same
- * instant printed as two different days depending on the handset's timezone.
+ * The date-read defect lived here too: it was read on the DEVICE clock, so the same instant
+ * printed as two different days depending on the handset's timezone.
  */
 
 const BASE: BookingSummaryDto = {
@@ -32,50 +31,125 @@ const IST = 'Asia/Kolkata';
 
 const at = (over: Partial<BookingSummaryDto>): BookingSummaryDto => ({ ...BASE, ...over });
 
-describe('the status pill states what actually happened', () => {
-  it('calls a paid, cook-assigned booking Confirmed', () => {
-    expect(bookingCardFrom(at({ status: 'assigned' }), IST).statusLabel).toBe('Confirmed');
-  });
-
-  it('does NOT call an unfinalized payment Confirmed', () => {
-    // `created` means the payment never completed. Labelling it "Confirmed" told the customer
-    // their money had moved and a cook was coming, when neither had happened.
-    const card = bookingCardFrom(at({ status: 'created' }), IST);
-
-    expect(card.statusLabel).not.toBe('Confirmed');
-    expect(card.statusLabel).toBe('Payment pending');
-  });
-
-  it('never calls a captured, cook-assigned booking payment pending', () => {
-    // The founder's 10:15 booking: payment captured, assignment made. It was overdue, not
-    // unpaid, and calling it "Payment pending" would tell the customer their money never moved.
-    // Only `created` carries that label, and this booking is not `created`.
-    const card = bookingCardFrom(at({ status: 'assigned' }), IST);
-
-    expect(card.statusLabel).not.toBe('Payment pending');
-    expect(card.statusLabel).toBe('Confirmed');
-  });
-
-  it('reads Cancelled once the expiry sweep has ended an abandoned checkout', () => {
-    // What the app shows on the refresh AFTER the backend sweep runs. The same booking that read
-    // "Payment pending" while it was `created` now reads a real ending, because the server moved
-    // it to a terminal status rather than leaving it unresolved forever.
-    const beforeSweep = bookingCardFrom(at({ status: 'created' }), IST);
-    const afterSweep = bookingCardFrom(at({ status: 'cancelled' }), IST);
-
-    expect(beforeSweep.statusLabel).toBe('Payment pending');
-    expect(afterSweep.statusLabel).toBe('Cancelled');
-    expect(afterSweep.statusLabel).not.toBe('Payment pending');
-  });
-
+describe('myBookingPresentationFor — the five My-bookings states', () => {
+  /**
+   * These are the REAL, Postgres-verified rows the backend handed over when confirming
+   * `cancelledBy`/`policyBand`/`rescheduleCount` shipped on both list endpoints — not
+   * synthesized cases. Locking the function down against them is what proves the precedence
+   * order actually matches what backend implemented, not just what was asked for.
+   */
   it.each([
-    ['cook_en_route', 'On the way'],
-    ['cook_arrived', 'Arrived'],
-    ['cooking', 'In service'],
-    ['completed', 'Completed'],
-    ['cancelled', 'Cancelled'],
-  ] as const)('leaves %s reading %s', (status, label) => {
-    expect(bookingCardFrom(at({ status }), IST).statusLabel).toBe(label);
+    [{ status: 'assigned', cancelledBy: null, policyBand: null, rescheduleCount: 0 }, 'Confirmed'],
+    [
+      { status: 'assigned', cancelledBy: null, policyBand: null, rescheduleCount: 1 },
+      'Rescheduled',
+    ],
+    [
+      {
+        status: 'cancelled',
+        cancelledBy: 'system',
+        policyBand: 'SERVICE_FAILURE_FULL_REFUND',
+        rescheduleCount: 0,
+      },
+      'Unfulfilled',
+    ],
+    [
+      {
+        status: 'cancelled',
+        cancelledBy: 'customer',
+        policyBand: 'SCHEDULED_FULL_REFUND',
+        rescheduleCount: 0,
+      },
+      'Cancelled',
+    ],
+    // `cancelledBy: 'system'` here too — proves cancelledBy ALONE is not enough; only
+    // `policyBand` decides Unfulfilled, and CHECKOUT_EXPIRED_NO_PAYMENT is not that band.
+    [
+      {
+        status: 'cancelled',
+        cancelledBy: 'system',
+        policyBand: 'CHECKOUT_EXPIRED_NO_PAYMENT',
+        rescheduleCount: 0,
+      },
+      'Cancelled',
+    ],
+    [{ status: 'completed', cancelledBy: null, policyBand: null, rescheduleCount: 0 }, 'Completed'],
+  ] as const)('reads %o as %s', (fields, label) => {
+    expect(myBookingPresentationFor(fields).label).toBe(label);
+  });
+
+  it('reads Completed, not Rescheduled, for a booking that was rescheduled and then completed', () => {
+    // Order matters: rescheduling is history once the meal happened. Checking `status` before
+    // `rescheduleCount` is what this test pins down, not just the individual branches above.
+    const label = myBookingPresentationFor({
+      status: 'completed',
+      cancelledBy: null,
+      policyBand: null,
+      rescheduleCount: 1,
+    }).label;
+
+    expect(label).toBe('Completed');
+    expect(label).not.toBe('Rescheduled');
+  });
+
+  it('collapses every live status to one Confirmed/Rescheduled pill, not five distinct ones', () => {
+    // Deliberate: this screen is a flat historical index; Home already owns live-tracking detail
+    // (arriving/arrived/in-service), so this screen must not draw that granularity again.
+    for (const status of [
+      'created',
+      'assigned',
+      'cook_en_route',
+      'cook_arrived',
+      'cooking',
+    ] as const) {
+      expect(
+        myBookingPresentationFor({
+          status,
+          cancelledBy: null,
+          policyBand: null,
+          rescheduleCount: 0,
+        }).label,
+      ).toBe('Confirmed');
+    }
+  });
+});
+
+describe('bookingCardFrom', () => {
+  it("sources the rating from ratingStars — the customer's own rating for THIS booking", () => {
+    const card = bookingCardFrom(
+      at({
+        status: 'completed',
+        ratingStars: 5,
+        cook: { displayName: 'Cook Rekha', ratingAverage: 4.2 },
+      }),
+      IST,
+    );
+
+    // Never the cook's aggregate average — a different fact this card must not show instead.
+    expect(card.rating).toBe(5);
+    expect(card.rating).not.toBe(4.2);
+  });
+
+  it('omits rating entirely when ratingStars is absent, rather than falling back to the cook average', () => {
+    const card = bookingCardFrom(
+      at({ status: 'completed', cook: { displayName: 'Cook Rekha', ratingAverage: 4.2 } }),
+      IST,
+    );
+
+    expect(card.rating).toBeUndefined();
+  });
+
+  it('reads the subtitle as "Scheduled • <time>" for a scheduled booking, on the service clock', () => {
+    // BASE.scheduledStart is 10:00 IST — asserting the IST reading, not the runner's own zone.
+    expect(bookingCardFrom(BASE, IST).subtitle).toBe('Scheduled • 10:00 AM');
+  });
+
+  it('reads the subtitle as plain "Instant" for an instant booking, never a time', () => {
+    expect(bookingCardFrom(at({ slotType: 'instant' }), IST).subtitle).toBe('Instant');
+  });
+
+  it('falls back to "Scheduled" alone when a scheduled booking has no start time', () => {
+    expect(bookingCardFrom(at({ scheduledStart: null }), IST).subtitle).toBe('Scheduled');
   });
 });
 

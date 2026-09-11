@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { useBookingHistory, useRefunds } from '@features/booking';
+import { useActiveBookings, useBookingHistory, useRefunds } from '@features/booking';
 import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
@@ -10,22 +10,52 @@ import { formatServiceDate, serviceDateIn } from '@features/scheduled';
 import type { StatusTone } from '@ui';
 
 import { bookingListFrom, cookFieldsFrom, headlineFor } from './adapters';
-import { DEMO_BOOKING_HISTORY, DEMO_REFUND_HISTORY } from '@/demo/fixtures/screens';
+import {
+  DEMO_BOOKING_HISTORY,
+  DEMO_REFUND_HISTORY,
+  DEMO_UPCOMING_BOOKINGS,
+} from '@/demo/fixtures/screens';
 import type { BookingListViewModel } from './types';
 
 /**
- * Past bookings and refunds.
+ * My bookings — Upcoming tab. `GET /v1/me/bookings/active`, the SAME read Home's carousel uses,
+ * shared via `useActiveBookings`. The endpoint already returns exactly the right set (live
+ * statuses plus a few time-bounded exceptions, `cancelled` rows included) — this hook does no
+ * filtering of its own, it only maps each row through `bookingCardFrom`.
  *
- * `GET /v1/me/bookings` and `GET /v1/me/refunds`. The refund list is a CUSTOMER-level endpoint,
- * so the Refunds screen does not fan out one request per booking — §22's N+1 warning does not
- * apply here because the backend closed that gap.
+ * A recent, unseen, refunded system-cancellation legitimately appears here AND on the Past tab at
+ * once (it is a live "apology" until the customer acknowledges it) — that overlap is intentional,
+ * not something to de-duplicate against `useBookingHistoryData`.
+ */
+export function useUpcomingBookingsData(): ScreenQuery<BookingListViewModel> {
+  const active = useActiveBookings();
+  const catalogue = useCatalogue();
+  const timeZone =
+    catalogue.state.status === 'ready' ? catalogue.state.data.operatingWindow.timeZone : undefined;
+
+  const state = useMemo(() => {
+    if (active.state.status !== 'ready') return active.state;
+    return ready(
+      bookingListFrom({
+        base: DEMO_UPCOMING_BOOKINGS,
+        bookings: active.state.data,
+        timeZone,
+      }),
+    );
+  }, [active.state, timeZone]);
+
+  return { state, refetch: active.refetch };
+}
+
+/**
+ * My bookings — Past tab. `GET /v1/me/bookings`, cursor-paginated
+ * (`limit`/`cursorCreatedAt`/`cursorId`) but read here with no params, same as before this screen
+ * grew a second tab — a long-history customer only sees the backend's first page. Known scope
+ * limit, not a regression; infinite scroll is a follow-up, not part of this change.
  *
- * The two fixtures supply the screen's static copy only: the title and the empty-state text. A
- * real account with no history returns `[]` and the designed empty state renders as drawn.
- *
- * The drawn status vocabulary is still incomplete against the real enum — there is no `Cancelled`
- * pill (B-15) and no `Failed` refund state (D-15). The adapter maps what exists and leaves the
- * gaps recorded rather than inventing pills the design never drew.
+ * The two fixtures below (`DEMO_BOOKING_HISTORY`, `DEMO_UPCOMING_BOOKINGS`) supply only the
+ * screen's static copy — title and empty-state text. A real account with no bookings returns `[]`
+ * and the designed empty state renders as drawn.
  */
 export function useBookingHistoryData(): ScreenQuery<BookingListViewModel> {
   const history = useBookingHistory();
@@ -50,6 +80,22 @@ export function useBookingHistoryData(): ScreenQuery<BookingListViewModel> {
   return { state, refetch: history.refetch };
 }
 
+export interface MyBookingsData {
+  readonly upcoming: ScreenQuery<BookingListViewModel>;
+  readonly past: ScreenQuery<BookingListViewModel>;
+}
+
+/**
+ * Both tabs, fetched unconditionally — cheap (TanStack Query dedupes by key regardless of how
+ * many times a hook calling it renders), and it is what makes switching tabs instant once both
+ * have loaded rather than re-fetching on every switch.
+ */
+export function useMyBookingsData(): MyBookingsData {
+  const upcoming = useUpcomingBookingsData();
+  const past = useBookingHistoryData();
+  return { upcoming, past };
+}
+
 /**
  * Refund `state` -> the pill the frames draw.
  *
@@ -66,7 +112,7 @@ export function useBookingHistoryData(): ScreenQuery<BookingListViewModel> {
  * real durable outcomes where nobody yet knows the money is coming, and labelling them
  * "Processing" would tell a customer it is. No frame draws a "Failed" or "Needs review" pill
  * (defect D-15), so none is invented here — the row shows the refund and its amount, and the pill
- * is simply absent, exactly as a cancelled booking's is under B-15.
+ * is simply absent.
  *
  * The raw `state` string was previously rendered straight into the pill. It never appeared,
  * because the schema read `status` and the backend sends `state`, so the field parsed as

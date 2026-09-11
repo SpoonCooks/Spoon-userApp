@@ -58,18 +58,21 @@ describe('Home — pre-booking variant (Page 3a, 1:455)', () => {
     expect(emphasis.props.children).toBe(' 18 mins');
   });
 
-  it('shows no active-booking card', () => {
+  it('shows no active-booking carousel', () => {
     render(<HomeView state={ready(DEMO_HOME_PRE_BOOKING)} {...actions} />);
 
-    expect(screen.queryByTestId('home-upcoming-booking')).toBeNull();
+    expect(screen.queryByTestId('home-booking-carousel')).toBeNull();
   });
 });
 
 describe('Home — active-booking variant (`381:511`, Home WITH a banner)', () => {
+  /** One booking in the fixture, so the carousel draws exactly one card, at track position 0. */
+  const CARD = 'home-booking-carousel-card-0';
+
   it('renders the active-booking card with the server copy', () => {
     render(<HomeView state={ready(DEMO_HOME_ACTIVE_BOOKING)} {...actions} />);
 
-    const card = within(screen.getByTestId('home-upcoming-booking'));
+    const card = within(screen.getByTestId(CARD));
     // `337:4284` — the title and the caption come from ONE variant. The fixture is `arriving`,
     // so the title is "Arriving"; asserting "Live booking" here alongside "Arriving in" asked
     // for a card `homeBannerFor` can never build, since `live` draws the "Time left" caption.
@@ -101,29 +104,29 @@ describe('Home — active-booking variant (`381:511`, Home WITH a banner)', () =
     }
   });
 
-  it('inserts the card BELOW the booking tiles, where `333:3835` puts it', () => {
+  it('inserts the carousel BELOW the booking tiles, where `333:3835` puts it', () => {
     const tree = render(<HomeView state={ready(DEMO_HOME_ACTIVE_BOOKING)} {...actions} />);
 
     // `333:3835` orders the body: tiles (y 16) → active banner (y 186) → mosaic (y 356).
     const order = testIdOrder(tree.toJSON());
     expect(order.indexOf('home-promo')).toBeLessThan(order.indexOf('home-tiles'));
-    expect(order.indexOf('home-tiles')).toBeLessThan(order.indexOf('home-upcoming-booking'));
-    expect(order.indexOf('home-upcoming-booking')).toBeLessThan(order.indexOf('home-cuisines'));
+    expect(order.indexOf('home-tiles')).toBeLessThan(order.indexOf('home-booking-carousel'));
+    expect(order.indexOf('home-booking-carousel')).toBeLessThan(order.indexOf('home-cuisines'));
   });
 
   it('opens the active booking by pressing the card itself', () => {
     render(<HomeView state={ready(DEMO_HOME_ACTIVE_BOOKING)} {...actions} />);
 
-    fireEvent.press(screen.getByTestId('home-upcoming-booking'));
+    fireEvent.press(screen.getByTestId(CARD));
     expect(actions.onOpenActiveBooking).toHaveBeenCalledTimes(1);
   });
 
   it('selects the variant from the payload alone, never from a client guess', () => {
     const { rerender } = render(<HomeView state={ready(DEMO_HOME_ACTIVE_BOOKING)} {...actions} />);
-    expect(screen.getByTestId('home-upcoming-booking')).toBeTruthy();
+    expect(screen.getByTestId(CARD)).toBeTruthy();
 
     rerender(<HomeView state={ready(DEMO_HOME_PRE_BOOKING)} {...actions} />);
-    expect(screen.queryByTestId('home-upcoming-booking')).toBeNull();
+    expect(screen.queryByTestId('home-booking-carousel')).toBeNull();
   });
 });
 

@@ -185,31 +185,31 @@ const POPPING_BACK_ROUTES = [
   ['scheduled', ScheduledRoute, 'schedule-header-back', '/home'],
   // `275:4321`'s "edit number" IS the back control on OTP — the frame draws no chevron.
   ['otp', OtpRoute, 'otp-screen-edit', '/login'],
-] as const;
-
-/**
- * Routes whose back control lands on ONE named screen whatever the stack looks like.
- *
- * These are the founder's V7 routing matrix (task §5, §11, §14, §15), and each destination is a
- * product decision rather than a consequence of history:
- *
- *   `6:663`  Profile          -> Home
- *   `6:227`  Past bookings    -> Profile, never Home
- *   `71:615` Refunds          -> Profile, never Home
- *   `68:214` Saved addresses  -> Profile
- *   `53:31`  Address location -> Saved addresses (repeat customer; a first-run one has NO control)
- *   `60:655` Complete address -> `53:31`, including on an edit
- *
- * They are asserted on a stack that CAN pop, because that is the shape where "deterministic" and
- * "pop" disagree — and where the old behaviour silently did the wrong thing.
- */
-const DETERMINISTIC_BACK_ROUTES = [
+  // `68:214` is always pushed directly on top of whichever entry sent it (Home or Profile — see
+  // "Saved addresses back target follows its entry point" below), so popping both lands on the
+  // right screen AND plays the platform's reverse-of-push closing animation, which a bare
+  // `replace` does not. No `?from=` here, so the fallback below is the un-tagged default.
+  ['address', SavedAddressesRoute, 'address-header-back', '/profile'],
+  // `6:663` is always pushed directly on top of Home (its one push site, `home.tsx`), so the same
+  // pop-gets-the-closing-animation reasoning as `address` above applies here too. The `spoon://`
+  // deep-link case has no history, which is exactly what the fallback below covers.
   ['profile', ProfileRoute, 'screen-header-back', '/home'],
+  // `53:31`'s only push site is `68:214`'s "Add a new address" (the first-run case reaches it by
+  // a `<Redirect>` and draws no back control at all), so the same pop-gets-the-closing-animation
+  // reasoning applies once more — a right-to-left "opening" animation on the way back out was the
+  // exact defect reported here.
+  ['address/location', AddressLocationRoute, 'address-header-back', '/address'],
+  // `6:227` and `71:615` are each pushed only from Profile's tile grid — their rows draw no
+  // secondary navigation of their own — so the same pop-gets-the-closing-animation reasoning
+  // applies to both.
   ['history', HistoryRoute, 'screen-header-back', '/profile'],
   ['refunds', RefundsRoute, 'screen-header-back', '/profile'],
-  ['address', SavedAddressesRoute, 'address-header-back', '/profile'],
-  ['address/location', AddressLocationRoute, 'address-header-back', '/address'],
-  ['address/details', AddressDetailsRoute, 'address-header-back', '/address/location'],
+  // `60:655`'s header back NO LONGER forces `53:31` on an edit (reversed product decision — see
+  // "address edit now returns to the list" below): it has two genuinely different predecessors
+  // (the map's confirm, or `68:214`'s "Edit" pushing here directly), and a plain pop resolves to
+  // whichever is actually true — which is also what fixes the same "opening" animation defect
+  // fixed everywhere else in this file. No `?from=` here, so `/address` is the un-tagged default.
+  ['address/details', AddressDetailsRoute, 'address-header-back', '/address'],
 ] as const;
 
 describe('back is always handled', () => {
@@ -238,30 +238,67 @@ describe('back is always handled', () => {
   );
 });
 
-describe('the V7 routing matrix is deterministic', () => {
-  it.each(DETERMINISTIC_BACK_ROUTES)(
-    '%s goes to its named destination even when the stack COULD pop',
-    async (_name, Route, backId, destination) => {
-      render(<Route />);
+/**
+ * `60:655`'s "Change area" is a forward DIGRESSION, not a back control — it belongs in neither
+ * table above. It always PUSHES (never replaces) to `53:31`, tagged `resume=1` so the map's own
+ * Confirm knows to pop back to this exact screen instead of pushing a second, blank one — see
+ * `location.tsx` and "the map pops back to an open Details screen after Change area" below. The
+ * old `dismissAll` + `replace` destroyed this screen outright, which is what made both back AND
+ * Confirm land somewhere other than "the screen Change area was pressed from" (the reported bug).
+ */
+describe('address details "Change area" is a push, not a replace', () => {
+  it('pushes the map, tagged to resume this exact screen, even on an edit', async () => {
+    mockSearchParams = { addressId: 'addr-1' };
 
-      fireEvent.press(await screen.findByTestId(backId));
+    render(<AddressDetailsRoute />);
 
-      expect(mockRouter.back).not.toHaveBeenCalled();
-      expect(mockRouter.replace).toHaveBeenCalledWith(destination);
-    },
-  );
+    fireEvent.press(await screen.findByTestId('address-change-area'));
 
-  it.each(DETERMINISTIC_BACK_ROUTES)(
-    '%s reaches the same destination with NO history',
-    async (_name, Route, backId, destination) => {
-      mockRouter = makeRouter(false);
-      render(<Route />);
+    expect(mockRouter.push).toHaveBeenCalledWith('/address/location?resume=1&addressId=addr-1');
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(mockRouter.dismissAll).not.toHaveBeenCalled();
+  });
+});
 
-      fireEvent.press(await screen.findByTestId(backId));
+/**
+ * `68:214` Saved addresses is pushed directly on top of whichever entry sent it — Home's
+ * serving-at banner or Profile's "Addresses" tile (`home.tsx`, `profile/index.tsx`) — each tagging
+ * its `push('/address')` with `?from=`. With a history to pop, that tag is redundant with the
+ * stack (both land in the same place either way); it earns its keep on the no-history fallback,
+ * previously a blanket `/profile` that put an extra screen between a Home-initiated trip and Home.
+ */
+describe('Saved addresses back target follows its entry point', () => {
+  it('pops when opened from Home, with a history to pop', async () => {
+    mockSearchParams = { from: 'home' };
+    render(<SavedAddressesRoute />);
 
-      expect(mockRouter.replace).toHaveBeenCalledWith(destination);
-    },
-  );
+    fireEvent.press(await screen.findByTestId('address-header-back'));
+
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  it('falls back straight to Home when opened from Home with no history', async () => {
+    mockRouter = makeRouter(false);
+    mockSearchParams = { from: 'home' };
+    render(<SavedAddressesRoute />);
+
+    fireEvent.press(await screen.findByTestId('address-header-back'));
+
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/home');
+  });
+
+  it('falls back to Profile when opened from Profile with no history', async () => {
+    mockRouter = makeRouter(false);
+    mockSearchParams = { from: 'profile' };
+    render(<SavedAddressesRoute />);
+
+    fireEvent.press(await screen.findByTestId('address-header-back'));
+
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/profile');
+  });
 });
 
 /**
@@ -339,34 +376,64 @@ describe('first-run address flow', () => {
    * The other half of the same rule: a REPEAT customer adding an address reached `53:31` from
    * `68:214` and gets the disc, which goes back to that list. The same route must not render one
    * affordance and perform the other, so both halves are asserted against the same component.
+   *
+   * This is a POP (see the popping table above), not a replace: `53:31`'s only push site is
+   * `68:214` itself, so there is always a history to pop, and popping is what gets the platform's
+   * reverse-of-push closing animation rather than the "opening" animation a bare `replace` played.
    */
-  it('draws a back control for a repeat customer, and it returns to the saved list', async () => {
+  it('draws a back control for a repeat customer, and it pops to the saved list', async () => {
     render(<AddressLocationRoute />);
 
     fireEvent.press(await screen.findByTestId('address-header-back'));
 
-    expect(mockRouter.replace).toHaveBeenCalledWith('/address');
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  /**
+   * With no history to pop — a deep link straight to this route — the `from` tag `68:214` needs
+   * for its OWN back control still has to survive the fallback replace, or a trip that started at
+   * Home would silently lose it. See "Saved addresses back target follows its entry point".
+   */
+  it('falls back to the correct list entry point with no history to pop', async () => {
+    mockRouter = makeRouter(false);
+    mockSearchParams = { from: 'home' };
+    render(<AddressLocationRoute />);
+
+    fireEvent.press(await screen.findByTestId('address-header-back'));
+
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/address?from=home');
   });
 });
 
-describe('address edit keeps its identity', () => {
+describe('address edit now returns to the list', () => {
   /**
-   * `60:655` back -> `53:31`, unconditionally (V7 routing matrix, task §5/§15/§28).
-   *
-   * The superseded behaviour sent an EDIT to `68:214` instead, on the reasoning that an edit never
-   * went through the map. The founder's matrix overrides that, and the chain it produces is
-   * coherent — list -> form (prefilled) -> map -> list — provided the map step is told WHICH
-   * record is in play. `addressId` therefore travels with it, which is what keeps a round trip
-   * through the map an UPDATE rather than a second address.
+   * `60:655` back -> `68:214` directly on an edit (product decision REVERSED — see `goBack`'s
+   * comment in `address/details.tsx`). An edit is pushed straight from the list, skipping the
+   * map entirely, so a pop lands correctly on the list without any special-casing.
    */
-  it('backs an edit out to the map, carrying the address id', async () => {
+  it('pops an edit straight back to the list', async () => {
     mockSearchParams = { addressId: 'addr-1' };
 
     render(<AddressDetailsRoute />);
 
     fireEvent.press(await screen.findByTestId('address-header-back'));
 
-    expect(mockRouter.replace).toHaveBeenCalledWith('/address/location?addressId=addr-1');
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the correct list entry point with no history to pop', async () => {
+    mockRouter = makeRouter(false);
+    mockSearchParams = { addressId: 'addr-1', from: 'home' };
+
+    render(<AddressDetailsRoute />);
+
+    fireEvent.press(await screen.findByTestId('address-header-back'));
+
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/address?from=home');
   });
 
   it('opens Edit with the id of the row that was tapped', async () => {
@@ -425,13 +492,18 @@ describe('Home is a root', () => {
 
     fireEvent.press(await screen.findByTestId('home-tile-scheduled'));
     expect(mockRouter.push).toHaveBeenCalledWith('/scheduled');
+
+    // Tagged with its entry point, so Saved addresses' back control can send it straight home
+    // rather than through Profile — see "Saved addresses back target follows its entry point".
+    fireEvent.press(await screen.findByTestId('home-address'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/address?from=home');
   });
 });
 
 describe('profile children', () => {
   it.each([
     ['orders', '/history'],
-    ['addresses', '/address'],
+    ['addresses', '/address?from=profile'],
     ['refunds', '/refunds'],
   ])('%s opens %s', async (tile, destination) => {
     render(<ProfileRoute />);
@@ -559,7 +631,8 @@ describe('Home banner destinations', () => {
     });
     renderWithRuntime(<HomeRoute />, { runtime: createTestRuntime({ api }) });
 
-    const banner = await screen.findByTestId('home-upcoming-booking');
+    // One booking in the stub, so the carousel draws exactly one card, at track position 0.
+    const banner = await screen.findByTestId('home-booking-carousel-card-0');
     fireEvent.press(banner);
 
     expect(mockRouter.push).toHaveBeenCalledWith('/booking/bk-live-1');

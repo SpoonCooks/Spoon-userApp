@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useActiveBookings, useBookingDetail, useTracking } from '@features/booking';
+import { useActiveBookings, useBookingDetails, useTrackings } from '@features/booking';
 import { addressLineOf, useAddresses } from '@features/address';
 import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
@@ -23,40 +23,30 @@ import type { HomeViewModel } from './types';
 import type { BookingSummaryDto } from '@features/booking';
 
 /**
- * Picks the one booking Home should project when the server returns more than one active row.
- * Live/actionable work outranks a completed unrated item; within a state the nearest upcoming
- * service start wins, and the id tie-breaker makes equal timestamps deterministic.
+ * Every booking Home's carousel should offer, ascending by date/time — a past/live booking
+ * (earlier `scheduledStart`) sorts before an upcoming one, which is the requested reading order.
+ *
+ * `GET /v1/me/bookings/active` already does the filtering: it returns live/upcoming bookings plus
+ * completed-but-unrated-and-unrefunded ones within a server-side 120-hour backstop from
+ * `actual_end` (confirmed against the backend repo) — this function only orders what it is given,
+ * it does not re-filter by time. `status === 'cancelled'` rows are NOT excluded here (the old
+ * single-pick version dropped them entirely): a booking the SYSTEM cancelled still gets its
+ * apology card, and one the CUSTOMER cancelled is filtered downstream by `homeBannerFor`
+ * (`cancelledBy !== 'system'` returns `null`, same as today) rather than by this function guessing
+ * who cancelled it from the summary alone, which does not carry that field.
  */
-export function selectHomeBooking(
+export function selectHomeBookings(
   bookings: readonly BookingSummaryDto[],
-): BookingSummaryDto | null {
-  const rank: Readonly<Record<BookingSummaryDto['status'], number>> = {
-    cook_en_route: 0,
-    cook_arrived: 1,
-    cooking: 2,
-    assigned: 3,
-    created: 4,
-    completed: 5,
-    cancelled: 6,
-  };
-
-  return (
-    bookings
-      .filter((booking) => booking.status !== 'cancelled')
-      .slice()
-      .sort((left, right) => {
-        const stateOrder = rank[left.status] - rank[right.status];
-        if (stateOrder !== 0) return stateOrder;
-        const leftStart =
-          left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
-        const rightStart =
-          right.scheduledStart === null
-            ? Number.POSITIVE_INFINITY
-            : Date.parse(right.scheduledStart);
-        if (leftStart !== rightStart) return leftStart - rightStart;
-        return left.id.localeCompare(right.id);
-      })[0] ?? null
-  );
+): readonly BookingSummaryDto[] {
+  return bookings.slice().sort((left, right) => {
+    const leftStart =
+      left.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(left.scheduledStart);
+    const rightStart =
+      right.scheduledStart === null ? Number.POSITIVE_INFINITY : Date.parse(right.scheduledStart);
+    if (leftStart !== rightStart) return leftStart - rightStart;
+    // Deterministic tie-break for equal (or both-null) timestamps.
+    return left.id.localeCompare(right.id);
+  });
 }
 
 /**
@@ -88,18 +78,25 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   const active = useActiveBookings();
   const catalogue = useCatalogue();
 
-  const activeSummary =
-    active.state.status === 'ready' ? selectHomeBooking(active.state.data) : null;
+  const activeSummaries = useMemo(
+    () => (active.state.status === 'ready' ? selectHomeBookings(active.state.data) : []),
+    [active.state],
+  );
+  const activeSummaryIds = activeSummaries.map((summary) => summary.id);
 
-  // The summary carries no cook, no timing and no allowed actions, so the banner's cook, its
-  // countdown and its rateability all come from the DETAIL. Fetched only when there IS a booking.
-  const detail = useBookingDetail(activeSummary === null ? null : activeSummary.id, { poll: true });
-  const detailData = detail.state.status === 'ready' ? detail.state.data : null;
+  // The summary carries no cook, no timing and no allowed actions, so each card's cook, its
+  // countdown and its rateability all come from its own DETAIL. One entry per summary, same
+  // order — `useBookingDetails` builds its queries directly from this same id list.
+  const details = useBookingDetails(activeSummaryIds, { poll: true });
 
   // Countdown labels are local display arithmetic over server timestamps. A one-second clock
-  // state keeps the card live without making a network request; the detail/active reads resync the
-  // authoritative timestamps and server clock offset.
-  const liveCountdown = detailData?.status === 'cook_en_route' || detailData?.status === 'cooking';
+  // state keeps every live card ticking without a network request; the detail/active reads
+  // resync the authoritative timestamps and server clock offset. Live if ANY card needs it.
+  const liveCountdown = details.some(
+    (detail) =>
+      detail.state.status === 'ready' &&
+      (detail.state.data.status === 'cook_en_route' || detail.state.data.status === 'cooking'),
+  );
   const [serverNowMs, setServerNowMs] = useState<number | null>(null);
   useEffect(() => {
     const updateClock = () => setServerNowMs(Date.now() - currentSkewMs());
@@ -110,14 +107,16 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   }, [liveCountdown]);
 
   /**
-   * Tracking is read ONLY while a cook is travelling, because that is the one banner with an ETA
-   * on it (`337:4284` "Arriving in 12 mins") and the endpoint 404s outside that window. Polling it
-   * for a confirmed or completed booking would turn an expected absence into an error, and would
-   * cost Home a request per interval for a number no card is showing.
+   * Tracking is read ONLY for bookings whose cook is currently travelling, because that is the
+   * one banner with an ETA on it (`337:4284` "Arriving in 12 mins") and the endpoint 404s outside
+   * that window. Polling it for a confirmed or completed booking would turn an expected absence
+   * into an error, and would cost a request per interval for a number no card is showing.
    */
-  const enRoute = detailData?.status === 'cook_en_route';
-  const tracking = useTracking(enRoute && activeSummary !== null ? activeSummary.id : null);
-  const trackingData = tracking.state.status === 'ready' ? tracking.state.data : null;
+  const enRouteIds = activeSummaryIds.filter((_id, i) => {
+    const detail = details[i];
+    return detail?.state.status === 'ready' && detail.state.data.status === 'cook_en_route';
+  });
+  const trackings = useTrackings(enRouteIds);
 
   const state = useMemo(() => {
     if (addresses.state.status !== 'ready') return addresses.state;
@@ -126,43 +125,62 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
       addresses.state.data.find((address) => address.isDefault) ?? addresses.state.data[0] ?? null;
 
     /**
-     * The banner, built from what the SERVER said — never from a client guess.
+     * One banner per booking, each built from what the SERVER said for THAT booking — never from
+     * a client guess. A booking whose own detail has not resolved yet is simply not offered yet;
+     * it joins the carousel the moment its detail arrives, the same way the single-card version
+     * showed the pre-booking Home rather than a spinner while its one detail was in flight.
      *
      * Both minute figures are display arithmetic over a server INSTANT, not predictions: the ETA
      * is `eta.estimatedArrivalAt` and the time left is `timing.expectedEnd`, which moves when a
      * service starts late or is extended. `scheduledStart + duration` is deliberately not used
      * for either.
      */
-    const activeBooking =
-      activeSummary === null || detailData === null || serverNowMs === null
-        ? undefined
-        : ((() => {
+    const activeBookings =
+      serverNowMs === null
+        ? []
+        : (() => {
             const serverNow = new Date(serverNowMs);
-            return homeBannerFor({
-              bookingId: activeSummary.id,
-              status: detailData.status,
-              cookName: detailData.cook?.name ?? null,
-              // The banner draws the TRANSPARENT cut-out over its `#FFF7CC` panel (`337:4364`).
-              // A hosted photo wins; otherwise the cook's stable profileCode resolves the
-              // bundled cut-out, and a cook with neither renders the banner without a photo.
-              cookPhotoUrl:
-                detailData.cook?.photoUrl ??
-                cookCardContentFor(detailData.cook?.profileCode)?.cutoutPhotoUrl ??
-                null,
-              dateLabel: formatDateLabel(detailData.scheduledStart, serverNow),
-              timeLabel: formatTimeLabel(detailData.scheduledStart, detailData.durationMinutes),
-              etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),
-              minutesLeft:
-                detailData.status === 'cooking'
-                  ? minutesUntil(detailData.timing.expectedEnd, serverNow)
-                  : null,
-              arrivedAtLabel: formatClockLabel(detailData.timing.arrivedAt),
-              canRate: detailData.allowedActions.canRate,
-              cancelledBy: detailData.cancellation?.cancelledBy ?? null,
-              reassigned: detailData.reassignment?.occurred === true,
-              recoveryHandoff: detailData.recovery?.state === 'support_handoff',
-            });
-          })() ?? undefined);
+            const trackingByBookingId = new Map(
+              enRouteIds.map((id, i) => [
+                id,
+                trackings[i]?.state.status === 'ready' ? trackings[i]?.state.data : undefined,
+              ]),
+            );
+
+            return activeSummaries
+              .map((summary, i) => {
+                const detail = details[i];
+                if (detail?.state.status !== 'ready') return null;
+                const detailData = detail.state.data;
+                const trackingData = trackingByBookingId.get(summary.id);
+
+                return homeBannerFor({
+                  bookingId: summary.id,
+                  status: detailData.status,
+                  cookName: detailData.cook?.name ?? null,
+                  // The banner draws the TRANSPARENT cut-out over its `#FFF7CC` panel (`337:4364`).
+                  // A hosted photo wins; otherwise the cook's stable profileCode resolves the
+                  // bundled cut-out, and a cook with neither renders the banner without a photo.
+                  cookPhotoUrl:
+                    detailData.cook?.photoUrl ??
+                    cookCardContentFor(detailData.cook?.profileCode)?.cutoutPhotoUrl ??
+                    null,
+                  dateLabel: formatDateLabel(detailData.scheduledStart, serverNow),
+                  timeLabel: formatTimeLabel(detailData.scheduledStart, detailData.durationMinutes),
+                  etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),
+                  minutesLeft:
+                    detailData.status === 'cooking'
+                      ? minutesUntil(detailData.timing.expectedEnd, serverNow)
+                      : null,
+                  arrivedAtLabel: formatClockLabel(detailData.timing.arrivedAt),
+                  canRate: detailData.allowedActions.canRate,
+                  cancelledBy: detailData.cancellation?.cancelledBy ?? null,
+                  reassigned: detailData.reassignment?.occurred === true,
+                  recoveryHandoff: detailData.recovery?.state === 'support_handoff',
+                });
+              })
+              .filter((banner): banner is NonNullable<typeof banner> => banner !== null);
+          })();
 
     const base = DEMO_HOME_ACTIVE_BOOKING;
     const promiseMinutes =
@@ -202,30 +220,38 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
           defaultAddress === undefined || defaultAddress === null
             ? null
             : addressLineOf(defaultAddress),
-        activeBooking,
+        activeBookings,
       }),
     );
-  }, [addresses.state, activeSummary, detailData, trackingData, catalogue.state, serverNowMs]);
+  }, [
+    addresses.state,
+    activeSummaries,
+    details,
+    trackings,
+    enRouteIds,
+    catalogue.state,
+    serverNowMs,
+  ]);
 
   const refetchers = useRef({
     addresses: addresses.refetch,
     active: active.refetch,
-    detail: detail.refetch,
-    tracking: tracking.refetch,
+    details: details.map((detail) => detail.refetch),
+    trackings: trackings.map((tracking) => tracking.refetch),
   });
   useEffect(() => {
     refetchers.current = {
       addresses: addresses.refetch,
       active: active.refetch,
-      detail: detail.refetch,
-      tracking: tracking.refetch,
+      details: details.map((detail) => detail.refetch),
+      trackings: trackings.map((tracking) => tracking.refetch),
     };
-  }, [addresses.refetch, active.refetch, detail.refetch, tracking.refetch]);
+  }, [addresses.refetch, active.refetch, details, trackings]);
   const refetch = useCallback(() => {
     refetchers.current.addresses();
     refetchers.current.active();
-    refetchers.current.detail();
-    refetchers.current.tracking();
+    refetchers.current.details.forEach((detailRefetch) => detailRefetch());
+    refetchers.current.trackings.forEach((trackingRefetch) => trackingRefetch());
   }, []);
 
   return {

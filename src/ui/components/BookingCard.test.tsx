@@ -4,12 +4,12 @@ import { DEMO_BOOKING_COMPLETED, DEMO_REFUND_PROCESSING } from '@/demo/fixtures/
 import { BookingCard } from './BookingCard';
 
 describe('BookingCard — history variant', () => {
-  it('renders headline, cook, time range, amount, rating and status', () => {
+  it('renders headline, cook, the slot subtitle, amount, rating and status', () => {
     render(<BookingCard booking={DEMO_BOOKING_COMPLETED} />);
 
     expect(screen.getByText('12th April • 1 hr')).toBeTruthy();
     expect(screen.getByText('Cook Rekha')).toBeTruthy();
-    expect(screen.getByText('12:30 PM - 01:45 PM')).toBeTruthy();
+    expect(screen.getByText('Scheduled • 4:00 PM')).toBeTruthy();
     expect(screen.getByTestId('booking-card-amount')).toBeTruthy();
     expect(screen.getByTestId('booking-card-rating')).toBeTruthy();
     expect(screen.getByTestId('booking-card-status')).toBeTruthy();

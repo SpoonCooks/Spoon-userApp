@@ -12,7 +12,7 @@ import { COOK_SAMPLE_PHOTO } from './cooks';
 export const DEMO_BOOKING_COMPLETED: BookingCardViewModel = {
   id: 'demo-booking-1',
   headline: '12th April • 1 hr',
-  subtitle: '12:30 PM - 01:45 PM',
+  subtitle: 'Scheduled • 4:00 PM',
   statusLabel: 'Completed',
   statusTone: 'positive',
   cookName: 'Cook Rekha',
@@ -24,9 +24,44 @@ export const DEMO_BOOKING_COMPLETED: BookingCardViewModel = {
 export const DEMO_BOOKING_UNFULFILLED: BookingCardViewModel = {
   id: 'demo-booking-2',
   headline: '12th April • 1:15 PM',
-  subtitle: '12:30 PM - 01:45 PM',
+  subtitle: 'Scheduled • 5:00 AM',
   statusLabel: 'Unfulfilled',
   statusTone: 'warning',
+  cookName: 'Cook Rekha',
+  cookPhotoUrl: COOK_SAMPLE_PHOTO,
+  amount: '₹188',
+};
+
+/** Distinct from `DEMO_BOOKING_UNFULFILLED` — cancelled by the CUSTOMER, not by Spoon. Also the
+ * `Instant` sample: `subtitle` names the slot type, never a time range, for either slot type. */
+export const DEMO_BOOKING_CANCELLED: BookingCardViewModel = {
+  id: 'demo-booking-cancelled',
+  headline: '11th April • 1 hr',
+  subtitle: 'Instant',
+  statusLabel: 'Cancelled',
+  statusTone: 'neutral',
+  cookName: 'Cook Rekha',
+  cookPhotoUrl: COOK_SAMPLE_PHOTO,
+  amount: '₹188',
+};
+
+export const DEMO_BOOKING_CONFIRMED: BookingCardViewModel = {
+  id: 'demo-booking-confirmed',
+  headline: '12th September • 1 hr',
+  subtitle: 'Scheduled • 4:00 PM',
+  statusLabel: 'Confirmed',
+  statusTone: 'info',
+  cookName: 'Cook Rekha',
+  cookPhotoUrl: COOK_SAMPLE_PHOTO,
+  amount: '₹188',
+};
+
+export const DEMO_BOOKING_RESCHEDULED: BookingCardViewModel = {
+  id: 'demo-booking-rescheduled',
+  headline: '14th September • 1.5 hrs',
+  subtitle: 'Scheduled • 11:00 AM',
+  statusLabel: 'Rescheduled',
+  statusTone: 'info',
   cookName: 'Cook Rekha',
   cookPhotoUrl: COOK_SAMPLE_PHOTO,
   amount: '₹188',

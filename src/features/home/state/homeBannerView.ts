@@ -88,16 +88,18 @@ export interface HomeBannerViewModel {
   readonly bookingId: string;
   /** `337:4356` — the brand-yellow title. */
   readonly title: string;
-  /** `337:4366` / `337:4367` / `337:4368`. Absent on `cancelled`, which draws no cook block. */
+  /** `337:4366` / `337:4367` / `337:4368`. Present on `cancelled` too — see `HomeBookingBanner`'s
+   * doc comment for why that deviates from `393:1072`'s literal drawing. */
   readonly dateLabel?: string;
   readonly timeLabel?: string;
   readonly cookName?: string;
   readonly cookPhotoUrl?: string;
   /** `337:4412` — "Arriving in" / "Arrived at" / "Time left". Absent on the block-badge forms. */
   readonly badgeCaption?: string;
-  /** `337:4370` — "Confirmed!" / "Completed!" / "12 mins" / "1:12 PM". Absent on `cancelled`. */
+  /** `337:4370` — "Confirmed!" / "Completed!" / "12 mins" / "1:12 PM" / "Cancelled". */
   readonly badgeValue?: string;
-  /** `393:1202` — the apology row, the only body the cancelled card draws. */
+  /** `393:1202` — the apology row. Present only on `cancelled`, appended below its cook block and
+   * badge rather than replacing them. */
   readonly notice?: string;
   /** `336:4235` — present only when the server says the booking may be rated. */
   readonly rating?: HomeBannerRating;
@@ -165,6 +167,7 @@ const COPY = {
   /** Shown where a number is designed but the server supplied none. Never a guessed figure. */
   badgeArrived: 'Arrived',
   badgeUnknown: '—',
+  badgeCancelled: 'Cancelled',
 } as const;
 
 function minutesBadge(minutes: number | null | undefined, fallback: string): string {
@@ -189,17 +192,6 @@ export function homeBannerFor(input: HomeBannerInput): HomeBannerViewModel | nul
     figmaPage: BANNER_DESTINATION_PAGE[variant],
   };
 
-  if (variant === 'cancelled') {
-    // `393:1072` draws NO cook block and NO badge — an apology row is its entire body.
-    return {
-      variant,
-      bookingId: input.bookingId,
-      title: COPY.cancelled,
-      notice: COPY.cancelledNotice,
-      destination,
-    };
-  }
-
   const identity = {
     bookingId: input.bookingId,
     dateLabel: input.dateLabel,
@@ -212,6 +204,18 @@ export function homeBannerFor(input: HomeBannerInput): HomeBannerViewModel | nul
   };
 
   switch (variant) {
+    case 'cancelled':
+      // Cook block + "Cancelled" badge (same shape as every other card) PLUS the apology row —
+      // a deliberate departure from `393:1072`'s literal "no cook block, no badge" drawing, per
+      // explicit product reference showing both present alongside the notice.
+      return {
+        ...identity,
+        variant,
+        title: COPY.cancelled,
+        badgeValue: COPY.badgeCancelled,
+        notice: COPY.cancelledNotice,
+      };
+
     case 'confirmed':
       return {
         ...identity,

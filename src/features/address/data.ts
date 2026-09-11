@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 
-import { useAddressDraftStore } from '@core/store/addressDraftStore';
+import { EMPTY_ADDRESS_DRAFT, useAddressDraftStore } from '@core/store/addressDraftStore';
 
 import { useAddressLocation } from './location/useAddressLocation';
 import type { AddressLocationState } from './location/useAddressLocation';
@@ -236,9 +236,15 @@ export function useAddressDetailsData(addressId?: string | null): AddressDetails
      */
     if (editing && addresses.state.status !== 'ready') return addresses.state;
 
-    // An edit shows the SAVED point's area, not the draft's — the draft belongs to whatever the
-    // customer last pinned, which for an edit opened from the list is a different address.
-    const source = existing === null ? draft : existing;
+    /**
+     * The draft is trusted only when it is TAGGED for this exact address (`editingId` — null
+     * while adding, the record's id while editing). Untagged or tagged for something else, it is
+     * a leftover from an unrelated attempt (this store persists until a save succeeds, so an
+     * abandoned add or a "Change area" on a different address can leave one behind) — the saved
+     * record wins instead, or, adding with no matching draft, a blank form.
+     */
+    const currentEditingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
+    const source = draft.editingId === currentEditingId ? draft : (existing ?? EMPTY_ADDRESS_DRAFT);
     const area = [source.street, source.city, source.state, source.pincode]
       .filter((part): part is string => typeof part === 'string' && part.length > 0)
       .join(', ');
@@ -300,7 +306,7 @@ export function useAddressDetailsData(addressId?: string | null): AddressDetails
       ...(existing.receiverName === null ? {} : { receiverName: existing.receiverName }),
       ...(existing.receiverPhone === null ? {} : { receiverPhone: existing.receiverPhone }),
     });
-  }, [copy, draft, editing, existing, addresses.state]);
+  }, [copy, draft, editing, existing, addresses.state, addressId]);
 
   const savedPoint =
     existing === null ? null : { latitude: existing.latitude, longitude: existing.longitude };
