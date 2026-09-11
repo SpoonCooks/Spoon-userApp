@@ -24,7 +24,6 @@ export interface PaymentFailedBodyProps {
   readonly retrying: boolean;
   readonly onRetry: () => void;
   readonly cancelAllowed: boolean;
-  readonly cancelling: boolean;
   readonly onCancel: () => void;
 }
 
@@ -33,7 +32,6 @@ export function PaymentFailedBody({
   retrying,
   onRetry,
   cancelAllowed,
-  cancelling,
   onCancel,
 }: PaymentFailedBodyProps) {
   return (
@@ -49,7 +47,6 @@ export function PaymentFailedBody({
                 variant="outlineSoft"
                 size="bar"
                 fullWidth
-                disabled={cancelling}
                 testID="payment-failed-cancel"
               />
             ),

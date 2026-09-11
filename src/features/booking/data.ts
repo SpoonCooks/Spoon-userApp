@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { formatPaise } from '@core/format';
 import { useApiQuery, ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
+import { assertNever } from '@core/render';
 import { useRuntime } from '@core/runtimeContext';
 import { useAddresses } from '@features/address';
 import { useInstantAvailability } from '@features/availability';
@@ -430,11 +431,22 @@ export interface BookingSubmissionResult {
  * out of sync between callers the way two independently hand-written copies of this logic could.
  */
 export function destinationForPayment(payment: PaymentOutcome, bookingId: string): string {
-  if (payment === 'verified') return `/booking/confirming?id=${bookingId}`;
-  if (payment === 'failed') return `/booking/payment-failed?id=${bookingId}`;
-  // `cancelled` and `processing` both have nothing to confirm and nothing to explain: dismissing
-  // checkout is a choice, not a fault, and an order that was not ready is not a failure either.
-  return `/booking/${bookingId}`;
+  switch (payment) {
+    case 'verified':
+      return `/booking/confirming?id=${bookingId}`;
+    case 'failed':
+      return `/booking/payment-failed?id=${bookingId}`;
+    // `cancelled` and `processing` both have nothing to confirm and nothing to explain:
+    // dismissing checkout is a choice, not a fault, and an order that was not ready is not a
+    // failure either.
+    case 'cancelled':
+    case 'processing':
+      return `/booking/${bookingId}`;
+    default:
+      // Exhaustive by construction: a `PaymentOutcome` this app does not yet know how to route
+      // is a defect at the CALL SITE, not a reason to guess a destination.
+      return assertNever(payment);
+  }
 }
 
 export interface BookingSubmission {
@@ -515,7 +527,7 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
     // The booking now exists on HOLD. Payment is a SEPARATE operation against it, which is why
     // a failure below does not unmake the booking and is not thrown: the hold is real, the
     // server will expire it if nothing pays, and the customer is entitled to see that state.
-    const payment = await payAndClassify(pay, booking.booking.id);
+    const payment = await payAndClassify(pay.mutateAsync, booking.booking.id);
     return { booking, payment };
   }, [create, pay, addressId, durationMinutes, scheduledStart, selection.slotType]);
 
@@ -528,13 +540,15 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
  * payment from a callback). Shared by `useBookingSubmission` (paying for the booking it just
  * created) and `usePaymentRetry` (paying again for one that already exists), because the classify
  * step neither knows nor cares which caller it was.
+ *
+ * Takes `mutateAsync` alone, not the whole mutation — the only thing it does with it is call it.
  */
 async function payAndClassify(
-  pay: ReturnType<typeof usePayForBooking>,
+  mutateAsync: ReturnType<typeof usePayForBooking>['mutateAsync'],
   bookingId: string,
 ): Promise<PaymentOutcome> {
   try {
-    const order = await pay.mutateAsync({ bookingId, description: 'Spoon cooking service' });
+    const order = await mutateAsync({ bookingId, description: 'Spoon cooking service' });
 
     // `usePayForBooking` returns the order without opening checkout when the upstream order is
     // not ready. Nothing was charged and the same idempotency key retries the SAME order.
@@ -568,7 +582,7 @@ export function usePaymentRetry(
   readonly retry: () => Promise<PaymentOutcome>;
 } {
   const pay = usePayForBooking(launcher);
-  return { retrying: pay.isPending, retry: () => payAndClassify(pay, bookingId) };
+  return { retrying: pay.isPending, retry: () => payAndClassify(pay.mutateAsync, bookingId) };
 }
 
 /**

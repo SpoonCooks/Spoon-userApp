@@ -1,3 +1,4 @@
+import { BackHandler } from 'react-native';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import {
@@ -257,7 +258,9 @@ describe('Payment Failed — retry against the same hold, or leave once the serv
         api: createStubApi({
           ...DEFAULT_API_STUBS,
           ...CANCELLATION_STUBS,
-          'GET /v1/bookings/bk-1': () => ({ booking: bookingWith({ status: 'created', ...overrides }) }),
+          'GET /v1/bookings/bk-1': () => ({
+            booking: bookingWith({ status: 'created', ...overrides }),
+          }),
         }),
       }),
     });
@@ -330,6 +333,110 @@ describe('Payment Failed — retry against the same hold, or leave once the serv
     });
 
     await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/home'));
+  });
+});
+
+/* ------------------------------------------------------------- Cancel booking */
+
+describe('Cancel booking — `useCancelFlow`, shared by the booking host and Payment Failed', () => {
+  const CANCELLATION_STUBS = {
+    'GET /v1/bookings/bk-1/cancellation-preview': () => ({
+      bookingId: 'bk-1',
+      cancellable: true,
+      band: null,
+      refundPercent: null,
+      minutesToStart: null,
+      serviceAmountPaise: 12900,
+      capturedAmountPaise: 12900,
+      refundAmountPaise: 12900,
+      chargeAmountPaise: 0,
+      policyVersion: 'cancellation-policy-v0',
+    }),
+    'GET /v1/bookings/bk-1/reschedule-options': () => ({
+      bookingId: 'bk-1',
+      durationMinutes: 60,
+      currentServiceStart: '2026-08-18T12:00:00.000Z',
+      rescheduleCount: 0,
+      maxReschedules: 2,
+      reschedulable: false,
+    }),
+  };
+
+  /**
+   * A live, scheduled booking is what actually draws the Cancel control on the confirmation
+   * view (`instantBooking` hides it for Instant). This is the same route ([id].tsx) `useCancelFlow`
+   * was extracted out of, so driving the sheet all the way to `confirmed` here is the regression
+   * net for that extraction — not just "it typechecks".
+   */
+  it('drives the sheet through to a confirmed cancellation', async () => {
+    mockSearchParams = { id: 'bk-1' };
+    const cancelCalls: unknown[] = [];
+
+    renderWithRuntime(<BookingRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({
+            booking: bookingWith({ status: 'assigned', slotType: 'scheduled' }),
+          }),
+          'POST /v1/bookings/bk-1/cancel': (body: unknown) => {
+            cancelCalls.push(body);
+            return {};
+          },
+        }),
+      }),
+    });
+
+    fireEvent.press(await screen.findByTestId('confirmation-cancel'));
+    fireEvent.press(await screen.findByTestId('cancel-continue-policy'));
+    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
+    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
+    fireEvent.press(await screen.findByTestId('cancel-confirm'));
+
+    expect(await screen.findByTestId('cancel-step-confirmed')).toBeTruthy();
+    expect(cancelCalls).toEqual([{ reasonCode: 'URGENT_CHANGE' }]);
+  });
+
+  /**
+   * `[id].tsx`'s own comment explains why this exists: the sheet is a native modal that takes
+   * Android back itself in the general case, but a `QueryBoundary` still loading renders no
+   * modal at all — this is the host's own `useAndroidBackHandler`, wired through `cancelFlow`
+   * now instead of the local `cancelOpen` state it replaced, closing the loop for that gap.
+   */
+  it('Android back closes the open sheet (handled) and falls through once it is closed', async () => {
+    const spy = jest.spyOn(BackHandler, 'addEventListener');
+    mockSearchParams = { id: 'bk-1' };
+
+    renderWithRuntime(<BookingRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({
+            booking: bookingWith({ status: 'assigned', slotType: 'scheduled' }),
+          }),
+        }),
+      }),
+    });
+    fireEvent.press(await screen.findByTestId('confirmation-cancel'));
+    await screen.findByTestId('cancel-sheet');
+    const backHandler = spy.mock.calls.at(-1)?.[1] as () => boolean;
+
+    // `backHandler` triggers a `setState` outside of `fireEvent`, so the update needs its own
+    // `act` — otherwise the close is not guaranteed to have flushed before the assertion below.
+    let handled = false;
+    await act(async () => {
+      handled = backHandler();
+    });
+    expect(handled).toBe(true);
+    await waitFor(() => expect(screen.queryByTestId('cancel-sheet')).toBeNull());
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    // With the sheet closed, the SAME handler now defers to whatever the screen behind it does.
+    expect(backHandler()).toBe(false);
+
+    spy.mockRestore();
   });
 });
 

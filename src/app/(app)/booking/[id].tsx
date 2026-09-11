@@ -1,21 +1,17 @@
-import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   BookingDetailScreen,
   tipAmountPaiseFrom,
   useCallCook,
-  useCancelBooking,
   useExtensionCheckout,
   useRateBooking,
   useTipCheckout,
 } from '@features/booking';
-import { CancelBookingSheet, useCancellationData } from '@features/cancellation';
-import type { CancellationStep } from '@features/cancellation';
+import { useCancelFlow } from '@features/cancellation';
 import { useWhatsAppHelp } from '@features/support';
-import { ErrorBoundary, QueryBoundary, isNumericRating } from '@ui';
-import { getUserMessage, normalizeError } from '@core/errors';
-import { useAndroidBackHandler, useDeterministicBack } from '@core/navigation';
+import { ErrorBoundary, isNumericRating } from '@ui';
+import { useDeterministicBack } from '@core/navigation';
 
 /**
  * Booking lifecycle host - Confirmation (`3:1041`), En route (`3:1381` / `99:1413`), Arrived
@@ -49,10 +45,14 @@ export default function BookingRoute() {
   const rate = useRateBooking();
   const tip = useTipCheckout();
   const extend = useExtensionCheckout();
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelStep, setCancelStep] = useState<CancellationStep>('policy');
-  const cancellation = useCancellationData(bookingId === '' ? null : bookingId);
-  const cancelBooking = useCancelBooking();
+  const cancelFlow = useCancelFlow(bookingId === '' ? null : bookingId, {
+    onReschedule: () => router.push(`/reschedule/${bookingId}`),
+    onHelp: () => openHelp(`Hi Spoon, I need help cancelling my booking ${bookingId}.`),
+    // PRODUCT_DESIGN_CONFLICT (§37): `115:2703` labels this "Book Now", but a cancellation flow
+    // must not create a booking. It closes and returns the customer to Home, where booking
+    // actually starts. Recorded, not obeyed.
+    onCancelled: () => router.replace('/home'),
+  });
 
   /**
    * HOME, always — and now DETERMINISTICALLY so (V7 founder comment, task §11: "all these back
@@ -72,18 +72,6 @@ export default function BookingRoute() {
    */
   const goBack = useDeterministicBack('/home');
 
-  /**
-   * The cancellation sheet is a native modal and takes Android back itself. This closes the loop
-   * for the ONE state the modal cannot see: a sheet mid-flight whose `QueryBoundary` has not
-   * resolved yet renders no modal at all, so back would pop the booking out from under a
-   * cancellation the customer believes they opened.
-   */
-  useAndroidBackHandler(() => {
-    if (!cancelOpen) return false;
-    setCancelOpen(false);
-    return true;
-  });
-
   return (
     <ErrorBoundary scope="booking-host">
       <BookingDetailScreen
@@ -98,10 +86,7 @@ export default function BookingRoute() {
         }}
         callCookError={callCook.errorMessage}
         onDismissCallCookError={callCook.clearError}
-        onCancel={() => {
-          setCancelStep('policy');
-          setCancelOpen(true);
-        }}
+        onCancel={cancelFlow.open}
         /**
          * `275:4265` — "Extend" (task §15, the extension step of the service flow).
          *
@@ -193,63 +178,7 @@ export default function BookingRoute() {
         }}
       />
 
-      {cancelOpen ? (
-        <QueryBoundary state={cancellation.state} onRetry={cancellation.refetch}>
-          {(model) => (
-            <CancelBookingSheet
-              visible
-              cancellation={model}
-              step={cancelStep}
-              onStepChange={setCancelStep}
-              onClose={() => setCancelOpen(false)}
-              cancelling={cancelBooking.isPending}
-              cancelErrorMessage={
-                cancelBooking.error === null
-                  ? null
-                  : getUserMessage(normalizeError(cancelBooking.error))
-              }
-              onReschedule={() => {
-                setCancelOpen(false);
-                router.push(`/reschedule/${bookingId}`);
-              }}
-              onConfirmCancel={(reasonId, detail) => {
-                if (cancelBooking.isPending) return;
-
-                cancelBooking
-                  .mutateAsync({
-                    bookingId,
-                    reasonCode: reasonId,
-                    // The sheet already refuses to continue without a detail when the
-                    // catalogue's `requiresDetail` says one is needed. Whatever the customer
-                    // typed is forwarded — it is their words, and the server stores them.
-                    ...(detail.trim() === '' ? {} : { reasonDetail: detail.trim() }),
-                    scope: `booking.cancel:${bookingId}`,
-                  })
-                  .then(() => {
-                    // The fee, the refund and the final status are the SERVER's. The mutation
-                    // invalidates the booking reads; the confirmation step then renders what
-                    // came back rather than what this screen predicted.
-                    setCancelStep('confirmed');
-                  })
-                  .catch(() => {
-                    // Already normalized and surfaced by the sheet's own state. Staying on the
-                    // reason step lets the customer retry against the same idempotency scope.
-                  });
-              }}
-              onBookAgain={() => {
-                // PRODUCT_DESIGN_CONFLICT (§37): `115:2703` labels this "Book Now", but a
-                // cancellation flow must not create a booking. It closes and returns the
-                // customer to Home, where booking actually starts. Recorded, not obeyed.
-                setCancelOpen(false);
-                router.replace('/home');
-              }}
-              onHelp={() => {
-                openHelp(`Hi Spoon, I need help cancelling my booking ${bookingId}.`);
-              }}
-            />
-          )}
-        </QueryBoundary>
-      ) : null}
+      {cancelFlow.sheet}
     </ErrorBoundary>
   );
 }
