@@ -10,8 +10,10 @@ import { createKeyFactory } from '@core/query';
  * These are NOT two routes and NOT two designs. Which variant renders is decided by authoritative
  * server state (is there an active booking?), never by a client guess.
  *
- * Ruling R-5 — upcoming/active booking information appears here; there is no separate
- * Upcoming Bookings screen.
+ * Ruling R-5 — upcoming/active booking information appears here for AT-A-GLANCE, live-tracking
+ * purposes (ETA, arrival, in-service). The full list of every upcoming/past booking, any state,
+ * lives on My bookings (`@features/history`) — a separate, complete listing, not a duplicate of
+ * this curated carousel.
  *
  * Everything in the en-route card — ETA, cook name, duration — is dynamic backend data. The
  * client never computes an ETA.

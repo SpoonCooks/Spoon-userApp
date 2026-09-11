@@ -25,8 +25,10 @@ import type { BookingCardViewModel, StatusTone } from '@ui/types/viewModels';
  * as `UpcomingBookingCard` (task §22: do not distort the Figma design merely to force reuse).
  *
  * BOUNDARY: `statusLabel` + `statusTone` are PRESENTATION inputs. This component has no knowledge
- * of backend status values — the drawn set has no `Cancelled` (B-15) and no `Failed` (D-15), and
- * no enum exists to map. Amounts and ratings are pre-formatted server values; nothing is computed.
+ * of backend status values or of how they map to a label — that mapping lives in each screen's
+ * own adapter (`myBookingPresentationFor` for My bookings, `REFUND_PRESENTATION` for Refunds,
+ * both in `@features/history`). Refunds still draws no `Failed` state (D-15). Amounts and ratings
+ * are pre-formatted server values; nothing here is computed.
  */
 
 export type BookingCardVariant = 'history' | 'refund';

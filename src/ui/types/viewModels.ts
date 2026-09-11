@@ -96,10 +96,9 @@ export interface BookingCardViewModel {
   /** Secondary line: "12:30 PM - 01:45 PM", or "Refund expected by 15th Apr". */
   readonly subtitle?: string;
   /**
-   * Display text for the status pill — "Completed", "Unfulfilled", "Processing", "Refunded".
-   * TODO(backend-contract): the status enum does not exist. The drawn set has no `Cancelled`
-   * (B-15) and no `Failed` refund state (D-15). The screen maps status → label + tone; the
-   * component never does.
+   * Display text for the status pill — "Completed", "Cancelled", "Unfulfilled", "Confirmed",
+   * "Rescheduled" on My bookings; "Processing", "Refunded" on Refunds, which still has no
+   * drawn `Failed` state (D-15). The screen maps status → label + tone; the component never does.
    */
   readonly statusLabel?: string;
   readonly statusTone?: StatusTone;

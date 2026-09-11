@@ -101,7 +101,7 @@ export const DEV_ROUTES: readonly DevRoute[] = [
   { path: '/address?edit=1', label: 'Address · Edit / Delete sheet', note: 'NEW 228:1801' },
   { path: '/address/out-of-service', label: 'Address · Out of service', note: 'FINAL · 215:1472' },
   { path: '/profile', label: 'Profile', note: 'FINAL · Profile 275:6021 · 6:663' },
-  { path: '/history', label: 'Past bookings', note: 'FINAL · 6:227' },
+  { path: '/history', label: 'My bookings', note: 'FINAL · 6:227' },
   { path: '/refunds', label: 'Refunds', note: 'FINAL · 71:615' },
   { path: '/otp', label: 'Login · OTP (countdown)', note: 'FINAL · 275:4289' },
   { path: '/otp?state=ready', label: 'Login · OTP (resend ready)', note: 'FINAL · 250:2439' },

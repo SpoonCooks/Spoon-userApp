@@ -407,7 +407,17 @@ export const bookingSummaryCookSchema = z.object({
 });
 export type BookingSummaryCookDto = z.infer<typeof bookingSummaryCookSchema>;
 
-/** A row of `GET /v1/me/bookings` and `/me/bookings/active` — a summary, not the full detail. */
+/**
+ * A row of `GET /v1/me/bookings` and `/me/bookings/active` — a summary, not the full detail.
+ *
+ * `cancelledBy` / `policyBand` / `rescheduleCount` / `ratingStars` are loose and nullish for the
+ * same reason every other lifecycle-dependent field on this schema is (`recovery`,
+ * `reassignment`): each is only meaningful once something specific has happened to the booking
+ * (a cancellation, a reschedule, a rating), so a booking that never reached that state has none of
+ * it — never an invented default. `cancelledBy`/`policyBand` are bare strings, not enums, matching
+ * `bookingCancellationSchema.band` / `refundSchema.reason` elsewhere in this file: a new backend
+ * category must not crash parsing before the client has a name for it.
+ */
 export const bookingSummarySchema = z.object({
   id: z.string(),
   status: bookingStatusSchema,
@@ -419,6 +429,17 @@ export const bookingSummarySchema = z.object({
   cook: bookingSummaryCookSchema.nullish(),
   reassignment: bookingReassignmentSchema.nullish(),
   recovery: bookingRecoverySchema.nullish(),
+  /** Who cancelled it — `'customer' | 'operations' | 'system'`. Not sufficient alone to decide
+   * Cancelled vs. Unfulfilled; see `myBookingPresentationFor` in `@features/history`. */
+  cancelledBy: z.string().nullish(),
+  /** The refund policy that decided a cancellation. The field that actually distinguishes
+   * Unfulfilled (`'SERVICE_FAILURE_FULL_REFUND'`) from every other cancellation. */
+  policyBand: z.string().nullish(),
+  /** How many times the customer moved this booking. Capped at 1 by product policy (DEC-070). */
+  rescheduleCount: z.number().int().nullish(),
+  /** The customer's OWN rating for this specific booking — never the cook's aggregate average
+   * (`cook.ratingAverage`, a different field with different meaning). */
+  ratingStars: z.number().nullish(),
 });
 
 export type BookingSummaryDto = z.infer<typeof bookingSummarySchema>;

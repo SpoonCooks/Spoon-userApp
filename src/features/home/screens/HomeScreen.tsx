@@ -44,7 +44,8 @@ import type { HomeViewModel } from '../types';
  *
  * Ruling R-2: the variant is selected SOLELY by `activeBookings` being non-empty in the server
  * payload — never by a client guess, a timer, a local flag, or any inference about the booking
- * lifecycle. Ruling R-5: active bookings surface here; there is no Upcoming Bookings screen.
+ * lifecycle. Ruling R-5: this carousel is the at-a-glance, live-tracking surface; the full listing
+ * of every booking lives on My bookings (`@features/history`), a separate, complete screen.
  *
  * The frame's phone chrome — the 9.78pt bezel, the 44pt device radius, the status bar (`1:615`),
  * the notch (`1:630`) and the grey home indicator (`156:48`) — is MOCKUP, not app UI, and is
