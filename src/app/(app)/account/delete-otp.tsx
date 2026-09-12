@@ -97,11 +97,21 @@ export default function DeleteAccountOtpRoute() {
         message: blocked.message,
         actionLabel: blocked.actionLabel,
         onAction: () => {
-          if (target === 'bookings') router.push('/history' as Href);
-          if (target === 'refunds') router.push('/refunds' as Href);
+          /*
+           * REPLACE, not push. Taking this link abandons the deletion: the blocker has to be
+           * cleared first, and the code in the boxes will have expired long before that is done.
+           * Pushing left this spent screen underneath, so backing out of the bookings list
+           * returned the customer to an OTP they could no longer use and could not get past —
+           * observed on staging. Replacing drops it, leaving the Account screen as the thing
+           * behind them, which is where a second attempt starts anyway. Unmounting also retires
+           * the idempotency key, which is correct: the next attempt is a new one.
+           */
+          if (target === 'bookings') router.replace('/history' as Href);
+          if (target === 'refunds') router.replace('/refunds' as Href);
           // No resolution screen exists in this app (BLOCKED_BY_MISSING_EXISTING_UI in
           // `docs/FRONTEND_BACKEND_PENDING.md`), so a recovery case goes to the same WhatsApp
-          // line every other Help control in the app goes to.
+          // line every other Help control in the app goes to. That one does not navigate, so
+          // the screen stays as it is.
           if (target === 'support') openHelp('Hi Spoon, I want to delete my account.');
         },
       };

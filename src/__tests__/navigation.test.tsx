@@ -43,6 +43,8 @@ import ScheduledRoute from '@/app/(app)/scheduled';
 import LoginRoute from '@/app/(auth)/login';
 import OtpRoute from '@/app/(auth)/otp';
 import NotFoundRoute from '@/app/+not-found';
+import DeleteAccountOtpRoute from '@/app/(app)/account/delete-otp';
+import LegalDocumentRoute from '@/app/legal/[doc]';
 
 import { routeForNotification } from '@features/notifications';
 import { BANNER_DESTINATION_PAGE, homeBannerFor } from '@features/home';
@@ -565,6 +567,103 @@ describe('legal documents are reachable before signing in', () => {
     fireEvent.press(screen.getByText(label));
 
     expect(mockRouter.push).toHaveBeenCalledWith(href);
+  });
+
+  /**
+   * Back POPS, so the reader returns to whichever screen opened the document.
+   *
+   * This used to dismiss the stack and replace it with Profile, which was invisible while Profile
+   * was the only way in — origin and destination were the same screen. The Account screen now
+   * links here too, and on staging that sent a reader who opened the Terms from Account back to
+   * Profile, with the Account screen gone from under them.
+   */
+  it('returns to whichever screen opened it', () => {
+    mockSearchParams = { doc: 'terms' };
+    render(<LegalDocumentRoute />);
+
+    fireEvent.press(screen.getByTestId('legal-document-header-back'));
+
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.dismissAll).not.toHaveBeenCalled();
+  });
+
+  /** A cold `spoon://legal/:doc` has nothing to pop to, so it still lands somewhere real. */
+  it('falls back to Profile when there is no stack behind it', () => {
+    mockRouter = makeRouter(false);
+    mockSearchParams = { doc: 'privacy' };
+    render(<LegalDocumentRoute />);
+
+    fireEvent.press(screen.getByTestId('legal-document-header-back'));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith('/profile');
+  });
+});
+
+/**
+ * A booking in a list has to be reachable.
+ *
+ * `BookingListView` has always taken `onSelect` and `BookingCard` `onPress`, but no screen passed
+ * either — so every card was inert and the Cancel control on `/booking/:id` could not be reached
+ * from the list at all. Account deletion is what surfaced it: a deletion blocked by an active
+ * booking sends the customer to this list to clear it, and the list could not open the booking.
+ */
+describe('My bookings opens the booking it lists', () => {
+  it('pushes the booking the card names', async () => {
+    const api = createStubApi({
+      ...NAV_STUBS,
+      'GET /v1/me/bookings/active': () => ({
+        bookings: [
+          {
+            id: 'bk-live-1',
+            status: 'assigned',
+            slotType: 'scheduled',
+            scheduledStart: '2026-08-20T07:30:00.000Z',
+            durationMinutes: 60,
+            price: PRICE,
+            addressLabel: 'Home',
+          },
+        ],
+      }),
+    });
+    renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
+
+    fireEvent.press(await screen.findByTestId('history-screen-card-bk-live-1'));
+
+    expect(mockRouter.push).toHaveBeenCalledWith('/booking/bk-live-1');
+  });
+});
+
+/**
+ * A blocked deletion must not strand the customer on a spent OTP screen.
+ *
+ * Observed on staging: the "View my bookings" link PUSHED, so backing out of the bookings list
+ * returned to an OTP the customer could no longer use and could not get past. Taking the link
+ * abandons the attempt — the blocker has to be cleared first and the code expires long before
+ * that — so it replaces, leaving Account behind them, which is where a second attempt begins.
+ */
+describe('a blocked deletion leaves a way out', () => {
+  it('replaces the OTP screen rather than stacking the bookings list on it', async () => {
+    const api = createStubApi({
+      ...NAV_STUBS,
+      'DELETE /v1/me': () => {
+        throw {
+          kind: 'validation',
+          status: 409,
+          code: 'ACCOUNT_DELETION_BLOCKED',
+          message: 'This account cannot be deleted right now because of an active booking.',
+          details: { reason: 'ACTIVE_BOOKING' },
+        };
+      },
+    });
+    renderWithRuntime(<DeleteAccountOtpRoute />, { runtime: createTestRuntime({ api }) });
+
+    // The sixth digit IS the submit gesture; these frames draw no CTA.
+    fireEvent.changeText(await screen.findByTestId('otp-screen-input'), '123456');
+
+    fireEvent.press(await screen.findByTestId('otp-screen-notice-action'));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith('/history');
+    expect(mockRouter.push).not.toHaveBeenCalledWith('/history');
   });
 });
 
