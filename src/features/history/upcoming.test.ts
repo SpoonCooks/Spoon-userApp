@@ -1,3 +1,4 @@
+import { byMostRecentFirst } from './adapters';
 import { isStillUpcoming } from './data';
 import type { BookingSummaryDto } from '@features/booking';
 
@@ -88,5 +89,57 @@ describe('a booking with no booked window', () => {
     expect(isStillUpcoming(booking({ scheduledStart: null }), at('2030-01-01T00:00:00.000Z'))).toBe(
       true,
     );
+  });
+});
+
+/**
+ * Reading order, on both tabs.
+ *
+ * Neither tab ordered its rows: each rendered whatever order its endpoint returned, which on a
+ * real account interleaved dates — a Sep 13 row above a Sep 12 one above another Sep 12 one.
+ */
+describe('bookings read most recent first', () => {
+  const on = (id: string, iso: string | null) => booking({ id, scheduledStart: iso });
+
+  it('puts the latest booking at the top', () => {
+    const list = [
+      on('b-sep12-morning', '2026-09-12T05:00:00.000Z'),
+      on('b-sep13', '2026-09-13T05:00:00.000Z'),
+      on('b-sep12-evening', '2026-09-12T15:30:00.000Z'),
+    ];
+
+    expect([...list].sort(byMostRecentFirst).map((b) => b.id)).toEqual([
+      'b-sep13',
+      'b-sep12-evening',
+      'b-sep12-morning',
+    ]);
+  });
+
+  /** Same day, different times — the later slot reads first. */
+  it('orders by time of day, not only by date', () => {
+    const list = [
+      on('b-noon', '2026-09-12T12:00:00.000Z'),
+      on('b-late', '2026-09-12T15:30:00.000Z'),
+    ];
+
+    expect([...list].sort(byMostRecentFirst).map((b) => b.id)).toEqual(['b-late', 'b-noon']);
+  });
+
+  /**
+   * There is no other timestamp on the summary to order an undated row by, and floating one to
+   * the top of a list read as a chronology would be the more surprising answer.
+   */
+  it('sorts a booking with no scheduled start to the bottom', () => {
+    const list = [on('b-undated', null), on('b-dated', '2026-09-12T05:00:00.000Z')];
+
+    expect([...list].sort(byMostRecentFirst).map((b) => b.id)).toEqual(['b-dated', 'b-undated']);
+  });
+
+  /** Stable across refetches rather than reshuffling under the customer. */
+  it('breaks ties deterministically', () => {
+    const same = '2026-09-12T05:00:00.000Z';
+    const list = [on('b-2', same), on('b-1', same)];
+
+    expect([...list].sort(byMostRecentFirst).map((b) => b.id)).toEqual(['b-1', 'b-2']);
   });
 });
