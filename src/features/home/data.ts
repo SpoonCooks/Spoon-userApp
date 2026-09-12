@@ -13,6 +13,7 @@ import {
   formatTimeLabel,
   homeFrom,
   minutesUntil,
+  slotHasEnded,
 } from './adapters';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
 
@@ -175,6 +176,13 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
                   arrivedAtLabel: formatClockLabel(detailData.timing.arrivedAt),
                   canRate: detailData.allowedActions.canRate,
                   cancelledBy: detailData.cancellation?.cancelledBy ?? null,
+                  // The same window `timeLabel` above draws, asked whether it is over. Only the
+                  // cancelled card reads it; see `variantFor`.
+                  slotEnded: slotHasEnded(
+                    detailData.scheduledStart,
+                    detailData.durationMinutes,
+                    serverNow,
+                  ),
                   reassigned: detailData.reassignment?.occurred === true,
                   recoveryHandoff: detailData.recovery?.state === 'support_handoff',
                 });
