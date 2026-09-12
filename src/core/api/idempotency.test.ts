@@ -45,4 +45,25 @@ describe('idempotency scope', () => {
     const keys = new Set(Array.from({ length: 5000 }, () => createIdempotencyKey()));
     expect(keys.size).toBe(5000);
   });
+
+  /**
+   * The key's ALPHABET is contract, not decoration.
+   *
+   * Two layers guard it server-side and the inner one is much narrower than the outer: the
+   * transport accepts any printable ASCII up to 200 characters, but `idempotency/records.ts`
+   * rejects anything that is not `^[A-Za-z0-9._~-]{8,128}$` — and it rejects it as
+   * INVALID_REQUEST, which on the account-deletion screen is indistinguishable from the customer
+   * mistyping their OTP. A generator swapped for base64 or a nanoid with a wider alphabet would
+   * emit `+`, `/` or `=` and break deletion in a way that reads as the customer's fault.
+   *
+   * Base36 (`Number.prototype.toString(36)`) can only ever emit `0-9a-z`, and the composed length
+   * is fixed well inside 8..128 — this pins both so that neither can drift unnoticed.
+   */
+  it('only mints keys the backend will accept', () => {
+    const CONTRACT = /^[A-Za-z0-9._~-]{8,128}$/;
+
+    for (let attempt = 0; attempt < 1000; attempt += 1) {
+      expect(createIdempotencyKey()).toMatch(CONTRACT);
+    }
+  });
 });

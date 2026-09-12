@@ -13,11 +13,10 @@ import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
  * already ships in-app (`/legal/terms`, `/legal/privacy`); see the superseded Ruling R-6 in
  * `@features/profile`.
  *
- * "Yes" on the confirmation sheet no longer deletes directly — it requests an OTP
- * (`useRequestAccountDeletionOtp`, itself a local stub) and, once that resolves, hands off to the
- * Login OTP screen at `/account/delete-otp`. The actually-destructive step, and the one with no
- * backend behind it, is confirming that code — see `AccountDeletionUnavailableError` in
- * `../data.ts` and `docs/FRONTEND_BACKEND_PENDING.md`.
+ * "Yes" on the confirmation sheet deletes nothing — it requests the confirmation code and, once
+ * the server says one is on its way, hands off to `/account/delete-otp`, which spends it on
+ * `DELETE /v1/me`. A code that never went out stops here, in the sheet, exactly as a failed
+ * `otp/send` stops on Login rather than opening Login's OTP screen.
  */
 export interface AccountActions {
   readonly onBack: () => void;
@@ -25,13 +24,13 @@ export interface AccountActions {
   readonly onOpenPrivacy: () => void;
   readonly onOpenDeleteSheet: () => void;
   readonly onCloseDeleteSheet: () => void;
-  /** "Yes" on the sheet — requests the confirmation OTP, then hands off to `/account/delete-otp`. */
+  /** "Yes" on the sheet — requests the code, then hands off to `/account/delete-otp`. */
   readonly onConfirmDelete: () => void;
 }
 
 export interface AccountViewProps extends AccountActions {
   readonly deleteSheetVisible: boolean;
-  /** The OTP request is in flight — see `useRequestAccountDeletionOtp`. */
+  /** The code request is in flight, or the identity it needs is still loading. */
   readonly requestingDeleteOtp?: boolean;
   readonly requestDeleteOtpErrorMessage?: string | null;
 }

@@ -106,38 +106,74 @@ integration pass — `addressWriteResponseSchema` already required `serviceabili
 deliberately NOT weakened to accept the stale shape: doing so would drop the one field the
 first-run gate now reads. Re-verify after deployment.
 
+## 2b. Account deletion — CLOSED in contract, wired
+
+`BACKEND_GAP_ACCOUNT_DELETE` is retired. `DELETE /v1/me` exists, is instant and self-serve, and
+the frontend consumes it: Profile → Account → Delete Account → No/Yes sheet → `/account/delete-otp`
+(Login's own `OtpScreen`, reused rather than reproduced) → `DELETE /v1/me`.
+
+**The code is never pre-verified.** `POST /v1/auth/otp/verify` would consume the one-time code and
+mint a session as a side effect, so the delete call would arrive holding a code the server had
+already spent. The typed code goes straight into the delete body, which verifies it itself.
+
+**`audience` is sent by deletion only.** `POST /v1/auth/otp/send` defaults a missing `audience` to
+`customer`, so Login's request is left exactly as it was — pinned by `authApi.test.ts`, because a
+default leaking into Login would change a working production request on the app's only way in.
+Deletion also sends the call authenticated: the route ignores the header, but the auth rate limiter
+buckets by user id when a token is present and by phone when it is not, which keeps deletion sends
+out of the same 8-per-10-minutes budget as login sends on that number.
+
+**Idempotency.** One key per attempt (`account:delete:<userId>`), held across every retry of it —
+wrong code, block, timeout, 5xx — because the server hashes an empty body against the key and marks
+a failure `failed_retryable`, so the same key with a corrected code is processed rather than
+replayed. The key is retired when the customer leaves the OTP screen, so re-entering the flow is a
+genuinely new attempt. The key's alphabet is contract (`^[A-Za-z0-9._~-]{8,128}$`, narrower than
+the transport's 200-char printable-ASCII ceiling) and is pinned by `idempotency.test.ts`: a
+generator swapped for base64 or a wide-alphabet nanoid would emit `+` or `=` and fail as
+INVALID_REQUEST, which on this screen is indistinguishable from a mistyped OTP.
+
+**Retention copy.** Bookings, payments and refunds are RETAINED for eight years under Indian tax
+law, with the name and number stripped. No copy in this flow may say "all your data will be
+deleted"; the store-compliance disclosure is tracked as outstanding UI work, not a contract gap.
+
+**KNOWN: one `GET /v1/me` 401s immediately after a successful deletion.** The contract says not to
+call an authenticated endpoint after the 200, and this one is not called deliberately. Sign-out
+runs `queryClient.clear()` BEFORE it dispatches `SIGNED_OUT` (`onSessionCleared` in
+`src/core/runtime.ts`), so for the moment between the two, the OTP screen's `useMe` observer is
+still mounted against an empty cache and refetches with tokens the server has already revoked.
+
+It is bounded to a single request — auth errors are not retryable (`src/core/query/queryClient.ts`)
+— and self-correcting: the 401 lands in the same global handler that has already signed the
+customer out. It is NOT specific to deletion; a normal Log Out from Profile does the same thing
+with the same query. Fixing it properly means reordering teardown inside `sessionController`,
+which every sign-out in the app shares, so it is recorded here rather than worked around locally
+for one screen. Expect one post-deletion 401 per deletion in backend logs.
+
+**KNOWN: a blocked deletion leaves the six typed digits in place.** `ACCOUNT_DELETION_BLOCKED` is
+the one failure where the code was accepted, so the customer may want to retry the SAME code once
+they have cleared the booking or refund. The frames draw no CTA — the code submits when the last
+digit lands — so there is no control that resubmits an unchanged code. In practice the customer
+leaves the screen to deal with the blocker (the notice links them there), and re-entering the flow
+resets everything, so this is a dead end only for someone who resolves the block without leaving.
+
+### PENDING_BACKEND_DEPLOYMENT_VERIFICATION — `details.reason` on a blocked deletion
+
+`ACCOUNT_DELETION_BLOCKED` (409) currently returns `{ error: { code, message, requestId } }` with a
+fixed sentence naming all three possible causes — active booking, refund in progress, open recovery
+case — and no way to tell which one fired. The backend is adding `details.reason`
+(`active_booking` / `pending_refund` / `open_recovery_case`) following the same `publicDetails`
+pattern `SLOT_UNAVAILABLE` already uses.
+
+The client is already written for both: `deletionFailureView` (`src/features/account`) reads
+`details.reason` when present and names the cause with a link to the screen that clears it
+(bookings, refunds, or the WhatsApp line for a recovery case, since no resolution screen exists —
+see §4), and falls back to the server's own sentence with no link when it is absent. **No frontend
+change is needed when the field ships**; re-verify the deep-link targets against a real 409 then.
+
+A blocked deletion is deliberately NOT drawn in the rejected-code slot: the code was accepted, and
+tinting the digit boxes red would tell the customer they mistyped something they did not.
+
 ## 3. Still open
-
-### `BACKEND_GAP_ACCOUNT_DELETE` — blocks Delete Account
-
-The Profile → Account screen (`@features/account`) ships a full "Delete Account" UI: a
-destructive row opens a bottom-sheet confirmation ("Are you sure you want to delete?" / No / Yes),
-and "Yes" hands off to an OTP confirmation screen at `/account/delete-otp` — the same `OtpScreen`
-(`@features/auth`) Login uses, reused as-is. No endpoint exists for either half of this:
-
-- **Requesting the code.** There is no deletion-specific "send OTP" endpoint, and Login's
-  `POST /v1/auth/otp/send` / `verify` cannot be reused as-is: `useVerifyOtp` rotates the session's
-  tokens on success as an inseparable side effect of authenticating, so calling it here would
-  silently re-authenticate the customer instead of confirming a deletion.
-  `useRequestAccountDeletionOtp` (`src/features/account/data.ts`) resolves locally, with no
-  network call, purely so the OTP screen can be reached and exercised.
-- **Confirming it, and deleting.** No `DELETE /v1/me` (or equivalent) exists either.
-  `useConfirmAccountDeletion` is wired but its `mutationFn` throws
-  `AccountDeletionUnavailableError` without making a network call: a guessed endpoint could 404
-  silently or hit the wrong resource, either of which would misrepresent whether the account was
-  actually deleted. The OTP screen surfaces the failure in its own error slot and stays put — it
-  never claims success, and a customer never ends up looking at a "your account was deleted"
-  state that isn't true.
-
-Also unresolved: the bundled Privacy Policy copy already promises "Account deletion requests are
-processed within 30 days", which reads as a queued request rather than an immediate delete. Which
-of the two this is is a product/contract decision, not something the frontend can infer.
-
-*Minimal change:* add a deletion-specific OTP send/verify pair (or fold verification into a single
-`DELETE /v1/me` call that takes the code) and point the two `mutationFn`s at them; the sheet, the
-OTP screen, loading state and error surface need no further frontend change. On success, the route
-(`src/app/(app)/account/delete-otp.tsx`) already tears the session down and redirects to `/`, same
-as Log Out.
 
 ### `BACKEND_GAP_EXTENSION_KEY_ID` — blocks extension checkout
 

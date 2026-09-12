@@ -22,7 +22,7 @@
 export { LoginScreen } from './screens/LoginScreen';
 export type { LoginScreenProps } from './screens/LoginScreen';
 export { OtpScreen } from './screens/OtpScreen';
-export type { OtpScreenProps } from './screens/OtpScreen';
+export type { OtpNotice, OtpScreenProps } from './screens/OtpScreen';
 export type { LoginViewModel, OtpViewModel } from './types';
 
 export {
@@ -53,4 +53,5 @@ export type {
   OtpVerifyResponse,
   ProfileData,
   ProfileUpdateRequest,
+  SendOtpOptions,
 } from './api';

@@ -39,25 +39,30 @@ describe('DeleteAccountSheet', () => {
     expect(actions.onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('disables both buttons while confirming', () => {
+  it('disables both buttons while the code is being requested', () => {
     render(<DeleteAccountSheet visible {...actions} confirming />);
 
     expect(screen.getByTestId('delete-account-no').props.accessibilityState.disabled).toBe(true);
     expect(screen.getByTestId('delete-account-yes').props.accessibilityState.disabled).toBe(true);
   });
 
-  it('surfaces an error without dismissing the sheet', () => {
+  /**
+   * A code that never went out stops the flow HERE.
+   *
+   * The OTP screen's own copy says a code has been sent, so opening it on a failed send would
+   * make the screen state something untrue and leave the customer waiting for a message that is
+   * not coming. Login stops the same failure on the same screen, for the same reason.
+   */
+  it('shows a failed send without dismissing, so the OTP screen never opens', () => {
     render(
       <DeleteAccountSheet
         visible
         {...actions}
-        errorMessage="Deleting your account isn't available yet. Please contact support."
+        errorMessage="Too many attempts. Please wait a moment and try again."
       />,
     );
 
     expect(screen.getByTestId('delete-account-sheet')).toBeTruthy();
-    expect(
-      screen.getByText("Deleting your account isn't available yet. Please contact support."),
-    ).toBeTruthy();
+    expect(screen.getByText('Too many attempts. Please wait a moment and try again.')).toBeTruthy();
   });
 });

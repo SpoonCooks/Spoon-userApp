@@ -58,18 +58,26 @@ describe('Account screen', () => {
     expect(actions.onConfirmDelete).toHaveBeenCalledTimes(1);
   });
 
-  it('surfaces an OTP-request failure inside the sheet rather than closing it', () => {
+  /**
+   * "Yes" requests the code from here, so a send that fails has to be reported here — the OTP
+   * screen is only reached once a code is genuinely on its way.
+   */
+  it('surfaces a failed code request in the sheet', () => {
     render(
       <AccountView
         {...actions}
         deleteSheetVisible
-        requestDeleteOtpErrorMessage="Deleting your account isn't available yet. Please contact support."
+        requestDeleteOtpErrorMessage="Too many attempts. Please wait a moment and try again."
       />,
     );
 
     expect(screen.getByTestId('delete-account-sheet')).toBeTruthy();
-    expect(
-      screen.getByText("Deleting your account isn't available yet. Please contact support."),
-    ).toBeTruthy();
+    expect(screen.getByText('Too many attempts. Please wait a moment and try again.')).toBeTruthy();
+  });
+
+  it('shows the request as in flight rather than letting it be fired twice', () => {
+    render(<AccountView {...actions} deleteSheetVisible requestingDeleteOtp />);
+
+    expect(screen.getByTestId('delete-account-yes').props.accessibilityState.disabled).toBe(true);
   });
 });

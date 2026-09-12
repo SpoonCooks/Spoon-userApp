@@ -16,11 +16,15 @@ import { BottomSheet, Button, PromptBlock, Text, lightTheme } from '@ui';
 export interface DeleteAccountSheetProps {
   readonly visible: boolean;
   readonly onClose: () => void;
-  /** "Yes" — the host requests an OTP and, once it resolves, hands off to the OTP screen. */
+  /**
+   * "Yes" — requests the confirmation code. The OTP screen opens only once the server says a code
+   * is on its way, the same order Login uses, so that screen can never open having to admit it
+   * could not send one.
+   */
   readonly onConfirm: () => void;
-  /** The OTP request is in flight — disables both buttons and shows the Yes CTA as loading. */
+  /** The request is in flight — disables both buttons and shows the Yes CTA as loading. */
   readonly confirming?: boolean;
-  /** Surfaced without dismissing the sheet, so the customer can see why nothing happened. */
+  /** A code that never went out. Shown here, without dismissing, so the flow stops before the OTP. */
   readonly errorMessage?: string | null;
 }
 
