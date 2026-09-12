@@ -1,4 +1,4 @@
-import { slotHasEnded } from './adapters';
+import { slotHasEnded } from '@core/time';
 import { selectHomeBookings } from './data';
 
 import type { BookingSummaryDto } from '@features/booking';

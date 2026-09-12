@@ -5,7 +5,7 @@ import { addressLineOf, useAddresses } from '@features/address';
 import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
-import { currentSkewMs } from '@core/time';
+import { currentSkewMs, slotHasEnded } from '@core/time';
 
 import {
   formatClockLabel,
@@ -13,7 +13,6 @@ import {
   formatTimeLabel,
   homeFrom,
   minutesUntil,
-  slotHasEnded,
 } from './adapters';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
 

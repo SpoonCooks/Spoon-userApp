@@ -77,32 +77,6 @@ export function minutesUntil(
 }
 
 /**
- * Whether the slot this booking was made for has already finished.
- *
- * The window is the one the card itself draws — `formatTimeLabel`'s "5:30 PM • 2 hr" is
- * `scheduledStart` plus `durationMinutes`, and this asks whether the end of that has passed. A
- * card and its own lifetime therefore agree by construction.
- *
- * This is NOT a substitute for `timing.expectedEnd`, which is when a service actually ends and is
- * the only authority for "Time left" on a live card. It answers a different question, for a
- * booking where no service is going to happen at all.
- *
- * An absent or unparseable start means there is no window to have ended — an instant booking
- * carries no `scheduledStart` — so it reports false and the card is left alone. Hiding a card on
- * the strength of a timestamp we could not read would be the worse failure.
- */
-export function slotHasEnded(
-  iso: string | null | undefined,
-  durationMinutes: number,
-  now: Date = new Date(),
-): boolean {
-  if (iso === null || iso === undefined) return false;
-  const start = new Date(iso);
-  if (Number.isNaN(start.getTime())) return false;
-  return start.getTime() + durationMinutes * 60_000 <= now.getTime();
-}
-
-/**
  * Composes the Home view model.
  *
  * `base` is the STATIC screen definition — the promo panels, the two booking tiles, the cuisine

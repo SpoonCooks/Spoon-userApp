@@ -16,6 +16,7 @@
 export {
   BOOKING_STATUS_VIEWS,
   isAwaitingConfirmation,
+  isFinishedBooking,
   resolveBookingView,
   UNKNOWN_BOOKING_VIEW,
 } from './state/bookingStatusView';
