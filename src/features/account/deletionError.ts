@@ -42,24 +42,30 @@ const BLOCKED_FALLBACK =
  * `details.reason` — added to the 409 by the backend so the customer can be sent somewhere useful
  * instead of being told to go and find the problem themselves.
  *
- * An unrecognised reason falls through to the server's own sentence and no action, because a
+ * The wire values are UPPER_SNAKE_CASE. They were first described to us in lower_snake_case and
+ * corrected later, which is exactly the kind of drift that fails SILENTLY here: a miss produces
+ * no error, it just quietly degrades to the generic sentence and drops the link. So the lookup
+ * normalises case rather than trusting either spelling.
+ *
+ * An unrecognised reason still falls through to the server's own sentence with no action — a
  * reason this build has never heard of is not grounds for sending someone to the wrong screen.
+ * Only the FIRST blocker is ever reported; the server short-circuits.
  */
 const BLOCKED_BY_REASON: Readonly<Record<string, DeletionBlockedNotice>> = {
-  active_booking: {
+  ACTIVE_BOOKING: {
     message:
       'You have a booking in progress. Finish or cancel it, then you can delete your account.',
     actionLabel: 'View my bookings',
     target: 'bookings',
   },
-  pending_refund: {
+  PENDING_REFUND: {
     message: 'A refund is still being processed. Once it completes you can delete your account.',
     actionLabel: 'View my refunds',
     target: 'refunds',
   },
-  open_recovery_case: {
+  OPEN_RECOVERY_CASE: {
     message:
-      'There is an open support case on your account. Once it is closed you can delete your account.',
+      'There is an open support case on your account. Our team has to close it before the account can be deleted.',
     actionLabel: 'Message support',
     target: 'support',
   },
@@ -72,7 +78,7 @@ export function deletionFailureView(error: unknown): DeletionFailureView | null 
 
   if (appError.code === 'ACCOUNT_DELETION_BLOCKED') {
     const reason = appError.details?.reason;
-    const known = reason === undefined ? undefined : BLOCKED_BY_REASON[reason];
+    const known = reason === undefined ? undefined : BLOCKED_BY_REASON[reason.toUpperCase()];
     if (known !== undefined) return { notice: known };
 
     return { notice: { message: serverMessageOr(appError.message, BLOCKED_FALLBACK) } };

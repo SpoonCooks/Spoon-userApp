@@ -37,11 +37,15 @@ describe('a blocked account', () => {
     expect(view?.notice?.target).toBeUndefined();
   });
 
-  /** `details.reason` — each one names its own cause and offers the way out of it. */
+  /**
+   * `details.reason` — each one names its own cause and offers the way out of it.
+   *
+   * These are the wire values verbatim: UPPER_SNAKE_CASE, captured from a real 409.
+   */
   it.each([
-    ['active_booking', 'bookings'],
-    ['pending_refund', 'refunds'],
-    ['open_recovery_case', 'support'],
+    ['ACTIVE_BOOKING', 'bookings'],
+    ['PENDING_REFUND', 'refunds'],
+    ['OPEN_RECOVERY_CASE', 'support'],
   ] as const)('routes %s to the %s screen', (reason, target) => {
     const view = deletionFailureView(
       fromStatus(409, { code: 'ACCOUNT_DELETION_BLOCKED', details: { reason } }),
@@ -50,6 +54,19 @@ describe('a blocked account', () => {
     expect(view?.notice?.target).toBe(target);
     expect(view?.notice?.actionLabel).toBeDefined();
     expect(view?.errorMessage).toBeUndefined();
+  });
+
+  /**
+   * The casing was described to us in lower_snake_case first and corrected to UPPER later. A miss
+   * here throws no error — it silently degrades to the generic sentence and drops the link — so
+   * the lookup is deliberately case-insensitive and this pins that.
+   */
+  it('matches the reason whichever case the server sends it in', () => {
+    const view = deletionFailureView(
+      fromStatus(409, { code: 'ACCOUNT_DELETION_BLOCKED', details: { reason: 'active_booking' } }),
+    );
+
+    expect(view?.notice?.target).toBe('bookings');
   });
 
   /**

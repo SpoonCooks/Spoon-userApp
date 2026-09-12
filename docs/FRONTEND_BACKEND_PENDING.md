@@ -166,22 +166,62 @@ digit lands — so there is no control that resubmits an unchanged code. In prac
 leaves the screen to deal with the blocker (the notice links them there), and re-entering the flow
 resets everything, so this is a dead end only for someone who resolves the block without leaving.
 
-### PENDING_BACKEND_DEPLOYMENT_VERIFICATION — `details.reason` on a blocked deletion
+### PENDING_BACKEND_DEPLOYMENT — `details.reason` on a blocked deletion
 
-`ACCOUNT_DELETION_BLOCKED` (409) currently returns `{ error: { code, message, requestId } }` with a
-fixed sentence naming all three possible causes — active booking, refund in progress, open recovery
-case — and no way to tell which one fired. The backend is adding `details.reason`
-(`active_booking` / `pending_refund` / `open_recovery_case`) following the same `publicDetails`
-pattern `SLOT_UNAVAILABLE` already uses.
+`ACCOUNT_DELETION_BLOCKED` (409) returns `{ error: { code, message, requestId } }` with a fixed
+sentence naming all three possible causes — active booking, refund in progress, open recovery case
+— and no way to tell which one fired. `details.reason` fixes that and is **committed backend-side
+(`b6a7ca0`) but not merged and not deployed**, so against staging and production today the field is
+absent. The fallback is the behaviour to expect on the first real run.
 
-The client is already written for both: `deletionFailureView` (`src/features/account`) reads
-`details.reason` when present and names the cause with a link to the screen that clears it
-(bookings, refunds, or the WhatsApp line for a recovery case, since no resolution screen exists —
-see §4), and falls back to the server's own sentence with no link when it is absent. **No frontend
-change is needed when the field ships**; re-verify the deep-link targets against a real 409 then.
+Wire values are **UPPER_SNAKE_CASE** — `ACTIVE_BOOKING` / `PENDING_REFUND` / `OPEN_RECOVERY_CASE`
+— captured from a real 409. They were first described to us in lower_snake_case, which is why
+`deletionFailureView` matches case-insensitively and `deletionError.test.ts` pins it: a miss here
+raises nothing, it silently degrades to the generic sentence and drops the link. Only the FIRST
+blocker is ever reported; the server short-circuits in that order.
+
+The client is already written for both states, so **no frontend change is needed when the field
+ships** — re-verify the deep-link targets against a real 409 then.
 
 A blocked deletion is deliberately NOT drawn in the rejected-code slot: the code was accepted, and
 tinting the digit boxes red would tell the customer they mistyped something they did not.
+
+### Verified against the running implementation
+
+Captured by the backend from real requests, and reconciled against what this client sends:
+
+- **`otp/send` answers 202, not 200.** Our transport accepts any 2xx (`response.ok`) and never
+  asserts a status, so this is already correct — but a future `=== 200` check would break it.
+- **`DELETE /v1/me` with a JSON body is parsed**, confirmed by a real deletion. This app had no
+  DELETE-with-body precedent before; that concern is closed.
+- **`/v1/me.phone` cannot be anything but strict E.164.** Every write path calls `normalizePhone`,
+  which strips separators and enforces the pattern or throws. The `toE164` call in
+  `useRequestAccountDeletionOtp` is now belt-and-braces rather than load-bearing; it is kept
+  because it is idempotent and costs nothing.
+- **A malformed `Idempotency-Key` returns the SAME 400 body as a wrong OTP.** This is precisely
+  why `idempotency.test.ts` pins the key alphabet: a generator swapped for base64 or a wide
+  nanoid would emit `+`, `/` or `=`, and every deletion would fail telling the customer their
+  code was wrong.
+- **`INVALID_REQUEST` cannot distinguish a wrong code from an expired or already-spent one.** The
+  backend collapses all five failure modes deliberately, so an attacker cannot learn which
+  condition they tripped. Our copy says "Incorrect OTP. Please try again", which is the Figma
+  string and is imprecise for an expired code — **the same imprecision Login already ships**,
+  since it is the same endpoint and the same collapsed error. Worth a copy decision across BOTH
+  screens rather than diverging one of them.
+
+### KNOWN: no usable retry time on the OTP cooldown 429
+
+There are two different 429s on this path and they are indistinguishable in the response body:
+the distributed limiter (30/60s per IP, 8/600s per account) sends a `Retry-After` header, and the
+30-second same-number OTP cooldown sends **no header at all**. The cooldown is the one this flow
+hits most.
+
+We show the shared "Too many attempts" copy with no number in both cases. Reading the header would
+need response headers plumbed into `AppError`, which the transport does not carry today — a change
+to shared error handling for every feature, not just this one. The resend countdown already stops
+a customer reaching the cooldown by tapping, so this is a polish item, not a defect. The backend
+has offered to add the missing header on the cooldown path; taking that up would make a single
+follow-up worthwhile for every rate-limited surface in the app.
 
 ## 3. Still open
 
