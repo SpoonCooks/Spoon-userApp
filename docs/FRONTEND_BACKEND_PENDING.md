@@ -132,9 +132,19 @@ the transport's 200-char printable-ASCII ceiling) and is pinned by `idempotency.
 generator swapped for base64 or a wide-alphabet nanoid would emit `+` or `=` and fail as
 INVALID_REQUEST, which on this screen is indistinguishable from a mistyped OTP.
 
-**Retention copy.** Bookings, payments and refunds are RETAINED for eight years under Indian tax
-law, with the name and number stripped. No copy in this flow may say "all your data will be
-deleted"; the store-compliance disclosure is tracked as outstanding UI work, not a contract gap.
+**Retention copy — SHIPPED.** Bookings, payments and refunds are RETAINED for eight years under
+Indian tax law, with the name and number stripped, so no copy in this flow may say "all your data
+will be deleted". The confirmation sheet now discloses that deletion is immediate and
+irreversible, what is erased, that every session ends, and what is kept and for how long.
+`DeleteAccountSheet.test.tsx` asserts each of those claims — including that the sheet never
+overstates what is erased — so a release that drops one fails there rather than in store review.
+
+**STILL WRONG: the Privacy Policy contradicts this.** `src/features/legal/documents.ts` tells
+customers that "Account deletion requests are processed within 30 days" (twice) and that
+"Financial records are retained for 7 years". Deletion is immediate, and the retention period is
+eight years. That document is reachable one row above Delete Account on the same screen, so a
+reviewer testing this flow is one tap from the contradiction. Legal copy is not the frontend's to
+rewrite — this needs product/legal sign-off, then a straight text replacement in that file.
 
 **KNOWN: one `GET /v1/me` 401s immediately after a successful deletion.** The contract says not to
 call an authenticated endpoint after the 200, and this one is not called deliberately. Sign-out

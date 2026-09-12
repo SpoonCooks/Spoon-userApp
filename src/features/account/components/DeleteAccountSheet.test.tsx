@@ -66,3 +66,50 @@ describe('DeleteAccountSheet', () => {
     expect(screen.getByText('Too many attempts. Please wait a moment and try again.')).toBeTruthy();
   });
 });
+
+/**
+ * App-store compliance. Apple and Google both reject deletion flows that fail to say the action
+ * is immediate and irreversible, or that overstate what is erased.
+ *
+ * These assert the SUBSTANCE rather than the sentences — the wording is the product's to change,
+ * but a release that drops any of these claims is a release that gets rejected, and that should
+ * fail here rather than in review.
+ */
+describe('what the sheet has to disclose', () => {
+  it('says the deletion is immediate and cannot be reversed', () => {
+    render(<DeleteAccountSheet visible {...actions} />);
+
+    expect(screen.getByText(/immediately and cannot be undone/i)).toBeTruthy();
+  });
+
+  it('names what is erased, and that it ends every session', () => {
+    render(<DeleteAccountSheet visible {...actions} />);
+
+    const erased = screen.getByText(/permanently deleted/i);
+    expect(erased).toHaveTextContent(/name/i);
+    expect(erased).toHaveTextContent(/phone number/i);
+    expect(erased).toHaveTextContent(/addresses/i);
+    expect(erased).toHaveTextContent(/signed out everywhere/i);
+  });
+
+  /**
+   * The one that would actually fail review. Bookings, payments and refunds SURVIVE a deletion —
+   * eight years of them — so a sheet that implies otherwise is making a false claim about the
+   * customer's data on the screen where they consent to losing it.
+   */
+  it('admits that financial records are kept, and for how long', () => {
+    render(<DeleteAccountSheet visible {...actions} />);
+
+    const retained = screen.getByText(/8 years/i);
+    expect(retained).toHaveTextContent(/Payment and invoice records/i);
+    expect(retained).toHaveTextContent(/name and number removed/i);
+  });
+
+  it('never claims everything is deleted', () => {
+    render(<DeleteAccountSheet visible {...actions} />);
+
+    expect(screen.getByTestId('delete-account-disclosure')).not.toHaveTextContent(
+      /all (of )?your data/i,
+    );
+  });
+});
