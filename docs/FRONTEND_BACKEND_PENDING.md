@@ -111,21 +111,33 @@ first-run gate now reads. Re-verify after deployment.
 ### `BACKEND_GAP_ACCOUNT_DELETE` — blocks Delete Account
 
 The Profile → Account screen (`@features/account`) ships a full "Delete Account" UI: a
-destructive row that opens a bottom-sheet confirmation ("Are you sure you want to delete?" /
-No / Yes). No endpoint exists for the "Yes" action — no `DELETE /v1/me` or equivalent anywhere in
-the audited contract.
+destructive row opens a bottom-sheet confirmation ("Are you sure you want to delete?" / No / Yes),
+and "Yes" hands off to an OTP confirmation screen at `/account/delete-otp` — the same `OtpScreen`
+(`@features/auth`) Login uses, reused as-is. No endpoint exists for either half of this:
 
-`useDeleteAccount` (`src/features/account/data.ts`) is wired but its `mutationFn` throws
-`AccountDeletionUnavailableError` without making a network call: a guessed endpoint could 404
-silently or hit the wrong resource, either of which would misrepresent whether the account was
-actually deleted. The sheet surfaces the failure inline and stays open — it never claims success.
+- **Requesting the code.** There is no deletion-specific "send OTP" endpoint, and Login's
+  `POST /v1/auth/otp/send` / `verify` cannot be reused as-is: `useVerifyOtp` rotates the session's
+  tokens on success as an inseparable side effect of authenticating, so calling it here would
+  silently re-authenticate the customer instead of confirming a deletion.
+  `useRequestAccountDeletionOtp` (`src/features/account/data.ts`) resolves locally, with no
+  network call, purely so the OTP screen can be reached and exercised.
+- **Confirming it, and deleting.** No `DELETE /v1/me` (or equivalent) exists either.
+  `useConfirmAccountDeletion` is wired but its `mutationFn` throws
+  `AccountDeletionUnavailableError` without making a network call: a guessed endpoint could 404
+  silently or hit the wrong resource, either of which would misrepresent whether the account was
+  actually deleted. The OTP screen surfaces the failure in its own error slot and stays put — it
+  never claims success, and a customer never ends up looking at a "your account was deleted"
+  state that isn't true.
 
 Also unresolved: the bundled Privacy Policy copy already promises "Account deletion requests are
 processed within 30 days", which reads as a queued request rather than an immediate delete. Which
 of the two this is is a product/contract decision, not something the frontend can infer.
 
-*Minimal change:* add the endpoint (immediate or queued) and point `mutationFn` at it; the sheet,
-loading state and error surface need no further frontend change.
+*Minimal change:* add a deletion-specific OTP send/verify pair (or fold verification into a single
+`DELETE /v1/me` call that takes the code) and point the two `mutationFn`s at them; the sheet, the
+OTP screen, loading state and error surface need no further frontend change. On success, the route
+(`src/app/(app)/account/delete-otp.tsx`) already tears the session down and redirects to `/`, same
+as Log Out.
 
 ### `BACKEND_GAP_EXTENSION_KEY_ID` — blocks extension checkout
 

@@ -13,9 +13,11 @@ import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
  * already ships in-app (`/legal/terms`, `/legal/privacy`); see the superseded Ruling R-6 in
  * `@features/profile`.
  *
- * Delete Account has no backend behind it yet — see `AccountDeletionUnavailableError` in
- * `../data.ts` and `docs/FRONTEND_BACKEND_PENDING.md`. The sheet stays open and shows the
- * failure rather than pretending the account was deleted.
+ * "Yes" on the confirmation sheet no longer deletes directly — it requests an OTP
+ * (`useRequestAccountDeletionOtp`, itself a local stub) and, once that resolves, hands off to the
+ * Login OTP screen at `/account/delete-otp`. The actually-destructive step, and the one with no
+ * backend behind it, is confirming that code — see `AccountDeletionUnavailableError` in
+ * `../data.ts` and `docs/FRONTEND_BACKEND_PENDING.md`.
  */
 export interface AccountActions {
   readonly onBack: () => void;
@@ -23,13 +25,15 @@ export interface AccountActions {
   readonly onOpenPrivacy: () => void;
   readonly onOpenDeleteSheet: () => void;
   readonly onCloseDeleteSheet: () => void;
+  /** "Yes" on the sheet — requests the confirmation OTP, then hands off to `/account/delete-otp`. */
   readonly onConfirmDelete: () => void;
 }
 
 export interface AccountViewProps extends AccountActions {
   readonly deleteSheetVisible: boolean;
-  readonly deleting?: boolean;
-  readonly deleteErrorMessage?: string | null;
+  /** The OTP request is in flight — see `useRequestAccountDeletionOtp`. */
+  readonly requestingDeleteOtp?: boolean;
+  readonly requestDeleteOtpErrorMessage?: string | null;
 }
 
 export function AccountView({
@@ -40,8 +44,8 @@ export function AccountView({
   onCloseDeleteSheet,
   onConfirmDelete,
   deleteSheetVisible,
-  deleting = false,
-  deleteErrorMessage = null,
+  requestingDeleteOtp = false,
+  requestDeleteOtpErrorMessage = null,
 }: AccountViewProps) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']} testID="account-screen">
@@ -80,8 +84,8 @@ export function AccountView({
         visible={deleteSheetVisible}
         onClose={onCloseDeleteSheet}
         onConfirm={onConfirmDelete}
-        confirming={deleting}
-        errorMessage={deleteErrorMessage}
+        confirming={requestingDeleteOtp}
+        errorMessage={requestDeleteOtpErrorMessage}
       />
     </SafeAreaView>
   );

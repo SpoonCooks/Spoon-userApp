@@ -58,12 +58,12 @@ describe('Account screen', () => {
     expect(actions.onConfirmDelete).toHaveBeenCalledTimes(1);
   });
 
-  it('surfaces a delete failure inside the sheet rather than closing it', () => {
+  it('surfaces an OTP-request failure inside the sheet rather than closing it', () => {
     render(
       <AccountView
         {...actions}
         deleteSheetVisible
-        deleteErrorMessage="Deleting your account isn't available yet. Please contact support."
+        requestDeleteOtpErrorMessage="Deleting your account isn't available yet. Please contact support."
       />,
     );
 

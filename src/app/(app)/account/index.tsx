@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
 import { useSafeBack } from '@core/navigation';
-import { AccountView, useDeleteAccount } from '@features/account';
+import { AccountView, useRequestAccountDeletionOtp } from '@features/account';
 
 /**
  * Account — Figma frame id unavailable for this pass; built from the supplied mock.
@@ -11,11 +11,15 @@ import { AccountView, useDeleteAccount } from '@features/account';
  * Reached only from Profile's "Manage account" row, so `useSafeBack('/profile')` matches the
  * Refunds route's reasoning exactly: a pop always lands correctly and gets the platform's
  * reverse-of-push animation.
+ *
+ * "Yes" on the confirmation sheet requests an OTP (`useRequestAccountDeletionOtp`, a local stub —
+ * see `@features/account`) and, on success, hands off to `/account/delete-otp` carrying the
+ * cosmetic countdown, exactly as Login hands off to `/otp` with `retryAfter`.
  */
 export default function AccountRoute() {
   const router = useRouter();
   const goBack = useSafeBack('/profile');
-  const deleteAccount = useDeleteAccount();
+  const requestOtp = useRequestAccountDeletionOtp();
   const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
 
   return (
@@ -24,17 +28,22 @@ export default function AccountRoute() {
       onOpenTerms={() => router.push('/legal/terms' as Href)}
       onOpenPrivacy={() => router.push('/legal/privacy' as Href)}
       onOpenDeleteSheet={() => {
-        deleteAccount.reset();
+        requestOtp.reset();
         setDeleteSheetOpen(true);
       }}
       onCloseDeleteSheet={() => setDeleteSheetOpen(false)}
       onConfirmDelete={() => {
-        if (deleteAccount.isPending) return;
-        deleteAccount.mutate();
+        if (requestOtp.isPending) return;
+        requestOtp.mutate(undefined, {
+          onSuccess(result) {
+            setDeleteSheetOpen(false);
+            router.push(`/account/delete-otp?retryAfter=${result.retryAfterSeconds}` as Href);
+          },
+        });
       }}
       deleteSheetVisible={deleteSheetOpen}
-      deleting={deleteAccount.isPending}
-      deleteErrorMessage={deleteAccount.error?.message ?? null}
+      requestingDeleteOtp={requestOtp.isPending}
+      requestDeleteOtpErrorMessage={requestOtp.error?.message ?? null}
     />
   );
 }

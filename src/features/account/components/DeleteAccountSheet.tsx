@@ -16,8 +16,9 @@ import { BottomSheet, Button, PromptBlock, Text, lightTheme } from '@ui';
 export interface DeleteAccountSheetProps {
   readonly visible: boolean;
   readonly onClose: () => void;
+  /** "Yes" — the host requests an OTP and, once it resolves, hands off to the OTP screen. */
   readonly onConfirm: () => void;
-  /** The delete mutation is in flight — disables both buttons and shows the Yes CTA as loading. */
+  /** The OTP request is in flight — disables both buttons and shows the Yes CTA as loading. */
   readonly confirming?: boolean;
   /** Surfaced without dismissing the sheet, so the customer can see why nothing happened. */
   readonly errorMessage?: string | null;
