@@ -16,6 +16,37 @@ describe('the published documents', () => {
     expect(Object.keys(LEGAL_DOCUMENTS).sort()).toEqual(['privacy', 'terms']);
   });
 
+  /**
+   * The Privacy Policy sits ONE ROW above Delete Account on the Account screen, so a store
+   * reviewer testing the new deletion flow is one tap from reading it. It shipped contradicting
+   * that flow outright: "processed within 30 days" and "7 years" against a sheet that says the
+   * deletion is immediate and names 8. Apple and Google both check that a policy matches what the
+   * app actually does, and account deletion is the thing a reviewer exercises first.
+   *
+   * Prose is normally not worth pinning. This is, because the two texts live in different
+   * features and nothing else makes them move together — which is exactly how they drifted.
+   */
+  it('describes deletion the way the app performs it, not on a 30-day cycle', () => {
+    const privacy = LEGAL_DOCUMENTS.privacy.html;
+
+    expect(privacy).toContain('deleted immediately');
+    expect(privacy).toContain('Deletion is immediate and cannot be undone');
+    expect(privacy).not.toContain('deletion requests are processed within 30 days');
+    expect(privacy).not.toContain('associated personal data within 30 days');
+  });
+
+  /**
+   * The retention figure the sheet states and the one the policy states are the same claim about
+   * the same records. `DeleteAccountSheet` says 8 years, citing Indian tax law; a policy saying 7
+   * makes one of them false. Whichever number is legally right, they cannot disagree.
+   */
+  it('states the same retention period the delete sheet promises', () => {
+    const privacy = LEGAL_DOCUMENTS.privacy.html;
+
+    expect(privacy).toContain('8 years as required by Indian tax law');
+    expect(privacy).not.toContain('retained for 7 years');
+  });
+
   it('names each document as the PDF names it', () => {
     expect(LEGAL_DOCUMENTS.terms.title).toBe('Customer Terms of Service');
     expect(LEGAL_DOCUMENTS.privacy.title).toBe('Customer Privacy Policy');
