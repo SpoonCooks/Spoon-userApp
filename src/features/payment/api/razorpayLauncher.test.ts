@@ -129,6 +129,48 @@ describe('razorpayCheckoutLauncher', () => {
     await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(CheckoutFailedError);
   });
 
+  it('finds `reason` under `error` too — the OTHER shape a device has sent', async () => {
+    mockOpen.mockRejectedValue({
+      code: 0,
+      description: 'irrelevant',
+      error: { reason: 'payment_cancelled', source: 'customer', step: 'payment_authentication' },
+    });
+
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
+      CheckoutCancelledError,
+    );
+  });
+
+  /**
+   * The rejection a Galaxy S21 actually produced when the customer tapped "Yes, exit" — captured
+   * verbatim, `error` and all. It is pinned here for one reason: it is the shape that made
+   * `readReason` log `reason: null`, because the nested body arrived under `error` while only
+   * `details` was being read.
+   *
+   * It still classifies as a FAILURE, and that is not an oversight. Razorpay words this one
+   * `payment_error` with `description: "undefined"` — it says nothing about a dismissal for the
+   * heuristic to find. Reading the reason correctly is what this fixes; making Razorpay describe
+   * a dismissal is not something this file can do. The remaining gap is that a customer who exits
+   * on purpose is still told the payment failed.
+   */
+  it('reads the reason from a real device dismissal, which Razorpay still words as an error', async () => {
+    const body = {
+      code: 'BAD_REQUEST_ERROR',
+      description: 'undefined',
+      source: 'customer',
+      step: 'payment_authentication',
+      reason: 'payment_error',
+      metadata: {},
+    };
+    mockOpen.mockRejectedValue({
+      code: 0,
+      description: JSON.stringify({ error: body }),
+      error: body,
+    });
+
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(CheckoutFailedError);
+  });
+
   it('recognises a dismissal worded that way instead of "cancel"', async () => {
     mockOpen.mockRejectedValue({ code: 0, description: 'Checkout form dismissed' });
 

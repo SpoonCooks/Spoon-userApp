@@ -66,27 +66,35 @@ function readRejection(error: unknown): {
     code: typeof record['code'] === 'number' ? record['code'] : null,
     description: typeof record['description'] === 'string' ? record['description'] : null,
     /**
-     * Razorpay nests this one level DEEPER than its own published type suggests. A real
-     * rejection captured from a device reads:
+     * Razorpay nests this one level DEEPER than its own published type suggests, and it does not
+     * agree with itself about the key. Two rejection shapes have now been captured from devices:
      *
      *   { code, description, details: { code, description, reason, source, step, metadata } }
+     *   { code, description, error:   { code, description, reason, source, step, metadata } }
      *
-     * so reading `reason` off the top level found nothing, every time — the fallback added to
-     * catch a dismissal Razorpay worded rather than numbered was never actually armed. Both
-     * positions are read, because the documented shape is flat and the observed one is not.
+     * The second was read off a Galaxy S21 dismissing checkout, and `details` was absent from it
+     * — so the fallback meant to catch a dismissal Razorpay WORDED rather than numbered logged
+     * `reason: null` and never ran. All three positions are read, because the documented shape is
+     * flat and neither observed shape is.
      */
     reason: readReason(record),
   };
 }
 
+/** Where Razorpay has been observed putting the real rejection body. See `readRejection`. */
+const NESTED_REJECTION_KEYS = ['error', 'details'] as const;
+
 function readReason(record: Record<string, unknown>): string | null {
   if (typeof record['reason'] === 'string') return record['reason'];
 
-  const details = record['details'];
-  if (typeof details !== 'object' || details === null) return null;
+  for (const key of NESTED_REJECTION_KEYS) {
+    const nested = record[key];
+    if (typeof nested !== 'object' || nested === null) continue;
 
-  const nested = (details as Record<string, unknown>)['reason'];
-  return typeof nested === 'string' ? nested : null;
+    const reason = (nested as Record<string, unknown>)['reason'];
+    if (typeof reason === 'string') return reason;
+  }
+  return null;
 }
 
 /** The SDK is absent from this build. Distinct from a failed payment: nothing was attempted. */
