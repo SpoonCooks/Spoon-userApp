@@ -26,29 +26,6 @@ export interface ProfileTileViewModel {
   readonly icon?: IconName;
 }
 
-export interface ProfileLinkViewModel {
-  readonly id: string;
-  readonly title: string;
-  /** LEADING mark. `6:767` has one; `6:780` (the legal row) deliberately has none. */
-  readonly icon?: IconName;
-  /**
-   * TRAILING mark. `6:775` is an external-link arrow, `6:782` is a **shield** — not a chevron, and
-   * not derivable from an `external` flag, which is why this is the icon itself.
-   */
-  readonly trailingIcon?: IconName;
-  /**
-   * Where the row goes. ABSENT means there is nowhere to go, and the row is then drawn as plain
-   * text rather than as a button that does nothing (task §11).
-   *
-   * BACKEND_GAP: no legal or policy URL is published anywhere — `GET /v1/catalogue`'s `support`
-   * block carries `whatsappPhone`, `callPhone`, `email` and `helpUrl`, none of which is the terms
-   * document `6:779` names, and the deployment publishes none of them. See
-   * `docs/FRONTEND_BACKEND_PENDING.md`. No URL is guessed here: sending a customer to an invented
-   * address for a LEGAL document is worse than not offering the link.
-   */
-  readonly url?: string;
-}
-
 export interface ProfileViewModel {
   readonly title: string;
   readonly user: ProfileUserViewModel;
@@ -66,12 +43,11 @@ export interface ProfileViewModel {
    */
   readonly profileComplete: boolean;
   readonly tiles: readonly ProfileTileViewModel[];
-  readonly links: readonly ProfileLinkViewModel[];
   /**
-   * What joins the legal links when there is more than one — `6:779` writes them as ONE line,
-   * "Terms of Service & Privacy Policy", so the separator is drawn copy rather than a component
-   * choice. Absent for a single link, which needs nothing between it and itself.
+   * The bordered row above Log Out that opens the Account screen (Terms of Service, Privacy
+   * Policy, Delete Account). Replaces the V8 legal-links footer row — see the Account feature and
+   * the superseded Ruling R-6 in `ProfileScreen.tsx`.
    */
-  readonly linksSeparator?: string;
+  readonly manageAccountLabel: string;
   readonly logoutLabel: string;
 }

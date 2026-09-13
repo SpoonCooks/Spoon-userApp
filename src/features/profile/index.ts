@@ -4,11 +4,12 @@ import { createKeyFactory } from '@core/query';
  * Feature: profile.
  *
  * Screen: `6:663` — identity card plus a 2×2 tile grid (My bookings · Addresses · My refunds ·
- * Help), and a footer carrying the live-site link, **Terms of Service & Privacy Policy**, and
- * Log Out (the app's one confirmed destructive treatment: red on pink).
+ * Help), and a footer carrying **Manage account** (opens `@features/account`) and Log Out (the
+ * app's one confirmed destructive treatment: red on pink).
  *
  * Ruling R-1 — there is deliberately NO payment-methods entry: payment opens Razorpay directly.
- * Ruling R-6 — T&C / Privacy live here and nowhere else.
+ * Ruling R-6 (V9, superseded) — T&C / Privacy moved off this screen onto `@features/account`,
+ * which also carries Delete Account.
  *
  * Logout must clear all three: SecureStore, the query cache and session status. That is wired in
  * `@core/auth` + `@core/runtime`, not here.

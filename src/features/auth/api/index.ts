@@ -1,5 +1,5 @@
 export { AUTH_PATHS, createAuthApi, toE164 } from './authApi';
-export type { AuthApi } from './authApi';
+export type { AuthApi, SendOtpOptions } from './authApi';
 export { createSessionGateway } from './sessionGateway';
 export {
   authUserSchema,

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
 
 import { BookingListView, useMyBookingsData } from '@features/history';
 import { useSafeBack } from '@core/navigation';
@@ -14,6 +16,7 @@ import { useSafeBack } from '@core/navigation';
  * landed had this route been reached by anything other than a deep link.
  */
 export default function HistoryRoute() {
+  const router = useRouter();
   const { upcoming, past } = useMyBookingsData();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const active = activeTab === 'upcoming' ? upcoming : past;
@@ -27,11 +30,26 @@ export default function HistoryRoute() {
    */
   const goBack = useSafeBack('/profile');
 
+  /**
+   * A card opens the booking it names.
+   *
+   * `BookingListView` has taken `onSelect` since it was written and `BookingCard` has taken
+   * `onPress`, but no screen ever passed either — so every card on this list, and on Refunds, has
+   * been inert. The customer could see a booking and not reach it, which also means they could
+   * not reach the Cancel control that lives on `/booking/:id`.
+   *
+   * That surfaced through account deletion: a deletion blocked by an active booking tells the
+   * customer to go and clear it, and the list it sends them to could not open the booking.
+   *
+   * Every status is a valid destination — the host draws the whole lifecycle, including cancelled
+   * and completed — so no filtering is applied here.
+   */
   return (
     <BookingListView
       state={active.state}
       onRetry={active.refetch}
       onBack={goBack}
+      onSelect={(bookingId) => router.push(`/booking/${bookingId}` as Href)}
       variant="history"
       tabs={{
         active: activeTab,

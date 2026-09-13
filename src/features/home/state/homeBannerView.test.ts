@@ -108,6 +108,35 @@ describe('state mapping — `367:71`', () => {
     expect(homeBannerFor(at({ status: 'cancelled', cancelledBy: 'customer' }))).toBeNull();
     expect(homeBannerFor(at({ status: 'cancelled' }))).toBeNull();
   });
+
+  /**
+   * The apology is about a slot the customer is going to lose, so it retires with that slot.
+   *
+   * `GET /v1/me/bookings/active` keeps a cancelled booking for a backstop counted in days from
+   * `actual_end` — right for an endpoint that also has to keep unrated work reachable, wrong for
+   * a card whose whole message is about this evening. Observed on staging: a Sep 11 booking was
+   * still apologising on Sep 12.
+   */
+  it('retires the apology once the booked slot has passed', () => {
+    const live = homeBannerFor(
+      at({ status: 'cancelled', cancelledBy: 'system', slotEnded: false }),
+    );
+    expect(live).toMatchObject({ variant: 'cancelled' });
+
+    expect(
+      homeBannerFor(at({ status: 'cancelled', cancelledBy: 'system', slotEnded: true })),
+    ).toBeNull();
+  });
+
+  /**
+   * A completed booking is retired by `canRate` instead — the server keeps it rateable well past
+   * the slot on purpose, so reading `slotEnded` here would take the rating card away.
+   */
+  it('leaves the rate card alone when its slot has passed', () => {
+    expect(
+      homeBannerFor(at({ status: 'completed', canRate: true, slotEnded: true })),
+    ).toMatchObject({ variant: 'rate' });
+  });
 });
 
 describe('reassignment — the two titles that change', () => {

@@ -135,6 +135,14 @@ export interface HomeBannerInput {
   /** `cancellation.cancelledBy === 'system'` distinguishes 8c from a customer cancellation. */
   readonly cancelledBy?: string | null;
   /**
+   * Whether `scheduledStart + durationMinutes` is already in the past — `slotHasEnded` in
+   * `adapters.ts`, computed against the skew-corrected server clock Home already holds.
+   *
+   * Read ONLY by the cancelled branch. A completed booking's card is retired by `canRate`, which
+   * is the server's decision and outlives the slot on purpose so a customer can still rate it.
+   */
+  readonly slotEnded?: boolean;
+  /**
    * Whether this booking's cook was reassigned.
    *
    * Derived from the backend's durable replacement-assignment history. An absent field remains
@@ -327,6 +335,22 @@ function variantFor(input: HomeBannerInput): HomeBannerVariant | null {
       return input.canRate === true ? 'rate' : null;
 
     case 'cancelled':
+      /*
+       * The apology is for a slot the customer is about to lose, so it stops being Home's
+       * business once that slot has passed.
+       *
+       * `GET /v1/me/bookings/active` keeps a cancelled booking for a server-side backstop counted
+       * from `actual_end`, which is measured in days — correct for the endpoint, whose job is to
+       * keep completed-but-unrated work reachable, and far too long for a card whose only message
+       * is "the booking you have this evening is off". Left alone it sat on Home for days after
+       * the evening in question, which is what was observed: a Sep 11 booking still apologising
+       * on Sep 12.
+       *
+       * After the slot ends the record belongs to My bookings, which is the screen for bookings
+       * that have already happened — or, here, already not happened.
+       */
+      if (input.slotEnded === true) return null;
+
       // Only Spoon's own cancellation apologises. `cancelledBy` is the server's word for who did
       // it; absence is treated as NOT-system, so a customer cancellation never shows the apology.
       return input.cancelledBy === 'system' ? 'cancelled' : null;

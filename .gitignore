@@ -75,3 +75,8 @@ GoogleService-Info.plist
 
 # Machine-local agent settings. Records one developer's tool permissions, not project policy.
 .claude/settings.local.json
+
+# JetBrains project state, written the moment Android Studio opens this tree. workspace.xml is
+# one developer's window layout and run history, deviceManager.xml and caches/ are their
+# attached hardware. None of it is project policy, and all of it rewrites itself on every open.
+.idea/

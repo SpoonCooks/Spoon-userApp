@@ -1,3 +1,4 @@
+import { slotHasEnded } from '@core/time';
 import { selectHomeBookings } from './data';
 
 import type { BookingSummaryDto } from '@features/booking';
@@ -78,5 +79,47 @@ describe('selectHomeBookings', () => {
     const original = [...input];
     selectHomeBookings(input);
     expect(input).toEqual(original);
+  });
+});
+
+/**
+ * When a cancelled card stops being Home's business.
+ *
+ * The window is the one the card itself draws — `formatTimeLabel` renders
+ * `scheduledStart + durationMinutes` as "5:30 PM • 30 mins" — so the card and its own lifetime
+ * are derived from the same two fields and cannot disagree.
+ */
+describe('slotHasEnded', () => {
+  /** The reported case: a 30-minute booking at 5:00 PM, cancelled beforehand. */
+  const start = '2026-09-13T17:00:00.000Z';
+  const at = (iso: string) => new Date(iso);
+
+  it('keeps the card while the booked slot is still running', () => {
+    expect(slotHasEnded(start, 30, at('2026-09-13T16:59:00.000Z'))).toBe(false);
+    expect(slotHasEnded(start, 30, at('2026-09-13T17:15:00.000Z'))).toBe(false);
+    expect(slotHasEnded(start, 30, at('2026-09-13T17:29:59.000Z'))).toBe(false);
+  });
+
+  it('retires the card the moment the slot ends', () => {
+    // 5:00 PM + 30 min. The end instant itself counts as ended — the slot is over.
+    expect(slotHasEnded(start, 30, at('2026-09-13T17:30:00.000Z'))).toBe(true);
+    expect(slotHasEnded(start, 30, at('2026-09-13T17:30:01.000Z'))).toBe(true);
+    expect(slotHasEnded(start, 30, at('2026-09-14T09:00:00.000Z'))).toBe(true);
+  });
+
+  it('measures from the booking’s own duration, not a fixed window', () => {
+    // The same start, two hours long, is still running when the 30-minute one has finished.
+    expect(slotHasEnded(start, 120, at('2026-09-13T17:30:00.000Z'))).toBe(false);
+    expect(slotHasEnded(start, 120, at('2026-09-13T19:00:00.000Z'))).toBe(true);
+  });
+
+  /**
+   * Nothing to have ended. An instant booking carries no `scheduledStart`, and hiding a card on
+   * the strength of a timestamp that could not be read would be the worse failure.
+   */
+  it('leaves a card alone when there is no window to judge', () => {
+    expect(slotHasEnded(null, 30, at('2026-09-14T09:00:00.000Z'))).toBe(false);
+    expect(slotHasEnded(undefined, 30, at('2026-09-14T09:00:00.000Z'))).toBe(false);
+    expect(slotHasEnded('not-a-date', 30, at('2026-09-14T09:00:00.000Z'))).toBe(false);
   });
 });

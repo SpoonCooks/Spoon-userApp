@@ -56,16 +56,51 @@ export function toE164(rawDigits: string, countryCode = '+91'): string {
   return `${countryCode}${trimmed.replace(/\D/g, '')}`;
 }
 
+/**
+ * The non-default halves of an OTP send.
+ *
+ * Both exist for the account-deletion flow (`@features/account`) and both default to Login's
+ * behaviour, so Login's own call — `sendOtp(phone)` — puts the same bytes on the wire it always
+ * has: body `{ phone }`, no token.
+ */
+export interface SendOtpOptions {
+  /**
+   * Which app is asking. The backend resolves anything that is not the literal `cook` to
+   * `customer`, so omitting this is identical in behaviour to sending `customer` — Login omits
+   * it, and deletion sends it explicitly because that is the flag the backend splits the two
+   * apps on.
+   */
+  readonly audience?: 'customer';
+  /**
+   * Whether to attach the caller's bearer token.
+   *
+   * Login cannot: no session exists yet. Deletion can, and does, because the auth rate limiter
+   * buckets by user id when a token is present and by phone number when it is not — which keeps
+   * a customer's deletion sends out of the same 8-per-10-minutes budget as their login sends on
+   * that number, in both directions.
+   *
+   * This is the only reason it matters: the route itself never reads the header, and the phone
+   * is still taken from the BODY. The session is not, and must not be, the source of the number.
+   */
+  readonly authenticated?: boolean;
+  readonly signal?: AbortSignal;
+}
+
 export function createAuthApi(api: ApiClient) {
   return {
     /** `POST /v1/auth/otp/send`. Rate limited by a server-side cooldown; 429 = RATE_LIMITED. */
-    async sendOtp(phone: string, signal?: AbortSignal): Promise<OtpSendResponse> {
+    async sendOtp(phone: string, options: SendOtpOptions = {}): Promise<OtpSendResponse> {
       return api.request(AUTH_PATHS.otpSend, {
         method: 'POST',
-        authenticated: false,
-        body: { phone },
+        authenticated: options.authenticated ?? false,
+        // Built key by key rather than spread: an `audience: undefined` would reach the wire as a
+        // declared-but-absent key, and JSON has no `undefined` (see `updateProfile` below).
+        body: {
+          phone,
+          ...(options.audience === undefined ? {} : { audience: options.audience }),
+        },
         parse: (data) => otpSendResponseSchema.parse(data),
-        ...(signal === undefined ? {} : { signal }),
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
     },
 

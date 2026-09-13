@@ -49,7 +49,7 @@ const actions = {
   onBack: jest.fn(),
   onSelectTile: jest.fn(),
   onOpenProfileDetails: jest.fn(),
-  onOpenLink: jest.fn(),
+  onOpenManageAccount: jest.fn(),
   onLogout: jest.fn(),
   onRetry: jest.fn(),
 };
@@ -156,37 +156,22 @@ describe('identity and structure', () => {
   });
 
   /**
-   * `6:779` / `6:789` — the legal controls and logout close the frame.
-   *
-   * TWO controls, not one. The frame draws a single "Terms of Service & Privacy Policy" label,
-   * which is one control standing for two separate legal instruments — so it could only ever open
-   * one of them. Each document now has its own button naming exactly what it opens.
+   * V9 — the legal-links row is gone from Profile. "Manage account" replaces it, opening
+   * `@features/account` (Terms of Service, Privacy Policy, Delete Account now live there).
    */
-  it('draws both legal documents as separate controls, and logout', () => {
+  it('draws the Manage account row and logout, and no legal links', () => {
     renderProfile(BASE_ME);
 
-    // `6:779`'s own line is UNCHANGED — same words, same Livvic Bold 11/14.67, underlined. What
-    // changed is that each half is separately pressable; the "&" between them is inert copy.
-    expect(screen.getByText('Terms of Service')).toBeTruthy();
-    expect(screen.getByText('Privacy Policy')).toBeTruthy();
+    expect(screen.getByText('Manage account')).toBeTruthy();
     expect(screen.getByText('Log Out')).toBeTruthy();
+    expect(screen.queryByText('Terms of Service')).toBeNull();
+    expect(screen.queryByText('Privacy Policy')).toBeNull();
   });
 
-  /** The frame draws ONE sentence, so the row still reads as one. */
-  it('keeps the frame’s single legal line', () => {
+  it('opens Manage account on press', () => {
     renderProfile(BASE_ME);
 
-    const row = screen.getByTestId('profile-legal');
-    // Nested `Text` flattens, so the rendered line is the frame's own wording end to end.
-    expect(row).toHaveTextContent('Terms of Service & Privacy Policy');
-  });
-
-  /** Both are real destinations now: the documents ship with the app, so neither is a dead row. */
-  it('makes each legal control a live link', () => {
-    renderProfile(BASE_ME);
-
-    for (const id of ['terms', 'privacy']) {
-      expect(screen.getByTestId(`profile-link-${id}`).props.accessibilityRole).toBe('link');
-    }
+    fireEvent.press(screen.getByTestId('profile-manage-account'));
+    expect(actions.onOpenManageAccount).toHaveBeenCalledTimes(1);
   });
 });

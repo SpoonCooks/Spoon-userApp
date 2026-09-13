@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
@@ -50,54 +50,61 @@ export function BookingListView({
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']} testID={testID}>
       <QueryBoundary state={state} onRetry={onRetry} loadingVariant="card">
         {(list) => (
-          <ScrollView contentContainerStyle={styles.body}>
-            {/*
-              The two frames give this header different HEIGHTS and that difference is real:
-              `65:35` on `6:227` is overridden to **45**, `71:620` on `71:615` keeps the
-              component's **38**. Same component, two instances.
+          <FlatList
+            data={list.bookings}
+            keyExtractor={(booking) => booking.id}
+            contentContainerStyle={styles.body}
+            ListHeaderComponent={
+              <View style={styles.heading}>
+                {/*
+                  The two frames give this header different HEIGHTS and that difference is real:
+                  `65:35` on `6:227` is overridden to **45**, `71:620` on `71:615` keeps the
+                  component's **38**. Same component, two instances.
 
-              Their OFFSETS are not different, and the superseded reading that Past bookings sat
-              flush at y 0 was wrong: re-read on the final file, `65:35` and `71:620` are both at
-              x 16 / y 16 inside their body column, exactly like every other instance of `63:783`.
-              The 16pt lead is therefore unconditional.
-            */}
-            <ScreenHeader
-              title={tabs === undefined ? list.title : 'My bookings'}
-              onBack={onBack}
-              density={variant === 'refund' ? 'default' : 'band'}
-            />
+                  Their OFFSETS are not different, and the superseded reading that Past bookings
+                  sat flush at y 0 was wrong: re-read on the final file, `65:35` and `71:620` are
+                  both at x 16 / y 16 inside their body column, exactly like every other instance
+                  of `63:783`. The 16pt lead is therefore unconditional.
+                */}
+                <ScreenHeader
+                  title={tabs === undefined ? list.title : 'My bookings'}
+                  onBack={onBack}
+                  density={variant === 'refund' ? 'default' : 'band'}
+                />
 
-            {tabs === undefined ? null : (
-              <BookingTabSwitcher
-                options={BOOKING_TABS}
-                selectedId={tabs.active}
-                onSelect={tabs.onChange}
-                testID={`${testID}-tabs`}
-              />
+                {tabs === undefined ? null : (
+                  <BookingTabSwitcher
+                    options={BOOKING_TABS}
+                    selectedId={tabs.active}
+                    onSelect={tabs.onChange}
+                    testID={`${testID}-tabs`}
+                  />
+                )}
+              </View>
+            }
+            renderItem={({ item }) => (
+              <View style={styles.row}>
+                <BookingCard
+                  booking={item}
+                  variant={variant}
+                  {...(onSelect === undefined ? {} : { onPress: () => onSelect(item.id) })}
+                  testID={`${testID}-card-${item.id}`}
+                />
+              </View>
             )}
-
-            {/* `6:239` / `71:621` — px 4 / py 6, 16pt between cards. */}
-            <View style={styles.list}>
-              {list.bookings.length === 0 ? (
+            ListEmptyComponent={
+              <View style={styles.row}>
                 <EmptyState
                   title={list.emptyTitle}
                   description={list.emptyDescription}
                   icon="empty"
                   testID={`${testID}-empty`}
                 />
-              ) : (
-                list.bookings.map((booking) => (
-                  <BookingCard
-                    key={booking.id}
-                    booking={booking}
-                    variant={variant}
-                    {...(onSelect === undefined ? {} : { onPress: () => onSelect(booking.id) })}
-                    testID={`${testID}-card-${booking.id}`}
-                  />
-                ))
-              )}
-            </View>
-          </ScrollView>
+              </View>
+            }
+            /* `6:239` — the card block's own 6pt of ground below the last card. */
+            ListFooterComponent={<View style={styles.listFoot} />}
+          />
         )}
       </QueryBoundary>
     </SafeAreaView>
@@ -125,10 +132,16 @@ const styles = StyleSheet.create({
     paddingBottom: lightTheme.space.xl,
     gap: lightTheme.space.lg,
   },
-  /** `6:239` / `71:621` — px 4 / py 6, 16pt between cards. */
-  list: {
-    paddingHorizontal: lightTheme.space.xs,
-    paddingVertical: lightTheme.space.s6,
-    gap: lightTheme.space.lg,
-  },
+  /**
+   * The header block, and the 6pt of ground `6:239` puts above the first card.
+   *
+   * The card block used to be ONE `View` carrying `px 4 / py 6` and a 16pt gap. A virtualized
+   * list has no such wrapper — each row is mounted on its own — so that block's geometry is split
+   * between here (its 6pt lead), `row` (its 4pt gutter, per card) and `listFoot` (its 6pt tail).
+   * The drawn result is identical; only who holds each value moved.
+   */
+  heading: { gap: lightTheme.space.lg, paddingBottom: lightTheme.space.s6 },
+  /** `6:239` / `71:621` — the card block's 4pt gutter, now carried by each row. */
+  row: { paddingHorizontal: lightTheme.space.xs },
+  listFoot: { height: lightTheme.space.s6 },
 });

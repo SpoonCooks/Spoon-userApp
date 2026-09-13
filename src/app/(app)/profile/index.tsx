@@ -48,29 +48,8 @@ export default function ProfileRoute() {
          */
         if (tileId === 'help') openHelp('Hi Spoon, I need help with my account.');
       }}
-      /**
-       * `6:779` — the legal row.
-       *
-       * BACKEND_GAP (`docs/FRONTEND_BACKEND_PENDING.md`): no legal or policy URL is published by
-       * any endpoint, so `ProfileLinkViewModel.url` is absent and the row renders as plain text
-       * rather than as a control. This handler therefore only runs once a URL EXISTS — it opens
-       * that URL and never a guessed one, because sending a customer to an invented address for a
-       * terms document is worse than not linking it.
-       */
-      /**
-       * Terms and Privacy open IN THE APP, at `spoon://legal/:doc`.
-       *
-       * This used to be `Linking.openURL`, which ejected the customer into Chrome or Safari — and
-       * with no legal URL published by any endpoint (BACKEND_GAP, see `features/legal`), the row
-       * had nothing to open at all and simply did nothing. The documents now ship with the app,
-       * so the link id IS the route parameter and there is no URL to look up or fail on.
-       *
-       * Pushed, not replaced: the customer is reading a document mid-session and Back has to
-       * return them to Profile.
-       */
-      onOpenLink={(linkId) => {
-        router.push(`/legal/${linkId}` as Href);
-      }}
+      /** V9 — the legal row moved into `@features/account`; Profile now only opens that screen. */
+      onOpenManageAccount={() => router.push('/account' as Href)}
       onLogout={() => {
         // Revokes the session server-side, then clears SecureStore, the query cache and the
         // session machine. The local teardown is not conditional on the network call, so this

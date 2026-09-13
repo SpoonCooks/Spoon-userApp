@@ -1,9 +1,16 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
-import { useActiveBookings, useBookingHistory, useRefunds } from '@features/booking';
+import {
+  isFinishedBooking,
+  useActiveBookings,
+  useBookingHistory,
+  useRefunds,
+} from '@features/booking';
+import type { BookingSummaryDto } from '@features/booking';
 import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
+import { currentSkewMs, slotHasEnded } from '@core/time';
 
 import { formatPaise } from '@core/format';
 import { formatServiceDate, serviceDateIn } from '@features/scheduled';
@@ -19,30 +26,61 @@ import type { BookingListViewModel } from './types';
 
 /**
  * My bookings — Upcoming tab. `GET /v1/me/bookings/active`, the SAME read Home's carousel uses,
- * shared via `useActiveBookings`. The endpoint already returns exactly the right set (live
- * statuses plus a few time-bounded exceptions, `cancelled` rows included) — this hook does no
- * filtering of its own, it only maps each row through `bookingCardFrom`.
+ * shared via `useActiveBookings`.
  *
- * A recent, unseen, refunded system-cancellation legitimately appears here AND on the Past tab at
- * once (it is a live "apology" until the customer acknowledges it) — that overlap is intentional,
- * not something to de-duplicate against `useBookingHistoryData`.
+ * ## Why this filters, when it used to take the endpoint's set verbatim
+ *
+ * The endpoint keeps a finished booking for a server-side backstop counted from `actual_end`,
+ * measured in days. That is right for the endpoint — it also has to keep completed-but-unrated
+ * work reachable — but this tab is called UPCOMING, and a booking whose slot has already passed
+ * is not. Observed on staging: two Sep 11 bookings were still sitting under Upcoming on Sep 12.
+ *
+ * So a row is dropped here only when BOTH are true: the server says the booking is over
+ * (`isFinishedBooking` — `completed` or `cancelled`, never a live status), and the slot it was
+ * booked for has elapsed. A service that started late or ran long is still live, so it stays put
+ * however old its booked window looks.
+ *
+ * Nothing disappears. The Past tab reads `GET /v1/me/bookings`, which carries these rows already
+ * — the two tabs have always overlapped for exactly this set, deliberately, so what changes here
+ * is only where they stop being shown twice.
  */
+export function isStillUpcoming(booking: BookingSummaryDto, now: Date): boolean {
+  if (!isFinishedBooking(booking.status)) return true;
+  return !slotHasEnded(booking.scheduledStart, booking.durationMinutes, now);
+}
+
 export function useUpcomingBookingsData(): ScreenQuery<BookingListViewModel> {
   const active = useActiveBookings();
   const catalogue = useCatalogue();
   const timeZone =
     catalogue.state.status === 'ready' ? catalogue.state.data.operatingWindow.timeZone : undefined;
 
+  /*
+   * The clock is read ONCE, when the screen opens, rather than on a ticking one.
+   *
+   * This is a list the customer pushes, reads and leaves, so the boundary it needs is "as of when
+   * I opened this" — a row that crosses its end time while being looked at moves on the next
+   * visit, which is a limit worth having in exchange for a screen that does not re-render every
+   * second. Home keeps the ticking clock, because Home has live countdowns to draw.
+   *
+   * Skew-corrected for the same reason Home corrects it: a wrong device clock must not be what
+   * decides which tab a booking belongs to.
+   */
+  const [nowMs] = useState(() => Date.now() - currentSkewMs());
+
   const state = useMemo(() => {
     if (active.state.status !== 'ready') return active.state;
+
+    const now = new Date(nowMs);
+
     return ready(
       bookingListFrom({
         base: DEMO_UPCOMING_BOOKINGS,
-        bookings: active.state.data,
+        bookings: active.state.data.filter((booking) => isStillUpcoming(booking, now)),
         timeZone,
       }),
     );
-  }, [active.state, timeZone]);
+  }, [active.state, timeZone, nowMs]);
 
   return { state, refetch: active.refetch };
 }
