@@ -215,6 +215,11 @@ export function useAddressDetailsData(addressId?: string | null): AddressDetails
    */
   const copy: AddressDetailsViewModel = DEMO_ADDRESS_DETAILS;
   const editing = addressId !== null && addressId !== undefined && addressId !== '';
+  /**
+   * The normalised form of `addressId` (`null` while adding), used to check the draft's
+   * `editingId` tag — see the `source` comment below and `locationReady`, its other consumer.
+   */
+  const currentEditingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
   // Only an EDIT needs the list; adding an address must not wait on a read it has no use for.
   const addresses = useAddresses({ enabled: editing });
 
@@ -243,7 +248,6 @@ export function useAddressDetailsData(addressId?: string | null): AddressDetails
      * abandoned add or a "Change area" on a different address can leave one behind) — the saved
      * record wins instead, or, adding with no matching draft, a blank form.
      */
-    const currentEditingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
     const source = draft.editingId === currentEditingId ? draft : (existing ?? EMPTY_ADDRESS_DRAFT);
     const area = [source.street, source.city, source.state, source.pincode]
       .filter((part): part is string => typeof part === 'string' && part.length > 0)
@@ -306,7 +310,7 @@ export function useAddressDetailsData(addressId?: string | null): AddressDetails
       ...(existing.receiverName === null ? {} : { receiverName: existing.receiverName }),
       ...(existing.receiverPhone === null ? {} : { receiverPhone: existing.receiverPhone }),
     });
-  }, [copy, draft, editing, existing, addresses.state, addressId]);
+  }, [copy, draft, editing, existing, addresses.state, currentEditingId]);
 
   const savedPoint =
     existing === null ? null : { latitude: existing.latitude, longitude: existing.longitude };
@@ -316,11 +320,21 @@ export function useAddressDetailsData(addressId?: string | null): AddressDetails
     state,
     savedPoint,
     savedPlaceId,
-    // The draft's verdict is the SERVER's, recorded by `53:31` on Confirm. `serviceable === true`
-    // is required explicitly: `null` means the point was never checked and `false` means it was
-    // refused, and neither may enable a write.
+    /**
+     * The draft's verdict is the SERVER's, recorded by `53:31` on Confirm. `serviceable === true`
+     * is required explicitly: `null` means the point was never checked and `false` means it was
+     * refused, and neither may enable a write.
+     *
+     * Gated on `editingId` for the same reason `source` above is: without it, a leftover draft
+     * from an unrelated attempt could enable the CTA here while `address/details.tsx`'s own
+     * `editingId` check correctly refuses to use that same draft on Save — a button that looks
+     * live but does nothing when pressed.
+     */
     locationReady:
-      (draft.latitude !== null && draft.longitude !== null && draft.serviceable === true) ||
+      (draft.editingId === currentEditingId &&
+        draft.latitude !== null &&
+        draft.longitude !== null &&
+        draft.serviceable === true) ||
       savedPoint !== null,
     refetch: () => {
       if (editing) addresses.refetch();

@@ -47,11 +47,13 @@ export {
   isOthersSelected,
   missingAddressFields,
   othersLabelIdOf,
+  resolveAddressSavePoint,
 } from './validation';
 export type {
   AddressFormShape,
   AddressFormValues,
   AddressRequiredField,
+  AddressSavePoint,
   AddressSubmitGate,
 } from './validation';
 export type * from './types';
