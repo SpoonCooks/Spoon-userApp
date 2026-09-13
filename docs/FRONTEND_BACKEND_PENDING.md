@@ -225,6 +225,61 @@ follow-up worthwhile for every rate-limited surface in the app.
 
 ## 3. Still open
 
+### `BACKEND_GAP_LIST_CURSOR` — My bookings and Refunds are capped at 50 rows, permanently
+
+Every fact below is from real captured responses against the running backend.
+
+`GET /v1/me/bookings` and `GET /v1/me/refunds` are cursor-paginated with `limit` /
+`cursorCreatedAt` / `cursorId`, but **the response carries no cursor** — the body is
+`{ bookings: [...] }` and nothing else (`BookingListOk` declares `additionalProperties: false`).
+Nothing is being dropped client-side; there is nothing to drop.
+
+So the app cannot reach row 51, and not for want of trying:
+
+- `limit` is **clamped, not rejected** — `Math.min(50, max(1, limit))`. `?limit=100` and
+  `?limit=500` both return 50. Only a non-numeric value 400s. We therefore ask for exactly 50
+  (`MAX_LIST_PAGE` in `bookingApi.ts`), which is the most these endpoints will ever give.
+- The cursor is `(created_at, id)`, and `created_at` is **deliberately unpublished** — the
+  summary projection emits no timestamp, and the backend reserves the column as an
+  implementation detail ("orders the page; it never decides membership").
+- `?cursorId=` without `cursorCreatedAt` is a 400, so there is no half-cursor way in.
+- The ids are v4 UUIDs, so no creation time can be recovered from them either.
+
+**Consequence, stated plainly: a customer with more than 50 terminal bookings can never see the
+older ones.** That is roughly a year of weekly use — and it accrues faster than that, because
+every abandoned checkout becomes a `cancelled` row in history. Accepted for this release,
+scheduled for the next.
+
+*Minimal change:* return an opaque `nextCursor` (null on the last page) on both endpoints. Opaque
+rather than publishing `created_at`: if the client has to compose `(createdAt, id)` itself, the
+cursor's shape becomes a published contract and changing the sort key would break every shipped
+app. `FlatList` is already in place on both screens, so consuming it is `useInfiniteQuery` plus
+`onEndReached` and little else.
+
+### `GET /v1/me/bookings/active` cannot be paged at all
+
+It takes **no query parameters** — the schema is an empty object, so `?limit=` is a 400 rather
+than an ignored hint — and its page size is hardcoded to 20 server-side. Home's carousel and the
+Upcoming tab are therefore capped at 20 rows with no client-side remedy. Pinned by
+`bookingApi.test.ts`, because sending a parameter here breaks the screen rather than limiting it.
+
+### ⚠️ Two OpenAPI descriptions are stale — trust the code, not the spec
+
+Both confirmed against the live query by the backend, and both still unfixed in the document:
+
+- `openapi.yaml:565-568` says `/me/bookings` excludes a `created` booking "only while its service
+  window is still open". There is no window rule any more; the predicate has been
+  `status IN ('completed','cancelled')` since 2026-08-27. An unpaid booking is absent from
+  history until the sweep transitions it to `cancelled`.
+- `openapi.yaml:594-596` says `completed` and `cancelled` "are never active". Both can be: there
+  is a 120-hour completed-awaiting-rating branch, and a 24-hour branch admitting a
+  system-cancelled, captured, unseen booking — which is the apology card. This is why the same
+  cancelled booking legitimately appears on BOTH tabs for up to 24 hours, and why it leaves
+  Upcoming once the customer opens it.
+
+Our own connectivity doc was derived from the spec, so anything in it about these two rules
+inherits the same staleness.
+
 ### `BACKEND_GAP_EXTENSION_KEY_ID` — blocks extension checkout
 
 `POST /v1/bookings/:id/payments/order` and `POST /v1/bookings/:id/tips` both attach the PUBLIC
