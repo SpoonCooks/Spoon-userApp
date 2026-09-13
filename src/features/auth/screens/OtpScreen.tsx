@@ -205,7 +205,7 @@ export function OtpScreen({
                 accessibilityIgnoresInvertColors
               />
             ) : null}
-            <View style={styles.tagline}>
+            <View style={styles.tagline} testID={`${testID}-tagline`}>
               <Text variant="title" color="textPrimary" align="center">
                 {otp.taglineLead}
                 <Text variant="title" color="surfaceCta">
@@ -406,7 +406,24 @@ const styles = StyleSheet.create({
   },
   logo: { width: 134, height: 93 },
   /** `275:4308` — a 268pt measure, 2pt between the two lines. */
-  tagline: { width: 268, gap: lightTheme.space.xxs, alignItems: 'center' },
+  /**
+   * `275:4305` — the 268pt tagline block.
+   *
+   * NO `alignItems: 'center'`, deliberately. With it, the lines shrink-wrap their content, and a
+   * `Text` made of TWO runs — the lead plus the `#FFD600` "minutes" — measured short on Android:
+   * the view was framed from the first run and the accent was never painted. The word was in the
+   * layout (the node measured 477px for the whole string) and in the accessibility tree, so every
+   * test passed and only the screen was wrong.
+   *
+   * Centring is `align="center"` on each line instead, which is `textAlign` and needs no
+   * shrink-wrap: the lines fill 268 and the glyphs centre inside them, which is what `275:4305`
+   * draws anyway.
+   *
+   * LoginScreen still carries `alignItems` on its own 320pt tagline and renders both runs today —
+   * the mis-measure only bites at some widths. It is left alone rather than "fixed" blind, but it
+   * is the same shape, so this is where the reason lives if it ever shows up there.
+   */
+  tagline: { width: 268, gap: lightTheme.space.xxs },
   /** `275:4312` — px 4 / py 12, 16pt between the heading group and the digits block. */
   content: {
     gap: lightTheme.space.lg,

@@ -1,3 +1,5 @@
+import { StyleSheet } from 'react-native';
+
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import {
@@ -82,6 +84,38 @@ describe('OtpScreen — 275:4289 / 250:2439 / 275:4349', () => {
 
     // `275:4449` — every box swaps to the red tint in this state.
     expect(screen.getAllByTestId(/^otp-screen-digit-\d+$/)).toHaveLength(6);
+  });
+
+  /**
+   * A device-only defect, guarded here because nothing else can guard it.
+   *
+   * The tagline is one `Text` of TWO runs: the lead, then "minutes" in `#FFD600`. With
+   * `alignItems: 'center'` on its container the line shrink-wrapped, Android measured the pair
+   * short, framed the view from the first run and never painted the accent. Nothing in JS could
+   * see it — the string was in the layout AND in the accessibility tree, so `getByText('minutes')`
+   * passed while the screen showed "Trained cooks in".
+   *
+   * So this asserts the SHAPE that avoids the mis-measure rather than the paint: the lines fill
+   * the 268pt block and centre via `textAlign`. Re-adding `alignItems` here brings the bug back.
+   */
+  it('lets the tagline lines fill their block instead of shrink-wrapping (275:4305)', () => {
+    renderOtp(DEMO_OTP);
+
+    const tagline = screen.getByTestId('otp-screen-tagline');
+    const style = StyleSheet.flatten(tagline.props.style) as {
+      alignItems?: string;
+      width?: number;
+    };
+
+    expect(style.width).toBe(268);
+    expect(style.alignItems).toBeUndefined();
+  });
+
+  it('renders both runs of the tagline, lead and accent', () => {
+    renderOtp(DEMO_OTP);
+
+    expect(screen.getByText('minutes')).toBeTruthy();
+    expect(screen.getByText(/Trained cooks in/)).toBeTruthy();
   });
 
   it('offers resend only when the payload says so', () => {
