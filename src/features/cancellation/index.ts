@@ -22,4 +22,6 @@ export const cancellationKeys = createKeyFactory('cancellation');
 export { CancelBookingSheet } from './components/CancelBookingSheet';
 export type { CancelBookingSheetProps, CancellationStep } from './components/CancelBookingSheet';
 export { useCancellationData } from './data';
+export { useCancelFlow } from './useCancelFlow';
+export type { CancelFlow, CancelFlowOptions } from './useCancelFlow';
 export type * from './types';

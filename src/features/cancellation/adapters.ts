@@ -78,9 +78,21 @@ export function cancellationFrom(input: {
         ? []
         : base.refundRows
       : [
-          { label: 'Amount paid', value: formatPaise(preview.capturedAmountPaise) },
-          { label: 'Cancellation fee', value: formatPaise(preview.chargeAmountPaise) },
-          { label: 'Refund', value: formatPaise(preview.refundAmountPaise) },
+          // `104:2353` — the frame's own wording, and the same three labels `base.refundRows`
+          // carries. These drifted apart: with a preview in hand (which is every real booking)
+          // the screen drew "Amount paid / Cancellation fee / Refund" instead, and the refund
+          // line lost the `total` emphasis that gives it the rule above it and the darker
+          // label. Only the FIGURES are the server's; the words are the design's, on both paths.
+          { label: 'Original Amount Paid', value: formatPaise(preview.capturedAmountPaise) },
+          {
+            label: 'Cancellation Processing Fee',
+            value: formatPaise(preview.chargeAmountPaise),
+          },
+          {
+            label: 'Refund Amount',
+            value: formatPaise(preview.refundAmountPaise),
+            emphasis: 'total' as const,
+          },
         ];
 
   return {

@@ -31,7 +31,10 @@ export type {
   BookingDetailsSheetProps,
   BookingDetailsViewModel,
 } from './components/BookingDetailsSheet';
+export { PaymentFailedBody } from './components/PaymentFailedBody';
+export type { PaymentFailedBodyProps } from './components/PaymentFailedBody';
 export {
+  destinationForPayment,
   durationLabelFor,
   durationMerchandisingFor,
   useBookingDetailData,
@@ -39,9 +42,10 @@ export {
   useExtensionCheckout,
   useExtensionData,
   useInstantData,
+  usePaymentRetry,
   useTipCheckout,
 } from './data';
-export type { BookingSelection, BookingSubmission } from './data';
+export type { BookingSelection, BookingSubmission, PaymentOutcome } from './data';
 export { extensionMinutesFrom, tipAmountPaiseFrom, tipIdFor } from './adapters';
 export { BookingDetailScreen, BookingDetailView } from './screens/BookingDetailScreen';
 export type { BookingDetailActions, BookingDetailViewProps } from './screens/BookingDetailScreen';

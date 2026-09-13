@@ -69,6 +69,19 @@ function Harness({ durationId }: { durationId: string | null }) {
   );
 }
 
+/**
+ * `useBookingSubmission` releases an abandoned hold when the screen loses focus, so it reaches
+ * for navigation. These tests render the hook directly, with no navigator above it — the mock
+ * runs the effect and its cleanup on unmount, which is the moment being asserted.
+ */
+jest.mock('expo-router', () => ({
+  __esModule: true,
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('react').useEffect(effect, [effect]);
+  },
+}));
+
 describe('useBookingSubmission', () => {
   it('asks for no quote until a duration is selected', async () => {
     const { calls, api } = recordingApi({

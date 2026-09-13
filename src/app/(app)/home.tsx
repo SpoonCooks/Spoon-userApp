@@ -3,6 +3,7 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   InstantSheet,
+  destinationForPayment,
   useBookingSubmission,
   useInstantData,
   useRateBooking,
@@ -140,6 +141,7 @@ export default function HomeRoute() {
            */
           canBook={submission.canSubmit && submission.quote.state.status === 'ready'}
           submitting={submission.submitting}
+          submitError={submission.submitError}
           /**
            * Back and the backdrop are REFUSED while the booking call is in flight (task §14: back
            * during payment preparation must not corrupt booking state).
@@ -169,21 +171,22 @@ export default function HomeRoute() {
                  * a lifecycle view built from a booking that is still on hold. Page 21 polls the
                  * server and moves to Home once the booking has actually moved.
                  *
-                 * Anything else — a dismissed checkout, a failure, an order that was not ready —
-                 * has nothing to confirm, so it goes to the booking screen, which shows the
-                 * SERVER's state including the hold the customer can still pay off. Sending
-                 * those to a "Confirmation in progress" screen would be this app asserting a
-                 * payment it does not have.
+                 * Anything unpaid goes to Payment Failed or nowhere at all — never to the
+                 * booking screen, which heads an unpaid `created` hold "Booking confirmed!".
+                 * `destinationForPayment` owns that mapping for the Scheduled flow too.
+                 *
+                 * A null destination is a DISMISSED checkout: the sheet has already closed
+                 * above, which leaves the customer on Home — exactly where they were when they
+                 * decided not to pay, and with nothing claimed either way.
                  */
-                if (created.payment === 'verified') {
-                  router.push(`/booking/confirming?id=${bookingId}`);
-                  return;
-                }
-                router.push(`/booking/${bookingId}`);
+                const destination = destinationForPayment(created.payment, bookingId);
+                if (destination !== null) router.push(destination);
               })
               .catch(() => {
-                // The error is already normalized and surfaced by the mutation; the sheet stays
-                // open so the customer can retry against the same idempotency scope.
+                // Swallowed HERE because the sheet renders it through `submitError` — the
+                // comment this replaces claimed the mutation surfaced it, which was true of
+                // nothing. The sheet stays open so the customer can retry against the same
+                // idempotency scope.
               });
           }}
           onSchedule={() => {

@@ -348,7 +348,7 @@ export const DEMO_CANCELLATION: CancellationViewModel = {
     {
       id: 'reschedule-once',
       title: 'Cancellation on rescheduled bookings',
-      body: 'An original booking can be rescheduled only once',
+      body: 'An original booking can be rescheduled only once. Instant bookings can not be cancelled.',
     },
   ],
   reasonTitle: 'Why do you want to cancel?',
@@ -363,15 +363,20 @@ export const DEMO_CANCELLATION: CancellationViewModel = {
     { id: 'others', label: 'Others', requiresDetail: true },
   ],
   reasonDetailPlaceholder: 'Tell us what went wrong',
-  continueLabel: 'Continue',
+  /**
+   * `104:2314` labels this "Cancel", not "Continue" — every step of the sheet carries the same
+   * word on the same yellow bar, and only the LAST one actually cancels anything. Drawn as
+   * designed; the field still names the action (advance to the refund step), not the word.
+   */
+  continueLabel: 'Cancel',
   refundTitle: 'Refund details',
   refundRows: [
-    { label: 'Original Booking Paid', value: '₹135' },
+    { label: 'Original Amount Paid', value: '₹135' },
     { label: 'Cancellation Processing Fee', value: '₹0' },
     { label: 'Refund Amount', value: '₹135', emphasis: 'total' },
   ],
   refundMethodTitle: 'Refund to original payment source',
-  refundMethodBody: 'Takes 3-5 business days',
+  refundMethodBody: 'Takes 5-6 business days',
   cancelCtaLabel: 'Cancel',
   confirmedTitle: 'Your booking has been cancelled',
   bookAgainTitle: 'Would you like to make another booking?',

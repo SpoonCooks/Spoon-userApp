@@ -96,6 +96,14 @@ export interface InstantSheetProps {
    * guard for the one control in the app that creates a chargeable booking.
    */
   readonly submitting?: boolean;
+  /**
+   * A booking the SERVER refused, in the customer's words.
+   *
+   * `POST /v1/bookings` can decline, and this sheet used to discard every refusal — leaving the
+   * one control in the app that creates a chargeable booking sitting live and lit, doing nothing
+   * when pressed. The host owns the wording.
+   */
+  readonly submitError?: string | null;
   readonly onSchedule: () => void;
   /**
    * DEV reachability only — opens `25:1585` (the taxes dialog) with the sheet, so that finalized
@@ -114,6 +122,7 @@ export function InstantSheet({
   onBook,
   canBook = true,
   submitting = false,
+  submitError = null,
   onSchedule,
   initialTaxesOpen = false,
   testID = 'instant-sheet',
@@ -158,6 +167,19 @@ export function InstantSheet({
           loading={submitting}
           testID={`${testID}-book`}
         />
+
+        {/* A refused booking used to end here, silently — see `submitError`. */}
+        {submitError === null ? null : (
+          <Text
+            variant="body"
+            color="textSecondary"
+            align="center"
+            accessibilityRole="alert"
+            testID={`${testID}-error`}
+          >
+            {submitError}
+          </Text>
+        )}
         {/* `25:1325` — Livvic Regular 9/13.5, underlined, centred. Not a button in the frame. */}
         <Pressable
           onPress={() => setTaxesOpen(true)}

@@ -314,4 +314,38 @@ describe('Book NOW is gated on a chosen duration', () => {
     fireEvent.press(screen.getByTestId('instant-sheet-schedule'));
     expect(onSchedule).toHaveBeenCalledTimes(1);
   });
+
+  /**
+   * A refused `POST /v1/bookings` used to reach this sheet and stop: the CTA stayed live and
+   * lit, the press did nothing visible, and a customer on their second or third attempt could
+   * not tell a broken button from a server that had started declining them.
+   */
+  it('shows a refused booking instead of swallowing it', () => {
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_AVAILABLE}
+        selectedDurationId="dur-30"
+        {...actions}
+        submitError="That slot is no longer available."
+      />,
+    );
+
+    expect(screen.getByTestId('instant-sheet-error')).toHaveTextContent(
+      'That slot is no longer available.',
+    );
+  });
+
+  it('says nothing when there is nothing to report', () => {
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_AVAILABLE}
+        selectedDurationId="dur-30"
+        {...actions}
+      />,
+    );
+
+    expect(screen.queryByTestId('instant-sheet-error')).toBeNull();
+  });
 });
