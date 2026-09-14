@@ -68,13 +68,18 @@ export const DEMO_ADDRESS_LOCATION_UNSERVICEABLE: AddressLocationViewModel = {
 /**
  * `228:1801` — the Edit / Delete sheet.
  *
- * Both titles are the FRAME's own strings, including "Edit addresss" and "Edit this addresses".
- * They are rendered verbatim so the copy defect (D-31) stays visible to design rather than being
- * quietly corrected here, the same treatment D-22's reassignment grammar already gets.
+ * The frame (`230:1926`, `6:706`) draws "Edit addresss" and "Edit this addresses". Both were once
+ * rendered verbatim so the copy defect (D-31) stayed visible to design rather than being quietly
+ * corrected here — the treatment D-22's reassignment grammar still gets.
+ *
+ * D-31 is CORRECTED HERE instead, by decision, before the first store release: this sheet is
+ * reachable from Profile in two taps, so a misspelling on it is read by customers and reviewers
+ * rather than by design. The frame is still wrong and still needs fixing; see
+ * `docs/FIGMA_PIXEL_PERFECT_AUDIT.md`. Nothing else about the strings changes.
  */
 export const DEMO_ADDRESS_EDIT: AddressEditViewModel = {
-  title: 'Edit addresss',
-  cardTitle: 'Edit this addresses',
+  title: 'Edit address',
+  cardTitle: 'Edit this address',
   address: {
     id: 'addr-1',
     label: 'Home',

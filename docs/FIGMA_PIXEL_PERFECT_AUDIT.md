@@ -1936,7 +1936,7 @@ second line, which only ever engages below the reference width.
 | # | Defect | Node |
 | --- | --- | --- |
 | D-30 | The out-of-service line has a doubled comma — "in your area at the moment**, ,** but we are working towards it!". Rendered verbatim so it stays visible | `221:1555` |
-| D-31 | "Edit address**s**" as a sheet title, and "Edit this address**es**" for a single address | `230:1926`, `6:706` |
+| D-31 | "Edit address**s**" as a sheet title, and "Edit this address**es**" for a single address | `230:1926`, `6:706` | **CORRECTED IN CODE** 2026-09-14, before the first store release — the sheet is two taps from Profile, so the misspelling reached customers rather than design. The FRAMES are still wrong and still need fixing. |
 | D-32 | "Share **how** your meal preferences, so that we can serve you better" — the sentence has no verb | `222:1579` |
 | D-33 | `6:700` fixes the edit-sheet card at **423pt** inside a 504pt sheet, leaving ~230pt of empty white below "Delete". Rendered content-sized, as D-28 was — reproducing a fixed canvas height is reproducing a mistake | `6:700` |
 

@@ -50,9 +50,9 @@ export interface AddressLocationViewModel {
  * backend rule (an address in use by a live booking, the last remaining address, and so on).
  */
 export interface AddressEditViewModel {
-  /** `230:1926` — "Edit addresss" as drawn; the frame's spelling. */
+  /** `230:1926` — "Edit address". The frame misspells it (D-31); corrected in the fixture. */
   readonly title: string;
-  /** `6:706` — "Edit this addresses" as drawn. */
+  /** `6:706` — "Edit this address". The frame pluralises it (D-31); corrected in the fixture. */
   readonly cardTitle: string;
   readonly address: SavedAddressViewModel;
   readonly editLabel: string;
