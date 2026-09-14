@@ -45,13 +45,26 @@ export interface HomePromiseProps {
 }
 
 const styles = StyleSheet.create({
-  /** `144:438` — a 304pt row: the mark, 10pt, then the line. */
+  /**
+   * `144:438` — the mark, 10pt, then the line, as one block on the card's axis.
+   *
+   * The row is sized by its CONTENT and centred by `sectionStyles.section`'s `alignItems`. Two
+   * earlier shapes both drew it off-centre, and for opposite reasons:
+   *
+   *   `alignSelf: 'stretch'` + `flex: 1` — the pair spread across the whole card, putting the
+   *   mark hard against the left edge.
+   *   a fixed `width: 254` on the line — the row was then always 304 wide whatever the copy
+   *   said, so a line that fits comfortably (as the current one does) left the box wider than
+   *   its text and the pair sat left of centre inside it.
+   *
+   * `maxWidth` is what `319:3340`'s 254pt measure actually means: long copy wraps at 254, short
+   * copy lets the row close up around it. Either way the mark and its line stay centred together.
+   */
   vision: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'stretch',
     gap: HOME_DESIGN.promise.gap,
   },
   logo: { width: HOME_DESIGN.promise.logo, height: HOME_DESIGN.promise.logo },
-  line: { flex: 1, minWidth: 0 },
+  line: { maxWidth: HOME_DESIGN.promise.lineWidth },
 });

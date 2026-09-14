@@ -5,6 +5,7 @@ import type { Href } from 'expo-router';
 import {
   AddressDetailsView,
   addressCreateScope,
+  resolveAddressSavePoint,
   useAddressDetailsData,
   useCreateAddress,
   useUpdateAddress,
@@ -129,24 +130,13 @@ export default function AddressDetailsRoute() {
            * ADDING: the draft's, which only exists because `53:31` confirmed it and the server
            * approved it. EDITING: the record's own, unless the customer walked back to the map
            * and pinned a new one — re-sending a stale draft would silently MOVE an address they
-           * were only renaming.
+           * were only renaming. `resolveAddressSavePoint` is the single place that rule lives —
+           * see its own comment in `features/address/validation.ts` for why.
            *
            * `null` means there is no point, and there is then nothing to save. It used to be
            * `?? 0`, which sends the Gulf of Guinea to the backend as a real coordinate.
            */
-          const point =
-            draft.latitude !== null && draft.longitude !== null
-              ? {
-                  latitude: draft.latitude,
-                  longitude: draft.longitude,
-                  ...(draft.placeId === null ? {} : { placeId: draft.placeId }),
-                }
-              : savedPoint === null
-                ? null
-                : {
-                    ...savedPoint,
-                    ...(savedPlaceId === null ? {} : { placeId: savedPlaceId }),
-                  };
+          const point = resolveAddressSavePoint(draft, editingId, savedPoint, savedPlaceId);
           if (point === null) return;
 
           /**

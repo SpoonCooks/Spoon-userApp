@@ -36,6 +36,33 @@ export function remainingMs(endsAtMs: number, serverNowMs: number): number {
   return Math.max(0, endsAtMs - serverNowMs);
 }
 
+/**
+ * Whether a booked slot — a start instant plus a booked duration — is already over.
+ *
+ * The window is the one the screens themselves draw: "5:30 PM • 2 hr" is `scheduledStart` plus
+ * `durationMinutes`, so a card and its own lifetime are derived from the same two fields and
+ * cannot drift apart.
+ *
+ * It is NOT a substitute for `timing.expectedEnd`, which is when a service ACTUALLY ends and is
+ * the only authority for "Time left" on a live card — a service can start late or be extended.
+ * This answers a different question: whether the slot a booking was made for has passed, which
+ * matters for bookings where no service is going to happen at all.
+ *
+ * An absent or unparseable start means there is no window to have ended — an instant booking
+ * carries no `scheduledStart` — so it reports false. Retiring something on the strength of a
+ * timestamp that could not be read would be the worse failure.
+ */
+export function slotHasEnded(
+  startIso: string | null | undefined,
+  durationMinutes: number,
+  now: Date = new Date(),
+): boolean {
+  if (startIso === null || startIso === undefined) return false;
+  const start = new Date(startIso);
+  if (Number.isNaN(start.getTime())) return false;
+  return start.getTime() + durationMinutes * 60_000 <= now.getTime();
+}
+
 export interface DurationParts {
   readonly hours: number;
   readonly minutes: number;

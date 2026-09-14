@@ -1,3 +1,4 @@
+import { BackHandler } from 'react-native';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import {
@@ -20,6 +21,7 @@ import {
 
 import SavedAddressesRoute from '@/app/(app)/address/index';
 import BookingConfirmingRoute from '@/app/(app)/booking/confirming';
+import PaymentFailedRoute from '@/app/(app)/booking/payment-failed';
 import BookingRoute from '@/app/(app)/booking/[id]';
 import HomeRoute from '@/app/(app)/home';
 
@@ -220,6 +222,265 @@ describe('`433:2290` Page 21 — payment, then the SERVER (task §9, §10)', () 
     });
 
     await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/home'));
+  });
+});
+
+/* --------------------------------------------------------- Payment Failed */
+
+describe('Payment Failed — retry against the same hold, or leave once the server disagrees', () => {
+  const CANCELLATION_STUBS = {
+    'GET /v1/bookings/bk-1/cancellation-preview': () => ({
+      bookingId: 'bk-1',
+      cancellable: true,
+      band: null,
+      refundPercent: null,
+      minutesToStart: null,
+      serviceAmountPaise: 12900,
+      capturedAmountPaise: 0,
+      refundAmountPaise: 0,
+      chargeAmountPaise: 0,
+      policyVersion: 'cancellation-policy-v0',
+    }),
+    'GET /v1/bookings/bk-1/reschedule-options': () => ({
+      bookingId: 'bk-1',
+      durationMinutes: 60,
+      currentServiceStart: '2026-08-18T12:00:00.000Z',
+      rescheduleCount: 0,
+      maxReschedules: 2,
+      reschedulable: false,
+    }),
+  };
+
+  function renderPaymentFailed(overrides: Record<string, unknown> = {}) {
+    mockSearchParams = { id: 'bk-1' };
+    return renderWithRuntime(<PaymentFailedRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({
+            booking: bookingWith({ status: 'created', ...overrides }),
+          }),
+        }),
+      }),
+    });
+  }
+
+  it('shows the price snapshot and a retry CTA while the hold is still `created`', async () => {
+    renderPaymentFailed();
+
+    expect(await screen.findByTestId('payment-failed-retry')).toBeTruthy();
+    expect(screen.getByText(/Retry payment • ₹135.45/)).toBeTruthy();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  it('offers Cancel booking only when the server authorises it', async () => {
+    renderPaymentFailed({
+      allowedActions: {
+        canCancel: false,
+        canReschedule: false,
+        canExtend: false,
+        canRate: false,
+        canTip: false,
+        canCallCook: false,
+      },
+    });
+
+    await screen.findByTestId('payment-failed-retry');
+    expect(screen.queryByTestId('payment-failed-cancel')).toBeNull();
+  });
+
+  it('leaves for the real booking screen once the server settles the hold — paid after all', async () => {
+    renderPaymentFailed({ status: 'assigned' });
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/booking/bk-1'));
+  });
+
+  it('leaves for the real booking screen once the hold is gone — cancelled', async () => {
+    renderPaymentFailed({ status: 'cancelled' });
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/booking/bk-1'));
+  });
+
+  it('goes Home when opened with no booking id', async () => {
+    mockSearchParams = {};
+    renderWithRuntime(<PaymentFailedRoute />, {
+      runtime: createTestRuntime({ api: createStubApi(DEFAULT_API_STUBS) }),
+    });
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/home'));
+    expect(mockRouter.dismissAll).toHaveBeenCalled();
+  });
+
+  /**
+   * Observed on device: cancelling from this screen showed `115:2703` ("Your booking has been
+   * cancelled") for a single frame and then jumped away.
+   *
+   * The cancellation invalidates the booking read, so the very next poll saw `cancelled`, the
+   * settled-and-leave effect fired, and it replaced the sheet's own receipt before the customer
+   * could read it. The sheet owns the screen until they answer its "book again?" prompt.
+   */
+  it('does not navigate out from under the cancel sheet when the cancellation settles', async () => {
+    mockSearchParams = { id: 'bk-1' };
+    // The booking goes `cancelled` the moment the POST lands — which is exactly what the real
+    // mutation causes, by invalidating the booking read it has just changed.
+    let status = 'created';
+    renderWithRuntime(<PaymentFailedRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({ booking: bookingWith({ status }) }),
+          'POST /v1/bookings/bk-1/cancel': () => {
+            status = 'cancelled';
+            return {};
+          },
+        }),
+      }),
+    });
+
+    fireEvent.press(await screen.findByTestId('payment-failed-cancel'));
+    fireEvent.press(await screen.findByTestId('cancel-continue-policy'));
+    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
+    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
+    fireEvent.press(await screen.findByTestId('cancel-confirm'));
+
+    // `115:2703` is the customer's receipt. It has to still be on screen once the refetch the
+    // cancellation triggered has come back saying `cancelled`.
+    expect(await screen.findByTestId('cancel-step-confirmed')).toBeTruthy();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(screen.getByTestId('cancel-step-confirmed')).toBeTruthy();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A read that keeps failing is not a reason to hold the customer on an error screen forever —
+   * the same call `confirming.tsx` makes for the identical situation. Without this, a booking
+   * that actually settled while the device was offline would leave the customer stuck on a dead
+   * end instead of at Home, where the next successful read reports the truth.
+   */
+  it('goes Home when the booking cannot be read at all', async () => {
+    mockSearchParams = { id: 'bk-1' };
+    renderWithRuntime(<PaymentFailedRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => {
+            throw new Error('offline');
+          },
+        }),
+      }),
+    });
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/home'));
+  });
+});
+
+/* ------------------------------------------------------------- Cancel booking */
+
+describe('Cancel booking — `useCancelFlow`, shared by the booking host and Payment Failed', () => {
+  const CANCELLATION_STUBS = {
+    'GET /v1/bookings/bk-1/cancellation-preview': () => ({
+      bookingId: 'bk-1',
+      cancellable: true,
+      band: null,
+      refundPercent: null,
+      minutesToStart: null,
+      serviceAmountPaise: 12900,
+      capturedAmountPaise: 12900,
+      refundAmountPaise: 12900,
+      chargeAmountPaise: 0,
+      policyVersion: 'cancellation-policy-v0',
+    }),
+    'GET /v1/bookings/bk-1/reschedule-options': () => ({
+      bookingId: 'bk-1',
+      durationMinutes: 60,
+      currentServiceStart: '2026-08-18T12:00:00.000Z',
+      rescheduleCount: 0,
+      maxReschedules: 2,
+      reschedulable: false,
+    }),
+  };
+
+  /**
+   * A live, scheduled booking is what actually draws the Cancel control on the confirmation
+   * view (`instantBooking` hides it for Instant). This is the same route ([id].tsx) `useCancelFlow`
+   * was extracted out of, so driving the sheet all the way to `confirmed` here is the regression
+   * net for that extraction — not just "it typechecks".
+   */
+  it('drives the sheet through to a confirmed cancellation', async () => {
+    mockSearchParams = { id: 'bk-1' };
+    const cancelCalls: unknown[] = [];
+
+    renderWithRuntime(<BookingRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({
+            booking: bookingWith({ status: 'assigned', slotType: 'scheduled' }),
+          }),
+          'POST /v1/bookings/bk-1/cancel': (body: unknown) => {
+            cancelCalls.push(body);
+            return {};
+          },
+        }),
+      }),
+    });
+
+    fireEvent.press(await screen.findByTestId('confirmation-cancel'));
+    fireEvent.press(await screen.findByTestId('cancel-continue-policy'));
+    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
+    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
+    fireEvent.press(await screen.findByTestId('cancel-confirm'));
+
+    expect(await screen.findByTestId('cancel-step-confirmed')).toBeTruthy();
+    expect(cancelCalls).toEqual([{ reasonCode: 'URGENT_CHANGE' }]);
+  });
+
+  /**
+   * `[id].tsx`'s own comment explains why this exists: the sheet is a native modal that takes
+   * Android back itself in the general case, but a `QueryBoundary` still loading renders no
+   * modal at all — this is the host's own `useAndroidBackHandler`, wired through `cancelFlow`
+   * now instead of the local `cancelOpen` state it replaced, closing the loop for that gap.
+   */
+  it('Android back closes the open sheet (handled) and falls through once it is closed', async () => {
+    const spy = jest.spyOn(BackHandler, 'addEventListener');
+    mockSearchParams = { id: 'bk-1' };
+
+    renderWithRuntime(<BookingRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({
+            booking: bookingWith({ status: 'assigned', slotType: 'scheduled' }),
+          }),
+        }),
+      }),
+    });
+    fireEvent.press(await screen.findByTestId('confirmation-cancel'));
+    await screen.findByTestId('cancel-sheet');
+    const backHandler = spy.mock.calls.at(-1)?.[1] as () => boolean;
+
+    // `backHandler` triggers a `setState` outside of `fireEvent`, so the update needs its own
+    // `act` — otherwise the close is not guaranteed to have flushed before the assertion below.
+    let handled = false;
+    await act(async () => {
+      handled = backHandler();
+    });
+    expect(handled).toBe(true);
+    await waitFor(() => expect(screen.queryByTestId('cancel-sheet')).toBeNull());
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    // With the sheet closed, the SAME handler now defers to whatever the screen behind it does.
+    expect(backHandler()).toBe(false);
+
+    spy.mockRestore();
   });
 });
 

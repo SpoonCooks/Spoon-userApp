@@ -76,6 +76,109 @@ describe('razorpayCheckoutLauncher', () => {
     );
   });
 
+  /**
+   * A dismissal was observed reaching this launcher classified as a FAILURE — a customer who
+   * changed their mind was shown "Your payment failed" instead of being left alone. The numeric
+   * code Android's SDK sends is not the only signal this app can see, so it no longer has to be
+   * the only one that counts.
+   */
+  it('still reports a cancellation when the numeric code does not match Android’s constant', async () => {
+    mockOpen.mockRejectedValue({ code: 0, description: 'Payment Cancelled' });
+
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
+      CheckoutCancelledError,
+    );
+  });
+
+  it('recognises a cancellation worded only in `reason`, with no matching code', async () => {
+    mockOpen.mockRejectedValue({
+      code: 100,
+      description: 'Payment failed',
+      reason: 'payment_cancelled',
+    });
+
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
+      CheckoutCancelledError,
+    );
+  });
+
+  /**
+   * Captured from a device: Razorpay nests `reason` inside `details`, not at the top level its
+   * own published type shows. Read only at the top level it was always null, so this fallback
+   * existed without ever being able to fire.
+   */
+  it('finds `reason` where Razorpay actually puts it — nested under `details`', async () => {
+    mockOpen.mockRejectedValue({
+      code: 400,
+      description: 'Payment failed',
+      details: { reason: 'payment_cancelled', source: 'customer', step: 'payment_authentication' },
+    });
+
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
+      CheckoutCancelledError,
+    );
+  });
+
+  it('still treats a nested reason that is NOT a cancellation as a failure', async () => {
+    mockOpen.mockRejectedValue({
+      code: 400,
+      description: 'Your payment was declined by the bank',
+      details: { reason: 'payment_failed', source: 'bank', step: 'payment_authorization' },
+    });
+
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(CheckoutFailedError);
+  });
+
+  it('finds `reason` under `error` too — the OTHER shape a device has sent', async () => {
+    mockOpen.mockRejectedValue({
+      code: 0,
+      description: 'irrelevant',
+      error: { reason: 'payment_cancelled', source: 'customer', step: 'payment_authentication' },
+    });
+
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
+      CheckoutCancelledError,
+    );
+  });
+
+  /**
+   * The rejection a Galaxy S21 actually produced when the customer tapped "Yes, exit" — captured
+   * verbatim, `error` and all. It is pinned here for one reason: it is the shape that made
+   * `readReason` log `reason: null`, because the nested body arrived under `error` while only
+   * `details` was being read.
+   *
+   * It still classifies as a FAILURE, and that is not an oversight. Razorpay words this one
+   * `payment_error` with `description: "undefined"` — it says nothing about a dismissal for the
+   * heuristic to find. Reading the reason correctly is what this fixes; making Razorpay describe
+   * a dismissal is not something this file can do. The remaining gap is that a customer who exits
+   * on purpose is still told the payment failed.
+   */
+  it('reads the reason from a real device dismissal, which Razorpay still words as an error', async () => {
+    const body = {
+      code: 'BAD_REQUEST_ERROR',
+      description: 'undefined',
+      source: 'customer',
+      step: 'payment_authentication',
+      reason: 'payment_error',
+      metadata: {},
+    };
+    mockOpen.mockRejectedValue({
+      code: 0,
+      description: JSON.stringify({ error: body }),
+      error: body,
+    });
+
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(CheckoutFailedError);
+  });
+
+  it('recognises a dismissal worded that way instead of "cancel"', async () => {
+    mockOpen.mockRejectedValue({ code: 0, description: 'Checkout form dismissed' });
+
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
+      CheckoutCancelledError,
+    );
+  });
+
   it('reports any other provider rejection as a failure, keeping its reason for logs', async () => {
     mockOpen.mockRejectedValue({ code: 1, description: 'Your card was declined' });
 

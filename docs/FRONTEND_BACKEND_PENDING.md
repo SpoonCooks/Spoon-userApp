@@ -106,7 +106,179 @@ integration pass — `addressWriteResponseSchema` already required `serviceabili
 deliberately NOT weakened to accept the stale shape: doing so would drop the one field the
 first-run gate now reads. Re-verify after deployment.
 
+## 2b. Account deletion — CLOSED in contract, wired
+
+`BACKEND_GAP_ACCOUNT_DELETE` is retired. `DELETE /v1/me` exists, is instant and self-serve, and
+the frontend consumes it: Profile → Account → Delete Account → No/Yes sheet → `/account/delete-otp`
+(Login's own `OtpScreen`, reused rather than reproduced) → `DELETE /v1/me`.
+
+**The code is never pre-verified.** `POST /v1/auth/otp/verify` would consume the one-time code and
+mint a session as a side effect, so the delete call would arrive holding a code the server had
+already spent. The typed code goes straight into the delete body, which verifies it itself.
+
+**`audience` is sent by deletion only.** `POST /v1/auth/otp/send` defaults a missing `audience` to
+`customer`, so Login's request is left exactly as it was — pinned by `authApi.test.ts`, because a
+default leaking into Login would change a working production request on the app's only way in.
+Deletion also sends the call authenticated: the route ignores the header, but the auth rate limiter
+buckets by user id when a token is present and by phone when it is not, which keeps deletion sends
+out of the same 8-per-10-minutes budget as login sends on that number.
+
+**Idempotency.** One key per attempt (`account:delete:<userId>`), held across every retry of it —
+wrong code, block, timeout, 5xx — because the server hashes an empty body against the key and marks
+a failure `failed_retryable`, so the same key with a corrected code is processed rather than
+replayed. The key is retired when the customer leaves the OTP screen, so re-entering the flow is a
+genuinely new attempt. The key's alphabet is contract (`^[A-Za-z0-9._~-]{8,128}$`, narrower than
+the transport's 200-char printable-ASCII ceiling) and is pinned by `idempotency.test.ts`: a
+generator swapped for base64 or a wide-alphabet nanoid would emit `+` or `=` and fail as
+INVALID_REQUEST, which on this screen is indistinguishable from a mistyped OTP.
+
+**Retention copy — SHIPPED.** Bookings, payments and refunds are RETAINED for eight years under
+Indian tax law, with the name and number stripped, so no copy in this flow may say "all your data
+will be deleted". The confirmation sheet now discloses that deletion is immediate and
+irreversible, what is erased, that every session ends, and what is kept and for how long.
+`DeleteAccountSheet.test.tsx` asserts each of those claims — including that the sheet never
+overstates what is erased — so a release that drops one fails there rather than in store review.
+
+**STILL WRONG: the Privacy Policy contradicts this.** `src/features/legal/documents.ts` tells
+customers that "Account deletion requests are processed within 30 days" (twice) and that
+"Financial records are retained for 7 years". Deletion is immediate, and the retention period is
+eight years. That document is reachable one row above Delete Account on the same screen, so a
+reviewer testing this flow is one tap from the contradiction. Legal copy is not the frontend's to
+rewrite — this needs product/legal sign-off, then a straight text replacement in that file.
+
+**KNOWN: one `GET /v1/me` 401s immediately after a successful deletion.** The contract says not to
+call an authenticated endpoint after the 200, and this one is not called deliberately. Sign-out
+runs `queryClient.clear()` BEFORE it dispatches `SIGNED_OUT` (`onSessionCleared` in
+`src/core/runtime.ts`), so for the moment between the two, the OTP screen's `useMe` observer is
+still mounted against an empty cache and refetches with tokens the server has already revoked.
+
+It is bounded to a single request — auth errors are not retryable (`src/core/query/queryClient.ts`)
+— and self-correcting: the 401 lands in the same global handler that has already signed the
+customer out. It is NOT specific to deletion; a normal Log Out from Profile does the same thing
+with the same query. Fixing it properly means reordering teardown inside `sessionController`,
+which every sign-out in the app shares, so it is recorded here rather than worked around locally
+for one screen. Expect one post-deletion 401 per deletion in backend logs.
+
+**KNOWN: a blocked deletion leaves the six typed digits in place.** `ACCOUNT_DELETION_BLOCKED` is
+the one failure where the code was accepted, so the customer may want to retry the SAME code once
+they have cleared the booking or refund. The frames draw no CTA — the code submits when the last
+digit lands — so there is no control that resubmits an unchanged code. In practice the customer
+leaves the screen to deal with the blocker (the notice links them there), and re-entering the flow
+resets everything, so this is a dead end only for someone who resolves the block without leaving.
+
+### PENDING_BACKEND_DEPLOYMENT — `details.reason` on a blocked deletion
+
+`ACCOUNT_DELETION_BLOCKED` (409) returns `{ error: { code, message, requestId } }` with a fixed
+sentence naming all three possible causes — active booking, refund in progress, open recovery case
+— and no way to tell which one fired. `details.reason` fixes that and is **committed backend-side
+(`b6a7ca0`) but not merged and not deployed**, so against staging and production today the field is
+absent. The fallback is the behaviour to expect on the first real run.
+
+Wire values are **UPPER_SNAKE_CASE** — `ACTIVE_BOOKING` / `PENDING_REFUND` / `OPEN_RECOVERY_CASE`
+— captured from a real 409. They were first described to us in lower_snake_case, which is why
+`deletionFailureView` matches case-insensitively and `deletionError.test.ts` pins it: a miss here
+raises nothing, it silently degrades to the generic sentence and drops the link. Only the FIRST
+blocker is ever reported; the server short-circuits in that order.
+
+The client is already written for both states, so **no frontend change is needed when the field
+ships** — re-verify the deep-link targets against a real 409 then.
+
+A blocked deletion is deliberately NOT drawn in the rejected-code slot: the code was accepted, and
+tinting the digit boxes red would tell the customer they mistyped something they did not.
+
+### Verified against the running implementation
+
+Captured by the backend from real requests, and reconciled against what this client sends:
+
+- **`otp/send` answers 202, not 200.** Our transport accepts any 2xx (`response.ok`) and never
+  asserts a status, so this is already correct — but a future `=== 200` check would break it.
+- **`DELETE /v1/me` with a JSON body is parsed**, confirmed by a real deletion. This app had no
+  DELETE-with-body precedent before; that concern is closed.
+- **`/v1/me.phone` cannot be anything but strict E.164.** Every write path calls `normalizePhone`,
+  which strips separators and enforces the pattern or throws. The `toE164` call in
+  `useRequestAccountDeletionOtp` is now belt-and-braces rather than load-bearing; it is kept
+  because it is idempotent and costs nothing.
+- **A malformed `Idempotency-Key` returns the SAME 400 body as a wrong OTP.** This is precisely
+  why `idempotency.test.ts` pins the key alphabet: a generator swapped for base64 or a wide
+  nanoid would emit `+`, `/` or `=`, and every deletion would fail telling the customer their
+  code was wrong.
+- **`INVALID_REQUEST` cannot distinguish a wrong code from an expired or already-spent one.** The
+  backend collapses all five failure modes deliberately, so an attacker cannot learn which
+  condition they tripped. Our copy says "Incorrect OTP. Please try again", which is the Figma
+  string and is imprecise for an expired code — **the same imprecision Login already ships**,
+  since it is the same endpoint and the same collapsed error. Worth a copy decision across BOTH
+  screens rather than diverging one of them.
+
+### KNOWN: no usable retry time on the OTP cooldown 429
+
+There are two different 429s on this path and they are indistinguishable in the response body:
+the distributed limiter (30/60s per IP, 8/600s per account) sends a `Retry-After` header, and the
+30-second same-number OTP cooldown sends **no header at all**. The cooldown is the one this flow
+hits most.
+
+We show the shared "Too many attempts" copy with no number in both cases. Reading the header would
+need response headers plumbed into `AppError`, which the transport does not carry today — a change
+to shared error handling for every feature, not just this one. The resend countdown already stops
+a customer reaching the cooldown by tapping, so this is a polish item, not a defect. The backend
+has offered to add the missing header on the cooldown path; taking that up would make a single
+follow-up worthwhile for every rate-limited surface in the app.
+
 ## 3. Still open
+
+### `BACKEND_GAP_LIST_CURSOR` — My bookings and Refunds are capped at 50 rows, permanently
+
+Every fact below is from real captured responses against the running backend.
+
+`GET /v1/me/bookings` and `GET /v1/me/refunds` are cursor-paginated with `limit` /
+`cursorCreatedAt` / `cursorId`, but **the response carries no cursor** — the body is
+`{ bookings: [...] }` and nothing else (`BookingListOk` declares `additionalProperties: false`).
+Nothing is being dropped client-side; there is nothing to drop.
+
+So the app cannot reach row 51, and not for want of trying:
+
+- `limit` is **clamped, not rejected** — `Math.min(50, max(1, limit))`. `?limit=100` and
+  `?limit=500` both return 50. Only a non-numeric value 400s. We therefore ask for exactly 50
+  (`MAX_LIST_PAGE` in `bookingApi.ts`), which is the most these endpoints will ever give.
+- The cursor is `(created_at, id)`, and `created_at` is **deliberately unpublished** — the
+  summary projection emits no timestamp, and the backend reserves the column as an
+  implementation detail ("orders the page; it never decides membership").
+- `?cursorId=` without `cursorCreatedAt` is a 400, so there is no half-cursor way in.
+- The ids are v4 UUIDs, so no creation time can be recovered from them either.
+
+**Consequence, stated plainly: a customer with more than 50 terminal bookings can never see the
+older ones.** That is roughly a year of weekly use — and it accrues faster than that, because
+every abandoned checkout becomes a `cancelled` row in history. Accepted for this release,
+scheduled for the next.
+
+*Minimal change:* return an opaque `nextCursor` (null on the last page) on both endpoints. Opaque
+rather than publishing `created_at`: if the client has to compose `(createdAt, id)` itself, the
+cursor's shape becomes a published contract and changing the sort key would break every shipped
+app. `FlatList` is already in place on both screens, so consuming it is `useInfiniteQuery` plus
+`onEndReached` and little else.
+
+### `GET /v1/me/bookings/active` cannot be paged at all
+
+It takes **no query parameters** — the schema is an empty object, so `?limit=` is a 400 rather
+than an ignored hint — and its page size is hardcoded to 20 server-side. Home's carousel and the
+Upcoming tab are therefore capped at 20 rows with no client-side remedy. Pinned by
+`bookingApi.test.ts`, because sending a parameter here breaks the screen rather than limiting it.
+
+### ⚠️ Two OpenAPI descriptions are stale — trust the code, not the spec
+
+Both confirmed against the live query by the backend, and both still unfixed in the document:
+
+- `openapi.yaml:565-568` says `/me/bookings` excludes a `created` booking "only while its service
+  window is still open". There is no window rule any more; the predicate has been
+  `status IN ('completed','cancelled')` since 2026-08-27. An unpaid booking is absent from
+  history until the sweep transitions it to `cancelled`.
+- `openapi.yaml:594-596` says `completed` and `cancelled` "are never active". Both can be: there
+  is a 120-hour completed-awaiting-rating branch, and a 24-hour branch admitting a
+  system-cancelled, captured, unseen booking — which is the apology card. This is why the same
+  cancelled booking legitimately appears on BOTH tabs for up to 24 hours, and why it leaves
+  Upcoming once the customer opens it.
+
+Our own connectivity doc was derived from the spec, so anything in it about these two rules
+inherits the same staleness.
 
 ### `BACKEND_GAP_EXTENSION_KEY_ID` — blocks extension checkout
 

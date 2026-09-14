@@ -95,6 +95,27 @@ export function isAwaitingConfirmation(status: string | null | undefined): boole
 }
 
 /**
+ * The two statuses a booking never leaves.
+ *
+ * Everything else — `created`, `assigned`, `cook_en_route`, `cook_arrived`, `cooking` — is a
+ * booking the server still considers live, however old its slot looks. That distinction is what
+ * stops a service which started late or was extended from being treated as finished merely
+ * because its booked window has elapsed.
+ */
+const FINISHED_STATUSES: ReadonlySet<string> = new Set(['completed', 'cancelled']);
+
+/**
+ * Whether this booking is over as far as the SERVER is concerned.
+ *
+ * Read against the status string rather than a view, because the question is about the booking's
+ * lifecycle and not about which screen it draws. An unknown status reports false: a status this
+ * build has never heard of is not grounds for treating a booking as finished.
+ */
+export function isFinishedBooking(status: string | null | undefined): boolean {
+  return status !== null && status !== undefined && FINISHED_STATUSES.has(status);
+}
+
+/**
  * The view for a whole booking payload, not just its status string.
  *
  * Three of the designed screens are not reachable from a status alone, so this reads the fields

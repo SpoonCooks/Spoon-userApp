@@ -59,8 +59,17 @@ export interface BookingDetailActions {
   readonly onExtendBooking?: (minutes: number) => Promise<unknown>;
   /** True while `POST /v1/bookings/:id/extensions` is in flight. LOCAL to the sheet's CTA. */
   readonly extending?: boolean;
+  /**
+   * An extension or tip the SERVER refused, already turned into customer copy by the host.
+   *
+   * Both sheets used to swallow their failure entirely — the CTA's spinner stopped and nothing
+   * else changed, so a declined card was indistinguishable from a tap that did nothing. The
+   * host decides the wording AND decides that a dismissed checkout is not a failure at all.
+   */
+  readonly extendError?: string | null;
   /** True while `POST /v1/bookings/:id/tips` is in flight. LOCAL to the tip sheet's CTA. */
   readonly tipping?: boolean;
+  readonly tipError?: string | null;
   /**
    * `143:292` — Completion's Submit chip. Carries the RATING as well as the words, because
    * `299:1424` draws one Submit for both and `319:3191` is the state after that one press.
@@ -138,6 +147,9 @@ export function BookingDetailView({
                 helpLabel={booking.helpLabel}
                 {...(actions.onHelp === undefined ? {} : { onHelp: actions.onHelp })}
                 {...(actions.extending === undefined ? {} : { submitting: actions.extending })}
+                {...(actions.extendError === undefined
+                  ? {}
+                  : { errorMessage: actions.extendError })}
                 {...extendSeam(extension.state.data.defaultOptionId ?? null)}
                 onBookAnother={() => setExtensionOpen(false)}
               />
@@ -164,6 +176,7 @@ export function BookingDetailView({
                 helpLabel={booking.helpLabel}
                 {...(actions.onHelp === undefined ? {} : { onHelp: actions.onHelp })}
                 {...(actions.tipping === undefined ? {} : { submitting: actions.tipping })}
+                {...(actions.tipError === undefined ? {} : { errorMessage: actions.tipError })}
                 {...tipSeam(booking.tip.defaultOptionId ?? null)}
               />
             )}
@@ -203,7 +216,9 @@ export function BookingDetailView({
         void submit(minutes)
           .then(() => setExtensionOpen(false))
           .catch(() => {
-            // Surfaced by the mutation. Nothing here claims the service was extended.
+            // Swallowed HERE because the host renders it through `extendError` — this comment
+            // used to claim the mutation surfaced it, which was not true of any sheet that had
+            // nowhere to put it. Nothing here claims the service was extended.
           });
       },
     };
@@ -225,7 +240,8 @@ export function BookingDetailView({
         void submit(chosen)
           .then(() => setTipOpen(false))
           .catch(() => {
-            // Surfaced by the mutation. Nothing here claims a tip was paid.
+            // Swallowed HERE because the host renders it through `tipError`; see `extendSeam`.
+            // Nothing here claims a tip was paid.
           });
       },
     };

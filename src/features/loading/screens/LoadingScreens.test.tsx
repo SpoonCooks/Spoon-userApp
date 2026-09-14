@@ -50,7 +50,7 @@ describe('Loading → ready switching', () => {
     onBack: jest.fn(),
     onSelectTile: jest.fn(),
     onOpenProfileDetails: jest.fn(),
-    onOpenLink: jest.fn(),
+    onOpenManageAccount: jest.fn(),
     onLogout: jest.fn(),
     onRetry: jest.fn(),
   };

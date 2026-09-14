@@ -149,6 +149,33 @@ export function bookingCardFrom(
   };
 }
 
+/**
+ * Most recent first, on BOTH tabs.
+ *
+ * Neither tab ordered its rows at all — each rendered whatever order its endpoint happened to
+ * return, which on a real account interleaved dates (a Sep 13 row above a Sep 12 one above
+ * another Sep 12 one). A list of bookings is read by date, so the order is the screen's to decide
+ * rather than the endpoint's to leak.
+ *
+ * A booking with no `scheduledStart` sorts LAST rather than first. There is no other timestamp on
+ * the summary to order it by, and floating an undated row to the top of a list read as a
+ * chronology would be the more surprising answer. `id` breaks ties so the order is stable across
+ * refetches rather than reshuffling under the customer.
+ */
+export function byMostRecentFirst(left: BookingSummaryDto, right: BookingSummaryDto): number {
+  const leftStart =
+    left.scheduledStart === null || left.scheduledStart === undefined
+      ? Number.NEGATIVE_INFINITY
+      : Date.parse(left.scheduledStart);
+  const rightStart =
+    right.scheduledStart === null || right.scheduledStart === undefined
+      ? Number.NEGATIVE_INFINITY
+      : Date.parse(right.scheduledStart);
+
+  if (leftStart !== rightStart) return rightStart - leftStart;
+  return left.id.localeCompare(right.id);
+}
+
 export function bookingListFrom(input: {
   readonly base: BookingListViewModel;
   readonly bookings: readonly BookingSummaryDto[];
@@ -157,6 +184,11 @@ export function bookingListFrom(input: {
 }): BookingListViewModel {
   return {
     ...input.base,
-    bookings: input.bookings.map((dto) => bookingCardFrom(dto, input.timeZone)),
+    // Copied before sorting: the argument belongs to the caller's query cache, and sorting in
+    // place would reorder the cached array every render.
+    bookings: input.bookings
+      .slice()
+      .sort(byMostRecentFirst)
+      .map((dto) => bookingCardFrom(dto, input.timeZone)),
   };
 }

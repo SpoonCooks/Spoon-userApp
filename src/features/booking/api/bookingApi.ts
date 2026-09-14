@@ -43,6 +43,22 @@ import type {
  * its key: that is what makes an ambiguous timeout safe on an endpoint that takes money.
  */
 
+/**
+ * The most either customer-scoped list will return, per request AND in total.
+ *
+ * The server clamps `limit` to `Math.min(50, Math.max(1, limit))` rather than rejecting it, so
+ * this is the real ceiling and not a page size we picked: 100 and 500 both come back with 50.
+ * Asking for it exactly is the most these endpoints can be made to give.
+ *
+ * It is a TOTAL because there is no way to ask for row 51. Shared by `/me/bookings` and
+ * `/me/refunds`, which have the identical gap.
+ */
+const MAX_LIST_PAGE = 50;
+
+function query(params: Readonly<Record<string, string>>): string {
+  return new URLSearchParams(params).toString();
+}
+
 export const BOOKING_PATHS = {
   quote: '/v1/bookings/quote',
   create: '/v1/bookings',
@@ -129,7 +145,13 @@ export function createBookingApi(api: ApiClient) {
       });
     },
 
-    /** `GET /v1/me/bookings/active`. Drives Home's active-booking card. */
+    /**
+     * `GET /v1/me/bookings/active`. Drives Home's carousel and the Upcoming tab.
+     *
+     * Takes NO query parameters — its schema is an empty object, so `?limit=` is a 400 rather
+     * than an ignored hint. Its own page size is hardcoded to 20 server-side and there is no way
+     * to page it, which is a ceiling this app cannot lift.
+     */
     async active(signal?: AbortSignal): Promise<readonly BookingSummaryDto[]> {
       return api.request(BOOKING_PATHS.active, {
         parse: (data) => bookingListResponseSchema.parse(data).bookings,
@@ -137,9 +159,24 @@ export function createBookingApi(api: ApiClient) {
       });
     },
 
-    /** `GET /v1/me/bookings`. Past bookings. */
+    /**
+     * `GET /v1/me/bookings` — past bookings, asked for at the server's maximum page size.
+     *
+     * `MAX_LIST_PAGE` is not a preference, it is the ceiling: the server clamps with
+     * `Math.min(50, max(1, limit))`, so 100 and 500 both return 50 rather than erroring. Asking
+     * for exactly 50 therefore gets everything the endpoint will ever give in one request, and
+     * cannot 400 — only a non-numeric value does that.
+     *
+     * PAGINATION IS NOT IMPLEMENTED, and cannot be from here: rows 51+ need a cursor, the cursor
+     * is `(created_at, id)`, and `created_at` is deliberately unpublished — the summary carries
+     * no timestamp to build it from, and `cursorId` alone is rejected. So a customer with more
+     * than 50 terminal bookings cannot reach the older ones at all. That is a hard ceiling on
+     * this screen until the backend returns an opaque `nextCursor`; see
+     * `docs/FRONTEND_BACKEND_PENDING.md`.
+     */
     async history(signal?: AbortSignal): Promise<readonly BookingSummaryDto[]> {
-      return api.request(BOOKING_PATHS.list, {
+      const search = query({ limit: String(MAX_LIST_PAGE) });
+      return api.request(`${BOOKING_PATHS.list}?${search}`, {
         parse: (data) => bookingListResponseSchema.parse(data).bookings,
         ...(signal === undefined ? {} : { signal }),
       });
@@ -151,7 +188,10 @@ export function createBookingApi(api: ApiClient) {
      * A dedicated endpoint exists, so the Refunds screen does not fan out over every booking.
      */
     async refunds(signal?: AbortSignal) {
-      return api.request(BOOKING_PATHS.myRefunds, {
+      // The same `limit`/cursor trio as `/me/bookings`, and the same missing cursor — so the same
+      // ceiling applies, and asking for the maximum is the most this can fetch.
+      const search = query({ limit: String(MAX_LIST_PAGE) });
+      return api.request(`${BOOKING_PATHS.myRefunds}?${search}`, {
         parse: (data) => refundListResponseSchema.parse(data).refunds,
         ...(signal === undefined ? {} : { signal }),
       });

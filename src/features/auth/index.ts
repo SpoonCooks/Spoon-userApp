@@ -6,7 +6,8 @@
  *   `227:1649` Page 17b Login OTP — six-box code entry, resend line, "Verify & Proceed"
  *
  * The OTP screen's previous DESIGN_PENDING / B-7 status is OBSOLETE: it is now fully designed.
- * Ruling R-6: T&C / Privacy live in Profile; no additional legal UI is to be added to Login.
+ * Ruling R-6 (V9): T&C / Privacy live on the Account screen (`@features/account`), reached from
+ * Profile's "Manage account" row; no additional legal UI is to be added to Login.
  *
  * Headless session machinery (the machine, the token store, the controller) lives in
  * `@core/auth` because it is cross-cutting. This module owns the auth SCREENS, the auth
@@ -21,7 +22,7 @@
 export { LoginScreen } from './screens/LoginScreen';
 export type { LoginScreenProps } from './screens/LoginScreen';
 export { OtpScreen } from './screens/OtpScreen';
-export type { OtpScreenProps } from './screens/OtpScreen';
+export type { OtpNotice, OtpScreenProps } from './screens/OtpScreen';
 export type { LoginViewModel, OtpViewModel } from './types';
 
 export {
@@ -52,4 +53,5 @@ export type {
   OtpVerifyResponse,
   ProfileData,
   ProfileUpdateRequest,
+  SendOtpOptions,
 } from './api';

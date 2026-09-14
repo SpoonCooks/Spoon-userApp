@@ -1,3 +1,5 @@
+import type { AddressDraft } from '@core/store/addressDraftStore';
+
 import type { AddressLabelOption } from './types';
 
 /**
@@ -122,4 +124,40 @@ export interface AddressSubmitGate {
 
 export function canSubmitAddress(gate: AddressSubmitGate): boolean {
   return isAddressFormComplete(gate.values, gate.shape) && gate.locationReady && !gate.submitting;
+}
+
+/** The coordinates a save actually submits — `resolveAddressSavePoint`'s return shape. */
+export interface AddressSavePoint {
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly placeId?: string;
+}
+
+/**
+ * WHICH coordinates a save submits, asked once here rather than inline on the route — the same
+ * reason `canSubmitAddress` is a module and not an expression on the button: a rule asked in two
+ * places is a rule that can drift, and here the two places are "does the CTA look live" and
+ * "what does Save actually send".
+ *
+ * The draft is trusted only when `draft.editingId` matches `editingId` — the draft store persists
+ * until a save succeeds, so an add abandoned earlier, or a "Change area" on a DIFFERENT address,
+ * can leave an unrelated point sitting in it. Without this check, saving an edit that never
+ * revisited the map could silently pick up that leftover point and relocate an address the
+ * customer only meant to rename.
+ */
+export function resolveAddressSavePoint(
+  draft: Pick<AddressDraft, 'editingId' | 'latitude' | 'longitude' | 'placeId'>,
+  editingId: string | null,
+  savedPoint: { readonly latitude: number; readonly longitude: number } | null,
+  savedPlaceId: string | null,
+): AddressSavePoint | null {
+  if (draft.editingId === editingId && draft.latitude !== null && draft.longitude !== null) {
+    return {
+      latitude: draft.latitude,
+      longitude: draft.longitude,
+      ...(draft.placeId === null ? {} : { placeId: draft.placeId }),
+    };
+  }
+  if (savedPoint === null) return null;
+  return { ...savedPoint, ...(savedPlaceId === null ? {} : { placeId: savedPlaceId }) };
 }

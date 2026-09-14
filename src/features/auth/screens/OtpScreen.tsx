@@ -63,7 +63,25 @@ export interface OtpScreenProps {
   readonly onResend: () => void;
   /** `227:1700` — the pencil returns to phone entry. */
   readonly onEditNumber: () => void;
+  readonly notice?: OtpNotice;
   readonly testID?: string;
+}
+
+/**
+ * A message that is NOT about the code.
+ *
+ * `otp.errorMessage` is the rejected-code slot: it turns the digit boxes red, because a red box
+ * says "what you typed is wrong". Account deletion has an outcome that is neither success nor a
+ * bad code — the server accepting the code and still refusing to delete, because a booking or
+ * refund is open — and reusing the red slot for it would accuse the customer of a typo they did
+ * not make. This renders under the panel, neutral, with an optional way out of the dead end.
+ *
+ * Login passes none, and is drawn exactly as its frames draw it.
+ */
+export interface OtpNotice {
+  readonly message: string;
+  readonly actionLabel?: string;
+  readonly onAction?: () => void;
 }
 
 /** `275:4305` — the brand block's designed height, held wherever the viewport can afford it. */
@@ -90,6 +108,7 @@ export function OtpScreen({
   onVerify,
   onResend,
   onEditNumber,
+  notice,
   testID = 'otp-screen',
 }: OtpScreenProps) {
   const [code, setCode] = useState('');
@@ -186,7 +205,7 @@ export function OtpScreen({
                 accessibilityIgnoresInvertColors
               />
             ) : null}
-            <View style={styles.tagline}>
+            <View style={styles.tagline} testID={`${testID}-tagline`}>
               <Text variant="title" color="textPrimary" align="center">
                 {otp.taglineLead}
                 <Text variant="title" color="surfaceCta">
@@ -296,6 +315,39 @@ export function OtpScreen({
                 />
               </View>
 
+              {/* Not a rejected code — see `OtpNotice`. Drawn outside the panel, and on the
+                  panel's own neutral ink, so the boxes are not implicated. */}
+              {notice === undefined ? null : (
+                <View style={styles.notice} testID={`${testID}-notice`}>
+                  <Text
+                    variant="body"
+                    color="textSecondary"
+                    align="center"
+                    accessibilityRole="alert"
+                  >
+                    {notice.message}
+                  </Text>
+                  {notice.actionLabel === undefined || notice.onAction === undefined ? null : (
+                    <Pressable
+                      onPress={notice.onAction}
+                      accessibilityRole="button"
+                      accessibilityLabel={notice.actionLabel}
+                      hitSlop={8}
+                      testID={`${testID}-notice-action`}
+                    >
+                      <Text
+                        variant="otpResend"
+                        color="textPrimary"
+                        align="center"
+                        style={styles.resendOffered}
+                      >
+                        {notice.actionLabel}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+
               <Pressable
                 onPress={onResend}
                 disabled={!otp.resendEnabled}
@@ -354,7 +406,24 @@ const styles = StyleSheet.create({
   },
   logo: { width: 134, height: 93 },
   /** `275:4308` — a 268pt measure, 2pt between the two lines. */
-  tagline: { width: 268, gap: lightTheme.space.xxs, alignItems: 'center' },
+  /**
+   * `275:4305` — the 268pt tagline block.
+   *
+   * NO `alignItems: 'center'`, deliberately. With it, the lines shrink-wrap their content, and a
+   * `Text` made of TWO runs — the lead plus the `#FFD600` "minutes" — measured short on Android:
+   * the view was framed from the first run and the accent was never painted. The word was in the
+   * layout (the node measured 477px for the whole string) and in the accessibility tree, so every
+   * test passed and only the screen was wrong.
+   *
+   * Centring is `align="center"` on each line instead, which is `textAlign` and needs no
+   * shrink-wrap: the lines fill 268 and the glyphs centre inside them, which is what `275:4305`
+   * draws anyway.
+   *
+   * LoginScreen still carries `alignItems` on its own 320pt tagline and renders both runs today —
+   * the mis-measure only bites at some widths. It is left alone rather than "fixed" blind, but it
+   * is the same shape, so this is where the reason lives if it ever shows up there.
+   */
+  tagline: { width: 268, gap: lightTheme.space.xxs },
   /** `275:4312` — px 4 / py 12, 16pt between the heading group and the digits block. */
   content: {
     gap: lightTheme.space.lg,
@@ -406,6 +475,12 @@ const styles = StyleSheet.create({
   digitErrored: { backgroundColor: lightTheme.colors.dangerSurface },
   /** `250:2439` / `275:4469` — the resend line is underlined only once it is actually offered. */
   resendOffered: { textDecorationLine: 'underline' },
+  /** No frame draws this; it follows the panel's own rhythm (`275:4320`'s 6pt, opened to 10). */
+  notice: {
+    alignSelf: 'stretch',
+    gap: lightTheme.space.s10,
+    paddingHorizontal: lightTheme.space.xs,
+  },
   /**
    * Transparent rather than `display: none`, so it can still take focus, paste and SMS autofill —
    * and sized over the panel so the platform's focus auto-reveal lands on the boxes.

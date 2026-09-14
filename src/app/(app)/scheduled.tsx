@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useBookingSubmission } from '@features/booking';
+import { destinationForPayment, useBookingSubmission } from '@features/booking';
 import { formatPaise } from '@core/format';
 import { useSafeBack } from '@core/navigation';
 import { ScheduleView, devScheduleSelection, useScheduleData } from '@features/scheduled';
@@ -78,6 +78,7 @@ export default function ScheduledRoute() {
       canSubmit={submission.canSubmit && submission.quote.state.status === 'ready'}
       onSelectionChange={setSelection}
       submitting={submission.submitting}
+      submitError={submission.submitError}
       onSubmit={() => {
         if (!submission.canSubmit || submission.submitting) return;
         void submission
@@ -91,19 +92,26 @@ export default function ScheduledRoute() {
              * second booking of a time the customer already has.
              *
              * A VERIFIED payment goes to `433:2290`, Page 21, which waits on the SERVER and then
-             * moves to Home (V7 founder comment, task §9/§10). Anything else has no confirmation
-             * to wait for and goes to the booking screen, which shows the hold as it stands. See
-             * `app/(app)/home.tsx` for the same split on the Instant path.
+             * moves to Home (V7 founder comment, task §9/§10). Anything unpaid goes to Payment
+             * Failed — never to the booking screen, which heads an unpaid `created` hold
+             * "Booking confirmed!". `destinationForPayment` is shared with `app/(app)/home.tsx`
+             * so this mapping is decided in exactly one place.
+             *
+             * A null destination is a DISMISSED checkout, and it STAYS — the paragraph above is
+             * about a time the customer now HAS, which is exactly what someone who backed out of
+             * paying does not. Sending them on anyway made the grid flash past on the way to
+             * Home; leaving them on it, selection intact, is both what they asked for by
+             * dismissing and what lets them simply press the CTA again.
              */
-            router.replace(
-              created.payment === 'verified'
-                ? `/booking/confirming?id=${bookingId}`
-                : `/booking/${bookingId}`,
-            );
+            const destination = destinationForPayment(created.payment, bookingId);
+            if (destination !== null) router.replace(destination);
           })
           .catch(() => {
-            // Already normalized and surfaced by the mutation; the selection is left intact so a
-            // retry replays the same idempotency scope rather than creating a second booking.
+            // Swallowed HERE because the screen renders it through `submitError` — the comment
+            // this replaces claimed the mutation surfaced it, which was true of nothing: there
+            // was no error surface on this screen at all, so a refused booking left a live CTA
+            // that did nothing. The selection is left intact so a retry replays the same
+            // idempotency scope rather than creating a second booking.
           });
       }}
       /*

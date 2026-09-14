@@ -101,6 +101,12 @@ export const DEV_ROUTES: readonly DevRoute[] = [
   { path: '/address?edit=1', label: 'Address · Edit / Delete sheet', note: 'NEW 228:1801' },
   { path: '/address/out-of-service', label: 'Address · Out of service', note: 'FINAL · 215:1472' },
   { path: '/profile', label: 'Profile', note: 'FINAL · Profile 275:6021 · 6:663' },
+  /*
+   * Account, but NOT `/account/delete-otp`: entering that screen sends a real OTP against the
+   * signed-in customer's own number and spends one of their eight-per-ten-minutes budget, which
+   * is not something a menu of screens should do on a tap. It is reached through the sheet.
+   */
+  { path: '/account', label: 'Account · Delete account', note: 'No frame id · supplied mock' },
   { path: '/history', label: 'My bookings', note: 'FINAL · 6:227' },
   { path: '/refunds', label: 'Refunds', note: 'FINAL · 71:615' },
   { path: '/otp', label: 'Login · OTP (countdown)', note: 'FINAL · 275:4289' },

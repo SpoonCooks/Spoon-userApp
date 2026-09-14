@@ -2,7 +2,7 @@ import { Redirect, useLocalSearchParams } from 'expo-router';
 import type { Href } from 'expo-router';
 
 import { LEGAL_DOCUMENTS, LegalDocumentView, legalDocumentFor } from '@features/legal';
-import { useDeterministicBack } from '@core/navigation';
+import { useSafeBack } from '@core/navigation';
 
 /**
  * `spoon://legal/terms` and `spoon://legal/privacy` — the two customer documents, in-app.
@@ -19,9 +19,18 @@ import { useDeterministicBack } from '@core/navigation';
  * content, and gating them would mean the only people who can read the terms are the people who
  * already agreed to them.
  *
- * Profile is the fallback destination for the same reason History and Refunds use it — a pop with
- * no stack behind it should land somewhere real. A signed-out reader who arrived from Login pops
- * back to Login normally, because there IS a stack behind them.
+ * ## Back POPS, and the fallback is only for a deep link
+ *
+ * This screen has three entry points — Login, and both rows on the Account screen — so the only
+ * correct answer to "back" is the screen the reader actually came from. `useSafeBack` gives that,
+ * and falls back to Profile for a cold `spoon://legal/:doc` with nothing behind it, for the same
+ * reason History and Refunds fall back there.
+ *
+ * It used to be `useDeterministicBack('/profile')`, which does not pop at all: it dismissed the
+ * stack and REPLACED it with Profile, so a reader who opened the Terms from the Account screen
+ * was put on Profile and had to walk back in. That was invisible while Profile was the only way
+ * in — the destination and the origin were the same screen — and became wrong the moment the
+ * Account screen started linking here.
  *
  * An unknown `doc` REDIRECTS rather than rendering an error. A legal document is either published
  * or it is not; there is no partial state worth drawing, and a mistyped deep link should put the
@@ -29,7 +38,7 @@ import { useDeterministicBack } from '@core/navigation';
  */
 export default function LegalDocumentRoute() {
   const { doc } = useLocalSearchParams<{ doc?: string }>();
-  const goBack = useDeterministicBack('/profile');
+  const goBack = useSafeBack('/profile');
 
   const id = legalDocumentFor(doc);
   if (id === null) return <Redirect href={'/profile' as Href} />;

@@ -5,7 +5,7 @@ import { addressLineOf, useAddresses } from '@features/address';
 import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
-import { currentSkewMs } from '@core/time';
+import { currentSkewMs, slotHasEnded } from '@core/time';
 
 import {
   formatClockLabel,
@@ -175,6 +175,13 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
                   arrivedAtLabel: formatClockLabel(detailData.timing.arrivedAt),
                   canRate: detailData.allowedActions.canRate,
                   cancelledBy: detailData.cancellation?.cancelledBy ?? null,
+                  // The same window `timeLabel` above draws, asked whether it is over. Only the
+                  // cancelled card reads it; see `variantFor`.
+                  slotEnded: slotHasEnded(
+                    detailData.scheduledStart,
+                    detailData.durationMinutes,
+                    serverNow,
+                  ),
                   reassigned: detailData.reassignment?.occurred === true,
                   recoveryHandoff: detailData.recovery?.state === 'support_handoff',
                 });

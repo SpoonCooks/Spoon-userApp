@@ -196,6 +196,9 @@ export const lightColors = {
 
   danger: palette.danger,
   dangerSurface: palette.dangerSurface,
+  dangerSurfaceStrong: palette.dangerSurfaceStrong,
+  /** The Delete Account confirmation prompt's rose block — `rose600` at 30%, per the inspector. */
+  surfaceCritical: palette.rose600Surface,
 
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */

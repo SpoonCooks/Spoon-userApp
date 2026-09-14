@@ -331,7 +331,7 @@ const PRIVACY_BODY = `
 <p>Your data is primarily stored on servers in India. Some third-party providers may process data outside India. Where such transfers occur, we ensure appropriate contractual safeguards are in place in accordance with applicable law.</p>
 
 <h2><span class="n">8.</span>Data Retention</h2>
-<p>We retain your personal data for as long as your account is active or as needed to provide services. Financial records are retained for 7 years for tax and legal compliance. Account deletion requests are processed within 30 days, except for data we are legally required to retain. Aggregated, anonymised data may be retained indefinitely for analytical purposes.</p>
+<p>We retain your personal data for as long as your account is active or as needed to provide services. When you delete your account, your name, phone number, saved addresses and preferences are deleted immediately and you are signed out on every device. Payment and invoice records are retained for 8 years as required by Indian tax law, with your name and phone number removed from them. Aggregated, anonymised data may be retained indefinitely for analytical purposes.</p>
 
 <h2><span class="n">9.</span>Your Rights</h2>
 <h3>Right to access</h3>
@@ -339,7 +339,7 @@ const PRIVACY_BODY = `
 <h3>Right to correction</h3>
 <p>If any data is inaccurate or incomplete, you may request correction. You are responsible for keeping your profile information up to date.</p>
 <h3>Right to deletion</h3>
-<p>You may request deletion of your account and associated personal data within 30 days, subject to data we are legally required to retain.</p>
+<p>You may delete your account at any time from the app, under Profile &rarr; Manage account &rarr; Delete Account. Deletion is immediate and cannot be undone: your name, phone number, saved addresses and preferences are permanently removed and you are signed out everywhere. Payment and invoice records are retained for 8 years as required by Indian tax law, with your name and phone number removed from them.</p>
 <h3>Right to withdraw consent</h3>
 <p>You may withdraw consent to data processing at any time by emailing <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Withdrawal may affect certain Platform features.</p>
 <h3>How to exercise your rights</h3>

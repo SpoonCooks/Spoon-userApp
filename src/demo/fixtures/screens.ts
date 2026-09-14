@@ -202,23 +202,9 @@ export const DEMO_PROFILE: ProfileViewModel = {
     { id: 'refunds', title: 'My refunds', subtitle: 'View refund status', icon: 'refresh' },
     { id: 'help', title: 'Help', subtitle: 'Get immediate help', icon: 'help' },
   ],
-  links: [
-    // The "Visit Live Website (spoonhelp.com)" row (`6:766`) was REMOVED in the current file —
-    // the footer panel dropped 154.43 → 110.43 with it. Nothing replaced it.
-    // `6:779` in v4 carries the text ALONE — no leading mark and no trailing shield. The row is
-    // a 28pt bar whose only child is the underlined label.
-    //
-    // TWO rows, not one. `6:779` draws a single "Terms of Service & Privacy Policy" label, which
-    // is one control standing for two separate documents — so it could only ever open one of
-    // them, or a page that is neither. They are distinct legal instruments with distinct
-    // "Last Updated" dates, and a customer looking for the privacy policy should be able to press
-    // "Privacy Policy". Each row now names exactly what it opens.
-    { id: 'terms', title: 'Terms of Service' },
-    { id: 'privacy', title: 'Privacy Policy' },
-  ],
-  // `6:779` draws the two as ONE line — "Terms of Service & Privacy Policy" — so this is the
-  // frame's own separator, not a layout decision.
-  linksSeparator: ' & ',
+  // V9: the legal-links footer row is GONE from Profile itself. Terms of Service and Privacy
+  // Policy now live one level down, on the Account screen this row opens — see `@features/account`.
+  manageAccountLabel: 'Manage account',
   // `6:789` reads exactly "Log Out".
   logoutLabel: 'Log Out',
 };
@@ -362,7 +348,7 @@ export const DEMO_CANCELLATION: CancellationViewModel = {
     {
       id: 'reschedule-once',
       title: 'Cancellation on rescheduled bookings',
-      body: 'An original booking can be rescheduled only once',
+      body: 'An original booking can be rescheduled only once. Instant bookings can not be cancelled.',
     },
   ],
   reasonTitle: 'Why do you want to cancel?',
@@ -377,15 +363,20 @@ export const DEMO_CANCELLATION: CancellationViewModel = {
     { id: 'others', label: 'Others', requiresDetail: true },
   ],
   reasonDetailPlaceholder: 'Tell us what went wrong',
-  continueLabel: 'Continue',
+  /**
+   * `104:2314` labels this "Cancel", not "Continue" — every step of the sheet carries the same
+   * word on the same yellow bar, and only the LAST one actually cancels anything. Drawn as
+   * designed; the field still names the action (advance to the refund step), not the word.
+   */
+  continueLabel: 'Cancel',
   refundTitle: 'Refund details',
   refundRows: [
-    { label: 'Original Booking Paid', value: '₹135' },
+    { label: 'Original Amount Paid', value: '₹135' },
     { label: 'Cancellation Processing Fee', value: '₹0' },
     { label: 'Refund Amount', value: '₹135', emphasis: 'total' },
   ],
   refundMethodTitle: 'Refund to original payment source',
-  refundMethodBody: 'Takes 3-5 business days',
+  refundMethodBody: 'Takes 5-6 business days',
   cancelCtaLabel: 'Cancel',
   confirmedTitle: 'Your booking has been cancelled',
   bookAgainTitle: 'Would you like to make another booking?',

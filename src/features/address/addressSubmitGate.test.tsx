@@ -17,6 +17,7 @@ import {
   isOthersSelected,
   missingAddressFields,
   othersLabelIdOf,
+  resolveAddressSavePoint,
 } from './validation';
 import type { AddressFormShape, AddressFormValues } from './validation';
 
@@ -108,6 +109,66 @@ describe('address form validation (60:655)', () => {
   });
 });
 
+/**
+ * `resolveAddressSavePoint` — the fix for a real (pre-existing) bug: the draft store persists
+ * until a save succeeds, so an abandoned add, or a "Change area" on a DIFFERENT address, can
+ * leave an unrelated point sitting in it. Saving an edit that never revisited the map must never
+ * pick that up and silently relocate an address the customer only meant to rename.
+ */
+describe('resolveAddressSavePoint (60:655) — which coordinates a save actually submits', () => {
+  const NO_DRAFT = { editingId: null, latitude: null, longitude: null, placeId: null };
+  const SAVED_POINT = { latitude: 12.97, longitude: 77.64 };
+
+  it('adding: uses the draft, tagged for no address (null)', () => {
+    const draft = { editingId: null, latitude: 12.9, longitude: 77.6, placeId: 'place-1' };
+
+    expect(resolveAddressSavePoint(draft, null, null, null)).toEqual({
+      latitude: 12.9,
+      longitude: 77.6,
+      placeId: 'place-1',
+    });
+  });
+
+  it('editing with no draft: uses the address’s own saved point', () => {
+    expect(resolveAddressSavePoint(NO_DRAFT, 'addr-7', SAVED_POINT, 'place-saved')).toEqual({
+      latitude: 12.97,
+      longitude: 77.64,
+      placeId: 'place-saved',
+    });
+  });
+
+  it('editing after "Change area" on THIS address: uses the fresh draft, not the stale saved point', () => {
+    const draft = { editingId: 'addr-7', latitude: 12.9, longitude: 77.6, placeId: null };
+
+    expect(resolveAddressSavePoint(draft, 'addr-7', SAVED_POINT, 'place-saved')).toEqual({
+      latitude: 12.9,
+      longitude: 77.6,
+    });
+  });
+
+  /** The defect this closes: a leftover draft from an unrelated attempt must never win. */
+  it('editing with a leftover draft tagged for a DIFFERENT address: uses the saved point, not the leftover', () => {
+    const staleDraft = { editingId: 'addr-9', latitude: 12.9, longitude: 77.6, placeId: null };
+
+    expect(resolveAddressSavePoint(staleDraft, 'addr-7', SAVED_POINT, 'place-saved')).toEqual({
+      latitude: 12.97,
+      longitude: 77.64,
+      placeId: 'place-saved',
+    });
+  });
+
+  /** Adding with a leftover EDIT draft is the same defect from the other side. */
+  it('adding with a leftover draft tagged for an EDIT: finds no usable point at all', () => {
+    const staleDraft = { editingId: 'addr-9', latitude: 12.9, longitude: 77.6, placeId: null };
+
+    expect(resolveAddressSavePoint(staleDraft, null, null, null)).toBeNull();
+  });
+
+  it('is null when adding with no point pinned yet', () => {
+    expect(resolveAddressSavePoint(NO_DRAFT, null, null, null)).toBeNull();
+  });
+});
+
 function Harness({ addressId }: { addressId?: string | null }) {
   const details = useAddressDetailsData(addressId);
   return (
@@ -162,6 +223,23 @@ describe('useAddressDetailsData — the confirmed-location half of the gate', ()
     const { getByTestId } = renderDetails();
 
     await waitFor(() => expect(getByTestId('location-ready')).toHaveTextContent('true'));
+  });
+
+  /**
+   * The store persists until a save succeeds, so a leftover point from editing (or abandoning)
+   * a DIFFERENT address can still be sitting there. It must not make a fresh add's CTA look live
+   * — that would be a button that appears enabled but has no point of its own to save.
+   */
+  it('reports no location while adding, for a leftover draft tagged for a different edit', async () => {
+    useAddressDraftStore.getState().setPoint({
+      latitude: 12.9,
+      longitude: 77.6,
+      serviceable: true,
+      editingId: 'addr-1',
+    });
+    const { getByTestId } = renderDetails(null);
+
+    await waitFor(() => expect(getByTestId('location-ready')).toHaveTextContent('false'));
   });
 
   /** An edit already has a point the backend accepted, so Confirm may be live on arrival. */
