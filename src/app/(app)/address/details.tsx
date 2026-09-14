@@ -44,7 +44,7 @@ export default function AddressDetailsRoute() {
     from?: string;
   }>();
   const editingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
-  const { state, refetch, savedPoint, savedPlaceId, locationReady } =
+  const { state, refetch, savedPoint, savedPlaceId, savedArea, locationReady } =
     useAddressDetailsData(editingId);
   const draft = useAddressDraftStore((store) => store.draft);
   const clearDraft = useAddressDraftStore((store) => store.clear);
@@ -158,12 +158,28 @@ export default function AddressDetailsRoute() {
             label,
             ...(form.flat.trim() === '' ? {} : { flat: form.flat.trim() }),
             ...(form.building.trim() === '' ? {} : { society: form.building.trim() }),
-            // The geocoder's street is a prefill for a field the design does not draw, so it
-            // is sent as-is; an empty one is sent as empty rather than guessed at.
-            street: draft.street ?? form.building.trim(),
-            pincode: draft.pincode ?? '',
-            ...(draft.city === null ? {} : { city: draft.city }),
-            ...(draft.state === null ? {} : { state: draft.state }),
+            /*
+             * AREA: the draft's, then the address's own, then the form.
+             *
+             * The draft only carries an area when the customer went through the map step. An
+             * EDIT that never did — renaming, or fixing a flat number — has an empty draft, and
+             * reading `pincode` straight off it sent `''`. `PUT /v1/me/addresses/:id` requires a
+             * pincode, so the backend refused the whole request with a 400 and the screen showed
+             * "Couldn't save address" with no way through. Reproduced on the handset.
+             *
+             * `savedArea` is the same idea as `savedPoint` one field over: when there is no fresh
+             * draft, an edit resends what the address already holds rather than blanking it.
+             */
+            street: draft.street ?? savedArea?.street ?? form.building.trim(),
+            pincode: draft.pincode ?? savedArea?.pincode ?? '',
+            ...(() => {
+              const city = draft.city ?? savedArea?.city ?? null;
+              return city === null ? {} : { city };
+            })(),
+            ...(() => {
+              const state = draft.state ?? savedArea?.state ?? null;
+              return state === null ? {} : { state };
+            })(),
             ...(form.receiverName.trim() === '' ? {} : { receiverName: form.receiverName.trim() }),
             ...(form.receiverPhone.trim() === ''
               ? {}

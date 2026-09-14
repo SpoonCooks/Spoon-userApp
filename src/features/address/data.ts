@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { ready } from '@core/data';
+import { getLogger } from '@core/logging';
 import type { ScreenQuery } from '@core/data';
 
 import { EMPTY_ADDRESS_DRAFT, useAddressDraftStore } from '@core/store/addressDraftStore';
@@ -188,6 +189,21 @@ export interface AddressDetailsData extends ScreenQuery<AddressDetailsViewModel>
   /** The saved Places identity, if the address originally came from Places search. */
   readonly savedPlaceId: string | null;
   /**
+   * The AREA already stored against the address being edited, or `null` when adding.
+   *
+   * Exists for the same reason as `savedPoint`, and was missing for the same case it covers.
+   * `PUT /v1/me/addresses/:id` requires `street` and `pincode`, and an edit that never revisited
+   * the map has no draft to take them from — the draft only carries an area the map step wrote.
+   * Without this the save sent `pincode: ''` and the backend refused the whole request with a
+   * 400, so renaming an address, or correcting its flat number, could not be done at all.
+   */
+  readonly savedArea: {
+    readonly street: string;
+    readonly pincode: string;
+    readonly city: string | null;
+    readonly state: string | null;
+  } | null;
+  /**
    * Whether a CONFIRMED, server-approved coordinate exists for the address about to be saved.
    *
    * ADDING: the map step's draft, and only once `POST /v1/serviceability/check` answered
@@ -315,11 +331,21 @@ export function useAddressDetailsData(addressId?: string | null): AddressDetails
   const savedPoint =
     existing === null ? null : { latitude: existing.latitude, longitude: existing.longitude };
   const savedPlaceId = existing?.placeId ?? null;
+  const savedArea =
+    existing === null
+      ? null
+      : {
+          street: existing.street,
+          pincode: existing.pincode,
+          city: existing.city,
+          state: existing.state,
+        };
 
   return {
     state,
     savedPoint,
     savedPlaceId,
+    savedArea,
     /**
      * The draft's verdict is the SERVER's, recorded by `53:31` on Confirm. `serviceable === true`
      * is required explicitly: `null` means the point was never checked and `false` means it was
@@ -431,6 +457,8 @@ export function isAddressUsable(address: AddressDto): boolean {
 export type AddressGate = 'resolving' | 'required' | 'satisfied';
 
 export function useAddressGate(options: { enabled?: boolean } = {}): AddressGate {
+  // TEMP PROBE — remove before commit
+  getLogger('probe').warn('gate:enter', { enabled: options.enabled ?? true });
   /**
    * `enabled` exists for the BOOT gate, which asks this question at `/` before the session has
    * been proved. A `GET /v1/me/addresses` fired while signed out 401s and burns a refresh, so the

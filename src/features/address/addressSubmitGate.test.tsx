@@ -178,6 +178,8 @@ function Harness({ addressId }: { addressId?: string | null }) {
       <Text testID="area">
         {details.state.status === 'ready' ? details.state.data.areaValue : ''}
       </Text>
+      <Text testID="saved-street">{details.savedArea?.street ?? ''}</Text>
+      <Text testID="saved-pincode">{details.savedArea?.pincode ?? ''}</Text>
     </>
   );
 }
@@ -191,6 +193,35 @@ function renderDetails(addressId?: string | null) {
 describe('useAddressDetailsData — the confirmed-location half of the gate', () => {
   beforeEach(() => {
     useAddressDraftStore.getState().clear();
+  });
+
+  /**
+   * `PUT /v1/me/addresses/:id` requires `street` and `pincode`. The DRAFT only carries an area
+   * when the customer walked through the map step, so an edit that just renames an address, or
+   * corrects its flat number, has nothing in the draft to send.
+   *
+   * Before `savedArea` existed the route read `draft.pincode ?? ''` and sent an EMPTY pincode.
+   * The backend refused the whole request with a 400 and the screen showed "Couldn't save
+   * address" with no way through — reproduced on a handset against staging, on every edit that
+   * did not re-pin the map, which is most of them.
+   *
+   * This is `savedPoint`'s problem one field over, and it gets the same answer: when there is no
+   * fresh draft, an edit resends what the address already holds.
+   */
+  it('exposes the address’s own area for an edit that never revisited the map', async () => {
+    const { getByTestId } = renderDetails('addr-1');
+
+    await waitFor(() => expect(getByTestId('saved-pincode')).toHaveTextContent('560102'));
+    expect(getByTestId('saved-street')).toHaveTextContent('Silver County Road');
+  });
+
+  /** Adding has no record behind it, so there is nothing to fall back to and none is invented. */
+  it('has no saved area while adding', async () => {
+    const { getByTestId } = renderDetails();
+
+    await waitFor(() => expect(getByTestId('status')).toHaveTextContent('ready'));
+    expect(getByTestId('saved-pincode')).toHaveTextContent('');
+    expect(getByTestId('saved-street')).toHaveTextContent('');
   });
 
   it('reports no location while the draft is empty', async () => {
