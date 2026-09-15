@@ -290,8 +290,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
     ...(GOOGLE_SERVICES_JSON === '' ? {} : { googleServicesFile: GOOGLE_SERVICES_JSON }),
 
+    /**
+     * Android composites an adaptive icon from a background and a foreground, and ours was the
+     * wordmark in black over `SPLASH_BACKGROUND` -- an off-white. Correct, and completely unlike
+     * `icon.png`, which iOS uses: black over the brand's yellow-to-lime ramp. The launcher showed
+     * what looked like a monochrome icon next to a colourful one on the App Store.
+     *
+     * `backgroundImage` wins over `backgroundColor` where both are given, so the ramp is now an
+     * image rather than a flat colour -- a single colour cannot express a gradient, and picking
+     * one end of it would be choosing a new brand colour in a build file. The image is generated
+     * from `icon.png`'s own four corners, so the two icons are the same artwork and stay that way
+     * if the source changes. `backgroundColor` stays as the fallback for anything that asks for a
+     * colour and cannot take an image.
+     */
     adaptiveIcon: {
       backgroundColor: SPLASH_BACKGROUND,
+      backgroundImage: './assets/images/android-icon-background.png',
       foregroundImage: './assets/images/android-icon-foreground.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
