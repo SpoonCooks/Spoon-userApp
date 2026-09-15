@@ -22,9 +22,11 @@
  * ## Transcription
  *
  * Both documents are transcribed from the supplied PDFs (`Spoon - Customer Terms of Service.pdf`,
- * `Spoon - Customer Privacy Policy.pdf`, both "Last Updated: September 1, 2026"). The wording is
- * verbatim: legal copy is not paraphrased, tidied or abridged here, and the section numbering is
- * the source's own so a customer quoting "clause 8" means what Legal means.
+  * `Spoon - Customer Privacy Policy.pdf`). The Privacy Policy PDF is confirmed at "Last Updated:
+   * September 15, 2026" and now lives at a public URL; the Terms of Service PDF's date has not yet
+    * been reconciled the same way. The wording is verbatim: legal copy is not paraphrased, tidied
+     * or abridged here, and the section numbering is the source's own so a customer quoting "clause
+      * 8" means what Legal means.
  *
  * WHEN THE DOCUMENTS CHANGE: replace the body constants and update `updated`. Nothing else on the
  * screen reads the date, so the two cannot drift apart.
@@ -274,7 +276,7 @@ Address: ${OFFICE}</p>
 
 const PRIVACY_BODY = `
 <p class="tagline">How we collect, use, and protect your personal information</p>
-<p class="meta">Last Updated: September 1, 2026 · ${ENTITY} · ${CONTACT_EMAIL}</p>
+<p class="meta">Last Updated: September 15, 2026 · ${ENTITY} · ${CONTACT_EMAIL}</p>
 
 <h2><span class="n">1.</span>About This Policy</h2>
 <p>This Privacy Policy describes how Tametoe Tomatoe Technologies Private Limited ("Spoon", "we", "us", or "our") collects, uses, shares, and protects your personal information when you use the Spoon customer application and related services (the "Platform").</p>
@@ -383,7 +385,7 @@ export const LEGAL_DOCUMENTS: Readonly<Record<LegalDocumentId, LegalDocument>> =
   },
   privacy: {
     title: 'Customer Privacy Policy',
-    updated: 'Last Updated: September 1, 2026',
+            updated: 'Last Updated: September 15, 2026',
     html: page({
       title: 'Customer Privacy Policy',
       updated: 'September 1, 2026',
