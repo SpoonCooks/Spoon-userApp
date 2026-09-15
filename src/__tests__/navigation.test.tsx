@@ -325,8 +325,11 @@ describe('booking host — the notification entry point', () => {
   });
 
   it('is the route a notification targets, and falls back to Home without an id', () => {
-    expect(routeForNotification({ bookingId: 'bk-1', eventType: 'booking.completed' })).toBe(
-      '/booking/bk-1',
+    // A uuid, because routing checks the SHAPE of a booking id rather than merely that a string
+    // is non-empty — see `deepLink.ts`. Every id Spoon issues is one.
+    const bookingId = '3f1c2a5e-0000-4000-8000-000000000001';
+    expect(routeForNotification({ bookingId, eventType: 'booking.completed' })).toBe(
+      `/booking/${bookingId}`,
     );
     // §20 — a payload with no identifier opens a safe root rather than a route built from it.
     expect(routeForNotification({ eventType: 'promo' })).toBe('/home');

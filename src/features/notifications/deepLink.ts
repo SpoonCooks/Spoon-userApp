@@ -29,9 +29,19 @@ export const KNOWN_EVENT_TYPES = [
   'booking.completed',
   'eta.revised',
   'booking.reassigned',
+  // The apology, added to the backend's map after this list was written and missing from it
+  // since. Routing never depended on the list, so nothing broke -- which is exactly why an
+  // audit list that has quietly stopped matching the backend is worth correcting.
+  'booking.cancelled',
 ] as const;
 
 export type KnownEventType = (typeof KNOWN_EVENT_TYPES)[number];
+
+const BOOKING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isBookingId(value: unknown): value is string {
+  return typeof value === 'string' && BOOKING_ID.test(value);
+}
 
 export function isKnownEventType(value: unknown): value is KnownEventType {
   return typeof value === 'string' && (KNOWN_EVENT_TYPES as readonly string[]).includes(value);
@@ -51,7 +61,13 @@ export function routeForNotification(data: unknown): string {
   // A booking id is the only thing that can target a screen. Anything else — a malformed
   // payload, a campaign message, an event from a newer backend — lands on Home rather than on a
   // route built from an unvalidated string.
-  if (typeof bookingId !== 'string' || bookingId.trim() === '') return '/home';
+  //
+  // Checked against the SHAPE of a booking id, not merely for a non-empty string. Every booking
+  // Spoon issues is a uuid, and the looser test let `'../../admin'` through as
+  // `/booking/../../admin` — a route assembled out of a payload, which the note above says this
+  // function never does. The backend is the only thing that can send a push today, so this is a
+  // guard on the contract rather than a live hole.
+  if (!isBookingId(bookingId)) return '/home';
 
   return `/booking/${bookingId}`;
 }
