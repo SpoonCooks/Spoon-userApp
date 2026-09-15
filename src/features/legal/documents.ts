@@ -24,9 +24,10 @@
  * Both documents are transcribed from the supplied PDFs (`Spoon - Customer Terms of Service.pdf`,
  * `Spoon - Customer Privacy Policy.pdf`). The Privacy Policy PDF is corrected (retention and
  * deletion language rewritten to describe the instant, self-serve flow this app actually runs)
- * and now public, at "Last Updated: September 15, 2026". The Terms of Service PDF has unchanged
- * content but is confirmed at "Last Updated: May 1, 2026" and remains restricted (owner and two
- * named collaborators only). The wording is verbatim: legal copy is not paraphrased, tidied or
+ * and now public, at "Last Updated: September 15, 2026". The Terms of Service PDF carries the
+ * same date and remains restricted (owner and two named collaborators only) -- it needs no public
+ * URL, because the app renders the Terms itself and only the Privacy Policy is linked from a
+ * store listing. The wording is verbatim: legal copy is not paraphrased, tidied or
  * abridged here, and the section numbering is the source's own so a customer quoting "clause 8"
  * means what Legal means.
  *
@@ -161,7 +162,7 @@ ${input.body}
 
 const TERMS_BODY = `
 <p class="tagline">The terms that govern your use of the Spoon platform</p>
-<p class="meta">Last Updated: May 1, 2026 · ${ENTITY} · ${CONTACT_EMAIL}</p>
+<p class="meta">Last Updated: September 15, 2026 · ${ENTITY} · ${CONTACT_EMAIL}</p>
 
 <h2><span class="n">1.</span>About These Terms</h2>
 <p>These Terms of Service ("Terms") constitute a legally binding agreement between you ("Customer") and Tametoe Tomatoe Technologies Private Limited ("Spoon"). They govern your access to and use of the Spoon mobile application, website, and all related services (the "Platform").</p>
@@ -378,10 +379,10 @@ Email: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p>
 export const LEGAL_DOCUMENTS: Readonly<Record<LegalDocumentId, LegalDocument>> = {
   terms: {
     title: 'Customer Terms of Service',
-    updated: 'Last Updated: May 1, 2026',
+    updated: 'Last Updated: September 15, 2026',
     html: page({
       title: 'Customer Terms of Service',
-      updated: 'May 1, 2026',
+      updated: 'September 15, 2026',
       body: TERMS_BODY,
     }),
   },
