@@ -85,7 +85,12 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
               <ScreenHeader title={profile.title} onBack={actions.onBack} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.body}>
+            {/*
+              The indicator is hidden here as it is on Home, Login, OTP and every bottom sheet:
+              this screen scrolls by a few rows at most, and a bar that appears for a moment on a
+              list that barely moves reads as a glitch rather than as an affordance.
+            */}
+            <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
               <View style={styles.identity} testID="profile-identity">
                 <Image
                   source={PROFILE_AVATAR_GLYPH}
