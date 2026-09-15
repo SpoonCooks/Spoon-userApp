@@ -71,7 +71,7 @@ describe('the published documents', () => {
    * The two dates differ: the Privacy Policy PDF was revised on September 15, the Terms were not.
    */
   it.each([
-    ['terms', 'September 1, 2026'],
+        ['terms', 'May 1, 2026'],
     ['privacy', 'September 15, 2026'],
   ] as const)('carries the source date for %s', (id, date) => {
     expect(LEGAL_DOCUMENTS[id].updated).toBe(`Last Updated: ${date}`);
