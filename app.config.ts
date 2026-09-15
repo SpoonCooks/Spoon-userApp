@@ -199,6 +199,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: ANDROID_PACKAGE,
 
+    /**
+     * `SYSTEM_ALERT_WINDOW` -- "Display over other apps" -- reaches the manifest from Expo's own
+     * prebuild template, not from this config or from any dependency: `android/` is generated and
+     * gitignored, so the line nobody wrote is the line nobody can delete for good either. It was
+     * in the first production AAB we built, and Play treats it as a sensitive permission: it
+     * invites Data safety scrutiny and sometimes a policy questionnaire, neither of which this app
+     * has an answer for, because nothing here draws an overlay. React Native's dev menu is what
+     * wants it, and the dev menu ships in debug variants that declare it themselves.
+     *
+     * `blockedPermissions` makes prebuild emit `tools:node="remove"` for it, so the merge drops it
+     * from every variant this config produces rather than us editing a generated file that the
+     * next prebuild overwrites.
+     */
+    blockedPermissions: ['android.permission.SYSTEM_ALERT_WINDOW'],
+
     ...(GOOGLE_SERVICES_JSON === '' ? {} : { googleServicesFile: GOOGLE_SERVICES_JSON }),
 
     adaptiveIcon: {
