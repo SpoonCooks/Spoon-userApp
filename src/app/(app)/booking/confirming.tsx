@@ -39,10 +39,22 @@ import { getLogger } from '@core/logging';
  *
  * ## Destination
  *
- * HOME (task §10). Home's dynamic banner is the designed surface for a live booking, so a
- * confirmed booking is shown there rather than on a separate confirmation screen. `replace`, via
- * `useDeterministicBack`, so the stack does not keep Page 21 — or the sheet the customer booked
- * from — behind it.
+ * A CONFIRMED booking goes to `/booking/:id` — the confirmation page, headed "Booking
+ * confirmed!". Confirmed, not merely settled: `cancelled` has also moved on, and sending it to a
+ * page that says confirmed would announce a booking the server refused.
+ * Task §10 sent every outcome to Home on the reasoning that Home's banner is the designed surface
+ * for a live booking. It is, but it is not an ACKNOWLEDGEMENT: a customer who has just paid was
+ * returned to the screen they started on and left to find their booking in a banner, which reads
+ * as the payment having gone nowhere.
+ *
+ * Anything UNSETTLED still goes to Home, and that distinction is the point. Timed out, unreadable,
+ * or opened without an id, the app does not know the booking is confirmed — and `/booking/:id` is
+ * headed "Booking confirmed!", so sending an unsettled booking there would be the app claiming a
+ * confirmation a timer produced. Home shows whatever the next successful read returns.
+ *
+ * Both moves go through `useDeterministicBack`, which drops the stack and replaces: Page 21 and
+ * the sheet the customer booked from are gone, and back from the confirmation page lands on Home
+ * (its own `useDeterministicBack('/home')`) rather than walking back into checkout.
  */
 
 /**
@@ -60,6 +72,12 @@ export default function BookingConfirmingRoute() {
 
   const { state } = useBookingConfirmation(bookingId);
   const goHome = useDeterministicBack('/home');
+  /**
+   * Falls back to Home when there is no id, so the hook is never handed `/booking/` — a route that
+   * does not exist. Nothing reaches it in that state anyway: `nothingToWaitFor` leaves via
+   * `goHome` below.
+   */
+  const goToBooking = useDeterministicBack(bookingId === null ? '/home' : `/booking/${bookingId}`);
 
   /**
    * Leaving must happen once. The poll keeps running for a beat after the status changes, and a
@@ -74,6 +92,14 @@ export default function BookingConfirmingRoute() {
   }, []);
 
   const settled = state.status === 'ready' && !isAwaitingConfirmation(state.data.status);
+  /**
+   * Settled is not the same as confirmed. `isAwaitingConfirmation` is false for `cancelled` too --
+   * a booking the server refused has also "moved on" -- and `/booking/:id` is headed "Booking
+   * confirmed!", so routing every settled booking there would announce a confirmation for a
+   * booking that was declined. Cancelled goes to Home with everything else the app cannot call
+   * confirmed.
+   */
+  const confirmed = settled && state.data.status !== 'cancelled';
   /**
    * A read that FAILED is not a reason to hold the customer here. The booking exists — it was
    * created before checkout opened — so the honest move is Home, where the banner will show
@@ -97,8 +123,9 @@ export default function BookingConfirmingRoute() {
       });
     }
 
-    goHome();
-  }, [settled, waitedOut, unreadable, nothingToWaitFor, goHome, bookingId]);
+    if (confirmed) goToBooking();
+    else goHome();
+  }, [settled, confirmed, waitedOut, unreadable, nothingToWaitFor, goHome, goToBooking, bookingId]);
 
   /**
    * Android back goes HOME rather than being swallowed.
