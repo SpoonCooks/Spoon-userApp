@@ -44,9 +44,12 @@ const SPLASH_BACKGROUND = '#FFFDF5';
 /**
  * The deployed API, used when no `EXPO_PUBLIC_API_BASE_URL` is supplied in development.
  *
- * A developer who has not written a `.env` gets the real staging deployment rather than an
+ * A developer who has not written a `.env` gets the real PRODUCTION deployment rather than an
  * unresolvable placeholder, which is the behaviour that makes "clone and run" work now that a
- * backend exists. Point it at `http://127.0.0.1:3000` (with `adb reverse`) to develop against a
+ * backend exists. This host used to be staging and was promoted: `APP_ENV` and `NODE_ENV` on the
+ * Render service both read `production`, and it is the Pro-plan Supabase project, not the free
+ * one that `spoon-api-staging.onrender.com` uses. Cloning without a `.env` therefore talks to the
+ * live API and its real data -- which is worth knowing before you seed anything. Point it at `http://127.0.0.1:3000` (with `adb reverse`) to develop against a
  * local API — see `.env.example`.
  *
  * **Production still fails fast** when no base URL is supplied: a release build must be told
@@ -175,7 +178,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   name: `Spoon${ENV_SUFFIX[APP_ENV]}`,
   slug: 'spoon-user-app',
-  version: '0.1.0',
+  version: '1.0.0',
 
   orientation: 'portrait',
 
@@ -193,6 +196,77 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     infoPlist: {
       NSPhotoLibraryUsageDescription:
         'Spoon does not access your photo library directly. This declaration is required for compatibility with a bundled system component.',
+
+      /**
+       * HTTPS is all this app speaks, and that is exempt. Without the key App Store Connect asks
+       * the encryption question on every single build and holds it until answered, which across
+       * fourteen iOS builds is fourteen interruptions for one unchanging answer.
+       */
+      ITSAppUsesNonExemptEncryption: false,
+    },
+
+    /**
+     * The privacy manifest Apple reads, and cross-checks against the answers given in App Store
+     * Connect. Expo's generated `PrivacyInfo.xcprivacy` declares `NSPrivacyCollectedDataTypes` as
+     * an empty array -- on an app that collects a name, a phone number and a precise location,
+     * that is not vague, it is false, and a contradiction between the two is a firmer rejection
+     * than any wording problem.
+     *
+     * Declared here rather than by editing the file: `ios/` is generated and gitignored, so an
+     * edit there survives exactly until the next prebuild -- the same trap that put
+     * `SYSTEM_ALERT_WINDOW` in the first production AAB.
+     *
+     * Each type is linked to the purpose it is actually used for and, per Apple's definitions,
+     * `linked` because all of it hangs off an account. None of it is used for tracking: nothing
+     * here is shared with a data broker or joined with data from other companies' apps.
+     */
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyCollectedDataTypes: [
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeName',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePhoneNumber',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeEmailAddress',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePreciseLocation',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePhysicalAddress',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePurchaseHistory',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeCrashData',
+          NSPrivacyCollectedDataTypeLinked: false,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+      ],
     },
   },
 
@@ -267,6 +341,24 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         locationWhenInUsePermission:
           'Spoon uses your location to find your address and check whether we serve your area.',
+
+        /**
+         * `false` DELETES the key rather than leaving Expo's default text
+         * (`@expo/config-plugins` ios/Permissions.js: `if (permissions[p] === false) delete
+         * infoPlist[p]`). Setting them to `undefined` in `ios.infoPlist` would not work twice
+         * over: an undefined value disappears when the config is serialised, and this plugin
+         * writes the plist AFTER `infoPlist` is applied, so it would win anyway.
+         *
+         * They have to go because the app never asks for them. `deviceLocation.ts` calls
+         * `requestForegroundPermissionsAsync` and nothing else, so "Always" and motion described
+         * capabilities this app does not have, in Expo's unedited placeholder wording -- and a
+         * reviewer who reads "Allow Spoon to access your location" over an Always key is owed an
+         * answer to why a cooking app wants one.
+         */
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        motionUsagePermission: false,
+
         isAndroidBackgroundLocationEnabled: false,
         isIosBackgroundLocationEnabled: false,
       },
