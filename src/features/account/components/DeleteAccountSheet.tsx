@@ -13,18 +13,14 @@ import { BottomSheet, Button, PromptBlock, Text, lightTheme } from '@ui';
  * is `dangerSolid`: a solid `#FF0404` fill with a white label, not `danger`'s pale Log Out
  * treatment, because that is what the mock draws.
  *
- * ## The disclosure, and why it is not in the mock
+ * ## What the prompt carries, and what it dropped
  *
- * Apple and Google both check that a deletion flow states plainly that it is immediate and
- * irreversible, and that it is HONEST about what survives. Ours survives a lot: bookings,
- * payments and refunds are retained for eight years under Indian tax law, with the name and
- * number stripped. "All your data will be deleted" would therefore be a lie, and it is the exact
- * lie reviewers look for — so this sheet says what goes and what stays, in the product's own
- * approved wording.
- *
- * It is drawn ABOVE the prompt because the mock leaves the top half of the sheet empty and puts
- * the rose block and the No/Yes pair at the foot. Filling that space costs the drawn composition
- * nothing; adding it between the prompt and the buttons would have split them.
+ * A separate disclosure block used to sit above the prompt: immediacy, what is erased, and that
+ * payment and invoice records survive for eight years under Indian tax law with the name and
+ * number stripped. It read as too long on the sheet, so the irreversibility -- the half Apple and
+ * Google actually check for on a deletion screen -- folded into the prompt itself, and the
+ * retention detail went. That detail is still stated in full by the in-app Privacy Policy
+ * (`src/features/legal/documents.ts`), which is now the only place in the app that gives it.
  */
 export interface DeleteAccountSheetProps {
   readonly visible: boolean;
@@ -57,24 +53,8 @@ export function DeleteAccountSheet({
       testID="delete-account-sheet"
     >
       <View style={styles.body}>
-        <View style={styles.disclosure} testID="delete-account-disclosure">
-          <Text variant="bodyBold" color="textPrimary">
-            This happens immediately and cannot be undone.
-          </Text>
-          {/*
-            Product-approved wording. The eight years and the "with your name and number removed"
-            qualifier are the load-bearing parts: they are what makes this an honest account of a
-            deletion that deliberately leaves financial records standing.
-          */}
-          <Text variant="body" color="textSecondary">
-            Your name, phone number, saved addresses and preferences will be permanently deleted and
-            you&apos;ll be signed out everywhere. Payment and invoice records are kept for 8 years
-            as required by Indian tax law, with your name and number removed.
-          </Text>
-        </View>
-
         <PromptBlock
-          title="Are you sure you want to delete?"
+          title="This happens immediately and cannot be undone. Are you sure you want to delete?"
           tone="critical"
           testID="delete-account-prompt"
         />
@@ -121,8 +101,6 @@ export function DeleteAccountSheet({
 
 const styles = StyleSheet.create({
   body: { gap: lightTheme.space.lg, paddingVertical: lightTheme.space.lg },
-  /** Left-aligned, unlike the centred prompt below it: this is read, not reacted to. */
-  disclosure: { gap: lightTheme.space.sm },
   actions: { flexDirection: 'row', gap: lightTheme.space.s10 },
   actionButton: { flex: 1 },
 });
