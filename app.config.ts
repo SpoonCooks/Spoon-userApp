@@ -357,7 +357,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
          */
         locationAlwaysAndWhenInUsePermission: false,
         locationAlwaysPermission: false,
-        motionUsagePermission: false,
+
+        /**
+         * Motion CANNOT be removed the way the two Always keys can. Build 15 failed Apple's binary
+         * check with ITMS-90683 naming this key: `expo-location` LINKS CoreMotion, and Apple's
+         * check reads what the binary references, not what the code calls -- "while your app might
+         * not use these APIs, a purpose string is still required". So it gets a real string, in
+         * the same shape as the photo-library one above, which is in this config for exactly this
+         * reason: a capability a bundled component drags in, described honestly rather than with
+         * Expo's placeholder about detecting your current motion activity.
+         */
+        motionUsagePermission:
+          'Spoon does not use motion data directly. This declaration is required for compatibility with a bundled location component.',
 
         isAndroidBackgroundLocationEnabled: false,
         isIosBackgroundLocationEnabled: false,
