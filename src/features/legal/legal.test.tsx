@@ -66,10 +66,16 @@ describe('the published documents', () => {
     expect(html).not.toMatch(/<img\b/i);
   });
 
-  /** Both carry the source PDFs' own "Last Updated", so the app never states a date Legal did not. */
-  it.each(['terms', 'privacy'] as const)('carries the source date for %s', (id) => {
-    expect(LEGAL_DOCUMENTS[id].updated).toBe('Last Updated: September 1, 2026');
-    expect(LEGAL_DOCUMENTS[id].html).toContain('September 1, 2026');
+  /**
+   * Each carries its own source PDF's "Last Updated", so the app never states a date Legal did not.
+   * The two dates differ: the Privacy Policy PDF was revised on September 15, the Terms were not.
+   */
+  it.each([
+    ['terms', 'September 1, 2026'],
+    ['privacy', 'September 15, 2026'],
+  ] as const)('carries the source date for %s', (id, date) => {
+    expect(LEGAL_DOCUMENTS[id].updated).toBe(`Last Updated: ${date}`);
+    expect(LEGAL_DOCUMENTS[id].html).toContain(date);
   });
 
   /** Spot-checks that the transcription reached the end of each document, not just the opening. */
