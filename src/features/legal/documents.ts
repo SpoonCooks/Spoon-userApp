@@ -378,10 +378,10 @@ Email: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p>
 export const LEGAL_DOCUMENTS: Readonly<Record<LegalDocumentId, LegalDocument>> = {
   terms: {
     title: 'Customer Terms of Service',
-        updated: 'Last Updated: May 1, 2026',
+    updated: 'Last Updated: May 1, 2026',
     html: page({
       title: 'Customer Terms of Service',
-          updated: 'May 1, 2026',
+      updated: 'May 1, 2026',
       body: TERMS_BODY,
     }),
   },
