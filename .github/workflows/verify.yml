@@ -1,0 +1,30 @@
+# Runs `npm run verify` -- formatting, types, lint, tests -- on every pull request and on main.
+#
+# Two changes reached `main` unformatted in as many days: `d1255eb`, then `91708c0` / `0615fc2`,
+# the same three lines each time. Nothing ran between a push and the branch, and `verify` itself
+# did not check formatting, so even a diligent local run missed it. `format:check` is now the
+# first thing `verify` does, which is why this workflow calls `verify` alone rather than listing
+# the checks separately: one command, the same one a developer runs, so the two cannot drift.
+name: verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` rather than `install`: the lockfile is the point, and it fails loudly if
+      # package.json and package-lock.json have drifted apart.
+      - run: npm ci
+
+      - run: npm run verify
