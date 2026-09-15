@@ -13,6 +13,11 @@ import { BottomSheet, Button, PromptBlock, Text, lightTheme } from '@ui';
  * is `dangerSolid`: a solid `#FF0404` fill with a white label, not `danger`'s pale Log Out
  * treatment, because that is what the mock draws.
  *
+ * The No/Yes pair is the sheet's FOOTER rather than the last row of its body, which is where
+ * every other sheet with a CTA puts it -- Instant, Schedule -- because `BottomSheet` pins the
+ * footer below the scrolling body. In the body it sat wherever the content left it; pinned, it is
+ * at the bottom of the sheet on every phone, and cannot be scrolled out of reach on a short one.
+ *
  * ## What the prompt carries, and what it dropped
  *
  * A separate disclosure block used to sit above the prompt: immediacy, what is erased, and that
@@ -51,26 +56,7 @@ export function DeleteAccountSheet({
       onBack={onClose}
       title="Delete Account"
       testID="delete-account-sheet"
-    >
-      <View style={styles.body}>
-        <PromptBlock
-          title="This happens immediately and cannot be undone. Are you sure you want to delete?"
-          tone="critical"
-          testID="delete-account-prompt"
-        />
-
-        {errorMessage === null ? null : (
-          <Text
-            variant="body"
-            color="textSecondary"
-            align="center"
-            accessibilityRole="alert"
-            testID="delete-account-error"
-          >
-            {errorMessage}
-          </Text>
-        )}
-
+      footer={
         <View style={styles.actions}>
           <Button
             label="No"
@@ -94,6 +80,26 @@ export function DeleteAccountSheet({
             testID="delete-account-yes"
           />
         </View>
+      }
+    >
+      <View style={styles.body}>
+        <PromptBlock
+          title="This happens immediately and cannot be undone. Are you sure you want to delete?"
+          tone="critical"
+          testID="delete-account-prompt"
+        />
+
+        {errorMessage === null ? null : (
+          <Text
+            variant="body"
+            color="textSecondary"
+            align="center"
+            accessibilityRole="alert"
+            testID="delete-account-error"
+          >
+            {errorMessage}
+          </Text>
+        )}
       </View>
     </BottomSheet>
   );
