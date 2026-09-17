@@ -661,13 +661,47 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
     setCouldNotStart(null);
 
     /**
+     * A hold the customer has moved on from is GIVEN BACK before the new one is asked for.
+     *
+     * Without this, changing the slot locked the customer out of their own booking. The hold was
+     * dropped from state and left alive on the server, where `bookings_customer_active_no_overlap`
+     * counts it: dismiss checkout on 8:45, pick 9:00, and `POST /v1/bookings` is refused for
+     * overlapping a booking they never paid for, cannot see and cannot cancel. A selection far
+     * enough away to avoid the overlap fared no better — it simply succeeded while the abandoned
+     * hold went on blocking their first choice until the server's abandon window closed.
+     *
+     * AWAITED, unlike the blur-time release, and that is the whole point: the create below races
+     * it. A fire-and-forget cancel can still be in flight when the server tests the new booking
+     * for overlap, which is the refusal this exists to prevent. `releaseAbandonedHold` never
+     * throws — a release that fails leaves the hold exactly where it was, the server expires it,
+     * and the create proceeds to whatever answer it would have given anyway.
+     *
+     * ## On the PRESS, not on the chip
+     *
+     * Releasing the moment a different chip is touched would cost a cancellation round trip per
+     * tap and take the hold away from a customer still deciding between 8:45 and 9:00. Pressing
+     * Book Now on a different selection is where the intent stops being ambiguous.
+     */
+    const superseded =
+      heldBooking !== null && heldBooking.key !== selectionKey
+        ? heldBooking.response.booking.id
+        : null;
+
+    if (superseded !== null) {
+      // Cleared FIRST, so the focus cleanup cannot race in and cancel it a second time.
+      heldRef.current = null;
+      setHeldBooking(null);
+      await releaseAbandonedHold(createBookingApi(api), queryClient, superseded);
+    }
+
+    /**
      * The hold from a dismissed checkout is REUSED rather than duplicated — but only for the
      * selection it was actually made against.
      *
      * `selectionKey` carries the address, the slot type, the duration and the exact start, so a
      * different day, time, length or address can never pay for the booking made for another one.
-     * Anything that does not match is a different intent and gets its own booking; the hold that
-     * no longer matches is released when this screen goes away.
+     * Anything that does not match is a different intent and gets its own booking — and, since
+     * the block above, gives the previous one back first.
      */
     const booking =
       heldBooking !== null && heldBooking.key === selectionKey
@@ -716,6 +750,8 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
     selection.slotType,
     selectionKey,
     heldBooking,
+    api,
+    queryClient,
   ]);
 
   return {

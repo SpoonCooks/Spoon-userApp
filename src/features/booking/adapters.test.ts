@@ -267,6 +267,58 @@ describe('summaryFrom server-owned action and recovery state', () => {
     }
   });
 
+  /**
+   * `created` is the server saying the payment has not settled. The screen it lands on is headed
+   * "Booking confirmed!", so without this it announced a confirmation for a booking nobody had
+   * paid for -- reachable by killing the app while Razorpay is open, which is the one path that
+   * leaves a hold alive (dismissing checkout cancels it server-side).
+   */
+  it('does not call an unsettled hold confirmed', () => {
+    const summary = summaryFrom({
+      base: DEMO_BOOKING_CONFIRMATION.summary!,
+      dto: { ...SUMMARY_DTO, status: 'created' } as BookingDetailDto,
+    });
+
+    expect(summary).toMatchObject({
+      bannerTitle: 'Payment pending!',
+      tone: 'warning',
+      /* The banner and the ACTIONS are one decision -- see `paymentPending` on the view model. */
+      paymentPending: true,
+    });
+  });
+
+  /** The ordinary confirmed screen keeps its action pair: the flag is set for `created` alone. */
+  it('does not mark a settled booking as awaiting payment', () => {
+    for (const status of ['assigned', 'cook_en_route', 'cooking', 'completed'] as const) {
+      expect(
+        summaryFrom({
+          base: DEMO_BOOKING_CONFIRMATION.summary!,
+          dto: { ...SUMMARY_DTO, status } as BookingDetailDto,
+        }).paymentPending,
+      ).toBeUndefined();
+    }
+  });
+
+  /** A paid booking with no cook matched yet is still confirmed, and must keep saying so. */
+  it('leaves an assigned booking confirmed', () => {
+    expect(
+      summaryFrom({
+        base: DEMO_BOOKING_CONFIRMATION.summary!,
+        dto: { ...SUMMARY_DTO, status: 'assigned' } as BookingDetailDto,
+      }).bannerTitle,
+    ).toBe(DEMO_BOOKING_CONFIRMATION.summary!.bannerTitle);
+  });
+
+  /** Unpaid outranks moved: what matters more is that it is not paid for. */
+  it('says payment is pending on a hold that was also rescheduled', () => {
+    expect(
+      summaryFrom({
+        base: DEMO_BOOKING_CONFIRMATION.summary!,
+        dto: { ...SUMMARY_DTO, status: 'created', rescheduleCount: 1 } as BookingDetailDto,
+      }).bannerTitle,
+    ).toBe('Payment pending!');
+  });
+
   /** A problem to act on outranks how the slot was arrived at. */
   it('lets a support handoff outrank the rescheduled banner', () => {
     expect(

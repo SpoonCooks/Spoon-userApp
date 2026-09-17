@@ -350,3 +350,126 @@ describe('a dismissed checkout keeps its hold for the retry', () => {
     expect(new CheckoutCancelledError()).toBeInstanceOf(CheckoutCancelledError);
   });
 });
+
+/**
+ * Changing the selection gives the previous hold back, BEFORE asking for the new one.
+ *
+ * The gap this closes: the hold was dropped from state and left alive on the server, where
+ * `bookings_customer_active_no_overlap` counts it. Dismiss checkout on one slot, pick a nearby
+ * one, and `POST /v1/bookings` was refused for overlapping a booking the customer never paid
+ * for, could not see and could not cancel — locked out of their own slot until the server's
+ * abandon window closed.
+ */
+const SECOND_START = '2026-08-19T09:30:00.000Z';
+
+function SelectionHarness({
+  start,
+  onDone,
+}: {
+  readonly start: string;
+  readonly onDone: (outcome: string) => void;
+}) {
+  const submission = useBookingSubmission({
+    slotType: 'scheduled',
+    durationId: 'dur-60',
+    scheduledStart: start,
+  });
+
+  return (
+    <>
+      <Text testID="can-submit">{String(submission.canSubmit)}</Text>
+      <Text
+        testID="submit"
+        onPress={() => {
+          void submission.submit().then((created) => onDone(created.payment));
+        }}
+      >
+        submit
+      </Text>
+    </>
+  );
+}
+
+describe('changing the selection releases the hold it no longer matches', () => {
+  /** A second booking id, so "a new booking was created" is provable rather than assumed. */
+  const SECOND = {
+    booking: { ...CREATED.booking, id: 'bkg-second', scheduledStart: SECOND_START },
+  };
+
+  function renderSelection() {
+    const calls: string[] = [];
+    let created = 0;
+    const stub = createStubApi({
+      ...BASE,
+      'POST /v1/bookings': () => {
+        created += 1;
+        return created === 1 ? CREATED : SECOND;
+      },
+      'GET /v1/bookings/bkg-held/cancellation-preview': preview(),
+      'POST /v1/bookings/bkg-held/cancel': () => ({}),
+      'POST /v1/bookings/bkg-second/payments/order': () => ORDER,
+      'GET /v1/bookings/bkg-second/cancellation-preview': preview(),
+      'POST /v1/bookings/bkg-second/cancel': () => ({}),
+    });
+    const api = {
+      async request(path: string, options: Parameters<typeof stub.request>[1]) {
+        calls.push(`${options.method ?? 'GET'} ${path}`);
+        return stub.request(path, options);
+      },
+    } as typeof stub;
+
+    const outcomes: string[] = [];
+    const view = renderWithRuntime(
+      <SelectionHarness start={QUOTE.scheduledStart} onDone={(o) => outcomes.push(o)} />,
+      { runtime: createTestRuntime({ api }) },
+    );
+
+    return { ...view, calls, outcomes };
+  }
+
+  it('cancels the superseded hold and only then creates the new booking', async () => {
+    const { calls, outcomes, getByTestId, rerender } = renderSelection();
+
+    await waitFor(() => expect(getByTestId('can-submit')).toHaveTextContent('true'));
+    fireEvent.press(getByTestId('submit'));
+    await waitFor(() => expect(outcomes).toEqual(['cancelled']));
+
+    // The customer picks a different start and presses again.
+    rerender(<SelectionHarness start={SECOND_START} onDone={(o) => outcomes.push(o)} />);
+    fireEvent.press(getByTestId('submit'));
+    await waitFor(() => expect(outcomes).toEqual(['cancelled', 'cancelled']));
+
+    // The first hold was given back...
+    expect(calls).toContain('POST /v1/bookings/bkg-held/cancel');
+
+    /*
+     * ...BEFORE the replacement was asked for, which is the whole point. A release still in
+     * flight when the server tests the new booking for overlap is the refusal this prevents.
+     */
+    const released = calls.indexOf('POST /v1/bookings/bkg-held/cancel');
+    const creates = calls.reduce<number[]>(
+      (at, call, index) => (call === 'POST /v1/bookings' ? [...at, index] : at),
+      [],
+    );
+    expect(creates).toHaveLength(2);
+    expect(released).toBeLessThan(creates[1]!);
+
+    // And checkout opened against the NEW booking, not the released one.
+    expect(calls).toContain('POST /v1/bookings/bkg-second/payments/order');
+  });
+
+  /** The same selection is untouched: that hold is the one the retry pays for. */
+  it('leaves the hold alone when the selection has not changed', async () => {
+    const { calls, outcomes, getByTestId } = renderSelection();
+
+    await waitFor(() => expect(getByTestId('can-submit')).toHaveTextContent('true'));
+    fireEvent.press(getByTestId('submit'));
+    await waitFor(() => expect(outcomes).toEqual(['cancelled']));
+
+    fireEvent.press(getByTestId('submit'));
+    await waitFor(() => expect(outcomes).toEqual(['cancelled', 'cancelled']));
+
+    expect(calls).not.toContain('POST /v1/bookings/bkg-held/cancel');
+    expect(calls.filter((call) => call === 'POST /v1/bookings')).toHaveLength(1);
+  });
+});

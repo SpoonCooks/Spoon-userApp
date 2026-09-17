@@ -69,7 +69,8 @@ describe('razorpayCheckoutLauncher', () => {
   });
 
   it('reports a dismissed sheet as a cancellation, not as a failure', async () => {
-    mockOpen.mockRejectedValue({ code: 2, description: 'Payment processing cancelled by user' });
+    // `0` is `Checkout.PAYMENT_CANCELED` in the bundled SDK — see the constant's own comment.
+    mockOpen.mockRejectedValue({ code: 0, description: 'Payment processing cancelled by user' });
 
     await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
       CheckoutCancelledError,
@@ -83,7 +84,7 @@ describe('razorpayCheckoutLauncher', () => {
    * the only one that counts.
    */
   it('still reports a cancellation when the numeric code does not match Android’s constant', async () => {
-    mockOpen.mockRejectedValue({ code: 0, description: 'Payment Cancelled' });
+    mockOpen.mockRejectedValue({ code: 99, description: 'Payment Cancelled' });
 
     await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
       CheckoutCancelledError,
@@ -147,13 +148,17 @@ describe('razorpayCheckoutLauncher', () => {
    * `readReason` log `reason: null`, because the nested body arrived under `error` while only
    * `details` was being read.
    *
-   * It still classifies as a FAILURE, and that is not an oversight. Razorpay words this one
-   * `payment_error` with `description: "undefined"` — it says nothing about a dismissal for the
-   * heuristic to find. Reading the reason correctly is what this fixes; making Razorpay describe
-   * a dismissal is not something this file can do. The remaining gap is that a customer who exits
-   * on purpose is still told the payment failed.
+   * It used to classify as a FAILURE, and that was accepted on the grounds that Razorpay words
+   * this one `payment_error` with `description: "undefined"` and so says nothing a wording
+   * heuristic can find. True — but it does say something: the OUTER numeric `code` is `0`,
+   * which is `Checkout.PAYMENT_CANCELED` in the bundled SDK. The constant was being compared
+   * against `2` (NETWORK_ERROR), so the one honest signal in this payload was thrown away and
+   * every dismissal on Android landed the customer on "Your payment failed".
+   *
+   * Pinned verbatim, `error` and all, because it is the exact shape that has to classify as a
+   * cancellation for a customer who exits on purpose to be left where they were.
    */
-  it('reads the reason from a real device dismissal, which Razorpay still words as an error', async () => {
+  it('classifies a real device dismissal as a cancellation, on the code Razorpay does send', async () => {
     const body = {
       code: 'BAD_REQUEST_ERROR',
       description: 'undefined',
@@ -168,11 +173,20 @@ describe('razorpayCheckoutLauncher', () => {
       error: body,
     });
 
+    await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
+      CheckoutCancelledError,
+    );
+  });
+
+  /** NETWORK_ERROR is 2, and it is not a dismissal — the exact confusion this constant had. */
+  it('does not read a network error as a dismissal', async () => {
+    mockOpen.mockRejectedValue({ code: 2, description: 'Network error' });
+
     await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(CheckoutFailedError);
   });
 
   it('recognises a dismissal worded that way instead of "cancel"', async () => {
-    mockOpen.mockRejectedValue({ code: 0, description: 'Checkout form dismissed' });
+    mockOpen.mockRejectedValue({ code: 99, description: 'Checkout form dismissed' });
 
     await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toBeInstanceOf(
       CheckoutCancelledError,
@@ -180,11 +194,11 @@ describe('razorpayCheckoutLauncher', () => {
   });
 
   it('reports any other provider rejection as a failure, keeping its reason for logs', async () => {
-    mockOpen.mockRejectedValue({ code: 1, description: 'Your card was declined' });
+    mockOpen.mockRejectedValue({ code: 5, description: 'Your card was declined' });
 
     await expect(razorpayCheckoutLauncher.open(ORDER)).rejects.toMatchObject({
       name: 'CheckoutFailedError',
-      providerCode: 1,
+      providerCode: 5,
       providerDescription: 'Your card was declined',
     });
   });
