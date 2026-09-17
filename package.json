@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "expo start",
-    "android": "expo run:android",
+    "android": "adb reverse tcp:8081 tcp:8081 || true; expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
