@@ -5,6 +5,7 @@ import {
   tipAmountPaiseFrom,
   useCallCook,
   useExtensionCheckout,
+  usePaymentRetry,
   useRateBooking,
   useTipCheckout,
 } from '@features/booking';
@@ -45,6 +46,16 @@ export default function BookingRoute() {
 
   const rate = useRateBooking();
   const tip = useTipCheckout();
+  /**
+   * "Book now" on an unpaid hold — see `onPayNow` below.
+   *
+   * The SAME hook the Payment Failed screen retries with, for the same reason: the booking already
+   * exists and `usePayForBooking`'s idempotency scope is keyed by booking id alone, so this reopens
+   * the order that was already created instead of making a second one (and instead of a second
+   * BOOKING, which the server's own overlap constraint would refuse anyway — the customer would
+   * be told they clash with themselves).
+   */
+  const payHold = usePaymentRetry(bookingId);
   const extend = useExtensionCheckout();
   const cancelFlow = useCancelFlow(bookingId === '' ? null : bookingId, {
     onReschedule: () => router.push(`/reschedule/${bookingId}`),
@@ -88,6 +99,24 @@ export default function BookingRoute() {
         callCookError={callCook.errorMessage}
         onDismissCallCookError={callCook.clearError}
         onCancel={cancelFlow.open}
+        /**
+         * The unpaid hold's only action (`status: created`, drawn by `ConfirmationBody` as a single
+         * "Book now" bar under the amber "Payment pending!" banner).
+         *
+         * `verified` hands over to `/booking/confirming`, which polls until the SERVER's status
+         * leaves `created` and then returns here — the client never redraws this screen as
+         * confirmed off the back of a checkout callback (ruling R-1). Every other outcome leaves
+         * the customer on this screen, which already says the payment is pending and offers the
+         * bar again: a dismissal is a choice, `processing` is safe to retry against the same
+         * order, and a failure is what the banner is already reporting.
+         */
+        onPayNow={() => {
+          if (bookingId === '') return;
+          void payHold.retry().then((outcome) => {
+            if (outcome === 'verified') router.replace(`/booking/confirming?id=${bookingId}`);
+          });
+        }}
+        paying={payHold.retrying}
         /**
          * `275:4265` — "Extend" (task §15, the extension step of the service flow).
          *

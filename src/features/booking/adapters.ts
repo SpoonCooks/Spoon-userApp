@@ -167,7 +167,23 @@ export function summaryFrom(input: {
      * "you have not paid" is the more urgent of the two; a handout to support outranks both,
      * because that is a thing the customer has to act on rather than a state to report.
      */
-    ...(unsettled ? { bannerTitle: 'Payment pending', tone: 'warning' as const } : {}),
+    ...(unsettled
+      ? {
+          bannerTitle: 'Payment pending!',
+          tone: 'warning' as const,
+          /*
+           * What the screen OFFERS changes with the banner, not only what it says.
+           *
+           * Cancel and Reschedule are the controls for a booking that exists. On an unpaid hold
+           * they are the wrong two: there is nothing to move, and "cancel" walks the customer
+           * into the refund flow (`7a`..`7d`, which quotes a notice-period refund band) for money
+           * that was never taken. The one thing they can usefully do is pay, so that is the one
+           * thing offered — `ConfirmationBody` reads this and draws "Book now" instead of the
+           * pair. The hold expires on its own if they do not.
+           */
+          paymentPending: true,
+        }
+      : {}),
     ...(recoveryHandoff
       ? { bannerTitle: 'This booking needs attention', tone: 'warning' as const }
       : {}),

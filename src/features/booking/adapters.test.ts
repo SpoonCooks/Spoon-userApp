@@ -279,7 +279,24 @@ describe('summaryFrom server-owned action and recovery state', () => {
       dto: { ...SUMMARY_DTO, status: 'created' } as BookingDetailDto,
     });
 
-    expect(summary).toMatchObject({ bannerTitle: 'Payment pending', tone: 'warning' });
+    expect(summary).toMatchObject({
+      bannerTitle: 'Payment pending!',
+      tone: 'warning',
+      /* The banner and the ACTIONS are one decision -- see `paymentPending` on the view model. */
+      paymentPending: true,
+    });
+  });
+
+  /** The ordinary confirmed screen keeps its action pair: the flag is set for `created` alone. */
+  it('does not mark a settled booking as awaiting payment', () => {
+    for (const status of ['assigned', 'cook_en_route', 'cooking', 'completed'] as const) {
+      expect(
+        summaryFrom({
+          base: DEMO_BOOKING_CONFIRMATION.summary!,
+          dto: { ...SUMMARY_DTO, status } as BookingDetailDto,
+        }).paymentPending,
+      ).toBeUndefined();
+    }
   });
 
   /** A paid booking with no cook matched yet is still confirmed, and must keep saying so. */
@@ -299,7 +316,7 @@ describe('summaryFrom server-owned action and recovery state', () => {
         base: DEMO_BOOKING_CONFIRMATION.summary!,
         dto: { ...SUMMARY_DTO, status: 'created', rescheduleCount: 1 } as BookingDetailDto,
       }).bannerTitle,
-    ).toBe('Payment pending');
+    ).toBe('Payment pending!');
   });
 
   /** A problem to act on outranks how the slot was arrived at. */

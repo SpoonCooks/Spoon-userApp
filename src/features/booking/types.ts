@@ -96,6 +96,15 @@ export interface BookingSummaryViewModel {
    */
   readonly rescheduleAllowed?: boolean;
   /**
+   * The booking is still on an UNPAID hold (`status: created`) — the server has not settled a
+   * payment for it.
+   *
+   * Set by `summaryFrom` alongside the "Payment pending!" banner, because the banner and the
+   * actions are one decision: a hold nobody has paid for is offered "Book now" rather than the
+   * Cancel / Reschedule pair a real booking gets. Absent means the ordinary confirmed screen.
+   */
+  readonly paymentPending?: boolean;
+  /**
    * `292:201` — Confirm reassign (`289:6607`) inserts ONE notice between the banner and the cook
    * card. Its PRESENCE is the server reporting a reassignment; the client never decides that one
    * happened and never models the matching that produced the new cook (task §7).

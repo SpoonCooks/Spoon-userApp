@@ -129,6 +129,79 @@ describe('Booking host — confirmation (3:1041)', () => {
 
     expect(screen.queryByTestId('confirmation-cancel')).toBeNull();
   });
+
+  /**
+   * An unpaid hold (`status: created`, which `summaryFrom` reports as `paymentPending`) is offered
+   * the ONE action that applies to it. Cancel and Reschedule belong to a booking that has been
+   * paid for: there is nothing to move, and Cancel walks the customer into the refund flow for
+   * money nobody took.
+   */
+  it('replaces the action pair with Book now while payment is pending', () => {
+    // `cancelAllowed` is deliberately TRUE: the pair disappearing has to be this flag's doing,
+    // not the server withholding permission, or the test would pass without the change.
+    const unpaid = ready({
+      ...DEMO_BOOKING_CONFIRMATION,
+      cancelAllowed: true,
+      summary: { ...DEMO_BOOKING_CONFIRMATION.summary!, paymentPending: true },
+    });
+    const onPayNow = jest.fn();
+
+    render(
+      <BookingDetailView
+        state={unpaid}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onReschedule={jest.fn()}
+        onCancel={jest.fn()}
+        onPayNow={onPayNow}
+      />,
+    );
+
+    expect(screen.queryByTestId('confirmation-reschedule')).toBeNull();
+    expect(screen.queryByTestId('confirmation-cancel')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('confirmation-pay-now'));
+    expect(onPayNow).toHaveBeenCalledTimes(1);
+  });
+
+  /** §15: a bar the host cannot honour is not drawn at all — and neither is the pair it replaced. */
+  it('offers no action on an unpaid hold when the host wired no payment', () => {
+    render(
+      <BookingDetailView
+        state={ready({
+          ...DEMO_BOOKING_CONFIRMATION,
+          cancelAllowed: true,
+          summary: { ...DEMO_BOOKING_CONFIRMATION.summary!, paymentPending: true },
+        })}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onReschedule={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId('confirmation-pay-now')).toBeNull();
+    expect(screen.queryByTestId('confirmation-reschedule')).toBeNull();
+    expect(screen.queryByTestId('confirmation-cancel')).toBeNull();
+  });
+
+  /** A settled booking keeps the pair — the swap is keyed to the unpaid flag, nothing else. */
+  it('keeps Cancel and Reschedule on a booking that has been paid for', () => {
+    render(
+      <BookingDetailView
+        state={ready({ ...DEMO_BOOKING_CONFIRMATION, cancelAllowed: true })}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onReschedule={jest.fn()}
+        onCancel={jest.fn()}
+        onPayNow={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('confirmation-reschedule')).toBeTruthy();
+    expect(screen.getByTestId('confirmation-cancel')).toBeTruthy();
+    expect(screen.queryByTestId('confirmation-pay-now')).toBeNull();
+  });
 });
 
 describe('Booking host — en route on time and late (3:1381 / 99:1413)', () => {

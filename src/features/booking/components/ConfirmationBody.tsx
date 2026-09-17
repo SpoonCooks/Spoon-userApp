@@ -54,6 +54,14 @@ import type { BookingSummaryViewModel } from '../types';
  *  - the Cancel action is present in the design but its handler stays unwired until blocker
  *    B-11 resolves where cancellation is entered from (PRODUCT_PENDING);
  *  - `onViewDetails` is a seam: this component decides nothing about what that screen shows.
+ *
+ * ## The unpaid variant
+ *
+ * `summary.paymentPending` — a hold the server has not settled a payment for — keeps the whole
+ * layout and changes the banner (amber, "Payment pending!") and the `250:2978` row, which draws
+ * ONE bar, "Book now", instead of the Cancel / Reschedule pair. The design has no frame for this
+ * state; it is the honest rendering of one the server can report, and the bar reopens checkout
+ * against the booking that already exists rather than creating another.
  */
 
 /** `250:2945` — the 32 × 66 to-do mark, shared with the En route note. */
@@ -81,6 +89,16 @@ export interface ConfirmationBodyProps {
   readonly onShareRecipe?: () => void;
   readonly onReschedule?: () => void;
   readonly onCancel?: () => void;
+  /**
+   * Pay for an unpaid hold — the ONLY action offered while `summary.paymentPending` is set.
+   *
+   * Reopens checkout against the booking that already exists rather than creating a second one;
+   * the host wires it to `usePaymentRetry`, the same hook the Payment Failed screen retries with.
+   * Absent, nothing is offered: this screen will not draw a Book now bar it cannot honour.
+   */
+  readonly onPayNow?: () => void;
+  /** Checkout is opening. Keeps the bar from being pressed twice into two orders. */
+  readonly paying?: boolean;
 }
 
 export function ConfirmationBody({
@@ -91,9 +109,22 @@ export function ConfirmationBody({
   onShareRecipe,
   onReschedule,
   onCancel,
+  onPayNow,
+  paying = false,
 }: ConfirmationBodyProps) {
-  const canReschedule = summary.rescheduleAllowed === true && onReschedule !== undefined;
-  const showActions = canReschedule || onCancel !== undefined;
+  /**
+   * An unpaid hold replaces the action pair outright.
+   *
+   * Not "plus a Book now bar": Cancel and Reschedule describe a booking that has been paid for,
+   * and offering them beside the payment would invite the customer to cancel — and be quoted a
+   * refund band — for money that was never taken. See `paymentPending` on the view model.
+   */
+  const unpaid = summary.paymentPending === true;
+  /** Nothing is offered if the host wired no payment — this bar will not be drawn inert (§15). */
+  const payNow = unpaid && onPayNow !== undefined;
+  const canReschedule = !unpaid && summary.rescheduleAllowed === true && onReschedule !== undefined;
+  const canCancel = !unpaid && onCancel !== undefined;
+  const showActions = payNow || canReschedule || canCancel;
 
   return (
     <View style={styles.container} testID="confirmation-body">
@@ -178,7 +209,20 @@ export function ConfirmationBody({
 
       {showActions ? (
         <View style={styles.actions}>
-          {onCancel === undefined ? null : (
+          {payNow ? (
+            <View style={styles.action}>
+              <Button
+                label="Book now"
+                onPress={onPayNow}
+                variant="primary"
+                size="bar"
+                flat
+                loading={paying}
+                testID="confirmation-pay-now"
+              />
+            </View>
+          ) : null}
+          {canCancel ? (
             <View style={styles.action}>
               <Button
                 label={summary.cancelLabel}
@@ -189,7 +233,7 @@ export function ConfirmationBody({
                 testID="confirmation-cancel"
               />
             </View>
-          )}
+          ) : null}
           {canReschedule ? (
             <View style={styles.action}>
               <Button
