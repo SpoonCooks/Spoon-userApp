@@ -13,7 +13,7 @@ import { useConfirmAccountDeletion, useRequestAccountDeletionOtp } from './data'
  * and what it does to this device on the way back.
  */
 
-const mockSendOtp = jest.fn();
+const mockRequestDeletionOtp = jest.fn();
 const mockDeleteAccount = jest.fn();
 const mockSignOut = jest.fn();
 const mockWarn = jest.fn();
@@ -26,21 +26,9 @@ jest.mock('@core/runtimeContext', () => ({
   }),
 }));
 
-/*
- * `toE164` is the REAL one — it is the thing under test in the first two cases below. It is taken
- * from its own module rather than through `jest.requireActual` on the barrel: that barrel reaches
- * auth -> booking -> address -> auth, and pulling the whole cycle into a mock factory deadlocks
- * the require graph. `authApi.ts` itself imports only the transport.
- */
-jest.mock('@features/auth', () => ({
-  toE164: jest.requireActual('../auth/api/authApi').toE164,
-  createAuthApi: () => ({
-    sendOtp: (phone: string, options: unknown) => mockSendOtp(phone, options),
-  }),
-}));
-
 jest.mock('./api', () => ({
   createAccountApi: () => ({
+    requestDeletionOtp: () => mockRequestDeletionOtp(),
     deleteAccount: (otp: string, scope: string) => mockDeleteAccount(otp, scope),
   }),
 }));
@@ -54,37 +42,52 @@ function wrapper({ children }: { children: ReactNode }) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockSendOtp.mockResolvedValue({ accepted: true, retryAfterSeconds: 30 });
+  mockRequestDeletionOtp.mockResolvedValue({ accepted: true, retryAfterSeconds: 30 });
   mockDeleteAccount.mockResolvedValue({ deleted: true });
   mockSignOut.mockResolvedValue(undefined);
 });
 
 describe('requesting the code', () => {
   /**
-   * The number comes from `GET /v1/me`, whose schema bounds it with nothing, and goes to
-   * `otp/send`, which bounds it with `^\+[1-9][0-9]{7,14}$`. A number that ever arrives spaced
-   * would fail as INVALID_REQUEST — and on this screen that reads as "we couldn't send a code",
-   * with no way for the customer to ever delete their account.
+   * This used to go through `auth.sendOtp` — the endpoint LOGIN uses — whose 30-second cooldown
+   * was keyed on the phone alone. Deletion is only reachable while signed in, so login's send
+   * always came first and the customer's FIRST press was refused `RATE_LIMITED`. The fix is a
+   * different endpoint with its own cooldown, so what this pins is that the hook no longer
+   * reaches for auth's.
    */
-  it('normalises a spaced number the server handed back', async () => {
+  it('asks the deletion endpoint, not the one login shares', async () => {
     const { result } = renderHook(() => useRequestAccountDeletionOtp(), { wrapper });
 
-    result.current.mutate('+91 98765 43210');
+    result.current.mutate();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(mockSendOtp).toHaveBeenCalledWith('+919876543210', {
-      audience: 'customer',
-      authenticated: true,
-    });
+    expect(mockRequestDeletionOtp).toHaveBeenCalledTimes(1);
   });
 
-  it('leaves an already-E.164 number untouched', async () => {
+  /**
+   * And sends NOTHING with it. The account is the one holding the session, so a phone read off
+   * `GET /v1/me` — whose schema bounds it with nothing — can no longer arrive spaced and fail as
+   * INVALID_REQUEST, which on this screen read as "we couldn't send a code" with no way for the
+   * customer to ever delete their account. A number never sent cannot be malformed.
+   */
+  it('sends no phone number with it', async () => {
     const { result } = renderHook(() => useRequestAccountDeletionOtp(), { wrapper });
 
-    result.current.mutate('+919876543210');
+    result.current.mutate();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(mockSendOtp.mock.calls[0]?.[0]).toBe('+919876543210');
+    expect(mockRequestDeletionOtp).toHaveBeenCalledWith();
+  });
+
+  /** The cooldown the delete sheet counts down is the server's, not a client constant. */
+  it('carries the server cooldown back to the caller', async () => {
+    mockRequestDeletionOtp.mockResolvedValue({ accepted: true, retryAfterSeconds: 45 });
+    const { result } = renderHook(() => useRequestAccountDeletionOtp(), { wrapper });
+
+    result.current.mutate();
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data?.retryAfterSeconds).toBe(45);
   });
 });
 

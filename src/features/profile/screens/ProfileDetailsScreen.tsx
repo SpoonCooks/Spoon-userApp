@@ -158,6 +158,10 @@ export function ProfileDetailsView({
             keyboardDismissMode="on-drag"
             onScroll={onScroll}
             scrollEventThrottle={16}
+            // Hidden as it is on Home, Login, OTP, Profile and every bottom sheet. The nested
+            // list further down keeps ITS indicator: that one is the only cue that the inner
+            // window scrolls independently of the page.
+            showsVerticalScrollIndicator={false}
             testID="profile-details-scroll"
           >
             {/* `456:3389` — Livvic Bold 14/20. */}

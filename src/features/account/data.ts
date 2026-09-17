@@ -4,10 +4,8 @@ import { idempotency } from '@core/api';
 import { useRuntime } from '@core/runtimeContext';
 import { addressDraftStore } from '@core/store/addressDraftStore';
 import { bookingDraftStore } from '@core/store/bookingDraftStore';
-import { createAuthApi, toE164 } from '@features/auth';
-import type { OtpSendResponse } from '@features/auth';
-
 import { createAccountApi } from './api';
+import type { DeletionOtpResponse } from './api';
 
 /**
  * Account deletion — instant, self-serve and irreversible.
@@ -30,21 +28,34 @@ export function accountDeletionScope(userId: string): string {
   return `account:delete:${userId}`;
 }
 
+/**
+ * The deletion code's send.
+ *
+ * ## Why this is no longer `auth.sendOtp`
+ *
+ * It used to be, which meant deletion asked for its code through `POST /v1/auth/otp/send` — the
+ * endpoint LOGIN uses. That endpoint's 30-second cooldown was keyed on the phone number alone and
+ * could not tell a login send from a deletion send. Deletion is only reachable while signed in,
+ * so login's send always came seconds earlier: the customer's FIRST press of Delete Account was
+ * refused `RATE_LIMITED`, having attempted nothing, and the copy then told them they had tried
+ * too many times. Reproduced against production — two sends seconds apart, 202 then 429.
+ *
+ * `POST /v1/me/account-deletion/otp` carries its own cooldown, so the two no longer collide.
+ *
+ * ## Why it takes no argument
+ *
+ * The account being deleted is the one holding the session; the server resolves the phone from
+ * it. That removes the `toE164` normalisation this hook used to need — the old endpoint bounded
+ * `phone` with `^\+[1-9][0-9]{7,14}$` while `meResponseSchema` bounded it with nothing, so a
+ * stored number that ever arrived spaced would have failed as INVALID_REQUEST and left the
+ * customer with no way to delete their account at all. A number never sent cannot be malformed.
+ */
 export function useRequestAccountDeletionOtp() {
   const { api } = useRuntime();
-  const auth = createAuthApi(api);
+  const account = createAccountApi(api);
 
-  return useMutation<OtpSendResponse, Error, string>({
-    /*
-     * Normalised even though the number came from the server, for the same reason
-     * `addressApi.create` normalises a stored `receiverPhone`: `otp/send` bounds `phone` with
-     * `^\+[1-9][0-9]{7,14}$`, `meResponseSchema` bounds it with nothing at all, and a number that
-     * ever arrives spaced would fail as INVALID_REQUEST — surfacing as "we couldn't send a code"
-     * with no way for the customer to ever delete their account. `toE164` is idempotent on a
-     * number that is already E.164, so this costs nothing when the server is well behaved.
-     */
-    mutationFn: (phone: string) =>
-      auth.sendOtp(toE164(phone), { audience: 'customer', authenticated: true }),
+  return useMutation<DeletionOtpResponse, Error, void>({
+    mutationFn: () => account.requestDeletionOtp(),
   });
 }
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
-import { getUserMessage, isAppError } from '@core/errors';
+import { getUserMessage, isAppError, isRateLimited } from '@core/errors';
 import { useSafeBack } from '@core/navigation';
 import { AccountView, useRequestAccountDeletionOtp } from '@features/account';
 import { useMe } from '@features/auth';
@@ -48,14 +48,27 @@ export default function AccountRoute() {
     me.state.status === 'error' ? getUserMessage(me.state.error) : undefined;
 
   /*
-   * Mapped copy, not `error.message`. The likeliest failure here is RATE_LIMITED — the customer
-   * has been asking for codes — and the shared taxonomy already words that as "wait a moment",
-   * where the raw field would be the backend's own text or, worse, the transport's synthetic
-   * "Request failed with status 429".
+   * Mapped copy, not `error.message` — the raw field would be the backend's own text or, worse,
+   * the transport's synthetic "Request failed with status 429".
+   *
+   * RATE_LIMITED gets its OWN wording here rather than the shared taxonomy's "Too many attempts."
+   * That sentence is true on Login, where a customer taps Resend and is told they tapped it too
+   * often. It was never true here: deletion's code used to come from the endpoint login shares,
+   * whose cooldown is keyed on the phone, so a customer who signed in and went straight to Delete
+   * Account was told they had attempted too many times on their FIRST press. The endpoint now
+   * carries its own cooldown and that case is gone, but the remaining one -- pressing Yes, going
+   * back, pressing it again -- is still not "too many attempts", it is one attempt too soon.
+   *
+   * No countdown: a 429 carries no retry hint the client keeps, and inventing 30 seconds from the
+   * SUCCESS envelope would be a guess dressed as a fact. The OTP screen counts down the real
+   * interval, because there the server has just told us what it is.
    */
-  const sendErrorMessage = isAppError(requestOtp.error)
-    ? getUserMessage(requestOtp.error)
-    : (requestOtp.error?.message ?? undefined);
+  const sendErrorMessage =
+    isAppError(requestOtp.error) && isRateLimited(requestOtp.error)
+      ? 'A code was just sent. Please wait a moment before asking for another.'
+      : isAppError(requestOtp.error)
+        ? getUserMessage(requestOtp.error)
+        : (requestOtp.error?.message ?? undefined);
 
   return (
     <AccountView
@@ -70,7 +83,9 @@ export default function AccountRoute() {
       onConfirmDelete={() => {
         if (identity === null || requestOtp.isPending) return;
 
-        requestOtp.mutate(identity.phone, {
+        // No argument: the endpoint resolves the account from the session. `identity` is still
+        // required above, because the sheet must not open against a profile that failed to load.
+        requestOtp.mutate(undefined, {
           onSuccess(result) {
             setDeleteSheetOpen(false);
             router.push({

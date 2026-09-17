@@ -91,7 +91,14 @@ export function AccountView({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: lightTheme.colors.surfaceForm },
+  /**
+   * `surface`, not `surfaceForm`. This paints the safe-area inset -- the strip behind the status
+   * bar -- and everything below it on this screen, header and body alike, is `surface`. At
+   * `surfaceForm` (#F8FAFC, a COOL grey) against #FFFFFF the inset read as a tinted band above a
+   * white screen, and this was one of only two screens in the app doing it; the other six all
+   * paint the inset the same colour as their content.
+   */
+  screen: { flex: 1, backgroundColor: lightTheme.colors.surface },
   headerColumn: {
     paddingHorizontal: lightTheme.space.lg,
     paddingTop: lightTheme.space.lg,

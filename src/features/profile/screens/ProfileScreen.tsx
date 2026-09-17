@@ -85,7 +85,12 @@ export function ProfileView({ state, onRetry, ...actions }: ProfileViewProps) {
               <ScreenHeader title={profile.title} onBack={actions.onBack} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.body}>
+            {/*
+              The indicator is hidden here as it is on Home, Login, OTP and every bottom sheet:
+              this screen scrolls by a few rows at most, and a bar that appears for a moment on a
+              list that barely moves reads as a glitch rather than as an affordance.
+            */}
+            <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
               <View style={styles.identity} testID="profile-identity">
                 <Image
                   source={PROFILE_AVATAR_GLYPH}
@@ -195,7 +200,18 @@ const HALF_GAP = lightTheme.space.sm;
 
 const styles = StyleSheet.create({
   /** `6:665` — Profile sits on `#F8FAFC`. */
-  screen: { flex: 1, backgroundColor: lightTheme.colors.surfaceForm },
+  /**
+   * `surface`, not `surfaceForm`. This paints the safe-area inset -- the strip behind the status
+   * bar -- and everything below it on this screen, header and body alike, is `surface`. At
+   * `surfaceForm` (#F8FAFC, a COOL grey) against #FFFFFF the inset read as a tinted band above a
+   * white screen.
+   *
+   * The same correction `BookingListScreen` and the address form already carry, for the same
+   * reason each records: a difference too small to be legible as a deliberate layer, and just
+   * large enough to look like a rendering fault on a device. This and `AccountScreen` were the
+   * last two screens still doing it.
+   */
+  screen: { flex: 1, backgroundColor: lightTheme.colors.surface },
   /** `6:664` — the 16pt gutter column the header is drawn inside, 16pt down from the top. */
   headerColumn: {
     paddingHorizontal: lightTheme.space.lg,

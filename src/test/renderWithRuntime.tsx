@@ -174,6 +174,18 @@ export const DEFAULT_API_STUBS: StubHandlers = {
    * The payload is deliberately MIXED — 05:00 is offered, 05:15 is not — so the default harness
    * renders both the live and the grey card, exactly as an ordinary day does.
    */
+  /**
+   * Home reads this on mount now, to decide whether the arrival PROMISE can be kept.
+   *
+   * `available: true` by default, because the promise on the header and the Instant tile is what
+   * most tests are looking at and an unavailable default would silently empty both. The
+   * unavailable case is stubbed per-test, where it is the thing under assertion.
+   */
+  'GET /v1/availability/instant': () => ({
+    available: true,
+    arrivalTargetMinutes: 30,
+    validUntil: '2026-08-18T09:00:30.000Z',
+  }),
   'GET /v1/availability/scheduled': () => ({
     date: '2026-08-18',
     durationMinutes: 30,

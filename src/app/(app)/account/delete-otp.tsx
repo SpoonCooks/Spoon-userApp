@@ -77,7 +77,7 @@ export default function DeleteAccountOtpRoute() {
 
   const onResend = useCallback(() => {
     if (phone === null || requestOtp.isPending) return;
-    requestOtp.mutate(phone, {
+    requestOtp.mutate(undefined, {
       onSuccess(result) {
         setSecondsLeft(result.retryAfterSeconds);
       },

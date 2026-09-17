@@ -36,6 +36,66 @@ function renderBook() {
   return render(<ScheduleView state={ready(DEMO_SCHEDULE_BOOK)} {...actions} />);
 }
 
+/**
+ * Late in the day the elapsed periods are drawn disabled, so the Time row can offer exactly one
+ * thing that can be pressed. The screen used to wait to be told what it already knew.
+ *
+ * The rule is the CLOCK -- `disabled` -- and not whether a period holds bookable slots: a live
+ * window with no free start is a routing verdict the grid draws as grey cards, and it is read for
+ * the DEFAULT duration, so acting on it could point someone at a period that stops qualifying the
+ * moment they pick two hours.
+ */
+describe('Schedule — a Time row with one live chip', () => {
+  function withPeriods(disabled: readonly string[]) {
+    return {
+      ...DEMO_SCHEDULE_BOOK,
+      periods: DEMO_SCHEDULE_BOOK.periods.map((period) =>
+        disabled.includes(period.id) ? { ...period, disabled: true } : period,
+      ),
+    };
+  }
+
+  it('chooses the only period that can be pressed', () => {
+    render(<ScheduleView state={ready(withPeriods(['morning', 'afternoon']))} {...actions} />);
+    fireEvent.press(screen.getByTestId('schedule-days-day-3'));
+
+    // Chosen, and the section it gates is open — no tap in between.
+    expect(screen.getByTestId('schedule-periods-evening').props.accessibilityState.selected).toBe(
+      true,
+    );
+    expect(screen.getByTestId('schedule-duration-dur-60')).toBeTruthy();
+  });
+
+  it('leaves the row alone while more than one is live', () => {
+    render(<ScheduleView state={ready(withPeriods(['morning']))} {...actions} />);
+    fireEvent.press(screen.getByTestId('schedule-days-day-3'));
+
+    expect(screen.getByTestId('schedule-periods-evening').props.accessibilityState.selected).toBe(
+      false,
+    );
+    expect(screen.queryByTestId('schedule-duration-dur-60')).toBeNull();
+  });
+
+  /** The Time row is not on screen before a day is named, so there is no question to answer yet. */
+  it('waits for a day to be chosen', () => {
+    render(<ScheduleView state={ready(withPeriods(['morning', 'afternoon']))} {...actions} />);
+
+    expect(screen.queryByTestId('schedule-periods')).toBeNull();
+    expect(screen.queryByTestId('schedule-duration-dur-60')).toBeNull();
+  });
+
+  /** A choice already made outranks the clock — including a choice of the OTHER live period. */
+  it('never overrides a period the customer picked', () => {
+    render(<ScheduleView state={ready(withPeriods(['morning']))} {...actions} />);
+    fireEvent.press(screen.getByTestId('schedule-days-day-3'));
+    fireEvent.press(screen.getByTestId('schedule-periods-afternoon'));
+
+    expect(screen.getByTestId('schedule-periods-afternoon').props.accessibilityState.selected).toBe(
+      true,
+    );
+  });
+});
+
 describe('Schedule — progressive disclosure (C-1)', () => {
   it('starts with Day only', () => {
     renderBook();

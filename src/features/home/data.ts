@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActiveBookings, useBookingDetails, useTrackings } from '@features/booking';
 import { addressLineOf, useAddresses } from '@features/address';
 import { useCatalogue } from '@features/catalogue';
+import { useInstantAvailability } from '@features/availability';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 import { currentSkewMs, slotHasEnded } from '@core/time';
@@ -118,6 +119,36 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   });
   const trackings = useTrackings(enRouteIds);
 
+  /**
+   * Whether a cook can actually be dispatched right now — the question the arrival promise on
+   * this screen implicitly answers, and did not used to ask.
+   *
+   * `catalogue.instant.arrivalPromiseMinutes` is POLICY: "we aim to be with you inside 30
+   * minutes". It is published whatever the state of the network, so Home said "Spoon in 30 mins"
+   * while `GET /v1/availability/instant` was answering `NO_PRESENT_COOK`. The promise is not
+   * wrong, it is simply not keepable at that moment, and a screen that states it anyway is making
+   * one on the operation's behalf.
+   *
+   * The probe duration is the SHORTEST the catalogue sells. Availability is asked per duration,
+   * and `NO_PRESENT_COOK` is about whether anyone is on shift rather than about a length -- so
+   * the shortest is the most permissive question available: if instant is refused even for that,
+   * it is refused. A longer probe could report unavailable for a reason the header is not about.
+   */
+  const defaultAddressId =
+    addresses.state.status === 'ready'
+      ? ((addresses.state.data.find((address) => address.isDefault) ?? addresses.state.data[0])
+          ?.id ?? null)
+      : null;
+
+  const probeDurationMinutes =
+    catalogue.state.status === 'ready'
+      ? (catalogue.state.data.durations[0]?.durationMinutes ?? null)
+      : null;
+  const instantAvailability = useInstantAvailability({
+    addressId: defaultAddressId,
+    durationMinutes: probeDurationMinutes,
+  });
+
   const state = useMemo(() => {
     if (addresses.state.status !== 'ready') return addresses.state;
 
@@ -190,8 +221,23 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
           })();
 
     const base = DEMO_HOME_ACTIVE_BOOKING;
+    /**
+     * The promise is stated only while it can be kept.
+     *
+     * `available === false` drops the minutes from both surfaces -- the header reads "Spoon", the
+     * Instant tile "Get a cook" -- rather than hiding the tile or inventing a different number.
+     * The offer is still real; what is not real, today, is the timing.
+     *
+     * An availability read that has NOT resolved is treated as unavailable too. The alternative
+     * is to show a promise on the strength of not having asked yet, and then take it away a
+     * moment later, which is both a flicker and a claim the app has no basis for. The minutes
+     * appear when the server says they can be met, and not before -- so the day instant is
+     * switched on, every one of these comes back on its own with nothing to redeploy.
+     */
+    const instantAvailable =
+      instantAvailability.state.status === 'ready' && instantAvailability.state.data.available;
     const promiseMinutes =
-      catalogue.state.status === 'ready'
+      instantAvailable && catalogue.state.status === 'ready'
         ? catalogue.state.data.instant.arrivalPromiseMinutes
         : null;
 
@@ -212,7 +258,27 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
          */
         base:
           promiseMinutes === null
-            ? base
+            ? {
+                ...base,
+                /**
+                 * `base` is the design fixture, and it carries "Spoon in 18 mins" and a " 18
+                 * mins" run transcribed off the frame. Falling through to it unchanged would
+                 * replace one unkeepable promise with an older one, so the minutes are removed
+                 * here rather than merely left un-patched.
+                 */
+                header: { ...base.header, etaHeadline: 'Spoon' },
+                tiles: base.tiles.map((tile) =>
+                  tile.id === 'instant' && tile.subtitleEmphasis !== undefined
+                    ? /*
+                       * BOTH runs. The subtitle is one sentence in two styles -- "Get a cook in"
+                       * and an emphasised " 30 mins" -- so clearing only the second leaves a
+                       * dangling "Get a cook in" with nothing after it. The sentence loses its
+                       * preposition with its number.
+                       */
+                      { ...tile, subtitle: 'Get a cook', subtitleEmphasis: '' }
+                    : tile,
+                ),
+              }
             : {
                 ...base,
                 header: { ...base.header, etaHeadline: `Spoon in ${promiseMinutes} mins` },
@@ -237,6 +303,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
     trackings,
     enRouteIds,
     catalogue.state,
+    instantAvailability.state,
     serverNowMs,
   ]);
 

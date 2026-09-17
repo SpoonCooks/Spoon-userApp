@@ -361,9 +361,19 @@ export function useInstantData(
 
     const base: InstantViewModel = {
       ...DEMO_INSTANT_AVAILABLE,
-      // The arrival PROMISE, not an ETA. `25:1751` draws it as "Arriving in 18 mins". Once
-      // availability answers, its own target supersedes the catalogue's.
-      etaLabel: `${live?.arrivalTargetMinutes ?? data.instant.arrivalPromiseMinutes} mins`,
+      /*
+       * The arrival PROMISE, not an ETA. `25:1751` draws it as "Arriving in 18 mins". Once
+       * availability answers, its own target supersedes the catalogue's.
+       *
+       * EMPTY while instant is unavailable, which drops the whole row: the sheet states a time
+       * the operation can meet, and `NO_PRESENT_COOK` means there is no one to meet it. The row
+       * returns by itself the moment `available` is true again -- there is no flag to unset.
+       *
+       * Unresolved availability counts as unavailable for the same reason Home treats it that
+       * way: showing a promise on the strength of not having asked, then withdrawing it a moment
+       * later, is a flicker and a claim with nothing behind it.
+       */
+      etaLabel: live?.available === true ? `${live.arrivalTargetMinutes} mins` : '',
       durations: data.durations.map((duration) => ({
         id: durationIdFor(duration.durationMinutes),
         label: durationLabelFor(duration.durationMinutes),

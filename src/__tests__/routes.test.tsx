@@ -164,6 +164,67 @@ describe('routes render', () => {
     expect(screen.queryByText(/18 mins/)).toBeNull();
   });
 
+  /**
+   * The promise is POLICY — "we aim to be with you inside 30 minutes" — published in the
+   * catalogue whatever the state of the network. Home used to state it unconditionally, so it
+   * read "Spoon in 30 mins" while `GET /v1/availability/instant` was answering
+   * `NO_PRESENT_COOK`: a promise nobody could keep, made on the operation's behalf.
+   *
+   * Both surfaces lose the minutes and keep the offer. Nothing is hidden and no flag is set —
+   * the day a cook is on shift, `available` turns true and every one of these comes back.
+   */
+  it('drops the arrival promise while no cook can be dispatched', async () => {
+    renderWithRuntime(<HomeRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...ROUTE_STUBS,
+          'GET /v1/availability/instant': () => ({
+            available: false,
+            arrivalTargetMinutes: 30,
+            reason: 'NO_PRESENT_COOK',
+            validUntil: '2026-08-18T09:00:30.000Z',
+          }),
+        }),
+      }),
+    });
+
+    expect(await screen.findByText('Spoon')).toBeTruthy();
+    expect(screen.getByText('Get a cook')).toBeTruthy();
+    expect(screen.getByTestId('home-tile-instant-emphasis').props.children).toBe('');
+    // Not the fixture's transcribed figure either: falling through to `base` unchanged would
+    // have swapped one unkeepable promise for an older one.
+    expect(screen.queryByText(/Spoon in \d+ mins/)).toBeNull();
+    expect(screen.queryByText('Get a cook in')).toBeNull();
+  });
+
+  /**
+   * The promise and a live ETA are different claims from different sources, and only the promise
+   * is gated. An active booking's "Arriving in 18 mins" is tracking's own number for a cook who
+   * has been assigned and routed — it is true whatever instant availability says, and a customer
+   * with a cook on the way must not be told the time is unknown because no NEW booking could be
+   * taken right now.
+   */
+  it('keeps a live tracking ETA while the promise is gone', async () => {
+    renderWithRuntime(<HomeRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...ROUTE_STUBS,
+          'GET /v1/availability/instant': () => ({
+            available: false,
+            arrivalTargetMinutes: 30,
+            reason: 'NO_PRESENT_COOK',
+            validUntil: '2026-08-18T09:00:30.000Z',
+          }),
+        }),
+      }),
+    });
+
+    expect(await screen.findByText('Spoon')).toBeTruthy();
+    // Not a specific figure: which banner a booking renders is the fixture's business. What is
+    // asserted is that a minutes reading SURVIVES on this screen while the promise does not.
+    expect(screen.getAllByText(/\d+ mins/).length).toBeGreaterThan(0);
+  });
+
   /** Both legal documents open IN the app, each under its own title. */
   it.each([
     ['terms', 'Customer Terms of Service'],

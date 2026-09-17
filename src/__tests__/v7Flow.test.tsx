@@ -189,13 +189,28 @@ describe('`433:2290` Page 21 — payment, then the SERVER (task §9, §10)', () 
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
-  it('goes to Home once the server has moved the booking on', async () => {
+  it('goes to the confirmation page once the server has confirmed the booking', async () => {
     renderConfirming('assigned');
 
-    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/home'));
-    // The stack is collapsed first, so back from Home is a root and not the sheet booked from.
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/booking/bk-1'));
+    // The stack is collapsed first, so back from the confirmation page is Home and not the sheet
+    // the customer booked from.
     expect(mockRouter.dismissAll).toHaveBeenCalled();
   });
+
+  /**
+   * The distinction the destination turns on. `cancelled` is settled too -- it is covered by the
+   * test below -- so "not awaiting confirmation" cannot be what sends a booking to a page headed
+   * "Booking confirmed!". Every status the server confirms with goes there; nothing else does.
+   */
+  it.each(['cook_en_route', 'cook_arrived', 'cooking', 'completed'])(
+    'treats %s as confirmed rather than as something to report on Home',
+    async (status) => {
+      renderConfirming(status);
+
+      await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/booking/bk-1'));
+    },
+  );
 
   /**
    * A booking the server CANCELLED is an answer too, and Home is entitled to show it. Holding a

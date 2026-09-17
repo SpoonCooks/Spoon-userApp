@@ -242,6 +242,45 @@ describe('summaryFrom server-owned action and recovery state', () => {
     ).toBe(false);
   });
 
+  /**
+   * The deployed detail endpoint has always sent `rescheduleCount`; it was undeclared in the
+   * schema, so Zod stripped it and the banner could not tell a moved booking from a fresh one.
+   * These pin the field's presence as much as the copy.
+   */
+  it('says a booking was moved when the server says it was', () => {
+    expect(
+      summaryFrom({
+        base: DEMO_BOOKING_CONFIRMATION.summary!,
+        dto: { ...SUMMARY_DTO, rescheduleCount: 1 } as BookingDetailDto,
+      }).bannerTitle,
+    ).toBe('Booking rescheduled!');
+  });
+
+  it('leaves a booking that was never moved saying what it said before', () => {
+    for (const rescheduleCount of [0, null, undefined]) {
+      expect(
+        summaryFrom({
+          base: DEMO_BOOKING_CONFIRMATION.summary!,
+          dto: { ...SUMMARY_DTO, rescheduleCount } as BookingDetailDto,
+        }).bannerTitle,
+      ).toBe(DEMO_BOOKING_CONFIRMATION.summary!.bannerTitle);
+    }
+  });
+
+  /** A problem to act on outranks how the slot was arrived at. */
+  it('lets a support handoff outrank the rescheduled banner', () => {
+    expect(
+      summaryFrom({
+        base: DEMO_BOOKING_CONFIRMATION.summary!,
+        dto: {
+          ...SUMMARY_DTO,
+          rescheduleCount: 1,
+          recovery: { state: 'support_handoff', openedAt: '2026-08-20T10:00:00.000Z' },
+        } as BookingDetailDto,
+      }).bannerTitle,
+    ).toBe('This booking needs attention');
+  });
+
   it('renders a support handoff as attention rather than confirmation', () => {
     const summary = summaryFrom({
       base: DEMO_BOOKING_CONFIRMATION.summary!,

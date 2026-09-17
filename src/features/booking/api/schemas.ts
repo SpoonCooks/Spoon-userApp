@@ -350,6 +350,15 @@ export const bookingDetailSchema = z.object({
   reassignment: bookingReassignmentSchema.nullish(),
   recovery: bookingRecoverySchema.nullish(),
   cancellation: bookingCancellationSchema.nullable(),
+  /**
+   * How many times the customer moved this booking -- capped at 1 by product policy (DEC-070),
+   * the same field `BookingSummaryDto` carries and My bookings already draws a pill from.
+   *
+   * The DEPLOYED detail endpoint has been sending this all along; it was simply not declared
+   * here, so Zod stripped it before anything could read it. `nullish` for the same reason it is
+   * nullish on the summary: it is absent on a booking that has never been moved.
+   */
+  rescheduleCount: z.number().int().nullish(),
   allowedActions: allowedActionsSchema,
 });
 

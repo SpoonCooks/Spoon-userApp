@@ -122,11 +122,26 @@ export function summaryFrom(input: {
 }): BookingSummaryViewModel {
   const recoveryHandoff = input.dto.recovery?.state === 'support_handoff';
 
+  /**
+   * A moved booking says so. Both states are confirmed and the page is otherwise identical, so
+   * the banner is the only thing that tells a customer the slot they are looking at is the one
+   * they changed it to rather than the one they first picked.
+   *
+   * `=== 1` rather than `>= 1` deliberately: product caps a booking at one move (DEC-070), and it
+   * is the same test My bookings uses for its "Rescheduled" pill, so the two screens cannot
+   * disagree about whether a booking was moved.
+   *
+   * Recovery wins where both apply. "This booking needs attention" is a problem the customer has
+   * to act on; how the slot was arrived at is history beside it.
+   */
+  const rescheduled = input.dto.rescheduleCount === 1;
+
   return {
     ...input.base,
     scheduleLine: scheduleLineFrom(input.dto),
     rows: bookingRowsFrom(input.dto),
     rescheduleAllowed: input.dto.allowedActions.canReschedule,
+    ...(rescheduled ? { bannerTitle: 'Booking rescheduled!' } : {}),
     ...(recoveryHandoff
       ? { bannerTitle: 'This booking needs attention', tone: 'warning' as const }
       : {}),
