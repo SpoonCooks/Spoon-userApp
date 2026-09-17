@@ -15,8 +15,9 @@ import type { BookingListViewModel } from './types';
  * ## The five My-bookings states
  *
  * `myBookingPresentationFor` collapses the backend's seven statuses (plus `policyBand` and
- * `rescheduleCount`) into exactly the five states the My-bookings screen draws: Completed,
- * Cancelled, Unfulfilled, Confirmed, Rescheduled. This is a SINGLE function used by BOTH tabs —
+ * `rescheduleCount`) into exactly the six states the My-bookings screen draws: Completed,
+ * Cancelled, Unfulfilled, Payment pending, Confirmed, Rescheduled. This is a SINGLE function used
+ * by BOTH tabs —
  * it does not branch on which tab is rendering it. That's confirmed, not assumed: the same
  * system-cancelled, fully-refunded booking legitimately renders "Unfulfilled" on the Upcoming tab
  * too (it's the live "apology" row there, and history on the Past tab, at the same time), so a
@@ -50,7 +51,21 @@ export function myBookingPresentationFor(
       : { label: 'Cancelled', tone: 'neutral' }; // includes CHECKOUT_EXPIRED_NO_PAYMENT
   }
 
-  // created / assigned / cook_en_route / cook_arrived / cooking — one pill on this screen.
+  /**
+   * `created` is the ONE live status that is not a booking yet.
+   *
+   * The server has not settled a payment for it: it is a HOLD, and `GET /v1/me/bookings/active`
+   * lists it alongside real bookings. Reading it as "Confirmed" is the same untruth the detail
+   * screen used to tell -- and this list is the screen a customer actually arrives through, since
+   * Home draws no banner for an unpaid hold. `warning`, not `info`, because it is something they
+   * have to act on before the server's abandon window closes and the hold is swept away.
+   *
+   * Checked before `rescheduleCount` for the same reason the banner is: a hold that was also
+   * moved is still, first and foremost, not paid for.
+   */
+  if (dto.status === 'created') return { label: 'Payment pending', tone: 'warning' };
+
+  // assigned / cook_en_route / cook_arrived / cooking — one pill on this screen.
   // Deliberate: this screen is a flat historical index; Home already owns live-tracking detail
   // (arriving/arrived/in-service), so drawing that granularity again here would duplicate it.
   return dto.rescheduleCount === 1

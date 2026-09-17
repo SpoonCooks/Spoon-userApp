@@ -31,7 +31,7 @@ const IST = 'Asia/Kolkata';
 
 const at = (over: Partial<BookingSummaryDto>): BookingSummaryDto => ({ ...BASE, ...over });
 
-describe('myBookingPresentationFor — the five My-bookings states', () => {
+describe('myBookingPresentationFor — the six My-bookings states', () => {
   /**
    * These are the REAL, Postgres-verified rows the backend handed over when confirming
    * `cancelledBy`/`policyBand`/`rescheduleCount` shipped on both list endpoints — not
@@ -92,16 +92,11 @@ describe('myBookingPresentationFor — the five My-bookings states', () => {
     expect(label).not.toBe('Rescheduled');
   });
 
-  it('collapses every live status to one Confirmed/Rescheduled pill, not five distinct ones', () => {
+  it('collapses every SETTLED live status to one Confirmed/Rescheduled pill, not four distinct ones', () => {
     // Deliberate: this screen is a flat historical index; Home already owns live-tracking detail
     // (arriving/arrived/in-service), so this screen must not draw that granularity again.
-    for (const status of [
-      'created',
-      'assigned',
-      'cook_en_route',
-      'cook_arrived',
-      'cooking',
-    ] as const) {
+    // `created` is excluded on purpose — it is not a settled booking; see the test below.
+    for (const status of ['assigned', 'cook_en_route', 'cook_arrived', 'cooking'] as const) {
       expect(
         myBookingPresentationFor({
           status,
@@ -111,6 +106,34 @@ describe('myBookingPresentationFor — the five My-bookings states', () => {
         }).label,
       ).toBe('Confirmed');
     }
+  });
+
+  /**
+   * An unpaid hold is listed by `GET /v1/me/bookings/active` alongside real bookings, and this
+   * list is how a customer reaches one -- Home draws no banner for it. Calling it Confirmed was
+   * the same untruth the detail screen told before `paymentPending`.
+   */
+  it('does not call an unpaid hold Confirmed', () => {
+    expect(
+      myBookingPresentationFor({
+        status: 'created',
+        cancelledBy: null,
+        policyBand: null,
+        rescheduleCount: 0,
+      }),
+    ).toEqual({ label: 'Payment pending', tone: 'warning' });
+  });
+
+  /** Unpaid outranks moved, exactly as the detail banner orders them. */
+  it('says payment is pending on a hold that was also rescheduled', () => {
+    expect(
+      myBookingPresentationFor({
+        status: 'created',
+        cancelledBy: null,
+        policyBand: null,
+        rescheduleCount: 1,
+      }).label,
+    ).toBe('Payment pending');
   });
 });
 
