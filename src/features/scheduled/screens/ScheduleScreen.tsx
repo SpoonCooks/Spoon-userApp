@@ -144,7 +144,25 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
     slotId: initialSelection?.slotId ?? null,
   });
 
-  const { dayId, periodId, durationId, slotId } = selection;
+  const { dayId, durationId, slotId } = selection;
+
+  const soleLivePeriodId = useMemo(() => {
+    if (state.status !== 'ready') return null;
+    const live = state.data.periods.filter((period) => period.disabled !== true);
+    return live.length === 1 ? (live[0]?.id ?? null) : null;
+  }, [state]);
+
+  /**
+   * DERIVED, not stored. Writing it into `selection` from an effect would make the screen render
+   * once with an empty Time row and again with a chip chosen, and would leave state that outlives
+   * the condition that produced it -- a period picked at 8 PM still sitting there after midnight,
+   * when all three windows are live again.
+   *
+   * As a derivation it simply stops applying the moment a second chip goes live, and everything
+   * downstream -- the duration section, the grid, the CTA, `effective` -- reads it without
+   * knowing whether a finger or the clock chose it.
+   */
+  const periodId = selection.periodId ?? (dayId === null ? null : soleLivePeriodId);
 
   /**
    * The start times currently on offer, read off `state` here rather than inside the boundary's
@@ -184,6 +202,34 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
     [dayId, periodId, durationId, selectableSlotId],
   );
 
+  /**
+   * A Time row with one live chip chooses it.
+   *
+   * Late in the day the elapsed periods are drawn disabled, so "Evening" can be the only thing on
+   * the row that can be pressed — and the screen still waited to be told what it already knew,
+   * holding the duration section back behind a tap with no alternative. Choosing it is not a
+   * decision made for the customer; there was no decision left.
+   *
+   * ## What counts as the only one
+   *
+   * `disabled`, which is the CLOCK: a period whose window has entirely passed today. Not whether
+   * the period holds bookable slots — a live window with no free start is a routing verdict that
+   * belongs to the server and is drawn as the grey cards in the grid, and it is read for the
+   * DEFAULT duration, so acting on it here could send someone to a period that stops qualifying
+   * the moment they pick two hours.
+   *
+   * ## When it does not fire
+   *
+   * Only while `periodId` is null, so a customer who has chosen is never overridden — including
+   * the one who picked Evening, went back to Morning, and would otherwise be pushed back. Picking
+   * a DAY clears the period, which re-arms this deliberately: the new day has its own elapsed
+   * windows, and tomorrow has none at all.
+   *
+   * Nothing happens before the day is chosen. The Time row is not on screen then (`showTime`),
+   * and periods are gated on today's clock, so selecting one for a day nobody has named would be
+   * answering a question that has not been asked.
+   */
+
   // Reported after commit rather than from inside the setter, so a host re-render caused by the
   // new selection cannot happen during this one's update.
   const { onSelectionChange } = actions;
@@ -196,7 +242,7 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
       {(schedule) => {
         const showTime = selection.dayId !== null;
         const hasDurations = schedule.durations !== undefined && schedule.durations.length > 0;
-        const showDuration = showTime && selection.periodId !== null && hasDurations;
+        const showDuration = showTime && periodId !== null && hasDurations;
         /**
          * The grid is drawn once the server has ANSWERED for this day and duration — never while
          * the answer is still in flight.
@@ -209,12 +255,11 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
          */
         const showStart =
           showTime &&
-          selection.periodId !== null &&
+          periodId !== null &&
           (!hasDurations || selection.durationId !== null) &&
           !schedule.slotsPending;
 
-        const slots =
-          selection.periodId === null ? [] : (schedule.slotsByPeriod[selection.periodId] ?? []);
+        const slots = periodId === null ? [] : (schedule.slotsByPeriod[periodId] ?? []);
 
         const complete =
           effective.dayId !== null &&
@@ -344,7 +389,7 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                     icon: period.icon,
                     ...(period.disabled === undefined ? {} : { disabled: period.disabled }),
                   }))}
-                  selectedId={selection.periodId}
+                  selectedId={periodId}
                   onSelect={(periodId) => {
                     // Same guard, and for the same reason, as the start-time grid below: `Chip`
                     // already refuses the press, and the style prop is not the authority on what
