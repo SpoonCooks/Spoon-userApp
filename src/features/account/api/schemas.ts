@@ -13,3 +13,21 @@ export const deleteAccountResponseSchema = z.object({
 });
 
 export type DeleteAccountResponse = z.infer<typeof deleteAccountResponseSchema>;
+
+/**
+ * `POST /v1/me/account-deletion/otp`.
+ *
+ * The same envelope `POST /v1/auth/otp/send` answers with, declared here rather than imported
+ * from auth for the reason `ACCOUNT_PATHS` states about the path: the two features own different
+ * things, and sharing a schema would make a change to login's reply a change to deletion's.
+ *
+ * `retryAfterSeconds` is this endpoint's OWN cooldown, independent of login's since the backend
+ * scoped the limit to (phone, purpose). It is what the delete sheet counts down; a client
+ * constant would be a guess at a number the server already states.
+ */
+export const deletionOtpResponseSchema = z.object({
+  accepted: z.boolean(),
+  retryAfterSeconds: z.number().int().nonnegative(),
+});
+
+export type DeletionOtpResponse = z.infer<typeof deletionOtpResponseSchema>;
