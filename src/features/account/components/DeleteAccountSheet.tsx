@@ -54,6 +54,14 @@ export function DeleteAccountSheet({
       visible={visible}
       onClose={onClose}
       onBack={onClose}
+      /*
+       * The disc, as `CancelBookingSheet`, `BookingDetailsSheet` and `HelpMePickSheet` all ask
+       * for, and as the Account screen behind this one draws through `ScreenHeader`. This sheet
+       * was the only one taking `BottomSheet`'s `plain` default -- a bare Feather arrow where
+       * everything around it is `DirectionalDisc`'s exported asset. Two different back buttons on
+       * one screen, one on top of the other.
+       */
+      backVariant="outlined"
       title="Delete Account"
       testID="delete-account-sheet"
       footer={
