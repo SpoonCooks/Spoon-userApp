@@ -276,16 +276,23 @@ export function InstantSheet({
           veil is what dims them. Collapsing the line to one word was a reading of the superseded
           file.
         */}
-        <View style={styles.etaRow}>
-          <Text variant="titleLead" color="textPrimary" numberOfLines={1} style={styles.shrink}>
-            {instant.etaCaption}
-          </Text>
-          <View style={styles.etaPill} testID={`${testID}-eta`}>
-            <Text variant="headingScreen" color="textStrong" align="center" numberOfLines={1}>
-              {instant.etaLabel}
+        {/*
+          The whole row goes when there is no time to state -- caption and pill together, not an
+          empty pill beside the words "Arriving in", which would read as a number that failed to
+          load rather than as an offer with no timing yet.
+        */}
+        {instant.etaLabel === '' ? null : (
+          <View style={styles.etaRow}>
+            <Text variant="titleLead" color="textPrimary" numberOfLines={1} style={styles.shrink}>
+              {instant.etaCaption}
             </Text>
+            <View style={styles.etaPill} testID={`${testID}-eta`}>
+              <Text variant="headingScreen" color="textStrong" align="center" numberOfLines={1}>
+                {instant.etaLabel}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/*
           `381:285` — the Duration label row, which this sheet did not draw at all before: a
