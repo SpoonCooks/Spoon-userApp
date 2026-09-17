@@ -6,17 +6,33 @@ import type { RazorpayCheckoutResult } from './schemas';
 /**
  * Razorpay's code for "the customer dismissed checkout".
  *
- * From the Android SDK's `Checkout` constants, which the wrapper forwards verbatim as `code`.
- * Treated as a HINT for messaging only — if Razorpay renumbers it, the worst case is that a
- * cancellation reads as a generic failure, never that an unpaid booking reads as paid.
+ * `0`, read straight out of the SDK the app actually bundles rather than from documentation:
  *
- * That "worst case" turned out to be real: a device dismissal was observed landing here as a
- * `CheckoutFailedError` rather than a `CheckoutCancelledError`, which means either the platform
- * SDK in use does not send `2` for a dismissal, or sends `code` in a shape `readRejection` was
- * not reading. The classification below no longer trusts the numeric code alone —
- * `mentionsCancellation` is the fallback for whichever of those it turns out to be.
+ *   javap -constants com/razorpay/Checkout.class   (checkout 1.6.41 / standard-core 1.7.18)
+ *     PAYMENT_CANCELED = 0
+ *     NETWORK_ERROR    = 2
+ *     INVALID_OPTIONS  = 3
+ *     TLS_ERROR        = 6
+ *
+ * This was `2` — which is NETWORK_ERROR. Every dismissal therefore fell through to
+ * `CheckoutFailedError`, and a customer who closed the sheet on purpose was shown "Your payment
+ * failed" instead of being returned to the screen they came from. The wording fallback below
+ * could not rescue it either: Razorpay describes a dismissal as
+ * `{"code":"BAD_REQUEST_ERROR","description":"undefined","reason":"payment_error"}`, which
+ * contains neither "cancel" nor "dismiss".
+ *
+ * Captured on a Galaxy S21 against production, from the launcher's own raw-rejection log — the
+ * top-level numeric `code` was `0` on every dismissal. The nested `code` is the string
+ * `BAD_REQUEST_ERROR`; it is the OUTER one the wrapper forwards from `onPaymentError(int code,
+ * ...)`, and the outer one this reads.
+ *
+ * Still only a hint, and deliberately so: if Razorpay renumbers it the worst case is a
+ * cancellation reading as a generic failure, never an unpaid booking reading as paid.
+ *
+ * iOS is UNVERIFIED — its SDK is a prebuilt framework with its own numbering, and no dismissal
+ * has been captured off a device. `mentionsCancellation` remains the fallback there.
  */
-const RAZORPAY_PAYMENT_CANCELLED = 2;
+const RAZORPAY_PAYMENT_CANCELLED = 0;
 
 /**
  * Razorpay's own wording for a closed sheet, seen across `description` and `reason` depending on
