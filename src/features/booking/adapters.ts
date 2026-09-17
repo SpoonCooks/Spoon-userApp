@@ -136,12 +136,38 @@ export function summaryFrom(input: {
    */
   const rescheduled = input.dto.rescheduleCount === 1;
 
+  /**
+   * An unsettled hold is not a confirmation, and this screen is headed "Booking confirmed!".
+   *
+   * `created` and `assigned` share the `confirmation` VIEW deliberately -- from the customer's
+   * side a paid booking is confirmed whether or not a cook has been matched yet -- but they are
+   * not the same claim. `created` means the server has not settled the payment, so a booking sat
+   * here announcing itself as confirmed, with a tick, a schedule line and Cancel / Reschedule
+   * beside it, for something nobody had paid for.
+   *
+   * REACHED BY a checkout that never reported back: the app killed, or crashing, while Razorpay
+   * is open. Dismissing checkout does NOT do this -- the server cancels on dismissal
+   * (`cancelledBy: customer`, confirmed against production) -- which is why the state looks
+   * unreachable until someone swipes the app away mid-payment, and then is not.
+   *
+   * The booking is left otherwise intact: the hold is real, the slot is held, and it becomes a
+   * genuine booking the moment payment lands. What changes is only that the screen stops calling
+   * it confirmed before it is.
+   */
+  const unsettled = input.dto.status === 'created';
+
   return {
     ...input.base,
     scheduleLine: scheduleLineFrom(input.dto),
     rows: bookingRowsFrom(input.dto),
     rescheduleAllowed: input.dto.allowedActions.canReschedule,
     ...(rescheduled ? { bannerTitle: 'Booking rescheduled!' } : {}),
+    /*
+     * After `rescheduled`, before `recoveryHandoff`. A booking can be both moved and unpaid, and
+     * "you have not paid" is the more urgent of the two; a handout to support outranks both,
+     * because that is a thing the customer has to act on rather than a state to report.
+     */
+    ...(unsettled ? { bannerTitle: 'Payment pending', tone: 'warning' as const } : {}),
     ...(recoveryHandoff
       ? { bannerTitle: 'This booking needs attention', tone: 'warning' as const }
       : {}),
