@@ -1106,7 +1106,14 @@ export function useBookingDetailData(bookingId: string): ScreenQuery<BookingDeta
     remote.state.status === 'ready' &&
     remote.state.data.status === 'cancelled' &&
     remote.state.data.cancellation?.cancelledBy === 'system';
-  const refunds = useBookingRefunds(isDev || !autoCancelled ? null : bookingId);
+  /*
+   * `bookingId === ''` guarded explicitly, not just `!autoCancelled`: the route host
+   * (`app/(app)/booking/[id].tsx`) falls back to `''`, not `null`, while Expo Router's `id`
+   * param is momentarily unresolved -- the same reason it guards `useCallCook`/`useCancelFlow`
+   * the same way. `useBookingRefunds`'s own `enabled` check only tests `!== null`, so an empty
+   * string reached it uncaught and became `GET /v1/bookings//refunds`, a guaranteed 400.
+   */
+  const refunds = useBookingRefunds(isDev || !autoCancelled || bookingId === '' ? null : bookingId);
 
   const devSample = useMemo(() => {
     if (!isDev) return null;
