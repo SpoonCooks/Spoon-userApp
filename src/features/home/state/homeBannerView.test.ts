@@ -227,4 +227,34 @@ describe('the demo fixtures quote the SAME destinations', () => {
   it('matches entry for entry', () => {
     expect(DEMO_BANNER_DESTINATION_PAGE).toEqual(BANNER_DESTINATION_PAGE);
   });
+
+  /**
+   * The live badge floored at zero, so a service nobody had ended read "Time left / 0 mins" for
+   * hours. Same defect as the in-service countdown, second place it surfaced.
+   */
+  it('counts up past the service end instead of sitting on 0 mins', () => {
+    expect(
+      homeBannerFor(at({ status: 'cooking', minutesLeft: 0, minutesOver: 230 })),
+    ).toMatchObject({
+      variant: 'live',
+      badgeCaption: 'Running over',
+      // Hours broken out — an overrun has no ceiling, and "230 mins" is unreadable in the badge.
+      badgeValue: '3h 50m',
+    });
+  });
+
+  it('keeps minutes alone for an overrun under an hour', () => {
+    expect(
+      homeBannerFor(at({ status: 'cooking', minutesLeft: 0, minutesOver: 7 }))?.badgeValue,
+    ).toBe('7 mins');
+  });
+
+  it('still counts down while any time remains', () => {
+    expect(homeBannerFor(at({ status: 'cooking', minutesLeft: 42, minutesOver: 0 }))).toMatchObject(
+      {
+        badgeCaption: 'Time left',
+        badgeValue: '42 mins',
+      },
+    );
+  });
 });

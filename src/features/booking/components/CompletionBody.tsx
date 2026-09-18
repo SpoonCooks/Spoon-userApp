@@ -385,8 +385,18 @@ const styles = StyleSheet.create({
   /** `143:292` — a CENTRED 102 × 25 `#E2FF68` chip at a 5pt radius. */
   submit: {
     alignSelf: 'center',
-    width: 102,
-    height: 25,
+    /*
+     * `102 x 25` is the frame's geometry, held as a MINIMUM rather than a fixed size.
+     *
+     * At a fixed 102 with no padding the label had exactly 102pt to live in, and "SUBMIT" --
+     * uppercased by `buttonUpper` -- did not fit on a Galaxy S21 at its default font scale: the
+     * button read "SUBMI". A customer at a larger accessibility scale loses more. The box now
+     * grows with its own text and keeps the designed size wherever the text fits inside it.
+     */
+    minWidth: 102,
+    minHeight: 25,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: lightTheme.radius.r5,

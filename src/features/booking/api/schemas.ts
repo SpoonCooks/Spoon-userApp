@@ -366,6 +366,25 @@ export const bookingDetailSchema = z.object({
   slotType: slotTypeSchema,
   scheduledStart: z.string().datetime().nullable(),
   durationMinutes: z.number().int().positive(),
+  /**
+   * `durationMinutes` plus every CONFIRMED extension, summed by the server.
+   *
+   * `durationMinutes` is the ORIGINAL priced duration and deliberately never moves -- pricing and
+   * capacity key off it, so a later, separately-priced add-on must not rewrite it. That leaves it
+   * unable to describe an extended service: the row would read "45 mins" beside a start and end
+   * 75 minutes apart.
+   *
+   * NOT computable here as `durationMinutes + extension.minutes`. `booking_extensions_one_live`
+   * only forbids a second CONCURRENT extension, so a booking may hold several confirmed rows,
+   * and `extension.minutes` names only the most recent -- that sum would under-report a
+   * twice-extended service by the earlier extension's minutes. The server sums every confirmed
+   * row, and guarantees the result agrees with `timing.expectedEnd - timing.actualStart`.
+   *
+   * BACKEND_PENDING: committed on `fix/booking-detail-rating-cancellation-fields`, not yet
+   * deployed. `nullish` so the app reads it the moment it lands and falls back to
+   * `durationMinutes` until then -- which is the correct answer for every unextended booking.
+   */
+  totalDurationMinutes: z.number().int().positive().nullish(),
   price: priceSchema,
   /** The payment hold. Past it, an unpaid booking is released by the worker. */
   holdExpiresAt: z.string().datetime().nullish(),
