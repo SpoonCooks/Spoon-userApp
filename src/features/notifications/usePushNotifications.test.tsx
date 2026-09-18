@@ -95,8 +95,15 @@ describe('usePushNotifications — registers when it becomes possible, not only 
     await foreground();
 
     await waitFor(() => expect(registered).toHaveLength(1));
-    // The platform is the one the app is actually running on, never a guess.
-    expect(registered[0]).toEqual({ token: 'fcm-token-value', platform: Platform.OS });
+    /*
+     * The platform is the one the app is actually running on, never a guess -- and so is the token
+     * SOURCE: on iOS that is Firebase, because the APNs token `expo-notifications` returns is one
+     * the backend's FCM-only send path cannot address.
+     */
+    expect(registered[0]).toEqual({
+      token: Platform.OS === 'ios' ? 'fcm-ios-token' : 'fcm-token-value',
+      platform: Platform.OS,
+    });
   });
 
   it('does not register a second time once a token has reached the backend', async () => {
