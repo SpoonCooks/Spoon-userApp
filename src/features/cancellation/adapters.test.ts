@@ -2,7 +2,7 @@ import type { CancellationPreviewDto } from '@features/booking';
 
 import { DEMO_CANCELLATION } from '@/demo/fixtures/screens';
 
-import { cancellationFrom } from './adapters';
+import { cancellationFrom, reasonsFrom } from './adapters';
 
 /**
  * The refund table, composed.
@@ -69,6 +69,47 @@ describe('cancellationFrom — the refund table', () => {
       '₹135.45',
       '₹34',
       '₹95',
+    ]);
+  });
+});
+
+/**
+ * `ABANDONED_CHECKOUT` is a normal published catalogue entry — nothing on the wire marks it as
+ * machine-only — but the APP sends it when it gives back a hold nobody paid for. Rendered
+ * verbatim it would sit in this sheet as a reason a customer could pick for cancelling a real
+ * booking, and choosing it would record a cancellation the server attributes to the system.
+ */
+describe('reasonsFrom — what a human is actually offered', () => {
+  const catalogueWith = (reasons: readonly { code: string; label: string }[]) =>
+    ({
+      cancellation: {
+        reasons: reasons.map((reason) => ({ ...reason, requiresDetail: reason.code === 'OTHER' })),
+      },
+    }) as Parameters<typeof reasonsFrom>[0];
+
+  it('drops the code the app sends for itself', () => {
+    const offered = reasonsFrom(
+      catalogueWith([
+        { code: 'CHANGE_OF_PLANS', label: 'Change of plans' },
+        { code: 'ABANDONED_CHECKOUT', label: 'Abandoned checkout' },
+        { code: 'OTHER', label: 'Others' },
+      ]),
+    );
+
+    expect(offered.map((reason) => reason.id)).toEqual(['CHANGE_OF_PLANS', 'OTHER']);
+  });
+
+  it('keeps every other published reason, and its detail requirement', () => {
+    const offered = reasonsFrom(
+      catalogueWith([
+        { code: 'CHANGE_OF_PLANS', label: 'Change of plans' },
+        { code: 'OTHER', label: 'Others' },
+      ]),
+    );
+
+    expect(offered).toEqual([
+      { id: 'CHANGE_OF_PLANS', label: 'Change of plans' },
+      { id: 'OTHER', label: 'Others', requiresDetail: true },
     ]);
   });
 });
