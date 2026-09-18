@@ -769,15 +769,28 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
 /**
  * The reason a released hold is recorded under.
  *
- * BACKEND_PENDING: `GET /v1/catalogue` publishes exactly ONE cancellation reason today — `OTHER`,
- * which requires a detail — and none that means "the customer abandoned checkout". `OTHER` plus
- * an explicit detail is the honest use of what exists; borrowing a reason like "Booked by
- * mistake" would put words in the customer's mouth, and inventing a code the catalogue never
- * published is the client-side invention this app's boundary forbids. Replace both the moment a
- * dedicated code exists, so these releases stop counting as customer cancellations.
+ * This used to be `OTHER` plus a free-text detail, because the catalogue published nothing that
+ * meant "the customer abandoned checkout" — so every automatic release landed in the data as a
+ * CUSTOMER cancellation, indistinguishable from someone who booked a cook and changed their mind.
+ *
+ * The backend now publishes a dedicated code, and stamps `cancelledBy: 'system'` whenever it is
+ * used — unconditionally, not at the caller's discretion — so a release recorded through this
+ * route is identical to one the server's own expiry sweep records. No detail is sent: the code
+ * says all of it, and `requiresDetail` is false, so any text would be dropped rather than stored.
+ *
+ * NOT offered to a human — see `CLIENT_ONLY_CANCELLATION_REASONS`.
  */
-const ABANDONED_HOLD_REASON = 'OTHER';
-const ABANDONED_HOLD_DETAIL = 'Released automatically: checkout was closed without paying.';
+export const ABANDONED_HOLD_REASON = 'ABANDONED_CHECKOUT';
+
+/**
+ * Reason codes this APP sends programmatically, which the catalogue publishes like any other.
+ *
+ * Nothing on the wire marks them as machine-only, so the cancellation sheet — which renders the
+ * published list verbatim — would otherwise offer "abandoned checkout" to a customer choosing why
+ * they are cancelling a real booking. Filtering happens here, against the codes this app actually
+ * sends, so the list and the sender can never drift apart.
+ */
+export const CLIENT_ONLY_CANCELLATION_REASONS: readonly string[] = [ABANDONED_HOLD_REASON];
 
 /**
  * Give back the slot a dismissed checkout left held.
@@ -831,7 +844,7 @@ async function releaseAbandonedHold(
 
     await bookings.cancel(
       bookingId,
-      { reasonCode: ABANDONED_HOLD_REASON, reasonDetail: ABANDONED_HOLD_DETAIL },
+      { reasonCode: ABANDONED_HOLD_REASON },
       `booking.release:${bookingId}`,
     );
 

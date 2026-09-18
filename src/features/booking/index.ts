@@ -35,6 +35,8 @@ export { PaymentFailedBody } from './components/PaymentFailedBody';
 export type { PaymentFailedBodyProps } from './components/PaymentFailedBody';
 export {
   destinationForPayment,
+  ABANDONED_HOLD_REASON,
+  CLIENT_ONLY_CANCELLATION_REASONS,
   durationLabelFor,
   durationMerchandisingFor,
   useBookingDetailData,

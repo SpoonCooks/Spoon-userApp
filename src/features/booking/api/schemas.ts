@@ -311,6 +311,34 @@ export const bookingRecoverySchema = z.object({
 
 export type BookingRecoveryDto = z.infer<typeof bookingRecoverySchema>;
 
+/**
+ * The rating a booking ALREADY carries, on the detail payload.
+ *
+ * `allowedActions.canRate` says whether a booking may still be rated, which is the only thing
+ * this payload used to carry -- and the completion screen was left inferring three facts from
+ * that one bit: whether a rating exists (fair), whether it was the `5+` appreciation (it cannot
+ * know), and whether WRITTEN feedback was given (it cannot know either). The result was a 4.5
+ * rendering as a lone "5+" chip, and "Thanks for sharing your feedback!" shown to a customer who
+ * wrote nothing.
+ *
+ * BACKEND_PENDING: none of these three fields is sent today. They are declared `nullish` so the
+ * app reads them the moment the backend adds them, and degrades to the in-memory rating until
+ * then (which survives only while the screen stays open). The names here are the contract asked
+ * for -- `ratingStars`, `ratingExceptional`, `ratingFeedback` -- and a different spelling on the
+ * wire is silently stripped by Zod rather than failing loudly, so they have to match.
+ *
+ * `ratingStars` is already published on `GET /v1/me/bookings*` (`bookingSummarySchema`), so this
+ * is the same field on a payload that lacks it, not a new concept.
+ */
+export const bookingRatingSchema = z.object({
+  /** 1..5 on a half-step scale, as `PUT /v1/bookings/:id/rating` accepts it. */
+  ratingStars: z.number().nullish(),
+  /** The `5+` appreciation, which is NOT the number 5 -- see `RATING_EXCEPTIONAL`. */
+  ratingExceptional: z.boolean().nullish(),
+  /** The words the customer wrote, or null when they rated without writing any. */
+  ratingFeedback: z.string().nullish(),
+});
+
 export const allowedActionsSchema = z.object({
   canCancel: z.boolean(),
   canReschedule: z.boolean(),
@@ -341,6 +369,10 @@ export const bookingDetailSchema = z.object({
   price: priceSchema,
   /** The payment hold. Past it, an unpaid booking is released by the worker. */
   holdExpiresAt: z.string().datetime().nullish(),
+  /** What the customer already rated, and whether they wrote anything. See `bookingRatingSchema`. */
+  ratingStars: z.number().nullish(),
+  ratingExceptional: z.boolean().nullish(),
+  ratingFeedback: z.string().nullish(),
   address: bookingAddressSchema,
   mealNotes: z.string().nullable(),
   referenceUrl: z.string().nullable(),

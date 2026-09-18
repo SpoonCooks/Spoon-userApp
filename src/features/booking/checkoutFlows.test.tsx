@@ -8,7 +8,7 @@ import { createStubApi, createTestRuntime } from '@/test/renderWithRuntime';
 import type { StubHandlers } from '@/test/renderWithRuntime';
 import type { CheckoutLauncher } from '@features/payment';
 
-import { useCreateExtension, useRateBooking, useTipCook } from './api';
+import { ratingScopeFor, useCreateExtension, useRateBooking, useTipCook } from './api';
 
 /**
  * Tip and extension are PAID operations, and rating carries a value the wire used to lose.
@@ -322,5 +322,34 @@ describe('rating', () => {
     // The reply is parsed, not discarded: `exceptional` here is the STORED answer.
     expect(saved.exceptional).toBe(true);
     expect(saved.created).toBe(true);
+  });
+});
+
+/**
+ * Rating and writing arrive as two calls from two screens, and the scope store is in memory —
+ * so one scope means one key, and the backend rejects a key reused with a different body (409
+ * IDEMPOTENCY_CONFLICT) before the rating logic runs. Under a single scope a customer who rated
+ * from Home and then wrote something on the booking had their feedback silently dropped.
+ */
+describe('ratingScopeFor — writing is a different intent from rating', () => {
+  it('scopes a bare rating and a rating WITH words to different intents', () => {
+    expect(ratingScopeFor('bkg-1', undefined)).not.toBe(ratingScopeFor('bkg-1', 'Lovely food'));
+  });
+
+  it('treats blank words as no words, so a retry of a bare rating replays it', () => {
+    const bare = ratingScopeFor('bkg-1', undefined);
+    expect(ratingScopeFor('bkg-1', '')).toBe(bare);
+    expect(ratingScopeFor('bkg-1', '   ')).toBe(bare);
+  });
+
+  /** A retry of the SAME intent has to repeat its key — that is what the store is for. */
+  it('is stable for the same booking and the same kind of submission', () => {
+    expect(ratingScopeFor('bkg-1', 'Lovely food')).toBe(ratingScopeFor('bkg-1', 'Lovely food'));
+    // ...and the words themselves do not split it further: editing before a retry is one intent.
+    expect(ratingScopeFor('bkg-1', 'Lovely food')).toBe(ratingScopeFor('bkg-1', 'Great roti'));
+  });
+
+  it('never collides across bookings', () => {
+    expect(ratingScopeFor('bkg-1', 'a')).not.toBe(ratingScopeFor('bkg-2', 'a'));
   });
 });

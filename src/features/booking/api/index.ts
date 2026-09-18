@@ -14,6 +14,7 @@ export {
   useBookingRefunds,
   useExtensionOptions,
   useQuote,
+  ratingScopeFor,
   useRateBooking,
   useRefunds,
   useRescheduleBooking,

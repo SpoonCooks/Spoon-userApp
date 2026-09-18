@@ -77,6 +77,10 @@ function bookingDto(overrides: {
   reassignment?: unknown;
   recovery?: unknown;
   cancellation?: unknown;
+  /** What the booking already carries — see `bookingRatingSchema`. */
+  ratingStars?: number;
+  ratingExceptional?: boolean;
+  ratingFeedback?: string;
 }): Record<string, unknown> {
   return {
     id: BOOKING_ID,
@@ -86,6 +90,11 @@ function bookingDto(overrides: {
     durationMinutes: 60,
     price: PRICE,
     holdExpiresAt: null,
+    ...(overrides.ratingStars === undefined ? {} : { ratingStars: overrides.ratingStars }),
+    ...(overrides.ratingExceptional === undefined
+      ? {}
+      : { ratingExceptional: overrides.ratingExceptional }),
+    ...(overrides.ratingFeedback === undefined ? {} : { ratingFeedback: overrides.ratingFeedback }),
     address: ADDRESS,
     mealNotes: null,
     referenceUrl: null,
@@ -390,7 +399,7 @@ describe('booking lifecycle from real DTOs', () => {
     expect(screen.queryByText('12th April • 1:15 PM • 1 hr')).toBeNull();
     unmount();
 
-    renderBooking({
+    const { unmount: unmountRated } = renderBooking({
       [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
         booking: bookingDto({
           status: 'completed',
@@ -405,7 +414,39 @@ describe('booking lifecycle from real DTOs', () => {
     });
     await settle();
 
+    /*
+     * `canRate: false` means a RATING exists. It does not mean anything was written, and this
+     * payload carries no feedback -- so the textarea is still offered and nobody is thanked for
+     * words they never wrote. That untruth is what this assertion used to pin.
+     */
+    expect(screen.getByTestId('completion-feedback')).toBeTruthy();
+    expect(screen.queryByText('Thanks for sharing your feedback!')).toBeNull();
+    unmountRated();
+  });
+
+  /** The acknowledgement follows the server's OWN record of the words, nothing else. */
+  it('acknowledges feedback only when the payload carries some', async () => {
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+        booking: bookingDto({
+          status: 'completed',
+          timing: {
+            actualStart: '2026-08-20T06:30:00.000Z',
+            expectedEnd: '2026-08-20T07:30:00.000Z',
+            actualEnd: '2026-08-20T07:28:00.000Z',
+          },
+          allowedActions: { canRate: false, canTip: true },
+          ratingStars: 4.5,
+          ratingFeedback: 'The dal was perfect.',
+        }),
+      }),
+    });
+    await settle();
+
     expect(screen.getByText('Thanks for sharing your feedback!')).toBeTruthy();
+    // And the rating drawn is the one recorded, not the `5+` chip.
+    expect(screen.getByTestId('completion-rating-4.5')).toBeTruthy();
+    expect(screen.queryByTestId('completion-rating-prompt')).toBeNull();
   });
 
   /**

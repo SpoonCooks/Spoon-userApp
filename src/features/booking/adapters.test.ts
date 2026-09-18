@@ -1,4 +1,4 @@
-import { bookingDetailFrom, summaryFrom, trackingDetailFrom } from './adapters';
+import { bookingDetailFrom, bookingRowsFrom, summaryFrom, trackingDetailFrom } from './adapters';
 import { DEMO_BOOKING_CONFIRMATION } from '@/demo/fixtures/booking';
 import type { BookingDetailDto, TrackingDto } from './api';
 import type { BookingDetailViewModel } from './types';
@@ -347,5 +347,72 @@ describe('summaryFrom server-owned action and recovery state', () => {
       tone: 'warning',
       rescheduleAllowed: false,
     });
+  });
+});
+
+/**
+ * `250:2861` — the Start time / End Time rows behind "View booking details".
+ *
+ * Service begins when the customer hands over the OTP, which the server reports as
+ * `timing.actualStart`. These rows read `scheduledStart` alone, so a cook who arrived late left
+ * the customer looking at a start time that had already passed with nothing having happened.
+ */
+describe('bookingRowsFrom — the times the customer actually experienced', () => {
+  const row = (dto: BookingDetailDto, label: string) =>
+    bookingRowsFrom(dto).find((entry) => entry.label === label)?.value;
+
+  const withTiming = (timing: Record<string, string | null>): BookingDetailDto =>
+    ({
+      ...SUMMARY_DTO,
+      scheduledStart: '2026-08-20T06:00:00.000Z',
+      timing: { arrivedAt: null, actualStart: null, expectedEnd: null, actualEnd: null, ...timing },
+    }) as BookingDetailDto;
+
+  it('reads the start from the OTP handover once service has begun', () => {
+    const dto = withTiming({
+      actualStart: '2026-08-20T06:30:00.000Z',
+      expectedEnd: '2026-08-20T07:30:00.000Z',
+    });
+
+    // 6:30, the actual start — NOT the 6:00 that was booked.
+    expect(row(dto, 'Start time')).toBe(
+      new Date('2026-08-20T06:30:00.000Z').toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+    );
+  });
+
+  it('falls back to the booked start before service has begun', () => {
+    expect(row(withTiming({}), 'Start time')).toBe(
+      new Date('2026-08-20T06:00:00.000Z').toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+    );
+  });
+
+  /**
+   * The end is the SERVER's projection, never start + duration computed here: an extended
+   * booking's end moves without `durationMinutes` moving with it, so arithmetic would
+   * under-report every extended service.
+   */
+  it('prefers the actual end once the service is over', () => {
+    const dto = withTiming({
+      actualStart: '2026-08-20T06:30:00.000Z',
+      expectedEnd: '2026-08-20T07:30:00.000Z',
+      actualEnd: '2026-08-20T07:28:00.000Z',
+    });
+
+    expect(row(dto, 'End Time')).toBe(
+      new Date('2026-08-20T07:28:00.000Z').toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+    );
+  });
+
+  it('shows no end time when the server has projected none', () => {
+    expect(row(withTiming({ actualStart: '2026-08-20T06:30:00.000Z' }), 'End Time')).toBe('—');
   });
 });
