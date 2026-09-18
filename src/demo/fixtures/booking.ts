@@ -11,6 +11,7 @@ import type {
   InstantViewModel,
 } from '@features/booking';
 import type { ScheduleViewModel } from '@features/scheduled';
+import { RATING_EXCEPTIONAL } from '@ui';
 
 import { DEMO_COOK_REKHA, DEMO_COOK_SANCHITA } from './cooks';
 
@@ -604,12 +605,36 @@ export const DEMO_BOOKING_COMPLETION: BookingDetailViewModel = {
 };
 
 /** `319:3191` "Page 14b- Feedback submission" — the SERVER reports the rating is recorded. */
+/**
+ * `319:3217` / `383:765` — the finished state where BOTH halves are in: the `5+` appreciation and
+ * written feedback.
+ *
+ * The three facts are carried separately on purpose. `submitted` alone means only "a rating
+ * exists"; drawing this frame from it made a 4.5 render as a lone `5+` chip and thanked customers
+ * for feedback they never wrote. `319:3284` — a numeric rating, keeping its scale — is the other
+ * finished state, and it is a different fixture because it is a different screen.
+ */
 export const DEMO_BOOKING_FEEDBACK_SUBMITTED: BookingDetailViewModel = {
   ...HEADER,
   details: DEMO_BOOKING_CONFIRMATION.details!,
   view: 'completion',
   cook: DEMO_COOK_REKHA,
-  completion: { ...COMPLETION, submitted: true },
+  completion: {
+    ...COMPLETION,
+    submitted: true,
+    submittedRating: RATING_EXCEPTIONAL,
+    feedbackGiven: true,
+  },
+  tip: TIP_SHEET,
+};
+
+/** `319:3284` — a NUMERIC rating recorded, and nothing written. The scale stays, 4.5 filled. */
+export const DEMO_BOOKING_RATED_NUMERIC: BookingDetailViewModel = {
+  ...HEADER,
+  details: DEMO_BOOKING_CONFIRMATION.details!,
+  view: 'completion',
+  cook: DEMO_COOK_REKHA,
+  completion: { ...COMPLETION, submitted: true, submittedRating: 4.5 },
   tip: TIP_SHEET,
 };
 

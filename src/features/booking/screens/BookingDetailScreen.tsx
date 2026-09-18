@@ -85,7 +85,14 @@ export interface BookingDetailActions {
    * with it is a contract question, answered where the request is built — never by narrowing it
    * to a number here, which would lose the distinction before anyone could act on it.
    */
-  readonly onSubmitFeedback?: (feedback: string, rating: RatingSelection | null) => void;
+  /**
+   * Returns the submission's promise where the host has one, so Completion can wait for the
+   * SERVER before drawing its acknowledgement rather than trusting the button press.
+   */
+  readonly onSubmitFeedback?: (
+    feedback: string,
+    rating: RatingSelection | null,
+  ) => void | Promise<unknown>;
   /**
    * `306:2885` — the tip sheet's CTA. Resolves when the SERVER has taken the tip; the sheet closes
    * on that, never on the press, because a sheet that dismisses itself is a receipt.
@@ -412,8 +419,18 @@ export function BookingDetailView({
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
             rating={rating}
             onChangeRating={setRating}
+            /*
+             * The rating sent is the one the BOOKING carries, falling back to this visit's choice.
+             *
+             * `rating` alone is local state, and it is null for a customer who rated earlier and
+             * has come back only to write something: the host refuses a submission with no rating,
+             * so adding feedback later sent nothing at all and failed silently.
+             */
             onSubmitFeedback={(feedback) =>
-              (actions.onSubmitFeedback ?? noopFeedback)(feedback, rating)
+              (actions.onSubmitFeedback ?? noopFeedback)(
+                feedback,
+                booking.completion?.submittedRating ?? rating,
+              )
             }
             {...(booking.tip === undefined ? {} : { onOpenTip: () => setTipOpen(true) })}
           />

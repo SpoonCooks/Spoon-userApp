@@ -1,5 +1,6 @@
 import { formatPaise } from '@core/format';
-import type { CookViewModel, DetailRow } from '@ui';
+import { RATING_EXCEPTIONAL, RATING_VALUES } from '@ui';
+import type { CookViewModel, DetailRow, RatingSelection } from '@ui';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
 
 import { currentSkewMs } from '@core/time';
@@ -114,6 +115,26 @@ export function scheduleLineFrom(dto: BookingDetailDto, now: Date = new Date()):
   const time = start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
   return `${dayLabel} • ${time} • ${duration}`;
+}
+
+/**
+ * The rating the server says is already on this booking, as the widget's own value type.
+ *
+ * `5+` is `RATING_EXCEPTIONAL`, not the number 5 -- the backend carries the two separately
+ * (`stars: 5` plus `exceptional: true`), and collapsing them here would lose the distinction the
+ * submit path is careful to preserve.
+ *
+ * A star value off the half-step scale is DROPPED rather than rounded: the widget has nine chips
+ * and can only fill one of them, so an unrecognised number would silently fill the wrong one.
+ */
+function submittedRatingFrom(dto: BookingDetailDto): { submittedRating?: RatingSelection } {
+  if (dto.ratingExceptional === true) return { submittedRating: RATING_EXCEPTIONAL };
+
+  const stars = dto.ratingStars;
+  if (typeof stars !== 'number') return {};
+
+  const onScale = RATING_VALUES.find((value) => value === stars);
+  return onScale === undefined ? {} : { submittedRating: onScale };
 }
 
 export function summaryFrom(input: {
@@ -482,6 +503,16 @@ export function bookingDetailFrom(input: {
             ...base.completion,
             bookingHeadline: scheduleLineFrom(dto),
             submitted: !dto.allowedActions.canRate,
+            /*
+             * WHAT was rated, and whether anything was written -- both server facts, both absent
+             * from the payload today (BACKEND_PENDING, see `bookingRatingSchema`). Omitted rather
+             * than defaulted: the screen then falls back to the rating held in memory, and offers
+             * the textarea instead of an acknowledgement it cannot justify.
+             */
+            ...submittedRatingFrom(dto),
+            ...(typeof dto.ratingFeedback === 'string' && dto.ratingFeedback.trim() !== ''
+              ? { feedbackGiven: true }
+              : {}),
           },
         }),
     // Ruling R-3 — the SERVER decides whether Reschedule is offered.

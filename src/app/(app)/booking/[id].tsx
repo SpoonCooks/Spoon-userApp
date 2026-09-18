@@ -195,18 +195,19 @@ export default function BookingRoute() {
            */
           const exceptional = !isNumericRating(rating);
 
-          rate
-            .mutateAsync({
-              bookingId,
-              stars: exceptional ? 5 : rating,
-              ...(exceptional ? { exceptional: true } : {}),
-              ...(feedback.trim() === '' ? {} : { feedback: feedback.trim() }),
-              scope: `booking.rate:${bookingId}`,
-            })
-            .catch(() => {
-              // Normalized and surfaced by the mutation. The form stays as it is so the customer
-              // can retry against the same idempotency scope; nothing claims a rating landed.
-            });
+          /*
+           * RETURNED, so Completion can draw its acknowledgement only once the server has the
+           * words -- a press alone used to be enough, which thanked customers for feedback a
+           * failed request never delivered. The rejection is handled there; the mutation still
+           * owns the normalized error.
+           */
+          return rate.mutateAsync({
+            bookingId,
+            stars: exceptional ? 5 : rating,
+            ...(exceptional ? { exceptional: true } : {}),
+            ...(feedback.trim() === '' ? {} : { feedback: feedback.trim() }),
+            scope: `booking.rate:${bookingId}`,
+          });
         }}
       />
 
