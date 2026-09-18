@@ -393,6 +393,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
 
+    /**
+     * Static linkage and react-native-firebase's SPM resolution are incompatible, and the fix has
+     * to reach the Podfile, which is generated. See the plugin for the full reasoning.
+     */
+    './plugins/withRNFirebasePods',
+
     [
       'expo-splash-screen',
       {
