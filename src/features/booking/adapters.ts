@@ -40,6 +40,29 @@ import type { BookingDetailsViewModel } from './components/BookingDetailsSheet';
  * It arrives on `GET /v1/bookings/:id/tracking` and is applied by `trackingDetailFrom` below.
  */
 
+/**
+ * "45 mins" / "1 hr", from whichever duration the caller decided is the truthful one.
+ *
+ * `servedDurationMinutes` below picks it; this only formats. Both call sites rendered these same
+ * three lines, so they share them rather than drifting apart.
+ */
+function durationTextFrom(minutes: number): string {
+  return minutes % 60 === 0 ? `${minutes / 60} hr` : `${minutes} mins`;
+}
+
+/**
+ * The duration the customer was actually served -- `totalDurationMinutes` when the server sends
+ * it, `durationMinutes` otherwise.
+ *
+ * The two differ only once a booking has been EXTENDED, and only the server can tell them apart;
+ * see `totalDurationMinutes` in `schemas.ts` for why this is not arithmetic.
+ */
+function servedDurationMinutes(dto: BookingDetailDto): number {
+  return typeof dto.totalDurationMinutes === 'number' && dto.totalDurationMinutes > 0
+    ? dto.totalDurationMinutes
+    : dto.durationMinutes;
+}
+
 /** `3:1095` — Date / Start time / Duration / End Time, formatted from server instants. */
 export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
   const at = (value: string | null | undefined) =>
@@ -64,8 +87,10 @@ export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
    * `durationMinutes` moving with it (`/extension-options` publishes `newExpectedEnd` for exactly
    * this reason), so arithmetic here would quietly under-report the end of every extended
    * service. The server owns the projection; this row picks which of its two answers applies.
-   * Whether `expectedEnd` is itself re-based on a late `actualStart` is a BACKEND guarantee, and
-   * it is the subject of an open question to that team.
+   *
+   * CONFIRMED with the backend: `expectedEnd` is written at the Start OTP as
+   * `actual_start + purchased duration`, so it is already re-based on a late start, and a
+   * confirmed extension updates the same column. Both reach here unmodified.
    */
   const end = at(dto.timing.actualEnd) ?? at(dto.timing.expectedEnd);
 
@@ -74,10 +99,11 @@ export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
       ? '—'
       : date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
-  const duration =
-    dto.durationMinutes % 60 === 0
-      ? `${dto.durationMinutes / 60} hr`
-      : `${dto.durationMinutes} mins`;
+  /*
+   * Beside the start and end above, so it MUST be the served duration: `durationMinutes` would
+   * label a 75-minute extended service "45 mins" between two timestamps that disagree with it.
+   */
+  const duration = durationTextFrom(servedDurationMinutes(dto));
 
   return [
     {
@@ -120,10 +146,8 @@ export function detailsSheetFrom(input: {
 
 /** `250:2951` — "Today, Aug 5 • 12:00 PM • 1 hr". Formatting, not assembly of domain facts. */
 export function scheduleLineFrom(dto: BookingDetailDto, now: Date = new Date()): string {
-  const duration =
-    dto.durationMinutes % 60 === 0
-      ? `${dto.durationMinutes / 60} hr`
-      : `${dto.durationMinutes} mins`;
+  // Same reasoning as the Duration row: an extended service ran longer than it was priced for.
+  const duration = durationTextFrom(servedDurationMinutes(dto));
 
   if (dto.scheduledStart === null) return duration;
   const start = new Date(dto.scheduledStart);

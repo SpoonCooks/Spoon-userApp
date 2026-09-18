@@ -415,4 +415,31 @@ describe('bookingRowsFrom — the times the customer actually experienced', () =
   it('shows no end time when the server has projected none', () => {
     expect(row(withTiming({ actualStart: '2026-08-20T06:30:00.000Z' }), 'End Time')).toBe('—');
   });
+
+  /**
+   * The Duration row sits between the two, so it has to agree with them.
+   *
+   * `durationMinutes` is the original PRICED duration and never moves when a booking is extended
+   * -- pricing and capacity key off it. `totalDurationMinutes` is the server's sum of it and every
+   * confirmed extension, and is the only field that can describe an extended service.
+   */
+  it('reads the Duration row from the served duration once a booking is extended', () => {
+    const dto = {
+      ...withTiming({
+        actualStart: '2026-08-20T06:30:00.000Z',
+        expectedEnd: '2026-08-20T07:45:00.000Z',
+      }),
+      durationMinutes: 45,
+      totalDurationMinutes: 75,
+    } as BookingDetailDto;
+
+    // 75, matching 6:30 -> 7:45 — NOT the 45 minutes that were priced.
+    expect(row(dto, 'Duration')).toBe('75 mins');
+  });
+
+  it('falls back to the priced duration while the server sends no total', () => {
+    const dto = { ...withTiming({}), durationMinutes: 45 } as BookingDetailDto;
+
+    expect(row(dto, 'Duration')).toBe('45 mins');
+  });
 });
