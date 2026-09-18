@@ -541,9 +541,45 @@ describe('booking lifecycle from real DTOs', () => {
     await settle();
 
     expect(screen.getByText('Thanks for sharing your feedback!')).toBeTruthy();
+    /*
+     * The thanks is the line ABOVE the box, and the box holds the words alone.
+     *
+     * Both lines used to be on screen together -- "We appreciate any feedback that helps us
+     * improve!" as the heading, with "Thanks for sharing your feedback!" inside the box above the
+     * sentence it was thanking them for. The card asked for feedback and acknowledged it at the
+     * same time, about the same words.
+     */
+    expect(screen.queryByText('We appreciate any feedback that helps us improve!')).toBeNull();
+    expect(screen.getByTestId('completion-feedback-text').props.children).toBe(
+      'The dal was perfect.',
+    );
     // And the rating drawn is the one recorded, not the `5+` chip.
     expect(screen.getByTestId('completion-rating-4.5')).toBeTruthy();
     expect(screen.queryByTestId('completion-rating-prompt')).toBeNull();
+  });
+
+  /** The other half: with nothing written, the card INVITES feedback and thanks nobody. */
+  it('asks for feedback, and does not thank anyone, when none was written', async () => {
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+        booking: bookingDto({
+          status: 'completed',
+          timing: {
+            actualStart: '2026-08-20T06:30:00.000Z',
+            expectedEnd: '2026-08-20T07:30:00.000Z',
+            actualEnd: '2026-08-20T07:28:00.000Z',
+          },
+          allowedActions: { canRate: false, canTip: true },
+          ratingStars: 4.5,
+        }),
+      }),
+    });
+    await settle();
+
+    expect(screen.getByText('We appreciate any feedback that helps us improve!')).toBeTruthy();
+    expect(screen.queryByText('Thanks for sharing your feedback!')).toBeNull();
+    // The box is the writable one, so a customer who rated can still come back and say something.
+    expect(screen.getByTestId('completion-feedback')).toBeTruthy();
   });
 
   /**

@@ -188,11 +188,22 @@ export function CompletionBody({
 
       {/* `143:286` — feedback. */}
       <View style={styles.feedback}>
+        {/*
+          The line ABOVE the box is the one that speaks to the customer; the box holds their words.
+
+          Before feedback exists it asks for some. After it exists it thanks them for it -- and the
+          box below then contains what they actually wrote and nothing else. The acknowledgement
+          used to sit INSIDE the box above the words, under a heading still asking for feedback
+          that had already been given: the card said "we appreciate any feedback" and "thanks for
+          sharing your feedback" at once, one above the other, about the same sentence.
+
+          `319:3252` is the acknowledgement, `143:286` the invitation. One or the other, never both.
+        */}
         <Text variant="bodyStrong" color="textPrimary" align="center">
-          {completion.feedbackTitle}
+          {feedbackDone ? completion.feedbackAcknowledgement : completion.feedbackTitle}
         </Text>
         {/*
-          `319:3252` — the acknowledgement belongs to feedback that EXISTS.
+          The acknowledgement belongs to feedback that EXISTS.
 
           It used to be drawn whenever a rating had been recorded, so a customer who rated and
           wrote nothing was thanked for sharing feedback, in the box where their words would have
@@ -200,10 +211,6 @@ export function CompletionBody({
         */}
         {feedbackDone ? (
           <View style={[styles.input, styles.submittedCard]} testID="completion-feedback-submitted">
-            {/* The acknowledgement leads, then what they actually wrote underneath it. */}
-            <Text variant="bodyStrong" color="textPrimary">
-              {completion.feedbackAcknowledgement}
-            </Text>
             {shownFeedback === '' ? null : (
               <Text variant="bodyMedium" color="textField" testID="completion-feedback-text">
                 {shownFeedback}
