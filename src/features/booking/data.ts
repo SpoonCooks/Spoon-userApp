@@ -12,6 +12,7 @@ import { assertNever } from '@core/render';
 import { useRuntime } from '@core/runtimeContext';
 import { useAddresses } from '@features/address';
 import { availabilityKeys, useInstantAvailability } from '@features/availability';
+import type { InstantAvailabilityDto } from '@features/availability';
 import { useCatalogue } from '@features/catalogue';
 import {
   CheckoutCancelledError,
@@ -325,6 +326,21 @@ function blockedIconFor(reason: string | undefined): 'moon' | 'calendar' {
  * address or no selection there is nothing to ask, and the sheet renders the catalogue's grid
  * without claiming that a cook is available.
  */
+/**
+ * "15 mins" for the arrival row, or empty where there is nothing honest to put in it.
+ *
+ * The server's per-address estimate first, its fixed promise second, nothing third. Same order
+ * Home applies, so the two screens cannot disagree about which source wins.
+ */
+function etaMinutesFor(live: InstantAvailabilityDto | null): string {
+  if (live === null || live.available !== true) return '';
+
+  const estimated = live.projectedArrival?.etaMinutes;
+  if (typeof estimated === 'number' && estimated > 0) return `${Math.round(estimated)} mins`;
+
+  return live.arrivalTargetMinutes > 0 ? `${live.arrivalTargetMinutes} mins` : '';
+}
+
 export function useInstantData(
   selection: { durationId?: string | null } = {},
 ): ScreenQuery<InstantViewModel> {
@@ -362,18 +378,30 @@ export function useInstantData(
     const base: InstantViewModel = {
       ...DEMO_INSTANT_AVAILABLE,
       /*
-       * The arrival PROMISE, not an ETA. `25:1751` draws it as "Arriving in 18 mins". Once
-       * availability answers, its own target supersedes the catalogue's.
+       * The REAL estimate, the same one Home states -- `projectedArrival.etaMinutes`, computed by
+       * the server for this address from route time to its gate, when the candidate cook comes
+       * free, and the preparation allowance.
        *
-       * EMPTY while instant is unavailable, which drops the whole row: the sheet states a time
-       * the operation can meet, and `NO_PRESENT_COOK` means there is no one to meet it. The row
-       * returns by itself the moment `available` is true again -- there is no flag to unset.
+       * `25:1751` draws this row as "Arriving in 18 mins", and it read `arrivalTargetMinutes`:
+       * the operating promise, which the backend locks to one figure for every customer and every
+       * address. So the sheet stated a fixed number beside a price and a duration that are both
+       * specific to the booking being made.
+       *
+       * It may legitimately DIFFER from Home's figure. Home probes the shortest duration the
+       * catalogue sells; this asks about the duration actually chosen, and a longer booking needs
+       * a cook free for longer, which can select a different candidate. They are answers to two
+       * different questions, and each screen shows the one it asked.
+       *
+       * The promise remains the fallback for when no candidate exists, and the row is EMPTY while
+       * instant is unavailable -- the sheet states a time the operation can meet, and
+       * `NO_PRESENT_COOK` means there is no one to meet it. It returns by itself the moment
+       * `available` is true again; there is no flag to unset.
        *
        * Unresolved availability counts as unavailable for the same reason Home treats it that
        * way: showing a promise on the strength of not having asked, then withdrawing it a moment
        * later, is a flicker and a claim with nothing behind it.
        */
-      etaLabel: live?.available === true ? `${live.arrivalTargetMinutes} mins` : '',
+      etaLabel: etaMinutesFor(live),
       durations: data.durations.map((duration) => ({
         id: durationIdFor(duration.durationMinutes),
         label: durationLabelFor(duration.durationMinutes),

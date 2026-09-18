@@ -288,8 +288,37 @@ describe('useInstantData', () => {
     });
 
     await waitFor(() => expect(getByTestId('cta')).toHaveTextContent('Book NOW • ₹199'));
-    // The arrival promise is availability's, superseding the catalogue's 30.
+    // With no candidate to estimate from, the promise is the fallback and the row still shows it.
     expect(getByTestId('eta')).toHaveTextContent('22 mins');
+  });
+
+  /**
+   * The sheet states the REAL estimate, the same source Home reads.
+   *
+   * It read `arrivalTargetMinutes` -- the operating promise, which the backend locks to one figure
+   * for every customer and every address -- so the row showed a fixed number beside a price and a
+   * duration that are both specific to the booking being made. `projectedArrival.etaMinutes` is
+   * the server's per-address estimate, and it was being dropped because nothing declared it.
+   *
+   * The stubs disagree deliberately: estimate 15, promise 30.
+   */
+  it('states the arrival estimate the server computed, not the fixed promise', async () => {
+    const { api } = recordingApi({
+      ...BASE_STUBS,
+      'GET /v1/availability/instant': () => ({
+        available: true,
+        arrivalTargetMinutes: 30,
+        projectedArrival: { etaMinutes: 15 },
+        validUntil: '2026-08-18T12:00:00.000Z',
+      }),
+      'POST /v1/bookings/quote': () => quoteFor(13545),
+    });
+
+    const { getByTestId } = renderWithRuntime(<InstantHarness durationId="dur-60" />, {
+      runtime: createTestRuntime({ api }),
+    });
+
+    await waitFor(() => expect(getByTestId('eta')).toHaveTextContent('15 mins'));
   });
 
   it('shows the out-of-shift state when the server is outside its operating window', async () => {
