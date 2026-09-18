@@ -23,11 +23,19 @@ import type { PushTokenProvider } from './pushApi';
  * token that silently fails forever — so the seam returns "no token" and registration is
  * skipped.
  *
- * ## CONFIGURATION_GAP
+ * ## Why the reason is REPORTED even though the token is not
  *
- * Android FCM needs a `google-services.json` for this app's package, and there is none in the
- * repo. Until it exists, `getDevicePushTokenAsync` cannot return a token on Android and this
- * provider returns null every time — correctly, and without pretending otherwise.
+ * "No token" has three unrelated causes — a declined prompt, a build with no Firebase config, and
+ * a device that cannot produce one — and the app's behaviour is identical in all three: stay
+ * quiet. That is right for the customer and useless for diagnosis, which is why push failing was
+ * indistinguishable from push being switched off. `report` names the cause for the log without
+ * changing what the customer sees.
+ *
+ * ## Android configuration — RESOLVED, verified 2026-09-18
+ *
+ * `google-services.json` is a FILE-type secret in the EAS `production` environment, so cloud
+ * builds bake in Firebase project `august-dev-3b4bf` and a real token is returned. Verified on a
+ * device: `notifications.register { registered: true }`.
  */
 
 /**
@@ -50,27 +58,56 @@ export async function ensureAndroidChannel(): Promise<void> {
   }
 }
 
-export const expoPushTokenProvider: PushTokenProvider = {
-  async getToken(): Promise<string | null> {
-    try {
-      await ensureAndroidChannel();
+/** Why no token came back. Each is a different thing to go and fix. */
+export type PushTokenUnavailable =
+  /** The customer declined, or the OS will no longer let us ask. Nothing to fix. */
+  | 'permission-denied'
+  /** Permission granted and the platform still returned nothing. */
+  | 'empty-token'
+  /** Threw: no Firebase config in the build, no Play Services, or no native module. */
+  | 'native-unavailable';
 
-      const existing = await Notifications.getPermissionsAsync();
-      let granted = existing.granted;
+/**
+ * The real provider, with a channel for saying why it came back empty.
+ *
+ * `report` is called instead of throwing, and never with the token itself — a device token
+ * identifies a handset and does not belong in a log line.
+ */
+export function createExpoPushTokenProvider(
+  report: (reason: PushTokenUnavailable, error?: unknown) => void = () => {},
+): PushTokenProvider {
+  return {
+    async getToken(): Promise<string | null> {
+      try {
+        await ensureAndroidChannel();
 
-      // Asked only when the OS still allows asking. Re-prompting a customer who has already
-      // declined does nothing on both platforms and is why `canAskAgain` is checked first.
-      if (!granted && existing.canAskAgain) {
-        const requested = await Notifications.requestPermissionsAsync();
-        granted = requested.granted;
+        const existing = await Notifications.getPermissionsAsync();
+        let granted = existing.granted;
+
+        // Asked only when the OS still allows asking. Re-prompting a customer who has already
+        // declined does nothing on both platforms and is why `canAskAgain` is checked first.
+        if (!granted && existing.canAskAgain) {
+          const requested = await Notifications.requestPermissionsAsync();
+          granted = requested.granted;
+        }
+        if (!granted) {
+          report('permission-denied');
+          return null;
+        }
+
+        const token = await Notifications.getDevicePushTokenAsync();
+        if (typeof token.data === 'string' && token.data.length > 0) return token.data;
+
+        report('empty-token');
+        return null;
+      } catch (error: unknown) {
+        // No Firebase config, no Play Services, or no native module. All "no token".
+        report('native-unavailable', error);
+        return null;
       }
-      if (!granted) return null;
+    },
+  };
+}
 
-      const token = await Notifications.getDevicePushTokenAsync();
-      return typeof token.data === 'string' && token.data.length > 0 ? token.data : null;
-    } catch {
-      // No Firebase config, no Play Services, or no native module. All "no token".
-      return null;
-    }
-  },
-};
+/** The silent default, for callers with no logger to hand. */
+export const expoPushTokenProvider: PushTokenProvider = createExpoPushTokenProvider();

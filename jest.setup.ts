@@ -183,6 +183,9 @@ jest.mock('expo-notifications', () => ({
   getDevicePushTokenAsync: jest.fn(async () => {
     throw new Error('No push token in the test environment');
   }),
+  // The rotation listener the push hook subscribes to. Absent here, any test that mounted the
+  // hook died on "not a function" rather than on anything it was written to check.
+  addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
 }));

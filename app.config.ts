@@ -331,7 +331,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      * Push. The JS side is already wired — registration, the rotation listener, the received
      * handler and the tap-to-route deep link all live in `@features/notifications` — but every
      * one of them needs the NATIVE module, and on iOS the plugin is also what adds the
-     * `aps-environment` entitlement and the remote-notification background mode.
+     * `aps-environment` entitlement.
+     *
+     * VERIFIED in the shipped build (iOS #18, `7fa8f6f`): `ExpoNotifications` is bundled and
+     * `embedded.mobileprovision` carries `aps-environment: production`, so an ALERT notification
+     * displays. `UIBackgroundModes` is NOT in the built `Info.plist`, contrary to what this
+     * comment used to claim — the plugin does not add it. A visible notification does not need
+     * it; a SILENT `content-available` push does, and would be dropped while backgrounded. Left
+     * absent deliberately for now: adding a background mode is an Apple-facing declaration, and
+     * nothing in the product sends silent pushes.
      *
      * No icon or colour is configured, deliberately: the design does not specify a notification
      * icon, and choosing one here would be a visual decision made in a build file.
