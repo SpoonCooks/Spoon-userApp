@@ -165,6 +165,63 @@ describe('routes render', () => {
   });
 
   /**
+   * Home states the REAL estimate, not the promise, wherever the server has one.
+   *
+   * `projectedArrival.etaMinutes` is computed per request for the requested address -- route time
+   * to its gate, when the candidate cook comes free, and the preparation allowance. The two
+   * figures it supersedes are both a fixed 30 that the backend locks by policy, so for as long as
+   * Home read either of them it could not show a customer anything but "Spoon in 30 mins". The
+   * estimate was on the wire the whole time and stripped by a schema that never declared it.
+   *
+   * The stubs make them DISAGREE -- estimate 14, promise 30 -- which is the only way to see which
+   * one a surface is reading.
+   */
+  it('states the arrival estimate the server computed for this address', async () => {
+    renderWithRuntime(<HomeRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...ROUTE_STUBS,
+          'GET /v1/availability/instant': () => ({
+            available: true,
+            arrivalTargetMinutes: 30,
+            projectedArrival: { etaMinutes: 14 },
+            validUntil: '2026-08-18T09:00:30.000Z',
+          }),
+        }),
+      }),
+    });
+
+    expect(await screen.findByText('Spoon in 14 mins')).toBeTruthy();
+    expect(screen.getByText('Get a cook in 14 mins')).toBeTruthy();
+    expect(screen.getByTestId('home-tile-instant-emphasis').props.children).toBe(' 14 mins');
+    // The locked 30 is published on both the catalogue and the availability read, and neither is
+    // what the customer is told any more.
+    expect(screen.queryByText('Spoon in 30 mins')).toBeNull();
+    expect(screen.queryByText('Get a cook in 30 mins')).toBeNull();
+  });
+
+  /**
+   * No candidate means nothing to estimate from, and the operating promise is then the truest
+   * thing left to say -- so it is the fallback, not the answer.
+   */
+  it('falls back to the published promise when the server estimated nothing', async () => {
+    renderWithRuntime(<HomeRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...ROUTE_STUBS,
+          'GET /v1/availability/instant': () => ({
+            available: true,
+            arrivalTargetMinutes: 30,
+            validUntil: '2026-08-18T09:00:30.000Z',
+          }),
+        }),
+      }),
+    });
+
+    expect(await screen.findByText('Spoon in 30 mins')).toBeTruthy();
+  });
+
+  /**
    * The promise is POLICY — "we aim to be with you inside 30 minutes" — published in the
    * catalogue whatever the state of the network. Home used to state it unconditionally, so it
    * read "Spoon in 30 mins" while `GET /v1/availability/instant` was answering
