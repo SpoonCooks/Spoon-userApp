@@ -13,6 +13,7 @@ import {
   formatDateLabel,
   formatTimeLabel,
   homeFrom,
+  minutesOverdue,
   minutesUntil,
 } from './adapters';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
@@ -202,6 +203,11 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
                   minutesLeft:
                     detailData.status === 'cooking'
                       ? minutesUntil(detailData.timing.expectedEnd, serverNow)
+                      : null,
+                  // The same instant read the other way, so the badge can count up past it.
+                  minutesOver:
+                    detailData.status === 'cooking'
+                      ? minutesOverdue(detailData.timing.expectedEnd, serverNow)
                       : null,
                   arrivedAtLabel: formatClockLabel(detailData.timing.arrivedAt),
                   canRate: detailData.allowedActions.canRate,

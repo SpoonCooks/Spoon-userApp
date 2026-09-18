@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react-native';
 
 import { renderWithDefaultRuntime as render } from '@/test/renderWithRuntime';
-import { useWindowDimensions } from 'react-native';
+import { useWindowDimensions, StyleSheet } from 'react-native';
 
 import { ready } from '@core/data';
 import { DEMO_HOME_ACTIVE_BOOKING } from '@/demo/fixtures/home';
@@ -380,6 +380,41 @@ describe.each(HEIGHTS)('on a %s viewport', (_label, height) => {
         />,
       );
       expect(screen.getByTestId(marker)).toBeTruthy();
+    });
+
+    /**
+     * Completion's Submit chip must be able to hold its own label.
+     *
+     * `143:286` draws it 102 x 25, and that was taken as a fixed size with no padding -- so the
+     * label had exactly 102pt to live in. "SUBMIT", uppercased by `buttonUpper`, did not fit on a
+     * Galaxy S21 at the DEFAULT font scale: the shipped button read "SUBMI". Anyone at a larger
+     * accessibility scale loses more of it.
+     *
+     * The frame's geometry is kept as a minimum, which is what a chip with a word in it needs.
+     */
+    it('lets the Submit chip grow to fit its label rather than clipping it', () => {
+      render(
+        <BookingDetailView
+          state={ready(DEMO_BOOKING_COMPLETION)}
+          onRetry={jest.fn()}
+          onBack={jest.fn()}
+          onCallCook={jest.fn()}
+          onHelp={jest.fn()}
+        />,
+      );
+
+      const submit = screen.getByTestId('completion-submit');
+      const style = StyleSheet.flatten(
+        typeof submit.props.style === 'function'
+          ? submit.props.style({ pressed: false })
+          : submit.props.style,
+      );
+
+      // A FIXED width is the defect: the text cannot push the box wider than the frame's figure.
+      expect(style.width).toBeUndefined();
+      expect(style.minWidth).toBe(102);
+      // And room either side of the word, which a 102pt box with no padding never had.
+      expect(style.paddingHorizontal).toBeGreaterThan(0);
     });
   });
 });

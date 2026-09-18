@@ -79,4 +79,40 @@ describe('useCountdown', () => {
 
     expect(result.current.remainingMs).toBe(1_800_000);
   });
+
+  /**
+   * A service the cook has not ended is a state a customer can sit in for hours — they hold the
+   * End OTP, and nothing happens until it is shared. `remainingMs` floors at zero, so the screen
+   * said "0 mins" one minute over and four hours over alike.
+   */
+  describe('past the end instant', () => {
+    it('reports how far past while leaving remainingMs floored at zero', () => {
+      const endsAt = deviceNow + 1_000;
+      const { result } = renderHook(() => useCountdown(endsAt, clock));
+
+      act(() => {
+        // 3h 50m past the end.
+        deviceNow += 1_000 + 3 * 3_600_000 + 50 * 60_000;
+        jest.advanceTimersByTime(1_000);
+      });
+
+      expect(result.current.remainingMs).toBe(0);
+      expect(result.current.isElapsed).toBe(true);
+      expect(result.current.overdueMs).toBe(3 * 3_600_000 + 50 * 60_000);
+    });
+
+    it('reports no overrun before the end, so the two readings never both apply', () => {
+      const { result } = renderHook(() => useCountdown(deviceNow + 90_000, clock));
+
+      expect(result.current.overdueMs).toBe(0);
+    });
+
+    it('reports no overrun when the server published no end at all', () => {
+      const { result } = renderHook(() => useCountdown(null, clock));
+
+      // `null` is "nothing to count", not "already over".
+      expect(result.current.overdueMs).toBe(0);
+      expect(result.current.isElapsed).toBe(false);
+    });
+  });
 });

@@ -1,12 +1,14 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
+import { AppState } from 'react-native';
+import type { AppStateStatus } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { useSessionStore } from '@core/store';
 import { useRuntime } from '@core/runtimeContext';
 import { bookingKeys } from '@features/booking';
 
-import { expoPushTokenProvider } from './api/expoPushProvider';
+import { createExpoPushTokenProvider } from './api/expoPushProvider';
 import { useRegisterPushToken } from './api';
 import { routeForNotification } from './deepLink';
 
@@ -30,8 +32,9 @@ import { routeForNotification } from './deepLink';
  *
  * ## Fails closed
  *
- * With no `google-services.json` (CONFIGURATION_GAP) the provider returns null, registration is
- * skipped, and the listeners simply never fire. No token is fabricated and no error is shown.
+ * A denied prompt, a build with no Firebase config and a device that cannot produce a token all
+ * return null: registration is skipped, no token is fabricated and no error is shown. The REASON
+ * is logged, because those three are identical to the customer and completely different to fix.
  */
 
 /**
@@ -53,26 +56,49 @@ export function usePushNotifications(): void {
   const router = useRouter();
   const { logger, queryClient } = useRuntime();
   const status = useSessionStore((state) => state.status);
-  const register = useRegisterPushToken(expoPushTokenProvider);
+  /*
+   * Memoised on `logger` alone: a provider rebuilt every render would be a new seam on each one,
+   * and `useRegisterPushToken` treats it as the source of the token.
+   */
+  const provider = useMemo(
+    () =>
+      createExpoPushTokenProvider((reason, error) => {
+        logger.warn('notifications.token.unavailable', {
+          feature: 'notifications',
+          operation: 'getToken',
+          reason,
+          ...(error instanceof Error ? { error: error.name } : {}),
+        });
+      }),
+    [logger],
+  );
+  const register = useRegisterPushToken(provider);
 
-  // Registration is attempted once per authenticated session, not once per render and not on
-  // every focus: the token is stable, and re-asking the OS on a loop is how a permission prompt
-  // turns into a nuisance.
+  /**
+   * Whether a token has actually been REGISTERED — not whether one was attempted.
+   *
+   * This guard used to close after the first attempt, which quietly made the failure permanent.
+   * A customer who had not granted the OS permission at that moment produced no token, the
+   * attempt was recorded as done, and the app never asked again for the life of the install: the
+   * one path back was a sign-out and sign-in. Turning notifications on in system Settings
+   * afterwards — the obvious thing to do, and the thing support would tell them to do — changed
+   * nothing at all, silently.
+   *
+   * So the door only closes on a token that reached the backend.
+   */
   const registeredRef = useRef(false);
+  /** One attempt at a time. Foregrounding twice in a second must not send two registrations. */
+  const inFlightRef = useRef(false);
 
-  useEffect(() => {
-    if (status !== 'authenticated') {
-      // A sign-out invalidates the association; the next sign-in registers again, which is what
-      // moves the token to the new account on a shared handset.
-      registeredRef.current = false;
-      return;
-    }
-    if (registeredRef.current) return;
-    registeredRef.current = true;
+  const attemptRegistration = useCallback(() => {
+    if (status !== 'authenticated' || registeredRef.current || inFlightRef.current) return;
+    inFlightRef.current = true;
 
     register
       .mutateAsync(undefined)
       .then((registered) => {
+        // `false` means no token was available — permission, config or platform. Stays open.
+        registeredRef.current = registered;
         logger.info('notifications.register', { feature: 'notifications', registered });
       })
       .catch((error: unknown) => {
@@ -82,10 +108,40 @@ export function usePushNotifications(): void {
           operation: 'registerToken',
           error: error instanceof Error ? error.name : 'unknown',
         });
+      })
+      .finally(() => {
+        inFlightRef.current = false;
       });
     // `register` is a new mutation object each render; depending on it would re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, logger]);
+
+  /**
+   * Registration runs on sign-in, and again whenever the app comes back to the foreground while
+   * it still has no token.
+   *
+   * Foreground is the moment that matters: granting the permission means LEAVING the app for
+   * Settings and coming back, so it is exactly when a previously impossible registration becomes
+   * possible. It does not re-prompt anybody — `getToken` asks the OS first and only raises a
+   * dialog where `canAskAgain` is true, so a customer who declined is asked once, not on every
+   * switch back.
+   */
+  useEffect(() => {
+    if (status !== 'authenticated') {
+      // A sign-out invalidates the association; the next sign-in registers again, which is what
+      // moves the token to the new account on a shared handset.
+      registeredRef.current = false;
+      return undefined;
+    }
+
+    attemptRegistration();
+
+    const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') attemptRegistration();
+    });
+
+    return () => subscription.remove();
+  }, [status, attemptRegistration]);
 
   /**
    * FCM and APNs ROTATE a device token — on reinstall, on a data restore, and on their own

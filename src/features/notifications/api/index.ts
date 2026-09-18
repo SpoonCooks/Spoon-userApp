@@ -6,4 +6,9 @@ export {
 } from './pushApi';
 export type { PushPlatform, PushTokenProvider } from './pushApi';
 export { useRegisterPushToken } from './hooks';
-export { ensureAndroidChannel, expoPushTokenProvider } from './expoPushProvider';
+export {
+  createExpoPushTokenProvider,
+  ensureAndroidChannel,
+  expoPushTokenProvider,
+} from './expoPushProvider';
+export type { PushTokenUnavailable } from './expoPushProvider';

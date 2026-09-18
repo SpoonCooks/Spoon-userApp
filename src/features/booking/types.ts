@@ -186,6 +186,20 @@ export interface InServiceViewModel {
   readonly statusTitle: string;
   readonly statusMessage: string;
   /**
+   * The same banner once the service has run PAST `endsAtMs`.
+   *
+   * A separate title and message rather than a computed variation of the two above: this is a
+   * different state, not a suffix. Copy lives on the model for the same reason every other string
+   * on this screen does -- a component that invented it would be making a product decision in a
+   * render function.
+   *
+   * No Figma frame covers this state; the wording was agreed with the product owner on
+   * 2026-09-18. The overrun FIGURE is not here because it changes every second -- `useCountdown`
+   * derives it from `endsAtMs` and the skew-corrected clock, like the countdown it replaces.
+   */
+  readonly overrunTitle: string;
+  readonly overrunMessage: string;
+  /**
    * Absolute server timestamp in epoch ms — `timing.expectedEnd`. The countdown renders from this.
    *
    * `null` where the server has published no session end. `useCountdown` treats that as "nothing

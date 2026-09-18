@@ -177,10 +177,14 @@ export function useBookingRefunds(bookingId: string | null): ScreenQuery<readonl
   const { api } = useRuntime();
   const bookings = createBookingApi(api);
 
+  // An empty string is not a booking id: `GET /v1/bookings//refunds` 400s every time. Checked
+  // here, not only by callers, so a caller that forgets the guard cannot reintroduce the request.
+  const validId = bookingId !== null && bookingId !== '' ? bookingId : null;
+
   return useApiQuery<readonly RefundDto[]>({
-    queryKey: bookingKeys.bookingRefunds(bookingId ?? 'none'),
-    queryFn: ({ signal }) => bookings.bookingRefunds(bookingId ?? '', signal),
-    enabled: bookingId !== null,
+    queryKey: bookingKeys.bookingRefunds(validId ?? 'none'),
+    queryFn: ({ signal }) => bookings.bookingRefunds(validId ?? '', signal),
+    enabled: validId !== null,
   });
 }
 

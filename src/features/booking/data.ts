@@ -966,7 +966,27 @@ export function useExtensionData(
   selection: { bookingId?: string | null; optionId?: string | null } = {},
 ): ScreenQuery<ExtensionViewModel> {
   const catalogue = useCatalogue();
-  const bookingOptions = useExtensionOptions(selection.bookingId ?? null);
+
+  /**
+   * The per-booking read is asked for ONLY where the server says the booking can be extended.
+   *
+   * `allowedActions.canExtend` was parsed and then read by nothing, so every booking detail screen
+   * asked for extension options on mount whatever the status -- and a booking that is over cannot
+   * be extended, so the server correctly refused: 409 `INVALID_BOOKING_STATE` on a completed one,
+   * 404 on one with no session at all. Nothing broke, because the sheet falls back to the
+   * catalogue's published options, which is why it went unnoticed. What it cost was a failed round
+   * trip on every past booking anyone opened, and a log full of expected 409s for a real failure
+   * to hide in.
+   *
+   * This observes the SAME query `useBookingDetailData` already runs -- same key, same cache
+   * entry, no second request -- so the flag is read where the decision is made rather than
+   * threaded down through the screen.
+   */
+  const detail = useBookingDetail(selection.bookingId ?? null);
+  const canExtend =
+    detail.state.status === 'ready' ? detail.state.data.allowedActions.canExtend : false;
+
+  const bookingOptions = useExtensionOptions(canExtend ? (selection.bookingId ?? null) : null);
   const optionId = selection.optionId ?? null;
 
   const state = useMemo(() => {
@@ -1106,7 +1126,14 @@ export function useBookingDetailData(bookingId: string): ScreenQuery<BookingDeta
     remote.state.status === 'ready' &&
     remote.state.data.status === 'cancelled' &&
     remote.state.data.cancellation?.cancelledBy === 'system';
-  const refunds = useBookingRefunds(isDev || !autoCancelled ? null : bookingId);
+  /*
+   * `bookingId === ''` guarded explicitly, not just `!autoCancelled`: the route host
+   * (`app/(app)/booking/[id].tsx`) falls back to `''`, not `null`, while Expo Router's `id`
+   * param is momentarily unresolved -- the same reason it guards `useCallCook`/`useCancelFlow`
+   * the same way. `useBookingRefunds`'s own `enabled` check only tests `!== null`, so an empty
+   * string reached it uncaught and became `GET /v1/bookings//refunds`, a guaranteed 400.
+   */
+  const refunds = useBookingRefunds(isDev || !autoCancelled || bookingId === '' ? null : bookingId);
 
   const devSample = useMemo(() => {
     if (!isDev) return null;
