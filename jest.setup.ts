@@ -174,6 +174,21 @@ jest.mock('react-native-maps', () => {
   };
 });
 
+/**
+ * Firebase messaging — the iOS token source.
+ *
+ * Android never reaches it (the provider branches on `Platform.OS`), but the module is imported
+ * at the top of the provider either way, so every test that touches push needs it stubbed. The
+ * default is a real-looking token: a test that cares asserts on the value, and one that does not
+ * gets a working path rather than a throw.
+ */
+jest.mock('@react-native-firebase/messaging', () => ({
+  getMessaging: jest.fn(() => ({})),
+  getToken: jest.fn(async () => 'fcm-ios-token'),
+  isDeviceRegisteredForRemoteMessages: jest.fn(() => true),
+  registerDeviceForRemoteMessages: jest.fn(async () => undefined),
+}));
+
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { DEFAULT: 3 },
   setNotificationHandler: jest.fn(),
