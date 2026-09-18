@@ -19,14 +19,40 @@ import { z } from 'zod';
  * rather than extrapolating, and never treats an expired grid as still bookable.
  */
 
+/**
+ * The real, per-address arrival estimate — and the only number on this response that moves.
+ *
+ * Backend computes it on every instant-availability call: route time to THIS address's gate from
+ * the chosen candidate cook (Google Routes in production), plus when that cook comes free, plus
+ * the preparation allowance. Two addresses asked at the same moment get different answers.
+ *
+ * Present ONLY when a candidate exists, so it is nullish throughout and the caller falls back to
+ * the promise rather than inventing a figure.
+ *
+ * Declared loosely on purpose. Everything but `etaMinutes` is passed through untouched, and
+ * `etaMinutes` itself is nullish, so a payload that grows a sibling field or omits the block
+ * entirely still parses.
+ */
+export const projectedArrivalSchema = z.object({
+  etaMinutes: z.number().nullish(),
+});
+
 export const instantAvailabilitySchema = z.object({
   available: z.boolean(),
   /**
-   * The operating PROMISE in minutes, echoed from policy. It is NOT an ETA for a specific cook:
-   * no cook has been assigned at this point, and nothing has been routed. The live ETA appears
-   * only once a booking exists, from tracking.
+   * The operating PROMISE in minutes, echoed from policy — "a cook within 30 minutes".
+   *
+   * It is NOT an estimate. The backend locks it to exactly 30 (`INSTANT_ARRIVAL_TARGET_MINUTES`,
+   * validated in `validateBookingPolicy` and re-clamped to `min: 30, max: 30` when published), so
+   * it is the same number for every customer, address and hour, by design and by DEC-019.
+   *
+   * This comment used to claim a live ETA existed only after a booking, from tracking. That was
+   * WRONG, and it is why `projectedArrival` went unread for so long: the estimate is computed
+   * before any booking exists and is on this very response.
    */
   arrivalTargetMinutes: z.number().int().nonnegative(),
+  /** The real estimate. See `projectedArrivalSchema`. */
+  projectedArrival: projectedArrivalSchema.nullish(),
   /** Absent when available. */
   reason: z.string().optional(),
   validUntil: z.string().datetime(),
