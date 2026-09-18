@@ -423,6 +423,57 @@ describe('booking lifecycle from real DTOs', () => {
     jest.useRealTimers();
   });
 
+  /**
+   * The extension read is a question only a LIVE booking can answer.
+   *
+   * `allowedActions.canExtend` was parsed and read by nothing, so this screen asked for extension
+   * options on mount for every booking it drew. A booking that is over cannot be extended, and the
+   * server said so -- 409 `INVALID_BOOKING_STATE` on a completed one, 404 on one with no session.
+   * Nothing broke, because the sheet falls back to the catalogue's published options, so the only
+   * cost was a doomed round trip on every past booking and a log full of expected failures for a
+   * real one to hide behind. Seen on a device, twice, in one session.
+   */
+  describe('extension options are asked for only where they can exist', () => {
+    it('does not ask about extending a booking the server says cannot be extended', async () => {
+      const asked = jest.fn(() => ({ options: [] }));
+
+      renderBooking({
+        [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+          booking: bookingDto({ status: 'completed', allowedActions: { canExtend: false } }),
+        }),
+        [`GET /v1/bookings/${BOOKING_ID}/extension-options`]: asked,
+      });
+
+      await settle();
+
+      expect(screen.getByTestId('completion-body')).toBeTruthy();
+      expect(asked).not.toHaveBeenCalled();
+    });
+
+    it('still asks while the booking is live and the server allows it', async () => {
+      const asked = jest.fn(() => ({ options: [] }));
+
+      renderBooking({
+        [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+          booking: bookingDto({
+            status: 'cooking',
+            timing: {
+              arrivedAt: '2026-08-20T06:40:00.000Z',
+              actualStart: '2026-08-20T06:45:00.000Z',
+              expectedEnd: '2026-08-20T07:45:00.000Z',
+            },
+            allowedActions: { canExtend: true },
+          }),
+        }),
+        [`GET /v1/bookings/${BOOKING_ID}/extension-options`]: asked,
+      });
+
+      await settle();
+
+      expect(asked).toHaveBeenCalled();
+    });
+  });
+
   it('renders 14a Completion, and 14b once the server says it may no longer be rated', async () => {
     const { unmount } = renderBooking({
       [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
