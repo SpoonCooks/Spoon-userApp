@@ -301,6 +301,15 @@ export interface CompletionViewModel {
    * words that do not exist.
    */
   readonly feedbackGiven?: boolean;
+  /**
+   * The words the customer actually wrote, shown UNDER the acknowledgement.
+   *
+   * `319:3252` draws only the thank-you pill, which tells a customer their feedback was received
+   * but not what it said — so they cannot check what they sent, and a booking they open weeks
+   * later says nothing about it. Absent means the server has not sent it (BACKEND_PENDING); the
+   * screen then shows what was typed in this visit, and nothing at all once that is gone.
+   */
+  readonly feedbackText?: string;
 }
 
 /**

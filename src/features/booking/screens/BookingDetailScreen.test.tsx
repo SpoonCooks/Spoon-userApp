@@ -593,6 +593,50 @@ describe('Booking host — completion (143:207)', () => {
     expect(onSubmitFeedback).toHaveBeenCalledWith('Lovely food, thank you', 4.5);
     expect(screen.getByTestId('completion-feedback-submitted')).toBeTruthy();
     expect(screen.queryByTestId('completion-feedback')).toBeNull();
+    // And it quotes what was just sent, without waiting for the payload to carry it back.
+    expect(screen.getByText('Lovely food, thank you')).toBeTruthy();
+  });
+
+  /**
+   * `319:3252` draws only the thank-you pill, which tells a customer their feedback landed but
+   * not what it said — so they cannot check what they sent, and a booking reopened later says
+   * nothing about it at all.
+   */
+  it('shows the words the customer wrote, under the acknowledgement', () => {
+    render(
+      <BookingDetailView
+        state={ready({
+          ...DEMO_BOOKING_RATED_NUMERIC,
+          completion: {
+            ...DEMO_BOOKING_RATED_NUMERIC.completion!,
+            feedbackGiven: true,
+            feedbackText: 'Amazing homestyle flavor! Roti was extremely soft.',
+          },
+        })}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Thanks for sharing your feedback!')).toBeTruthy();
+    expect(screen.getByText('Amazing homestyle flavor! Roti was extremely soft.')).toBeTruthy();
+  });
+
+  /** Acknowledged with nothing to quote is still honest — the pill alone, no empty line. */
+  it('draws no feedback line when the server acknowledged without sending the words', () => {
+    render(
+      <BookingDetailView
+        state={ready({
+          ...DEMO_BOOKING_RATED_NUMERIC,
+          completion: { ...DEMO_BOOKING_RATED_NUMERIC.completion!, feedbackGiven: true },
+        })}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('completion-feedback-submitted')).toBeTruthy();
+    expect(screen.queryByTestId('completion-feedback-text')).toBeNull();
   });
 
   /** A rejected submission keeps the textarea and the customer's words. Nothing is claimed. */

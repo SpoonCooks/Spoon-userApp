@@ -42,8 +42,32 @@ import type { BookingDetailsViewModel } from './components/BookingDetailsSheet';
 
 /** `3:1095` — Date / Start time / Duration / End Time, formatted from server instants. */
 export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
-  const start = dto.scheduledStart === null ? null : new Date(dto.scheduledStart);
-  const end = dto.timing.expectedEnd === null ? null : new Date(dto.timing.expectedEnd);
+  const at = (value: string | null | undefined) =>
+    typeof value === 'string' && value !== '' ? new Date(value) : null;
+
+  /**
+   * The start the customer actually experienced, not the one they booked.
+   *
+   * Service begins when the OTP is handed to the cook, which the server reports as
+   * `timing.actualStart`. This row read `scheduledStart` alone, so a cook who arrived late left
+   * the customer looking at a "Start time" that had already passed without anything happening,
+   * and an "End Time" measured from it. `scheduledStart` remains the answer BEFORE service
+   * starts, when there is no actual start to show.
+   */
+  const start = at(dto.timing.actualStart) ?? at(dto.scheduledStart);
+
+  /**
+   * And the end the server projects from it — `actualEnd` once the service is over,
+   * `expectedEnd` while it is running.
+   *
+   * NOT computed as start + duration, deliberately. An EXTENDED booking's end moves without its
+   * `durationMinutes` moving with it (`/extension-options` publishes `newExpectedEnd` for exactly
+   * this reason), so arithmetic here would quietly under-report the end of every extended
+   * service. The server owns the projection; this row picks which of its two answers applies.
+   * Whether `expectedEnd` is itself re-based on a late `actualStart` is a BACKEND guarantee, and
+   * it is the subject of an open question to that team.
+   */
+  const end = at(dto.timing.actualEnd) ?? at(dto.timing.expectedEnd);
 
   const time = (date: Date | null) =>
     date === null || Number.isNaN(date.getTime())
@@ -511,7 +535,7 @@ export function bookingDetailFrom(input: {
              */
             ...submittedRatingFrom(dto),
             ...(typeof dto.ratingFeedback === 'string' && dto.ratingFeedback.trim() !== ''
-              ? { feedbackGiven: true }
+              ? { feedbackGiven: true, feedbackText: dto.ratingFeedback.trim() }
               : {}),
           },
         }),

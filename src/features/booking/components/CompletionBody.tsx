@@ -106,6 +106,15 @@ export function CompletionBody({
   /** Written feedback exists — the only thing that earns the acknowledgement. */
   const feedbackDone = completion.feedbackGiven === true || feedbackAccepted;
 
+  /**
+   * The words to show back, server's first.
+   *
+   * `feedback` is what is still in the textarea from this visit, which is the only copy available
+   * until the payload carries `ratingFeedback` (BACKEND_PENDING). Trimmed to the same shape the
+   * submission sent, so the card shows what was stored rather than the stray whitespace around it.
+   */
+  const shownFeedback = completion.feedbackText ?? (feedbackAccepted ? feedback.trim() : '');
+
   return (
     <View style={styles.container} testID="completion-body">
       {/* `143:233` — 65pt mark, 7pt gap, Livvic Black 24/30. */}
@@ -190,10 +199,16 @@ export function CompletionBody({
           been. Rating and writing are separate acts; a rating does not imply a sentence.
         */}
         {feedbackDone ? (
-          <View style={styles.input} testID="completion-feedback-submitted">
-            <Text variant="bodyMedium" color="textField">
+          <View style={[styles.input, styles.submittedCard]} testID="completion-feedback-submitted">
+            {/* The acknowledgement leads, then what they actually wrote underneath it. */}
+            <Text variant="bodyStrong" color="textPrimary">
               {completion.feedbackAcknowledgement}
             </Text>
+            {shownFeedback === '' ? null : (
+              <Text variant="bodyMedium" color="textField" testID="completion-feedback-text">
+                {shownFeedback}
+              </Text>
+            )}
           </View>
         ) : (
           <TextInput
@@ -348,6 +363,19 @@ const styles = StyleSheet.create({
     borderWidth: lightTheme.stroke.thin,
     borderColor: lightTheme.colors.surfacePositiveBright,
     backgroundColor: lightTheme.colors.surface,
+  },
+  /**
+   * The same `143:289` card, holding two stacked lines instead of one centred one.
+   *
+   * `minHeight` replaces the frame's fixed 103 because the customer's own words are in here now
+   * and they are not a fixed length; `flex-start` stops a short acknowledgement floating in the
+   * middle with the feedback pushed off centre beneath it.
+   */
+  submittedCard: {
+    height: undefined,
+    minHeight: 103,
+    justifyContent: 'flex-start',
+    gap: lightTheme.space.s6,
   },
   inputField: {
     color: lightTheme.colors.textField,

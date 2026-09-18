@@ -36,6 +36,20 @@ export interface ScreenProps {
    * 22pt lead can state its own. `34:3045` opens 16 below the header and spaces sections at 21.
    */
   readonly contentStyle?: ViewStyle;
+  /**
+   * Scroll a focused `TextInput` clear of the keyboard, the way every other app does.
+   *
+   * `scroll` alone already shrinks the viewport by the IME's height, which is enough when the
+   * field is near the top. It is not enough for one near the BOTTOM: shrinking moves the field
+   * out of view rather than into it, and the customer types blind — which is what happened to
+   * Completion's feedback box, the last control on a long page.
+   *
+   * OPT-IN rather than automatic. Turning it on inserts a flex wrapper around the scroll view,
+   * and `Screen scroll` backs several screens that have no text input at all and no reason to
+   * absorb a layout change they cannot benefit from. `ProfileDetailsScreen` and `LoginScreen`
+   * already solve this themselves and are deliberately left alone.
+   */
+  readonly keyboardAware?: boolean;
   readonly testID?: string;
 }
 
@@ -176,12 +190,19 @@ export function Screen({
   header,
   footer,
   contentStyle,
+  keyboardAware = false,
   testID,
   children,
 }: PropsWithChildren<ScreenProps>) {
   const content = padded ? styles.padded : undefined;
   const keyboardHeight = useKeyboardHeight();
   const footerGutter = useBottomGutter(lightTheme.space.lg);
+  /**
+   * Always called — hooks cannot be conditional — but only WIRED when `keyboardAware` is set.
+   * Unwired it measures nothing and scrolls nothing.
+   */
+  const { scrollRef, viewportRef, onViewportLayout, onScroll } =
+    useKeyboardAwareScroll(keyboardHeight);
 
   return (
     <SafeAreaView
@@ -191,7 +212,28 @@ export function Screen({
     >
       {header ?? null}
 
-      {scroll ? (
+      {scroll && keyboardAware ? (
+        /*
+         * The wrapper carries the shrink and is what gets MEASURED — the scroll view's own frame
+         * is not a viewport the hook can compare a field against once it is scrolling inside it.
+         */
+        <View
+          ref={viewportRef}
+          onLayout={onViewportLayout}
+          style={[styles.flex, keyboardHeight === 0 ? null : { marginBottom: keyboardHeight }]}
+        >
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={[styles.scrollContent, content, contentStyle]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+          >
+            {children}
+          </ScrollView>
+        </View>
+      ) : scroll ? (
         <ScrollView
           style={keyboardHeight === 0 ? undefined : { marginBottom: keyboardHeight }}
           contentContainerStyle={[styles.scrollContent, content, contentStyle]}

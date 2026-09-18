@@ -135,8 +135,13 @@ export function BookingDetailView({
     optionId: extensionOptionId,
   });
 
+  /*
+   * `keyboardAware` is for Completion's feedback box (`143:289`), the last control on a long
+   * page: shrinking the viewport alone moved it further out of sight instead of into view, so
+   * the customer typed blind.
+   */
   return (
-    <Screen scroll tone="plain" testID="booking-detail-screen">
+    <Screen scroll keyboardAware tone="plain" testID="booking-detail-screen">
       <QueryBoundary state={state} onRetry={onRetry}>
         {(booking) => (
           <>
