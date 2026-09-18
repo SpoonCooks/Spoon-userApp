@@ -377,6 +377,52 @@ describe('booking lifecycle from real DTOs', () => {
     jest.useRealTimers();
   });
 
+  /**
+   * 12a past its end — the state a customer sits in when nobody has ended the service.
+   *
+   * The countdown floored at zero, so this screen read "Time left to service end / 0 mins" for as
+   * long as the session stayed open, identically at one minute over and at four hours over. Found
+   * on a booking that had been `cooking` for hours; the extension it had bought was applied
+   * correctly and the countdown still said nothing.
+   */
+  it('counts up past timing.expectedEnd rather than sitting on 0 mins', async () => {
+    jest.useFakeTimers();
+    // 3h 50m after the end below.
+    jest.setSystemTime(new Date('2026-08-20T11:35:00.000Z'));
+
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+        booking: bookingDto({
+          status: 'cooking',
+          timing: {
+            arrivedAt: '2026-08-20T06:40:00.000Z',
+            actualStart: '2026-08-20T06:45:00.000Z',
+            expectedEnd: '2026-08-20T07:45:00.000Z',
+          },
+          allowedActions: { canExtend: true },
+        }),
+      }),
+      [`GET /v1/bookings/${BOOKING_ID}/tracking`]: () =>
+        trackingDto({
+          status: 'cooking',
+          eta: { estimatedArrivalAt: null, updatedAt: null },
+          serviceOtp: { start: null, end: '907' },
+        }),
+    });
+
+    await jest.advanceTimersByTimeAsync(50);
+
+    expect(screen.getByTestId('in-service-body')).toBeTruthy();
+    expect(screen.getByText('3h 50m')).toBeTruthy();
+    expect(screen.getByText('Service time complete')).toBeTruthy();
+    expect(screen.getByText('Running over by')).toBeTruthy();
+    // The promise it can no longer keep is gone.
+    expect(screen.queryByText('Time left to service end')).toBeNull();
+    expect(screen.queryByText('0 mins')).toBeNull();
+
+    jest.useRealTimers();
+  });
+
   it('renders 14a Completion, and 14b once the server says it may no longer be rated', async () => {
     const { unmount } = renderBooking({
       [`GET /v1/bookings/${BOOKING_ID}`]: () => ({

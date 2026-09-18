@@ -57,6 +57,19 @@ function formatRemaining(ms: number): string {
   return `${totalMinutes} mins`;
 }
 
+/**
+ * The overrun, in the same 122pt box the countdown uses.
+ *
+ * Hours are broken out where `formatRemaining` does not, and for opposite reasons. A countdown
+ * runs to a known end, so "95 mins" is bounded and legible; an overrun has no ceiling -- a session
+ * nobody has ended reaches "230 mins", which the box truncates at one line and nobody can read at
+ * a glance anyway.
+ */
+function formatOverrun(ms: number): string {
+  const { hours, minutes } = splitDuration(ms);
+  return hours === 0 ? `${minutes} mins` : `${hours}h ${minutes}m`;
+}
+
 export function InServiceBody({
   inService,
   cook,
@@ -67,16 +80,32 @@ export function InServiceBody({
   onViewDetails,
 }: InServiceBodyProps) {
   const clock = useMemo(() => createServerClock(inService.clockSkewMs), [inService.clockSkewMs]);
-  const { remainingMs } = useCountdown(inService.endsAtMs, clock, { onElapsed });
+  const { remainingMs, isElapsed, overdueMs } = useCountdown(inService.endsAtMs, clock, {
+    onElapsed,
+  });
+
+  /**
+   * Past the service end, the banner answers a different question.
+   *
+   * It used to answer the same one badly: `remainingMs` is clamped at zero, so "0 mins" was shown
+   * identically one minute over and four hours over, under a title still promising "Time left to
+   * service end". The cook cannot end a session until the End OTP is shared, which is displayed
+   * directly below -- so this is a state a customer sits in, not an instant they pass through.
+   *
+   * `isElapsed` is already false when the server has published no end (`endsAtMs === null`), so
+   * a booking with nothing to count never reaches the overrun copy.
+   */
+  const over = isElapsed;
 
   return (
     <View style={styles.container} testID="in-service-body">
       <ServiceSection>
         <StatusBanner
-          title={inService.statusTitle}
-          message={inService.statusMessage}
-          tone="positive"
-          highlight={formatRemaining(remainingMs)}
+          title={over ? inService.overrunTitle : inService.statusTitle}
+          message={over ? inService.overrunMessage : inService.statusMessage}
+          // Warning, not positive: the same amber `292:1399` already uses for the extension notice.
+          tone={over ? 'warning' : 'positive'}
+          highlight={over ? formatOverrun(overdueMs) : formatRemaining(remainingMs)}
           testID="in-service-banner"
         />
       </ServiceSection>

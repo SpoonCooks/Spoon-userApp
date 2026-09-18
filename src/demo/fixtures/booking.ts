@@ -520,6 +520,13 @@ export function demoInServiceBooking(
       // lines (h 32) to one (h 16), which is why the h1 block closed 35 → 19.
       statusTitle: 'Time left to service end',
       statusMessage: 'Cooking in progress',
+      /*
+       * Past the service end. No frame in the file draws this — agreed with the product owner
+       * 2026-09-18 — so it is recorded here beside the copy it replaces rather than in a render
+       * function. The number lands in the same 122pt box, so it stays short: "3h 50m".
+       */
+      overrunTitle: 'Service time complete',
+      overrunMessage: 'Running over by',
       endsAtMs: nowMs + remainingMs,
       // The server would report its own clock; zero means "device and server agree".
       clockSkewMs: 0,
