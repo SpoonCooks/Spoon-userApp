@@ -494,6 +494,32 @@ export function useCreateExtension(launcher: CheckoutLauncher = unavailableCheck
   });
 }
 
+/**
+ * The idempotency scope for a rating submission — and why writing gets its own.
+ *
+ * Rating and writing arrive as SEPARATE calls from separate screens. Home rates a booking with
+ * no feedback at all; the completion screen's Submit is disabled without words. A customer who
+ * does both makes two calls against one booking.
+ *
+ * The scope store is in memory, so within a single app session one scope hands back one key --
+ * and the backend rejects a key reused with a DIFFERENT body: 409 IDEMPOTENCY_CONFLICT, raised
+ * before the rating logic runs. Under a single scope the second call never landed, and the
+ * customer was told nothing. (Across a restart the store is empty and a fresh key is minted, so
+ * the same flow worked or failed depending on whether the app had been killed -- which is worse
+ * than failing outright.)
+ *
+ * Splitting on whether words are attached separates the two intents exactly, because that is
+ * precisely how the two entry points differ. A genuine RETRY of either repeats its own key,
+ * which is the replay protection the store exists for.
+ *
+ * The scope is a CLIENT-side name, never the wire value: `idempotencyHeader` mints a random
+ * `[a-z0-9-]` key per scope, so the `:` here never reaches the `Idempotency-Key` header.
+ */
+export function ratingScopeFor(bookingId: string, feedback: string | undefined): string {
+  const words = feedback?.trim() ?? '';
+  return words === '' ? `booking.rate:${bookingId}` : `booking.rate:${bookingId}:words`;
+}
+
 export function useRateBooking() {
   const { api } = useRuntime();
   const queryClient = useQueryClient();

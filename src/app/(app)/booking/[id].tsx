@@ -6,6 +6,7 @@ import {
   useCallCook,
   useExtensionCheckout,
   usePaymentRetry,
+  ratingScopeFor,
   useRateBooking,
   useTipCheckout,
 } from '@features/booking';
@@ -201,12 +202,15 @@ export default function BookingRoute() {
            * failed request never delivered. The rejection is handled there; the mutation still
            * owns the normalized error.
            */
+          const words = feedback.trim();
+
           return rate.mutateAsync({
             bookingId,
             stars: exceptional ? 5 : rating,
             ...(exceptional ? { exceptional: true } : {}),
-            ...(feedback.trim() === '' ? {} : { feedback: feedback.trim() }),
-            scope: `booking.rate:${bookingId}`,
+            ...(words === '' ? {} : { feedback: words }),
+            /* Writing is a different intent from rating — see `ratingScopeFor`. */
+            scope: ratingScopeFor(bookingId, words),
           });
         }}
       />
