@@ -14,7 +14,7 @@ import { ExtensionSheet } from '../components/ExtensionSheet';
 import { InServiceBody } from '../components/InServiceBody';
 import { TipSheet } from '../components/TipSheet';
 import { TrackingBody } from '../components/TrackingBody';
-import { extensionMinutesFrom } from '../adapters';
+import { extensionMinutesFrom, tipSheetWithSelection } from '../adapters';
 import { useBookingDetailData, useExtensionData } from '../data';
 import type { BookingDetailViewModel } from '../types';
 
@@ -187,7 +187,11 @@ export function BookingDetailView({
             {booking.tip === undefined ? null : (
               <TipSheet
                 visible={tipOpen}
-                tip={booking.tip}
+                /* The bar names the CHOSEN amount, not the preselected one. */
+                tip={tipSheetWithSelection(
+                  booking.tip,
+                  tipOptionId ?? booking.tip.defaultOptionId ?? null,
+                )}
                 /* The sheet opens on the server's default until the user picks another. */
                 selectedOptionId={tipOptionId ?? booking.tip.defaultOptionId ?? null}
                 onSelectOption={setTipOptionId}

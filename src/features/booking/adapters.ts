@@ -801,3 +801,28 @@ export function tipSheetFrom(input: {
     ...(preselected === null ? {} : { ctaLabel: `Tip • ${formatAmount(preselected)}` }),
   };
 }
+
+/**
+ * The tip CTA, re-pointed at the option the customer actually chose.
+ *
+ * `tipSheetFrom` builds `ctaLabel` from the PRESELECTION, which was correct while the default was
+ * the only selection that existed -- `TipSheetViewModel.ctaLabel` still documents itself as
+ * "consistent with `defaultOptionId`". Once the chips became tappable that stopped being true and
+ * nothing re-pointed the label, so the bar read "Tip • ₹50" over every amount on the sheet: a
+ * customer selecting ₹100 was asked to confirm a button naming ₹50.
+ *
+ * The amount is READ OFF the chosen option's own label, never recomputed -- `option.label` is the
+ * server's suggested amount formatted once by `tipSheetFrom`. So the bar can still only ever name
+ * a price the sheet is offering (ruling R-1), which is the property the preselection wording was
+ * protecting in the first place.
+ *
+ * An id matching no option leaves the model untouched: that is the "nothing chosen" state, where
+ * the CTA is disabled anyway and the designed copy is the right thing to keep.
+ */
+export function tipSheetWithSelection(
+  tip: TipSheetViewModel,
+  selectedOptionId: string | null,
+): TipSheetViewModel {
+  const selected = tip.options.find((option) => option.id === selectedOptionId);
+  return selected === undefined ? tip : { ...tip, ctaLabel: `Tip • ${selected.label}` };
+}

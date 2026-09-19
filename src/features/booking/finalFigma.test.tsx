@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react-native';
 
 import { durationLabelFor } from './data';
-import { tipAmountPaiseFrom, tipIdFor, tipSheetFrom } from './adapters';
+import { tipAmountPaiseFrom, tipIdFor, tipSheetFrom, tipSheetWithSelection } from './adapters';
 import { ConfirmationBody } from './components/ConfirmationBody';
 import { DEMO_BOOKING_CONFIRMATION } from '@/demo/fixtures/booking';
 import type { BookingSummaryViewModel } from './types';
@@ -86,6 +86,33 @@ describe('tip amounts — the catalogue owns them (§14, §16)', () => {
     expect(tipAmountPaiseFrom(tipIdFor(5000))).toBe(5000);
     expect(tipAmountPaiseFrom('not-a-tip')).toBeNull();
     expect(tipAmountPaiseFrom(null)).toBeNull();
+  });
+
+  it('re-points the CTA at the CHOSEN amount, not the preselected one', () => {
+    const sheet = tipSheetFrom({
+      base,
+      suggestedAmountsPaise: [2000, 5000, 10000],
+      formatAmount: (paise) => `₹${paise / 100}`,
+    });
+    // The regression this pins: the bar read the preselection over every amount on the sheet.
+    expect(sheet.ctaLabel).toBe('Tip • ₹50');
+
+    expect(tipSheetWithSelection(sheet, tipIdFor(10000)).ctaLabel).toBe('Tip • ₹100');
+    expect(tipSheetWithSelection(sheet, tipIdFor(2000)).ctaLabel).toBe('Tip • ₹20');
+    // Back onto the default, which must read as the default and not as whatever was chosen last.
+    expect(tipSheetWithSelection(sheet, tipIdFor(5000)).ctaLabel).toBe('Tip • ₹50');
+  });
+
+  it('leaves the model untouched when the id matches no option', () => {
+    const sheet = tipSheetFrom({
+      base,
+      suggestedAmountsPaise: [2000, 5000],
+      formatAmount: (paise) => `₹${paise / 100}`,
+    });
+    // An amount the sheet does not offer must never reach the bar — the CTA is disabled in this
+    // state anyway, so the designed copy is what belongs there.
+    expect(tipSheetWithSelection(sheet, tipIdFor(9900))).toBe(sheet);
+    expect(tipSheetWithSelection(sheet, null)).toBe(sheet);
   });
 });
 
