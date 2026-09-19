@@ -28,16 +28,22 @@ import { sectionStyles } from './SectionTitle';
  * forbids, and it is a large part of why Home read as heavier than the frame.
  *
  * 142 is safe at every width because the stack inside it is fixed-size type: `1:578` is 100pt tall
- * and starts at 22, so the tile is never overflowed. The two tiles differ in what is LEFT below
- * that stack — Instant 20 (100pt stack), Schedule 28 (92pt stack) — so the padding is stated as a
- * top inset and the remainder simply falls out of the fixed height, exactly as the frame draws it.
+ * and starts at 22, so the tile is never overflowed. The padding is stated as a top inset and the
+ * remaining 20 simply falls out of the fixed height, exactly as the frame draws it.
  *
  * The 4.5pt row padding the superseded `209:1234` carried does not exist here: `1:575` is the
  * section's content and the section already pads 6 vertically.
  *
- * The two tiles are deliberately NOT symmetric — the frame sets "Instant" at Black 18/28 and
- * "Schedule" at Black 16/24 with −0.4 tracking, and the Instant subtitle carries a second, larger
- * emphasised run. Equalising them was part of the reported mismatch.
+ * The two tiles are deliberately NOT symmetric in TYPE — the frame sets "Instant" at Black 18/28
+ * and "Schedule" at Black 16/24 with −0.4 tracking, and the Instant subtitle carries a second,
+ * larger emphasised run. Equalising those styles was part of an earlier reported mismatch, so they
+ * are left alone here.
+ *
+ * They ARE symmetric in ROW GEOMETRY. Top-aligning each Text to its own line box made the unequal
+ * type drift: the titles landed ~2pt apart and the subtitles ~6.4pt apart (the Instant subtitle's
+ * box is inflated to 20 by the 14/20 emphasis run, against Schedule's 15.11), so the pair read as
+ * four rows rather than two. `titleRow`/`subtitleRow` give both tiles the same two bands and
+ * centre the shorter text inside, which aligns the rows without touching a single type token.
  */
 export interface HomeBookingTilesProps {
   readonly tiles: readonly HomeBookingTileViewModel[];
@@ -86,23 +92,27 @@ export function HomeBookingTiles({
                 />
               </View>
 
-              <Text variant={instant ? 'headingTile' : 'heading'} color="textOnAccent">
-                {tile.title}
-              </Text>
+              <View style={styles.titleRow}>
+                <Text variant={instant ? 'headingTile' : 'heading'} color="textOnAccent">
+                  {tile.title}
+                </Text>
+              </View>
 
               {/* `1:585` — one paragraph, two runs. */}
-              <Text variant={instant ? 'bodyStrong' : 'bodyBoldTight'} color="textSecondary">
-                {tile.subtitle}
-                {tile.subtitleEmphasis === undefined ? null : (
-                  <Text
-                    variant="title"
-                    color="textSecondary"
-                    testID={`home-tile-${tile.id}-emphasis`}
-                  >
-                    {tile.subtitleEmphasis}
-                  </Text>
-                )}
-              </Text>
+              <View style={styles.subtitleRow}>
+                <Text variant={instant ? 'bodyStrong' : 'bodyBoldTight'} color="textSecondary">
+                  {tile.subtitle}
+                  {tile.subtitleEmphasis === undefined ? null : (
+                    <Text
+                      variant="title"
+                      color="textSecondary"
+                      testID={`home-tile-${tile.id}-emphasis`}
+                    >
+                      {tile.subtitleEmphasis}
+                    </Text>
+                  )}
+                </Text>
+              </View>
             </View>
           </Pressable>
         );
@@ -133,6 +143,18 @@ const styles = StyleSheet.create({
     ...lightTheme.elevation.tile,
   },
   stack: { alignSelf: 'stretch', gap: TILE.gap },
+  /**
+   * The title and subtitle bands. Both tiles use the SAME two heights, so "Instant"/"Schedule" and
+   * the two subtitles occupy one row each across the pair — the designer's report. The type styles
+   * stay per-tile (18/28 vs 16/24, and the 14/20 emphasis run); only the band they sit in is
+   * shared, and the shorter text is centred in it rather than top-aligned to a shorter line box.
+   *
+   * `justifyContent` is the vertical axis here: these are the default `flexDirection: 'column'`.
+   * Stated as a MINIMUM for the same reason the tile height is — a longer subtitle from the server
+   * wraps and grows the band instead of being clipped.
+   */
+  titleRow: { alignSelf: 'stretch', minHeight: TILE.titleHeight, justifyContent: 'center' },
+  subtitleRow: { alignSelf: 'stretch', minHeight: TILE.subtitleHeight, justifyContent: 'center' },
   /** `59:517` — a 40pt white disc; the glyph inside is 30 × 40, inset 5pt. */
   iconWrap: {
     width: ICON,
