@@ -8,6 +8,7 @@ import {
   NoteCard,
   NoticeCard,
   StatusBanner,
+  Text,
   lightTheme,
 } from '@ui';
 import type { CookViewModel } from '@ui';
@@ -99,6 +100,15 @@ export interface ConfirmationBodyProps {
   readonly onPayNow?: () => void;
   /** Checkout is opening. Keeps the bar from being pressed twice into two orders. */
   readonly paying?: boolean;
+  /**
+   * What the last press actually did, when it did not open checkout.
+   *
+   * The server answers `202 processing` while a payment attempt is still unresolved, and the bar
+   * used to swallow it: the spinner stopped and nothing else happened, so a customer who had
+   * already waited through a slow payment was given a button that appeared to do nothing at all.
+   * Whatever the reason, a press that opens no checkout has to say so.
+   */
+  readonly payNotice?: string | null;
 }
 
 export function ConfirmationBody({
@@ -111,6 +121,7 @@ export function ConfirmationBody({
   onCancel,
   onPayNow,
   paying = false,
+  payNotice = null,
 }: ConfirmationBodyProps) {
   /**
    * An unpaid hold replaces the action pair outright.
@@ -220,6 +231,17 @@ export function ConfirmationBody({
                 loading={paying}
                 testID="confirmation-pay-now"
               />
+              {payNotice === null ? null : (
+                <Text
+                  variant="body"
+                  color="textSecondary"
+                  align="center"
+                  accessibilityRole="alert"
+                  testID="confirmation-pay-notice"
+                >
+                  {payNotice}
+                </Text>
+              )}
             </View>
           ) : null}
           {canCancel ? (

@@ -45,6 +45,7 @@ export {
   useExtensionData,
   useInstantData,
   usePaymentRetry,
+  payRetryingOnceWhileProcessing,
   useTipCheckout,
 } from './data';
 export type { BookingSelection, BookingSubmission, PaymentOutcome } from './data';
