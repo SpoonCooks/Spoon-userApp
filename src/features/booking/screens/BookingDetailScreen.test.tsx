@@ -512,6 +512,27 @@ describe('Booking host — completion (143:207)', () => {
     expect(screen.getByTestId('tip-sheet')).toBeTruthy();
   });
 
+  it('names the CHOSEN amount on the tip bar, not the preselected one', () => {
+    render(
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_COMPLETION)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onSelectTip={jest.fn(() => new Promise<void>(() => undefined))}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('completion-tip-row'));
+    // `306:3050` — the sheet opens on the drawn default, and the bar agrees with it.
+    expect(screen.getByText('Tip • ₹50')).toBeTruthy();
+
+    // The defect: the bar stayed on the preselection, so a customer choosing ₹100 was asked to
+    // confirm a button reading ₹50. The amount is the chip's own, never recomputed here.
+    fireEvent.press(screen.getByTestId('tip-sheet-option-tip-100'));
+    expect(screen.getByText('Tip • ₹100')).toBeTruthy();
+    expect(screen.queryByText('Tip • ₹50')).toBeNull();
+  });
+
   it('drops the scale and the Submit chip once the SERVER says the feedback is in', () => {
     render(
       <BookingDetailView
