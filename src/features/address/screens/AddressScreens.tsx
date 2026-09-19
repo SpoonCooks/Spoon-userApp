@@ -135,12 +135,28 @@ export function SavedAddressesView({
                   {/* `230:1959` — the rows sit 8pt apart, not at the card's 12pt gap. */}
                   <View style={styles.addressRows}>
                     {list.addresses.map((address) => (
-                      <View key={address.id} style={styles.addressRow}>
+                      <View
+                        key={address.id}
+                        style={[
+                          styles.addressRow,
+                          address.selected === true ? styles.addressRowSelected : null,
+                        ]}
+                      >
                         <Pressable
                           onPress={() => onSelect(address.id)}
+                          /*
+                           * The address already in use offers no action, so it does not pretend
+                           * to: re-selecting it would fire a PUT that demotes and re-promotes
+                           * the same row, and re-resolve its hub, to arrive back where it is.
+                           * The kebab beside it stays live — edit and delete still apply.
+                           */
+                          disabled={address.selected === true}
                           accessibilityRole="button"
                           accessibilityLabel={`${address.label}. ${address.line}`}
-                          accessibilityState={{ selected: address.selected ?? false }}
+                          accessibilityState={{
+                            selected: address.selected ?? false,
+                            disabled: address.selected === true,
+                          }}
                           style={({ pressed }) => [
                             styles.addressRowBody,
                             pressed ? styles.pressed : null,
@@ -1529,6 +1545,13 @@ const styles = StyleSheet.create({
     borderRadius: lightTheme.radius.md,
     backgroundColor: lightTheme.colors.surfaceTileIdle,
   },
+  /**
+   * The row for the address every booking uses. `surfaceTileSelected` is the pair to the
+   * `surfaceTileIdle` above — the same idle/selected fills the Instant duration tiles use — so
+   * the list states the current choice in the vocabulary the rest of the app already speaks,
+   * rather than inventing a tick or a badge `230:1960` does not draw.
+   */
+  addressRowSelected: { backgroundColor: lightTheme.colors.surfaceTileSelected },
   addressRowBody: { flex: 1, minWidth: 0, gap: 1.165 },
   /** `230:1968` — a 20 x 32 column holding the exported kebab. */
   rowMenu: { width: 20, height: 32 },

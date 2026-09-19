@@ -46,6 +46,40 @@ describe('Saved addresses (68:214)', () => {
     expect(props.onOpenActions).toHaveBeenCalledWith('addr-1');
   });
 
+  /*
+   * The row and the kebab are DIFFERENT actions. They were the same handler for the app's whole
+   * history — both opened the edit sheet — which is why no screen could change the address a
+   * booking uses. These two tests are what stop them collapsing back together.
+   */
+  it('selects the address when the ROW is tapped, without raising the sheet', () => {
+    render(<SavedAddressesView state={ready(DEMO_ADDRESS_LIST)} {...props} />);
+
+    fireEvent.press(screen.getByTestId('address-row-addr-2'));
+
+    expect(props.onSelect).toHaveBeenCalledWith('addr-2');
+    expect(props.onOpenActions).not.toHaveBeenCalled();
+  });
+
+  it('offers no selection on the address already in use, but keeps its kebab live', () => {
+    const list = {
+      ...DEMO_ADDRESS_LIST,
+      addresses: [
+        { ...DEMO_ADDRESS_LIST.addresses[0]!, selected: true },
+        DEMO_ADDRESS_LIST.addresses[1]!,
+      ],
+    };
+    render(<SavedAddressesView state={ready(list)} {...props} />);
+
+    // Re-selecting the current default would PUT it back to where it already is, and re-resolve
+    // its hub on the way.
+    fireEvent.press(screen.getByTestId('address-row-addr-1'));
+    expect(props.onSelect).not.toHaveBeenCalled();
+
+    // Edit and delete still apply to it.
+    fireEvent.press(screen.getByTestId('address-row-menu-addr-1'));
+    expect(props.onOpenActions).toHaveBeenCalledWith('addr-1');
+  });
+
   it('renders an empty state — the state every new user hits first', () => {
     render(<SavedAddressesView state={ready(DEMO_ADDRESS_LIST_EMPTY)} {...props} />);
 

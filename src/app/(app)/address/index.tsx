@@ -8,6 +8,7 @@ import {
   useAddressEditData,
   useDeleteAddress,
   useSavedAddressesData,
+  useSetDefaultAddress,
 } from '@features/address';
 import { getUserMessage, isAppError } from '@core/errors';
 import { useAndroidBackHandler, useSafeBack } from '@core/navigation';
@@ -16,10 +17,22 @@ import { InfoDialog } from '@ui';
 /**
  * Saved addresses — Figma `68:214`. A list screen, not a map screen.
  *
- * Tapping a saved row raises `228:1801`, the Edit / Delete sheet, FOR THAT ROW. The id the list
- * hands back is carried through to the sheet, to the edit route and to the delete call, so the
- * three can never disagree about which address is being acted on — the defect §5 was raised
- * against, where Edit opened a blank "add" form unrelated to the row that was tapped.
+ * ## The row and the kebab are two different actions
+ *
+ * Tapping the ROW makes that address the account default — the one every booking then uses.
+ * Tapping the KEBAB raises `228:1801`, the Edit / Delete sheet, for that row and nothing else.
+ *
+ * They used to be the same handler. Both called `setSelectedId`, so the only thing a row tap
+ * could do was open the edit sheet, and there was no way anywhere in the app to change which
+ * address a booking would use — the client never sent `isDefault`, and every screen that reads
+ * one (`home`, `booking`, `scheduled`) falls back to `list[0]`, which the backend sorts as the
+ * OLDEST saved address. The backend has accepted `isDefault` on this PUT since 2026-08-17 and
+ * demotes the previous default itself; only the trigger was missing.
+ *
+ * The id the list hands back is carried through to the sheet, to the edit route and to the
+ * delete call, so the three can never disagree about which address is being acted on — the
+ * defect §5 was raised against, where Edit opened a blank "add" form unrelated to the row that
+ * was tapped.
  *
  * Edit navigates to `60:655` (`18b`) with the address id, and that screen opens PREFILLED with
  * the saved record for review. It is an UPDATE of an existing address, not the creation of an
@@ -36,7 +49,9 @@ export default function SavedAddressesRoute() {
   );
   const { edit: editModel } = useAddressEditData(selectedId);
   const remove = useDeleteAddress();
-  const [error, setError] = useState<string | null>(null);
+  const setDefault = useSetDefaultAddress();
+  /** One dialog serves both failures, so it carries its own title rather than assuming delete. */
+  const [error, setError] = useState<{ title: string; body: string } | null>(null);
 
   /**
    * `68:214` back -> `6:663` PROFILE (V7 founder comment, task §5/§15) — UNLESS `?from=home`,
@@ -85,7 +100,28 @@ export default function SavedAddressesRoute() {
             (from === undefined ? '/address/location' : `/address/location?from=${from}`) as Href,
           )
         }
-        onSelect={setSelectedId}
+        /*
+         * The row: make this the account default. Guarded against a second tap while the first
+         * is still in flight — two PUTs racing would both demote and re-promote, and the list
+         * would settle on whichever answered last rather than whichever was tapped last.
+         */
+        onSelect={(id) => {
+          if (setDefault.isPending) return;
+          setDefault.mutateAsync(id).catch((thrown: unknown) => {
+            /*
+             * `ADDRESS_NOT_SERVICEABLE` reaches here as a real answer, not a transport failure:
+             * the PUT re-resolves the hub, so an address saved while a hub was live refuses to
+             * become the default once that hub is paused. The server's own message says which,
+             * so it is shown rather than replaced with a generic one.
+             */
+            setError({
+              title: 'Couldn’t switch address',
+              body: isAppError(thrown)
+                ? getUserMessage(thrown)
+                : 'We could not switch to this address.',
+            });
+          });
+        }}
         onOpenActions={setSelectedId}
       />
 
@@ -115,9 +151,12 @@ export default function SavedAddressesRoute() {
               })
               .catch((thrown: unknown) => {
                 setSelectedId(null);
-                setError(
-                  isAppError(thrown) ? getUserMessage(thrown) : 'We could not delete this address.',
-                );
+                setError({
+                  title: 'Couldn’t delete address',
+                  body: isAppError(thrown)
+                    ? getUserMessage(thrown)
+                    : 'We could not delete this address.',
+                });
               });
           }}
         />
@@ -127,9 +166,9 @@ export default function SavedAddressesRoute() {
       <InfoDialog
         visible={error !== null}
         onClose={() => setError(null)}
-        title="Couldn’t delete address"
-        body={error ?? ''}
-        testID="address-delete-error"
+        title={error?.title ?? ''}
+        body={error?.body ?? ''}
+        testID="address-action-error"
       />
     </>
   );

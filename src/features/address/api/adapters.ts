@@ -1,4 +1,4 @@
-import type { AddressDto, ServiceabilityStatus } from './schemas';
+import type { AddressDto, AddressWriteInput, ServiceabilityStatus } from './schemas';
 import type { AddressListViewModel, SavedAddressViewModel } from '../types';
 
 /**
@@ -39,6 +39,44 @@ export function addressListFrom(input: {
   readonly addresses: readonly AddressDto[];
 }): AddressListViewModel {
   return { ...input.base, addresses: input.addresses.map(savedAddressFrom) };
+}
+
+/**
+ * A saved address, back into the body `PUT /v1/me/addresses/:id` accepts.
+ *
+ * The inverse of `savedAddressFrom`: that maps a stored row to what a screen draws, this maps it
+ * to what a write sends. It exists because the API has no endpoint that flips a single field —
+ * making an address the account default is a FULL REPLACE, so the record has to be replayed
+ * whole with `isDefault` alongside it.
+ *
+ * Nullable columns become OMITTED optionals rather than nulls: `bodyOf` drops `undefined`, and
+ * the backend's write schemas are `additionalProperties: false` with typed optionals, so an
+ * explicit null is rejected.
+ *
+ * `receiverPhone` is replayed exactly as stored. It is already E.164 — the value the backend
+ * accepted when it was written — and `bodyOf`'s `toE164` passes a number that already carries
+ * its country code through untouched.
+ *
+ * Nothing here is computed or guessed. Every field is the server's own value, read back from the
+ * list the screen is already rendering, which is what keeps a "make this my address" tap from
+ * quietly rewriting the address it was meant to leave alone.
+ */
+export function addressWriteInputFrom(dto: AddressDto): AddressWriteInput {
+  return {
+    label: dto.label,
+    street: dto.street,
+    pincode: dto.pincode,
+    latitude: dto.latitude,
+    longitude: dto.longitude,
+    ...(dto.flat === null ? {} : { flat: dto.flat }),
+    ...(dto.tower === null ? {} : { tower: dto.tower }),
+    ...(dto.society === null ? {} : { society: dto.society }),
+    ...(dto.city === null ? {} : { city: dto.city }),
+    ...(dto.state === null ? {} : { state: dto.state }),
+    ...(dto.placeId === null || dto.placeId === undefined ? {} : { placeId: dto.placeId }),
+    ...(dto.receiverName === null ? {} : { receiverName: dto.receiverName }),
+    ...(dto.receiverPhone === null ? {} : { receiverPhone: dto.receiverPhone }),
+  };
 }
 
 /**

@@ -3,6 +3,7 @@ export type { AddressApi } from './addressApi';
 export {
   addressLineOf,
   addressListFrom,
+  addressWriteInputFrom,
   isServiceable,
   savedAddressFrom,
   serviceabilityMessageFor,
@@ -12,6 +13,7 @@ export {
   useCreateAddress,
   useDeleteAddress,
   useServiceabilityCheck,
+  useSetDefaultAddress,
   useUpdateAddress,
 } from './hooks';
 export { addressKeys } from './keys';
