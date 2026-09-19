@@ -627,7 +627,9 @@ function omitReassignNotice(summary: BookingSummaryViewModel): BookingSummaryVie
  *
  * ## The ETA and the verdict
  *
- * `eta.estimatedArrivalAt` is the server's arrival instant. It is formatted for display and never
+ * `eta.estimatedArrivalAt` is the server's arrival instant, and it is drawn TWO ways, because the
+ * frames do: the travelling banners count it down ("16 mins", `etaCountdownFrom`) and Arrived
+ * shows it as a clock time ("11:55 am", `etaClockLabelFrom`). Both are formatting; neither is
  * compared against the clock to assert lateness — `timingVerdict` is the server's verdict and the
  * only thing allowed to make that claim, which is why `tone` is set from it here and the
  * late/on-time COPY is selected by the caller from the two drawn variants.
@@ -639,27 +641,44 @@ function omitReassignNotice(summary: BookingSummaryViewModel): BookingSummaryVie
 export function trackingDetailFrom(input: {
   readonly base: BookingDetailViewModel;
   readonly dto: TrackingDto;
+  /** Injectable so a test pins the countdown instead of racing the wall clock. */
+  readonly nowMs?: number;
 }): BookingDetailViewModel {
   const { base, dto } = input;
+  const nowMs = input.nowMs ?? Date.now();
 
   const start = dto.serviceOtp?.start;
   const end = dto.serviceOtp?.end;
-  const etaLabel = etaLabelFrom(dto.eta.estimatedArrivalAt);
+  const etaCountdownLabel = etaCountdownFrom(dto.eta.estimatedArrivalAt, nowMs);
+  const etaClockLabel = etaClockLabelFrom(dto.eta.estimatedArrivalAt);
   const arrivedAtLabel = arrivedAtLabelFrom(dto.arrivedAt);
   const late = isLateVerdict(dto.timingVerdict);
   const knownVerdict = dto.timingVerdict === 'ON_TIME' || dto.timingVerdict === 'LATE';
-  const safeEtaLabel = etaLabel ?? '—';
+  const safeEtaLabel = etaCountdownLabel ?? '—';
 
   /** The server's punctuality answer, applied to whichever travelling surface is drawn. */
   const trackingSurface = <T extends TrackingViewModel>(surface: T): T => ({
     ...surface,
     etaLabel: safeEtaLabel,
-    ...(knownVerdict && etaLabel !== null
+    /**
+     * The VERDICT decides the tone and the copy; the countdown only decides the number.
+     *
+     * Gated on `etaClockLabel`, which is non-null whenever the server published a parseable
+     * arrival instant -- NOT on `etaCountdownLabel`, which also goes null the moment that instant
+     * elapses. Gating on the countdown suppressed `292:469` exactly when it was most warranted: a
+     * cook the server had already called LATE, whose ETA had slipped past, lost the amber fill and
+     * the "sorry for the delay" line and got a neutral "arrival time is not available yet" -- the
+     * screen for a booking with NO ETA, which is a different and much weaker claim.
+     *
+     * So an elapsed ETA now degrades the panel to "—" and nothing else. The server said late; the
+     * screen still says late.
+     */
+    ...(knownVerdict && etaClockLabel !== null
       ? { tone: late ? ('warning' as const) : ('positive' as const) }
       : {
           tone: 'neutral' as const,
           bannerMessage:
-            etaLabel === null
+            etaClockLabel === null
               ? 'Cook arrival time is not available yet.'
               : 'Cook arrival status is being updated.',
         }),
@@ -686,7 +705,7 @@ export function trackingDetailFrom(input: {
       : {
           arrived: {
             ...base.arrived,
-            etaLabel: arrivedAtLabel ?? etaLabel ?? '—',
+            etaLabel: arrivedAtLabel ?? etaClockLabel ?? '—',
             ...(start === null || start === undefined ? {} : { otpCode: start }),
           },
         }),
@@ -702,14 +721,58 @@ export function trackingDetailFrom(input: {
 }
 
 /**
- * The arrival instant as the banner draws it. `null` when the server has no ETA, which leaves the
- * designed copy in place instead of rendering an empty or invented time.
+ * The arrival instant as a CLOCK TIME -- the post-arrival treatment only.
+ *
+ * `99:1620`: once the cook has ARRIVED the panel stops counting down and shows a clock time. This
+ * is that label, and `arrivedAtLabelFrom` is preferred over it wherever the backend persisted a
+ * real arrival instant; this is the fallback for an arrived booking whose `arrivedAt` is missing.
+ *
+ * It must NOT reach `3:1381` / `292:469` / `201:100` / `292:657`, whose banners read "Cook is
+ * arriving in" and are completed by a duration -- see `etaCountdownFrom`.
  */
-function etaLabelFrom(estimatedArrivalAt: string | null): string | null {
+function etaClockLabelFrom(estimatedArrivalAt: string | null): string | null {
   if (estimatedArrivalAt === null) return null;
   const at = new Date(estimatedArrivalAt);
   if (Number.isNaN(at.getTime())) return null;
   return at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/**
+ * The wait still ahead, in whole minutes -- what the TRAVELLING banners draw.
+ *
+ * `3:1381` (en route), `292:469` (late), `201:100` / `292:657` (reassigned) all title the banner
+ * "Cook is arriving in" and let the panel finish the sentence, which only a duration can do: the
+ * frames draw "16 mins" and "21 mins", and the fixtures carry exactly those. The adapter was
+ * handing all four the clock-time label instead, so the sentence read "Cook is arriving in
+ * 8:45 AM" on device.
+ *
+ * ## Why a clock comparison is allowed here
+ *
+ * §18 rule 4 forbids the client deciding a cook is LATE -- that is `timingVerdict`, and it still
+ * is: `tone` and the late/on-time copy are untouched by this. Rendering the server's own instant
+ * as a duration is presentation, the same act `InServiceBody` already performs on `endsAtMs`.
+ * Nothing here advances state, and no ETA is invented: a booking the server gave no ETA for still
+ * renders the designed "not available yet" banner.
+ *
+ * Accuracy: tracking refetches on the server's `refreshAfterSeconds` (30s fallback), so the figure
+ * is re-derived at least twice a minute and cannot drift past the minute it names.
+ *
+ * `null` once the ETA is not in the future -- the frames draw no "overdue" state and "0 mins"
+ * under a title promising an arrival is a claim, not a number. Only the PANEL degrades, to "—";
+ * the banner keeps whatever the server's `timingVerdict` says, so a late cook still reads as
+ * late. The server is polling; a fresher ETA or an arrival is what resolves it.
+ */
+function etaCountdownFrom(estimatedArrivalAt: string | null, nowMs: number): string | null {
+  if (estimatedArrivalAt === null) return null;
+  const at = new Date(estimatedArrivalAt);
+  if (Number.isNaN(at.getTime())) return null;
+
+  const remainingMs = at.getTime() - nowMs;
+  if (remainingMs <= 0) return null;
+
+  // Floored at one: a cook 20 seconds away is "1 mins", never "0 mins" under "arriving in".
+  // The plural is the house form -- `etaMinutesFor` and `InServiceBody` both write "mins" flat.
+  return `${Math.max(1, Math.round(remainingMs / 60_000))} mins`;
 }
 
 /** The persisted backend arrival instant, never a handset detection time or an ETA. */
@@ -800,4 +863,29 @@ export function tipSheetFrom(input: {
     // preselection uses, so the button can never name a price the sheet does not offer.
     ...(preselected === null ? {} : { ctaLabel: `Tip • ${formatAmount(preselected)}` }),
   };
+}
+
+/**
+ * The tip CTA, re-pointed at the option the customer actually chose.
+ *
+ * `tipSheetFrom` builds `ctaLabel` from the PRESELECTION, which was correct while the default was
+ * the only selection that existed -- `TipSheetViewModel.ctaLabel` still documents itself as
+ * "consistent with `defaultOptionId`". Once the chips became tappable that stopped being true and
+ * nothing re-pointed the label, so the bar read "Tip • ₹50" over every amount on the sheet: a
+ * customer selecting ₹100 was asked to confirm a button naming ₹50.
+ *
+ * The amount is READ OFF the chosen option's own label, never recomputed -- `option.label` is the
+ * server's suggested amount formatted once by `tipSheetFrom`. So the bar can still only ever name
+ * a price the sheet is offering (ruling R-1), which is the property the preselection wording was
+ * protecting in the first place.
+ *
+ * An id matching no option leaves the model untouched: that is the "nothing chosen" state, where
+ * the CTA is disabled anyway and the designed copy is the right thing to keep.
+ */
+export function tipSheetWithSelection(
+  tip: TipSheetViewModel,
+  selectedOptionId: string | null,
+): TipSheetViewModel {
+  const selected = tip.options.find((option) => option.id === selectedOptionId);
+  return selected === undefined ? tip : { ...tip, ctaLabel: `Tip • ${selected.label}` };
 }

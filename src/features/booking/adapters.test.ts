@@ -134,14 +134,129 @@ describe('trackingDetailFrom', () => {
     expect(view.inService?.otpCode).toBe('DESIGNED');
   });
 
-  it('renders the server ETA on the tracking banner', () => {
+  /**
+   * `3:1381` titles the banner "Cook is arriving in" and lets the panel finish the sentence, so
+   * the panel has to hold a DURATION. This asserted the clock-time label, which is how
+   * "Cook is arriving in 8:45 AM" reached a device.
+   */
+  it('counts the server ETA down in minutes on the tracking banner', () => {
+    const now = new Date('2026-08-18T09:19:00.000Z').getTime();
     const at = new Date('2026-08-18T09:35:00.000Z');
     const view = trackingDetailFrom({
       base: BASE,
+      nowMs: now,
       dto: tracking({ eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null } }),
     });
 
-    expect(view.tracking?.etaLabel).toBe(
+    expect(view.tracking?.etaLabel).toBe('16 mins');
+  });
+
+  it('counts down on the REASSIGNED banner too — `201:100` / `292:657` draw the same panel', () => {
+    const now = new Date('2026-08-18T09:14:00.000Z').getTime();
+    const at = new Date('2026-08-18T09:35:00.000Z');
+    const view = trackingDetailFrom({
+      // Cast for the same reason BASE itself is: these fixtures carry only the fields the
+      // assertion reads, not the full designed view model.
+      base: {
+        ...BASE,
+        view: 'reassigned',
+        reassigned: {
+          ...BASE.tracking,
+          notice: { title: 'Another cook', body: 'We reassigned your booking' },
+        },
+      } as unknown as BookingDetailViewModel,
+      nowMs: now,
+      dto: tracking({ eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null } }),
+    });
+
+    expect(view.reassigned?.etaLabel).toBe('21 mins');
+  });
+
+  it('rounds to the nearest minute and never draws "0 mins" under "arriving in"', () => {
+    const at = new Date('2026-08-18T09:35:00.000Z');
+    const labelAt = (nowIso: string) =>
+      trackingDetailFrom({
+        base: BASE,
+        nowMs: new Date(nowIso).getTime(),
+        dto: tracking({ eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null } }),
+      }).tracking?.etaLabel;
+
+    expect(labelAt('2026-08-18T09:19:40.000Z')).toBe('15 mins'); // 15m20s rounds down
+    expect(labelAt('2026-08-18T09:19:20.000Z')).toBe('16 mins'); // 15m40s rounds up
+    expect(labelAt('2026-08-18T09:34:40.000Z')).toBe('1 mins'); // 20s floors to one
+  });
+
+  it('counts down on the LATE banner — `292:469` draws the same panel as on-time', () => {
+    // The server revises the ETA when a cook runs late, so the late screen has a number to show
+    // and must show it: `99:1413` draws "16 mins" under the apology, not a blank panel.
+    const now = new Date('2026-08-18T09:19:00.000Z').getTime();
+    const at = new Date('2026-08-18T09:35:00.000Z');
+    const view = trackingDetailFrom({
+      base: BASE,
+      nowMs: now,
+      dto: tracking({
+        timingVerdict: 'LATE',
+        eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null },
+      }),
+    });
+
+    expect(view.tracking?.etaLabel).toBe('16 mins');
+    expect(view.tracking?.tone).toBe('warning');
+    // The caller's late copy survives: nothing here overwrites it.
+    expect(view.tracking?.bannerMessage).toBe('Rekha is heading over');
+  });
+
+  it('keeps the LATE banner when the ETA elapses — only the panel degrades', () => {
+    /*
+     * The regression this pins. Gating tone on the COUNTDOWN meant a cook the server had already
+     * called late, whose ETA had slipped past, lost the amber fill and the apology and got the
+     * neutral "no ETA at all" banner instead — the weakest claim available, at the moment the
+     * strongest one was true.
+     */
+    const at = new Date('2026-08-18T09:35:00.000Z');
+    const view = trackingDetailFrom({
+      base: BASE,
+      nowMs: new Date('2026-08-18T09:36:00.000Z').getTime(),
+      dto: tracking({
+        timingVerdict: 'LATE',
+        eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null },
+      }),
+    });
+
+    expect(view.tracking?.tone).toBe('warning');
+    expect(view.tracking?.bannerMessage).toBe('Rekha is heading over');
+    // No number to state, and none invented.
+    expect(view.tracking?.etaLabel).toBe('—');
+  });
+
+  it('degrades only the panel when an ON_TIME ETA elapses', () => {
+    const at = new Date('2026-08-18T09:35:00.000Z');
+    const view = trackingDetailFrom({
+      base: BASE,
+      nowMs: new Date('2026-08-18T09:36:00.000Z').getTime(),
+      dto: tracking({
+        timingVerdict: 'ON_TIME',
+        eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null },
+      }),
+    });
+
+    expect(view.tracking?.etaLabel).toBe('—');
+    expect(view.tracking?.tone).toBe('positive');
+  });
+
+  it('keeps the CLOCK time on Arrived — `99:1620` stops counting down at the gate', () => {
+    const at = new Date('2026-08-18T09:35:00.000Z');
+    const view = trackingDetailFrom({
+      base: { ...BASE, view: 'arrived' },
+      nowMs: new Date('2026-08-18T09:19:00.000Z').getTime(),
+      dto: tracking({
+        status: 'cook_arrived',
+        eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null },
+      }),
+    });
+
+    // The countdown must not leak onto the arrived panel through the ETA fallback.
+    expect(view.arrived?.etaLabel).toBe(
       at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
     );
   });
@@ -181,6 +296,9 @@ describe('trackingDetailFrom', () => {
   it('never renders on-time styling for an UNKNOWN verdict', () => {
     const view = trackingDetailFrom({
       base: BASE,
+      // Pinned BEFORE the ETA: this case is about an unusable VERDICT, so the ETA has to be
+      // usable, and an unpinned clock would make it a past instant and assert the wrong branch.
+      nowMs: new Date('2026-08-18T09:19:00.000Z').getTime(),
       dto: tracking({
         eta: { estimatedArrivalAt: '2026-08-18T09:35:00.000Z', updatedAt: null },
         timingVerdict: 'UNKNOWN',

@@ -314,6 +314,46 @@ describe('Booking host — in service (101:1812)', () => {
     expect(screen.getByText('30 mins')).toBeTruthy();
   });
 
+  /**
+   * Regression: a 30-minute booking opened on "29 mins".
+   *
+   * The test above freezes the clock at EXACTLY the service start, the one instant a floor and a
+   * ceiling agree, so it passed throughout. Reality never lands there -- the cook verifies the
+   * Start OTP, the refetch round-trips and the screen paints, and by then some seconds of a
+   * genuine 30:00 have gone. This reproduces that: 29:57 left is still a 30-minute service.
+   */
+  it('opens at the booked figure when the service started seconds ago', () => {
+    const now = 3_000_000;
+    jest.setSystemTime(now);
+
+    render(
+      <BookingDetailView
+        state={ready(demoInServiceBooking(now, 30 * 60 * 1000 - 3_000))}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('30 mins')).toBeTruthy();
+    expect(screen.queryByText('29 mins')).toBeNull();
+  });
+
+  /** And it does tick -- a whole minute gone reads 29, not a countdown stuck one minute high. */
+  it('ticks to 29 once a whole minute of the service has passed', () => {
+    const now = 4_000_000;
+    jest.setSystemTime(now);
+
+    render(
+      <BookingDetailView
+        state={ready(demoInServiceBooking(now, 29 * 60 * 1000))}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('29 mins')).toBeTruthy();
+  });
+
   it('refetches — and does NOT transition — when the countdown reaches zero', () => {
     const now = 2_000_000;
     jest.setSystemTime(now);
@@ -510,6 +550,27 @@ describe('Booking host — completion (143:207)', () => {
     expect(onSelectTip).toHaveBeenCalledWith('tip-50');
     // The sheet is still up: only the SERVER taking the tip closes it (§11 — no invented success).
     expect(screen.getByTestId('tip-sheet')).toBeTruthy();
+  });
+
+  it('names the CHOSEN amount on the tip bar, not the preselected one', () => {
+    render(
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_COMPLETION)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onSelectTip={jest.fn(() => new Promise<void>(() => undefined))}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('completion-tip-row'));
+    // `306:3050` — the sheet opens on the drawn default, and the bar agrees with it.
+    expect(screen.getByText('Tip • ₹50')).toBeTruthy();
+
+    // The defect: the bar stayed on the preselection, so a customer choosing ₹100 was asked to
+    // confirm a button reading ₹50. The amount is the chip's own, never recomputed here.
+    fireEvent.press(screen.getByTestId('tip-sheet-option-tip-100'));
+    expect(screen.getByText('Tip • ₹100')).toBeTruthy();
+    expect(screen.queryByText('Tip • ₹50')).toBeNull();
   });
 
   it('drops the scale and the Submit chip once the SERVER says the feedback is in', () => {

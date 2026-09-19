@@ -600,12 +600,32 @@ export function useTipCook(launcher: CheckoutLauncher = unavailableCheckoutLaunc
         description: description ?? 'Tip for your cook',
       });
 
-      await service.verifyTip(bookingId, result, `booking.tip.verify:${bookingId}`);
-      idempotency.release(scope);
+      /**
+       * Derived from the ATTEMPT's scope, not fixed per booking.
+       *
+       * It used to be `booking.tip.verify:<bookingId>` and was never released, so a customer's
+       * SECOND tip verified under the first tip's key with a different Razorpay payload -- a
+       * request-hash mismatch, which the backend answers 409 unconditionally. The payment was
+       * captured and the client could never verify it. Tips are not capped per booking, so this
+       * was reachable by anyone who tipped twice.
+       */
+      await service.verifyTip(bookingId, result, `${scope}.verify`);
 
       return order;
     },
     onSettled(_data, _error, variables) {
+      /**
+       * Released on EVERY outcome, not just success.
+       *
+       * A key held past a failure is a key the next attempt reuses, and the backend's claim row
+       * commits as `processing` BEFORE it calls Razorpay: a reused key whose first attempt is
+       * still in flight does not replay and does not 409 -- it falls through and creates a second
+       * tip, a second payment and a second Razorpay order, returning 201. Silent duplication.
+       * Dropping the key here means the next attempt is a new intent, which is what it is.
+       */
+      idempotency.release(variables.scope);
+      idempotency.release(`${variables.scope}.verify`);
+
       // Refetched regardless of outcome: the webhook can finalize a tip the client never got to
       // verify, so the server's view is re-read either way rather than inferred from the error.
       void queryClient.invalidateQueries({ queryKey: bookingKeys.detail(variables.bookingId) });

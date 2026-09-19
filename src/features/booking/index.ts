@@ -48,7 +48,12 @@ export {
   useTipCheckout,
 } from './data';
 export type { BookingSelection, BookingSubmission, PaymentOutcome } from './data';
-export { extensionMinutesFrom, tipAmountPaiseFrom, tipIdFor } from './adapters';
+export {
+  extensionMinutesFrom,
+  tipAmountPaiseFrom,
+  tipIdFor,
+  tipSheetWithSelection,
+} from './adapters';
 export { BookingDetailScreen, BookingDetailView } from './screens/BookingDetailScreen';
 export type { BookingDetailActions, BookingDetailViewProps } from './screens/BookingDetailScreen';
 export type * from './types';

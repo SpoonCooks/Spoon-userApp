@@ -1,4 +1,5 @@
 import { slotHasEnded } from '@core/time';
+import { minutesRemainingUntil } from './adapters';
 import { selectHomeBookings } from './data';
 
 import type { BookingSummaryDto } from '@features/booking';
@@ -121,5 +122,37 @@ describe('slotHasEnded', () => {
     expect(slotHasEnded(null, 30, at('2026-09-14T09:00:00.000Z'))).toBe(false);
     expect(slotHasEnded(undefined, 30, at('2026-09-14T09:00:00.000Z'))).toBe(false);
     expect(slotHasEnded('not-a-date', 30, at('2026-09-14T09:00:00.000Z'))).toBe(false);
+  });
+});
+
+/**
+ * The live card's "Time left".
+ *
+ * Rounds UP, unlike `minutesUntil` beside it: this is a countdown against a paid duration, and a
+ * 30-minute service whose card reads "29 mins" seconds after it started shows the customer a
+ * minute short of what they bought. It is the same rule `formatRemaining` applies on the booking
+ * screen, so the two surfaces agree about one booking.
+ */
+describe('minutesRemainingUntil', () => {
+  const end = '2026-09-13T17:30:00.000Z';
+  const at = (iso: string) => new Date(iso);
+
+  it('holds at the booked figure until a whole minute has actually gone', () => {
+    // The service began three seconds ago. 29:57 left is a 30-minute booking.
+    expect(minutesRemainingUntil(end, at('2026-09-13T17:00:03.000Z'))).toBe(30);
+    // Still 30 with a second to spare; 29 only once the minute is genuinely spent.
+    expect(minutesRemainingUntil(end, at('2026-09-13T17:00:59.000Z'))).toBe(30);
+    expect(minutesRemainingUntil(end, at('2026-09-13T17:01:00.000Z'))).toBe(29);
+  });
+
+  it('never reports time left that has already run out', () => {
+    expect(minutesRemainingUntil(end, at('2026-09-13T17:30:00.000Z'))).toBe(0);
+    expect(minutesRemainingUntil(end, at('2026-09-13T17:45:00.000Z'))).toBe(0);
+  });
+
+  it('has nothing to count without a server timestamp', () => {
+    expect(minutesRemainingUntil(null, at('2026-09-13T17:00:00.000Z'))).toBeNull();
+    expect(minutesRemainingUntil(undefined, at('2026-09-13T17:00:00.000Z'))).toBeNull();
+    expect(minutesRemainingUntil('not-a-date', at('2026-09-13T17:00:00.000Z'))).toBeNull();
   });
 });

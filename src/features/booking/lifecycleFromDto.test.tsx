@@ -125,7 +125,16 @@ function trackingDto(overrides: Record<string, unknown> = {}): Record<string, un
   return {
     bookingId: BOOKING_ID,
     status: 'cook_en_route',
-    eta: { estimatedArrivalAt: '2026-08-20T06:24:00.000Z', updatedAt: '2026-08-20T06:10:00.000Z' },
+    /**
+     * RELATIVE, not the captured instant. The travelling banners count the ETA down now, so a
+     * cook who is still en route has to have an ETA that is still ahead — a frozen 2026-08-20
+     * instant is in the past on every later run, and the banner correctly degrades to
+     * "arrival time is not available yet", taking the on-time/late copy with it.
+     */
+    eta: {
+      estimatedArrivalAt: new Date(Date.now() + 16 * 60_000).toISOString(),
+      updatedAt: new Date(Date.now() - 60_000).toISOString(),
+    },
     movement: {
       status: 'progress_observed',
       lastEvidenceAt: '2026-08-20T06:10:00.000Z',

@@ -107,7 +107,23 @@ export const HOME_DESIGN = {
   /** `59:654` "Book tiles" — `1:575` is a 2-track grid at an 18pt gutter. */
   tiles: {
     gap: 18,
-    tile: { height: 142, paddingHorizontal: 10, paddingVertical: 22, gap: 6 },
+    tile: {
+      height: 142,
+      paddingHorizontal: 10,
+      paddingVertical: 22,
+      gap: 6,
+      /**
+       * The two text rows are bands of a SHARED height, not two independently-sized line boxes.
+       *
+       * `1:583` "Instant" is Black 18/28 and `129:35` "Schedule" is Black 16/24; `1:585` carries a
+       * 14/20 emphasis run where `129:37` is 12/15.11. Stacked top-aligned at the 6pt gap, those
+       * unequal line boxes put the two titles ~2pt apart and the two subtitles ~6.4pt apart — the
+       * tiles read as two different rows. Each band is the TALLER of the pair, so the taller tile
+       * (Instant) is unchanged and the shorter one is centred into the same band.
+       */
+      titleHeight: 28,
+      subtitleHeight: 20,
+    },
     icon: 40,
     /** `59:391` / `129:40` — the glyph inside the 40pt disc is 30 × 40. */
     iconGlyphWidth: 30,

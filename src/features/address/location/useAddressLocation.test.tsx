@@ -45,6 +45,8 @@ const resolutions = () => mocked.requestForegroundPermissionsAsync.mock.calls.le
 
 const DEVICE_POINT = { latitude: 28.6304, longitude: 77.2777 };
 const USER_POINT = { latitude: 12.9611, longitude: 77.6387 };
+/** What a chosen Places prediction resolves to, in the search tests below. */
+const CHOSEN_POINT = { latitude: 28.6363, longitude: 77.2772 };
 
 let appStateListener: ((status: string) => void) | undefined;
 
@@ -341,14 +343,17 @@ describe('device location acquisition', () => {
 /**
  * `53:63` — what the search field says after a suggestion is chosen.
  *
- * It used to take the suggestion's `primary` alone, which is only the first line of the two-line
- * row the customer tapped: picking "Laxmi Nagar / Delhi, India" left the box reading "Laxmi
- * Nagar" and dropped the half that disambiguates it. The pin moves to the whole place, so the
- * field states the whole place.
+ * It has been through two other answers. It first kept the abandoned half-typed text, so the box
+ * read "Laxmi naga" over a pin that had moved to Laxmi Nagar. It was then rewritten to the whole
+ * chosen place — which agreed with the pin, but restated an address `53:58`'s resolved row was
+ * already spelling out, in a box that still looked like a search in progress.
+ *
+ * Choosing ends the search, so the field ends up empty.
  */
-describe('choosing a Places suggestion rewrites the query', () => {
+describe('choosing a Places suggestion ends the search', () => {
   const suggestionsMock = jest.requireMock('./googlePlaces') as {
     placesAutocomplete: jest.Mock;
+    placeDetails: jest.Mock;
   };
 
   /** Types, lets the debounce fire, and returns once the predictions are on the hook. */
@@ -369,14 +374,31 @@ describe('choosing a Places suggestion rewrites the query', () => {
       ok: true,
       value: [{ placeId: 'laxmi', primary: 'Laxmi Nagar', secondary: 'Delhi, India' }],
     });
+    suggestionsMock.placeDetails.mockResolvedValue({
+      ok: true,
+      value: {
+        coordinates: CHOSEN_POINT,
+        address: {
+          title: 'Laxmi Nagar',
+          line: 'Delhi, India',
+          pincode: '110092',
+          street: 'Laxmi Nagar',
+          city: 'Delhi',
+          region: 'Delhi',
+          placeId: 'laxmi',
+        },
+      },
+    });
   });
 
   afterEach(() => {
     jest.useRealTimers();
     suggestionsMock.placesAutocomplete.mockResolvedValue({ ok: true, value: [] });
+    // The file's default is a FAILED details call; restore it for everything after this block.
+    suggestionsMock.placeDetails.mockResolvedValue({ ok: false, reason: 'error' });
   });
 
-  it('states the full place — primary AND locality — not just the first line', async () => {
+  it('empties the field once the chosen place resolves', async () => {
     const { result } = renderHook(() => useAddressLocation(), { wrapper });
     await flush();
 
@@ -384,25 +406,54 @@ describe('choosing a Places suggestion rewrites the query', () => {
     expect(result.current.query).toBe('Laxmi naga');
     expect(result.current.suggestions).toHaveLength(1);
 
-    act(() => result.current.chooseSuggestion('laxmi'));
-
-    expect(result.current.query).toBe('Laxmi Nagar, Delhi, India');
-  });
-
-  /** A prediction with no locality is not padded with a trailing comma. */
-  it('uses the primary alone when there is no locality under it', async () => {
-    suggestionsMock.placesAutocomplete.mockResolvedValue({
-      ok: true,
-      value: [{ placeId: 'solo', primary: 'Laxmi Nagar', secondary: '' }],
+    await act(async () => {
+      result.current.chooseSuggestion('laxmi');
+      await flush();
     });
 
+    expect(result.current.query).toBe('');
+    // The point is what the choice was FOR. Emptying the box is not un-choosing it.
+    expect(result.current.coordinates).toEqual(CHOSEN_POINT);
+  });
+
+  /** The predictions close on the tap itself, before the details call has answered. */
+  it('closes the prediction list as soon as a row is chosen', async () => {
     const { result } = renderHook(() => useAddressLocation(), { wrapper });
     await flush();
 
-    await searchFor(result, 'Laxmi');
-    act(() => result.current.chooseSuggestion('solo'));
+    await searchFor(result, 'Laxmi naga');
 
-    expect(result.current.query).toBe('Laxmi Nagar');
+    act(() => result.current.chooseSuggestion('laxmi'));
+
+    expect(result.current.suggestions).toHaveLength(0);
+    expect(result.current.searchState).toBe('idle');
+
+    // The details call is still out. Let it land inside `act` rather than after the test.
+    await flush();
+  });
+
+  /**
+   * Nothing was chosen in the end, so nothing is cleared.
+   *
+   * Wiping the box on a failed Places details call would make a flaky network cost the customer
+   * the whole phrase they typed, on the one screen onboarding cannot skip — and it would empty
+   * the field while the pin had not moved anywhere, which is the same disagreement the other way
+   * round.
+   */
+  it('keeps what was typed when the details call fails', async () => {
+    const { result } = renderHook(() => useAddressLocation(), { wrapper });
+    await flush();
+
+    await searchFor(result, 'Laxmi naga');
+    suggestionsMock.placeDetails.mockResolvedValueOnce({ ok: false, reason: 'network' });
+
+    await act(async () => {
+      result.current.chooseSuggestion('laxmi');
+      await flush();
+    });
+
+    expect(result.current.query).toBe('Laxmi naga');
+    expect(result.current.searchState).toBe('error');
   });
 });
 
