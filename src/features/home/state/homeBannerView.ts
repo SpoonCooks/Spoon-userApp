@@ -94,6 +94,8 @@ export interface HomeBannerViewModel {
   readonly timeLabel?: string;
   readonly cookName?: string;
   readonly cookPhotoUrl?: string;
+  /** Drawn only if `cookPhotoUrl` fails to load. See `HomeBannerInput.cookPhotoFallbackUrl`. */
+  readonly cookPhotoFallbackUrl?: string;
   /** `337:4412` — "Arriving in" / "Arrived at" / "Time left". Absent on the block-badge forms. */
   readonly badgeCaption?: string;
   /** `337:4370` — "Confirmed!" / "Completed!" / "12 mins" / "1:12 PM" / "Cancelled". */
@@ -116,6 +118,15 @@ export interface HomeBannerInput {
   /** `GET /v1/bookings/:id` → `cook.name` / `cook.photoUrl`. */
   readonly cookName?: string | null;
   readonly cookPhotoUrl?: string | null;
+  /**
+   * The bundled cut-out to show if `cookPhotoUrl` FAILS TO LOAD, not if it is absent.
+   *
+   * Set only when `cookPhotoUrl` is a hosted URL, because that is the only case with anything to
+   * fall back FROM: when the bundled asset is already the primary there is nothing behind it.
+   * A hosted photo that 404s otherwise leaves an empty panel, which makes a bad URL strictly
+   * worse than no URL — the bundled tier having been skipped the moment the field was non-null.
+   */
+  readonly cookPhotoFallbackUrl?: string | null;
   /** Preformatted by `adapters.ts` from `scheduledStart`. Presentation of a server instant. */
   readonly dateLabel: string;
   readonly timeLabel: string;
@@ -241,6 +252,9 @@ export function homeBannerFor(input: HomeBannerInput): HomeBannerViewModel | nul
     ...(input.cookPhotoUrl === null || input.cookPhotoUrl === undefined
       ? {}
       : { cookPhotoUrl: input.cookPhotoUrl }),
+    ...(input.cookPhotoFallbackUrl === null || input.cookPhotoFallbackUrl === undefined
+      ? {}
+      : { cookPhotoFallbackUrl: input.cookPhotoFallbackUrl }),
     destination,
   };
 

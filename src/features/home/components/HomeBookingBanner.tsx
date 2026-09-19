@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { DirectionalDisc, RatingWidget, Text, lightTheme } from '@ui';
@@ -63,6 +64,22 @@ export function HomeBookingBanner({
 }: HomeBookingBannerProps) {
   const rate = booking.variant === 'rate';
 
+  /**
+   * A hosted photo that does not load falls back to the bundled cut-out.
+   *
+   * `<Image>` reports a failed load and then draws nothing, so a 404 left the panel empty — and
+   * because a non-null `cookPhotoUrl` had already skipped the bundled tier, a BAD url was worse
+   * than no url at all. Only a load FAILURE swaps; an absent photo is resolved upstream.
+   *
+   * Keyed by the uri so a different booking scrolling into this card starts fresh rather than
+   * inheriting the previous cook's failure.
+   */
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const cookPhotoUrl =
+    booking.cookPhotoUrl !== undefined && booking.cookPhotoUrl === failedUri
+      ? booking.cookPhotoFallbackUrl
+      : booking.cookPhotoUrl;
+
   const header = (
     <View style={styles.header}>
       <Text variant="titleBlack" color="textBrand" numberOfLines={1} style={styles.title}>
@@ -92,12 +109,14 @@ export function HomeBookingBanner({
     <View style={styles.body}>
       <View style={styles.cook}>
         <View style={styles.photo}>
-          {booking.cookPhotoUrl === undefined ? null : (
+          {cookPhotoUrl === undefined ? null : (
             <Image
-              source={{ uri: booking.cookPhotoUrl }}
+              source={{ uri: cookPhotoUrl }}
               style={styles.photoImage}
               resizeMode="cover"
               accessibilityIgnoresInvertColors
+              onError={() => setFailedUri(cookPhotoUrl)}
+              testID={`${testID}-photo`}
             />
           )}
         </View>
