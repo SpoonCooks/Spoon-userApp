@@ -60,7 +60,7 @@ export default function BookingRoute() {
   const extend = useExtensionCheckout();
   const cancelFlow = useCancelFlow(bookingId === '' ? null : bookingId, {
     onReschedule: () => router.push(`/reschedule/${bookingId}`),
-    onHelp: () => openHelp(`Hi Spoon, I need help cancelling my booking ${bookingId}.`),
+    onHelp: () => openHelp('Hi Spoon, I need help cancelling my booking.'),
     // PRODUCT_DESIGN_CONFLICT (§37): `115:2703` labels this "Book Now", but a cancellation flow
     // must not create a booking. It closes and returns the customer to Home, where booking
     // actually starts. Recorded, not obeyed.
@@ -92,7 +92,7 @@ export default function BookingRoute() {
         onBack={goBack}
         onReschedule={() => router.push(`/reschedule/${bookingId}`)}
         onHelp={() => {
-          openHelp(`Hi Spoon, I need help with my booking ${bookingId}.`);
+          openHelp('Hi Spoon, I need help with my booking.');
         }}
         onCallCook={() => {
           void callCook.call();
@@ -149,9 +149,7 @@ export default function BookingRoute() {
         onDeclineRebook={goBack}
         /* `383:748` — the same Spoon line as every other WhatsApp control (task §15). */
         onShareRecipe={() => {
-          openHelp(
-            `Hi Spoon, I'd like to share a recipe or a special request for booking ${bookingId}.`,
-          );
+          openHelp("Hi Spoon, I'd like to share a recipe or a special request for my booking.");
         }}
         /**
          * `306:2885` — the tip sheet's CTA (task §14).
