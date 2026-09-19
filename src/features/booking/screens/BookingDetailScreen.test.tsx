@@ -186,6 +186,54 @@ describe('Booking host — confirmation (3:1041)', () => {
     expect(screen.queryByTestId('confirmation-cancel')).toBeNull();
   });
 
+  /**
+   * A press that opens no checkout has to say so.
+   *
+   * Only `verified` was ever acted on, so the other four outcomes ended in silence -- including
+   * `processing`, the ordinary answer while a slow payment attempt is still unresolved. The
+   * customer pressed Book now, watched the spinner stop, and was told nothing, which reads as a
+   * dead button rather than as "not yet".
+   */
+  it('reports why Book now opened no checkout', () => {
+    const unpaid = ready({
+      ...DEMO_BOOKING_CONFIRMATION,
+      cancelAllowed: true,
+      summary: { ...DEMO_BOOKING_CONFIRMATION.summary!, paymentPending: true },
+    });
+
+    const { rerender } = render(
+      <BookingDetailView
+        state={unpaid}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onReschedule={jest.fn()}
+        onCancel={jest.fn()}
+        onPayNow={jest.fn()}
+      />,
+    );
+
+    // Nothing is claimed before a press: silence is correct until there is something to report.
+    expect(screen.queryByTestId('confirmation-pay-notice')).toBeNull();
+
+    rerender(
+      <BookingDetailView
+        state={unpaid}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onReschedule={jest.fn()}
+        onCancel={jest.fn()}
+        onPayNow={jest.fn()}
+        payNotice="Still confirming your last payment. Try again in a moment."
+      />,
+    );
+
+    expect(screen.getByTestId('confirmation-pay-notice')).toHaveTextContent(
+      'Still confirming your last payment. Try again in a moment.',
+    );
+    // The bar stays: the whole point is that the customer can press it again.
+    expect(screen.getByTestId('confirmation-pay-now')).toBeTruthy();
+  });
+
   /** A settled booking keeps the pair — the swap is keyed to the unpaid flag, nothing else. */
   it('keeps Cancel and Reschedule on a booking that has been paid for', () => {
     render(

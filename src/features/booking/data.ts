@@ -950,6 +950,40 @@ async function payAndClassify(
  * `launcher` defaults to the real Razorpay checkout, same as `usePayForBooking` itself; a test
  * substitutes a stub the same way.
  */
+/**
+ * How long to wait before the one retry a `processing` answer earns.
+ *
+ * `processing` means the server holds an unresolved order attempt. The worker reconciles those
+ * inside the outbox loop, which production runs every 2s (`OUTBOX_POLL_INTERVAL_MS`), so this
+ * clears a full cycle with room to spare rather than racing it.
+ */
+export const PROCESSING_RETRY_DELAY_MS = 2_500;
+
+/**
+ * Pays, and gives `processing` exactly one second chance.
+ *
+ * `processing` is the server saying "ask again", not a refusal: an order attempt is unresolved,
+ * and the worker usually adopts the provider's order moments later. Left alone, the customer had
+ * to know that and press again -- so the recovery existed but nobody reached it.
+ *
+ * ONE retry, never a loop. If it is still unresolved after a full reconciliation cycle, the
+ * honest answer is to report it and let the customer decide.
+ *
+ * `sleep` is injected so this is testable without timers. Every other outcome returns untouched:
+ * a dismissal, a decline and a checkout that never opened are all answers, and retrying any of
+ * them would be guessing.
+ */
+export async function payRetryingOnceWhileProcessing(
+  attempt: () => Promise<PaymentOutcome>,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  delayMs: number = PROCESSING_RETRY_DELAY_MS,
+): Promise<PaymentOutcome> {
+  const first = await attempt();
+  if (first !== 'processing') return first;
+  await sleep(delayMs);
+  return attempt();
+}
+
 export function usePaymentRetry(
   bookingId: string,
   launcher: CheckoutLauncher = razorpayCheckoutLauncher,

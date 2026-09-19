@@ -49,6 +49,8 @@ export interface BookingDetailActions {
   readonly onPayNow?: () => void;
   /** Checkout is opening, so the Book now bar shows its spinner instead of taking a second press. */
   readonly paying?: boolean;
+  /** What the last Book now press did, when it opened no checkout. See `ConfirmationBody`. */
+  readonly payNotice?: string | null;
   /** `250:2966` — opens `250:2861` Booking details. A seam; this screen decides nothing there. */
   readonly onViewDetails?: () => void;
   /** `383:748` — the WhatsApp disc on "Share recipe/ special requests" (`8a` / `8b`, task §15). */
@@ -355,6 +357,7 @@ export function BookingDetailView({
             {...cancelSeam(booking)}
             {...(actions.onPayNow === undefined ? {} : { onPayNow: actions.onPayNow })}
             paying={actions.paying === true}
+            {...(actions.payNotice === undefined ? {} : { payNotice: actions.payNotice })}
           />
         );
 

@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   BookingDetailScreen,
@@ -6,10 +7,12 @@ import {
   useCallCook,
   useExtensionCheckout,
   usePaymentRetry,
+  payRetryingOnceWhileProcessing,
   ratingScopeFor,
   useRateBooking,
   useTipCheckout,
 } from '@features/booking';
+import type { PaymentOutcome } from '@features/booking';
 import { useCancelFlow } from '@features/cancellation';
 import { paymentErrorMessage } from '@features/payment';
 import { useWhatsAppHelp } from '@features/support';
@@ -38,6 +41,21 @@ import { useDeterministicBack } from '@core/navigation';
  * `allowedActions.canCancel` decides whether it is offered, and the SERVER decides the fee and
  * the refund — this route sends the reason and refetches.
  */
+/**
+ * What to tell the customer when the press opened no checkout.
+ *
+ * `cancelled` returns null on purpose: they closed the sheet themselves, and reporting that back
+ * at them is noise.
+ */
+function payNoticeFor(outcome: PaymentOutcome): string | null {
+  if (outcome === 'cancelled') return null;
+  if (outcome === 'processing') {
+    return 'Still confirming your last payment. Try again in a moment.';
+  }
+  if (outcome === 'failed') return 'That payment did not go through. You can try again.';
+  return 'Could not open checkout. Check your connection and try again.';
+}
+
 export default function BookingRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -58,6 +76,29 @@ export default function BookingRoute() {
    * be told they clash with themselves).
    */
   const payHold = usePaymentRetry(bookingId);
+  /**
+   * What the last Book now press did, when it opened no checkout.
+   *
+   * Only `verified` used to be acted on, so every other outcome ended in silence — including
+   * `processing`, which is the ordinary answer while a slow payment attempt is still unresolved.
+   * The customer pressed a button, watched a spinner stop, and was told nothing.
+   */
+  const [payNotice, setPayNotice] = useState<string | null>(null);
+  /**
+   * The delayed retry is in flight.
+   *
+   * Kept separate from `payHold.retrying`, which is false while we are merely waiting. Without it
+   * the bar would go idle mid-recovery and invite a press that starts the whole thing again.
+   */
+  const [awaitingPayRetry, setAwaitingPayRetry] = useState(false);
+  /** Stops a pending retry from touching state after the screen has gone. */
+  const payAbandoned = useRef(false);
+  useEffect(() => {
+    payAbandoned.current = false;
+    return () => {
+      payAbandoned.current = true;
+    };
+  }, []);
   const extend = useExtensionCheckout();
   const cancelFlow = useCancelFlow(bookingId === '' ? null : bookingId, {
     onReschedule: () => router.push(`/reschedule/${bookingId}`),
@@ -114,11 +155,25 @@ export default function BookingRoute() {
          */
         onPayNow={() => {
           if (bookingId === '') return;
-          void payHold.retry().then((outcome) => {
-            if (outcome === 'verified') router.replace(`/booking/confirming?id=${bookingId}`);
-          });
+          setPayNotice(null);
+          setAwaitingPayRetry(true);
+          void payRetryingOnceWhileProcessing(payHold.retry)
+            .then((outcome) => {
+              // The screen may be gone: a customer who leaves mid-retry gets no state written
+              // under them, and no navigation they did not ask for.
+              if (payAbandoned.current) return;
+              if (outcome === 'verified') {
+                router.replace(`/booking/confirming?id=${bookingId}`);
+                return;
+              }
+              setPayNotice(payNoticeFor(outcome));
+            })
+            .finally(() => {
+              if (!payAbandoned.current) setAwaitingPayRetry(false);
+            });
         }}
-        paying={payHold.retrying}
+        paying={payHold.retrying || awaitingPayRetry}
+        payNotice={payNotice}
         /**
          * `275:4265` — "Extend" (task §15, the extension step of the service flow).
          *
