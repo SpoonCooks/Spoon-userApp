@@ -14,6 +14,7 @@ import {
   formatTimeLabel,
   homeFrom,
   minutesOverdue,
+  minutesRemainingUntil,
   minutesUntil,
 } from './adapters';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
@@ -202,7 +203,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
                   etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),
                   minutesLeft:
                     detailData.status === 'cooking'
-                      ? minutesUntil(detailData.timing.expectedEnd, serverNow)
+                      ? minutesRemainingUntil(detailData.timing.expectedEnd, serverNow)
                       : null,
                   // The same instant read the other way, so the badge can count up past it.
                   minutesOver:
