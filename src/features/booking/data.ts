@@ -1063,18 +1063,52 @@ export function useExtensionData(
     }
 
     /**
-     * The per-booking read wins wherever it exists.
+     * The LADDER is the catalogue's. FEASIBILITY is the per-booking read's. They are two
+     * different questions, and this used to answer both with one list.
      *
-     * Both sources publish `pricePaise` (the tile amount) and `totalAmountPaise` (the tax-inclusive
-     * CTA amount), so either can price the sheet honestly. The per-booking read is preferred
-     * because it prices THIS service — it also states each option's `newExpectedEnd` and omits any
-     * option the assigned cook's schedule cannot absorb, neither of which a catalogue can know.
+     * `(live ?? published)` took the per-booking read INSTEAD of the published ladder, and that
+     * read omits every length the assigned cook's schedule cannot absorb. So a length that was
+     * merely unavailable right now vanished from the sheet: a customer who could buy 10 and 20
+     * saw two tiles and no sign that 30 exists, and a service with no room at all lost the whole
+     * row. Nothing said why, and nothing distinguished "we do not sell that" from "not today".
+     *
+     * `275:4265` draws a third tile state for exactly this — `rgba(0,0,0,0.07)` with muted ink —
+     * and `PriceTile` has always rendered it. Only the data withheld the tiles.
+     *
+     * So the two sources are merged rather than chosen between: the catalogue supplies WHICH
+     * lengths exist, the per-booking read supplies which of them can be bought now, and a length
+     * in the first but not the second is drawn disabled instead of dropped.
+     *
+     * Both publish `pricePaise` (the tile amount) and `totalAmountPaise` (the tax-inclusive CTA
+     * amount), so either can price a tile honestly. The per-booking read still WINS on price
+     * where it has one, because it prices THIS service; the catalogue only supplies the lengths
+     * it never mentioned.
+     *
+     * `feasibleMinutes` is null — not empty — when the per-booking read has not answered, which
+     * is the case a booking that cannot be extended at all reaches (`canExtend` false, so the
+     * query never runs). Null means "feasibility unknown", and nothing is greyed on a guess.
+     * Empty means the server answered and the answer was none, which greys the whole ladder.
      */
-    const options = (live ?? published ?? []).map((option) => ({
-      minutes: option.minutes,
-      pricePaise: option.pricePaise,
-      totalAmountPaise: option.totalAmountPaise,
-    }));
+    const feasibleMinutes = live === null ? null : new Set(live.map((option) => option.minutes));
+
+    const priced = new Map<number, { pricePaise: number; totalAmountPaise: number }>();
+    for (const option of [...(published ?? []), ...(live ?? [])]) {
+      priced.set(option.minutes, {
+        pricePaise: option.pricePaise,
+        totalAmountPaise: option.totalAmountPaise,
+      });
+    }
+
+    const options = [...priced.entries()]
+      .map(([minutes, price]) => ({
+        minutes,
+        pricePaise: price.pricePaise,
+        totalAmountPaise: price.totalAmountPaise,
+        disabled: feasibleMinutes !== null && !feasibleMinutes.has(minutes),
+      }))
+      // Each source publishes its own order, so merging them makes neither authoritative. The
+      // ladder is sorted by the only thing it is a ladder of.
+      .sort((left, right) => left.minutes - right.minutes);
 
     if (options.length === 0) {
       return ready<ExtensionViewModel>(unofferedExtension());
@@ -1085,20 +1119,40 @@ export function useExtensionData(
      * actually offers rather than assumed: if operations stops selling 10 minutes the sheet opens
      * on the first option the server does offer, which is the designed "something is selected"
      * state without preselecting a length nobody published.
+     *
+     * Chosen from the SELECTABLE options only. A disabled tile that opened preselected would put
+     * a price on the bar for a length the server has already refused, one tap from a
+     * `POST /extensions` it would reject — the same trap `unofferedExtension` was written to
+     * avoid. With nothing selectable there is no default, so the bar carries no figure and the
+     * CTA stays inert, while the greyed ladder still says what exists.
      */
+    const selectable = options.filter((option) => !option.disabled);
+
     const drawnDefault = extensionMinutesFrom(DEMO_EXTENSION.defaultOptionId ?? null);
     const defaultOption =
-      options.find((option) => option.minutes === drawnDefault) ?? options[0] ?? null;
+      selectable.find((option) => option.minutes === drawnDefault) ?? selectable[0] ?? null;
 
     const chosenMinutes = extensionMinutesFrom(optionId) ?? defaultOption?.minutes ?? null;
-    const chosen = options.find((option) => option.minutes === chosenMinutes) ?? defaultOption;
+    const chosen = selectable.find((option) => option.minutes === chosenMinutes) ?? defaultOption;
+
+    /*
+     * The fixture's own `defaultOptionId` is dropped before anything is added back.
+     *
+     * Spreading `DEMO_EXTENSION` and then conditionally overriding does NOT clear it: omitting the
+     * key leaves the fixture's `ext-10` standing. `unofferedExtension` already destructures it away
+     * for the no-options case, and a ladder whose every length is disabled is the same hazard
+     * arriving by a new route — the sheet would open preselected on a greyed tile with a price on
+     * the bar, one tap from a `POST /extensions` the server has already refused.
+     */
+    const { defaultOptionId: _drawnDefaultId, ...extensionCopy } = DEMO_EXTENSION;
 
     const base: ExtensionViewModel = {
-      ...DEMO_EXTENSION,
+      ...extensionCopy,
       options: options.map((option) => ({
         id: extensionIdFor(option.minutes),
         label: `${option.minutes} mins`,
         price: formatPaise(option.pricePaise),
+        ...(option.disabled ? { disabled: true } : {}),
       })),
       ...(defaultOption === null ? {} : { defaultOptionId: extensionIdFor(defaultOption.minutes) }),
     };
