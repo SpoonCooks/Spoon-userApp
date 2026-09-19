@@ -98,14 +98,15 @@ describe('Select service location (53:31)', () => {
   });
 
   /**
-   * `53:63` — the field has to state the place the pin is on.
+   * `53:63` — the field must follow whoever decided what it says, and after a suggestion is
+   * chosen that decision is "nothing".
    *
    * It was seed-once local state remounted by a `key`, and on the live map that key is a constant,
-   * so it never remounted. Choosing "Laxmi Nagar" therefore moved the pin and rewrote the hook's
-   * `query` while the box went on showing the abandoned "Laxmi naga" the customer had typed — the
-   * field disagreeing with the pin directly beneath it.
+   * so it never remounted. Choosing "Laxmi Nagar" therefore moved the pin while the box went on
+   * showing the abandoned "Laxmi naga" the customer had typed — the field disagreeing with the pin
+   * directly beneath it. The override below is what carries the hook's decision into the input.
    */
-  it('shows the chosen place in full once the query is rewritten', () => {
+  it('empties the box when the hook clears the query after a choice', () => {
     const { rerender } = render(
       <AddressLocationView
         state={ready(DEMO_ADDRESS_LOCATION)}
@@ -116,16 +117,80 @@ describe('Select service location (53:31)', () => {
 
     expect(screen.getByTestId('address-search').props.value).toBe('Laxmi naga');
 
-    // What `chooseSuggestion` does: the whole place, primary AND locality.
+    // What `chooseSuggestion` does once the Places details land: the search is over.
     rerender(
       <AddressLocationView
         state={ready(DEMO_ADDRESS_LOCATION)}
         {...props}
-        map={{ ...mapProps, coordinates: POINT, query: 'Laxmi Nagar, Delhi' }}
+        map={{ ...mapProps, coordinates: POINT, query: '' }}
       />,
     );
 
-    expect(screen.getByTestId('address-search').props.value).toBe('Laxmi Nagar, Delhi');
+    expect(screen.getByTestId('address-search').props.value).toBe('');
+  });
+
+  /**
+   * The ✕ is an affordance for text that is there. Drawn over an empty field it is a control
+   * that does nothing, sitting where the placeholder ends.
+   */
+  it('shows the clear control only while the field has something in it', () => {
+    render(
+      <AddressLocationView
+        state={ready(DEMO_ADDRESS_LOCATION)}
+        {...props}
+        map={{ ...mapProps, coordinates: POINT, query: '' }}
+      />,
+    );
+
+    expect(screen.queryByTestId('address-search-clear')).toBeNull();
+
+    fireEvent.changeText(screen.getByTestId('address-search'), 'Indira');
+
+    expect(screen.getByTestId('address-search-clear')).toBeTruthy();
+  });
+
+  /**
+   * Pressing it empties the box and reports the empty edit, which is what drops the predictions
+   * and cancels the pending debounce — the same path as holding backspace, so the two cannot
+   * leave the screen in different states.
+   */
+  it('clears the field and reports an empty search when the ✕ is pressed', () => {
+    const onSearch = jest.fn();
+    render(
+      <AddressLocationView
+        state={ready(DEMO_ADDRESS_LOCATION)}
+        {...props}
+        map={{ ...mapProps, coordinates: POINT, query: '', onSearch }}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByTestId('address-search'), 'Indiranagar');
+    fireEvent.press(screen.getByTestId('address-search-clear'));
+
+    expect(onSearch).toHaveBeenLastCalledWith('');
+    expect(screen.getByTestId('address-search').props.value).toBe('');
+    expect(screen.queryByTestId('address-search-clear')).toBeNull();
+  });
+
+  /**
+   * The ✕ clears TEXT. The point the customer already chose is not text, and a control that
+   * silently emptied the map would cost them the place they had spent time framing.
+   */
+  it('leaves the pin, the map and Confirm alone when the ✕ is pressed', () => {
+    const onSettle = jest.fn();
+    render(
+      <AddressLocationView
+        state={ready(DEMO_ADDRESS_LOCATION)}
+        {...props}
+        map={{ ...mapProps, coordinates: POINT, query: 'Indiranagar', onSettle }}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('address-search-clear'));
+
+    expect(screen.getByTestId('address-map')).toBeTruthy();
+    expect(onSettle).not.toHaveBeenCalled();
+    expect(screen.getByTestId('address-confirm').props.accessibilityState?.disabled).toBeFalsy();
   });
 
   /** Typing still wins: an echo of the customer's own keystrokes must not fight them. */

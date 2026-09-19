@@ -511,23 +511,8 @@ export function useAddressLocation(): AddressLocationState {
     (placeId: string) => {
       // A chosen Places result is a customer point too - same retirement as a tap or a drag.
       userPointGeneration.current += 1;
-      const chosen = suggestions.find((suggestion) => suggestion.placeId === placeId);
       setSuggestions([]);
       setSearchState('idle');
-      /**
-       * The field is rewritten to the WHOLE place that was chosen — `mainText` and the locality
-       * under it, exactly as the row the customer tapped read.
-       *
-       * It used to take `primary` alone, which is only the first line of a two-line row: tapping
-       * "Laxmi Nagar / Delhi, India" left the box saying "Laxmi Nagar" and dropped the half that
-       * disambiguates it. Now the box states the same place the pin has moved to, in full, so the
-       * two agree and re-opening the field shows what the search actually resolved.
-       */
-      if (chosen !== undefined) {
-        setQuery(
-          chosen.secondary === '' ? chosen.primary : `${chosen.primary}, ${chosen.secondary}`,
-        );
-      }
       setLocating(true);
 
       void (async () => {
@@ -537,18 +522,47 @@ export function useAddressLocation(): AddressLocationState {
 
         if (!mounted.current) return;
         if (!details.ok) {
-          // The pin does NOT move to somewhere invented. The previous point stands and the
-          // customer can try another suggestion.
+          /**
+           * The pin does NOT move to somewhere invented. The previous point stands and the
+           * customer can try another suggestion.
+           *
+           * The QUERY stands too — which is why it is cleared below rather than up with the
+           * prediction list. Nothing was chosen in the end, so wiping the box here would make a
+           * flaky network cost the customer the whole phrase they had typed, on the one screen
+           * onboarding cannot skip.
+           */
           setLocating(false);
           setSearchState('error');
           return;
         }
+        /**
+         * The search is OVER, so the field empties.
+         *
+         * It has been through both of the other answers. It first kept whatever had been typed,
+         * which left the box reading "Laxmi naga" over a pin that had moved to Laxmi Nagar — the
+         * field openly disagreeing with the map under it. It was then rewritten to the whole
+         * chosen place, which fixed the disagreement by restating the answer: `53:58`'s resolved
+         * row already names the place the pin is on, so the same address was drawn twice on one
+         * screen, the second time in a box that still looked like a search in progress.
+         *
+         * Empty is neither. A blank field cannot contradict the pin, it reads as a search that
+         * has finished rather than one half-typed, and the placeholder goes back to inviting the
+         * next one. Nothing is lost: what the customer picked is under the pin and spelled out in
+         * the row beneath it, which is where an address they have CHOSEN belongs.
+         */
+        setQuery('');
         // SELECTION only. Choosing a search result must not navigate and must not ask the server
         // anything — the customer is still looking (task §6).
         select(details.value.coordinates, details.value.address);
       })();
     },
-    [suggestions, select],
+    /**
+     * `suggestions` is deliberately absent. Reading the chosen row back out of the list was only
+     * ever needed to copy its text into the field, and the field no longer takes it — so this
+     * callback's identity stops changing on every keystroke, and the prediction rows stop being
+     * handed a new `onPress` while the customer is reaching for one.
+     */
+    [select],
   );
 
   const message =
