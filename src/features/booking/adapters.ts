@@ -322,6 +322,12 @@ function cookViewModelFrom(
 ): CookViewModel {
   const content = cookCardContentFor(cook.profileCode);
   const photoUrl = cook.photoUrl ?? content?.photoUrl;
+  /*
+   * Only when the HOSTED photo won. If the bundled one is already the primary there is nothing
+   * behind it, and handing the card the same uri twice would make a failure retry itself.
+   */
+  const photoFallbackUrl =
+    cook.photoUrl === null || cook.photoUrl === undefined ? undefined : content?.photoUrl;
   const languages = cook.languages ?? [];
   const cuisine = cook.cuisines?.[0];
   const anyBadge =
@@ -331,6 +337,7 @@ function cookViewModelFrom(
     displayName: cook.name,
     firstName: cookFirstNameFrom(cook.name),
     ...(photoUrl === undefined || photoUrl === null ? {} : { photoUrl }),
+    ...(photoFallbackUrl === undefined || photoFallbackUrl === null ? {} : { photoFallbackUrl }),
     ...(cook.gender === null || cook.gender === undefined ? {} : { gender: cook.gender }),
     ...(cuisine === undefined ? {} : { cuisine }),
     ...(cook.region === null || cook.region === undefined ? {} : { homeState: cook.region }),

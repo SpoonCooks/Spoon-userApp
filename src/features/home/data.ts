@@ -26,6 +26,16 @@ import type { HomeViewModel } from './types';
 import type { BookingSummaryDto } from '@features/booking';
 
 /**
+ * The bundled transparent cut-out for a cook, by the SERVER's stable `profileCode`.
+ *
+ * Read twice per banner — once as the primary when no photo is hosted, once as the failure
+ * fallback when one is — so it is named rather than repeated, and the two can never diverge.
+ */
+function bundledCutoutFor(cook: { readonly profileCode?: string | null } | null | undefined) {
+  return cookCardContentFor(cook?.profileCode)?.cutoutPhotoUrl ?? null;
+}
+
+/**
  * Every booking Home's carousel should offer, ascending by date/time — a past/live booking
  * (earlier `scheduledStart`) sorts before an upcoming one, which is the requested reading order.
  *
@@ -194,10 +204,15 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
                   // The banner draws the TRANSPARENT cut-out over its `#FFF7CC` panel (`337:4364`).
                   // A hosted photo wins; otherwise the cook's stable profileCode resolves the
                   // bundled cut-out, and a cook with neither renders the banner without a photo.
-                  cookPhotoUrl:
-                    detailData.cook?.photoUrl ??
-                    cookCardContentFor(detailData.cook?.profileCode)?.cutoutPhotoUrl ??
-                    null,
+                  //
+                  // The bundled cut-out also rides along as the FAILURE fallback whenever the
+                  // hosted photo won, so a URL that 404s degrades to the tier it skipped rather
+                  // than to an empty panel. Both come from the same `cookCardContentFor` read.
+                  cookPhotoUrl: detailData.cook?.photoUrl ?? bundledCutoutFor(detailData.cook),
+                  cookPhotoFallbackUrl:
+                    detailData.cook?.photoUrl === null || detailData.cook?.photoUrl === undefined
+                      ? null
+                      : bundledCutoutFor(detailData.cook),
                   dateLabel: formatDateLabel(detailData.scheduledStart, serverNow),
                   timeLabel: formatTimeLabel(detailData.scheduledStart, detailData.durationMinutes),
                   etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),

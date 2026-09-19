@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
@@ -110,20 +111,36 @@ export function CookCard({
   const attributes = attributesOf(cook);
   const dishes = dishesFor(cook, variant);
 
+  /**
+   * A hosted photo that does not load falls back to the bundled photograph.
+   *
+   * `<Image>` reports the failure and then draws nothing, so a 404 left the panel blank — and a
+   * non-null `photoUrl` had already skipped the bundled tier, which made a BAD url worse than no
+   * url at all. Only a load FAILURE swaps; an absent photo is resolved upstream and still lands
+   * on the initials below. Keyed by the uri so a different cook starts fresh.
+   */
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const photoUrl =
+    cook.photoUrl !== undefined && cook.photoUrl === failedUri
+      ? cook.photoFallbackUrl
+      : cook.photoUrl;
+
   return (
     <View style={styles.card} testID={testID}>
       <View style={styles.identity}>
         <View style={styles.photo} testID={`${testID}-avatar`}>
-          {cook.photoUrl === undefined ? (
+          {photoUrl === undefined ? (
             <Text variant="heading" color="textPrimary" align="center">
               {initialsOf(cook.displayName)}
             </Text>
           ) : (
             <Image
-              source={{ uri: cook.photoUrl }}
+              source={{ uri: photoUrl }}
               style={styles.photoImage}
               resizeMode="cover"
               accessibilityIgnoresInvertColors
+              onError={() => setFailedUri(photoUrl)}
+              testID={`${testID}-photo`}
             />
           )}
         </View>

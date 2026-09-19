@@ -112,6 +112,34 @@ describe('the assigned-cook card is payload-driven', () => {
     expect(model.cook?.photoUrl).toBe(content?.photoUrl);
   });
 
+  /*
+   * `photoFallbackUrl` exists so a hosted photo that 404s degrades to the bundled tier it
+   * skipped, rather than to an empty panel. It is supplied ONLY when the hosted photo won:
+   * handing the card the same uri twice would make a failed load retry itself.
+   */
+  it('carries a failure fallback only when the server supplied the photo', () => {
+    const hosted = bookingDetailFrom({
+      base: DEMO_BOOKING_CONFIRMATION,
+      dto: detailWithCook({
+        ...JYOTI_CARD,
+        profileImageUrl: 'https://cdn.spoonhelp.com/cooks/jyoti.png',
+      }),
+    });
+
+    expect(hosted.cook?.photoUrl).toBe('https://cdn.spoonhelp.com/cooks/jyoti.png');
+    expect(hosted.cook?.photoFallbackUrl).toBe(cookCardContentFor('COOK_JYOTI')?.photoUrl);
+  });
+
+  it('carries no fallback when the bundled photograph is already the primary', () => {
+    const bundled = bookingDetailFrom({
+      base: DEMO_BOOKING_CONFIRMATION,
+      dto: detailWithCook(JYOTI_CARD),
+    });
+
+    expect(bundled.cook?.photoUrl).toBe(cookCardContentFor('COOK_JYOTI')?.photoUrl);
+    expect(bundled.cook?.photoFallbackUrl).toBeUndefined();
+  });
+
   it('renders an unknown cook honestly: no badges, no dishes, no borrowed photo', () => {
     const model = bookingDetailFrom({
       base: DEMO_BOOKING_CONFIRMATION,

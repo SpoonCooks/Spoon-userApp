@@ -60,6 +60,13 @@ export interface CookViewModel {
   readonly firstName: string;
   /** TODO(backend-contract): photo URL and any sizing parameters. */
   readonly photoUrl?: string;
+  /**
+   * The bundled photograph to draw if `photoUrl` FAILS TO LOAD, not if it is absent.
+   *
+   * Set only when `photoUrl` is a hosted URL, because that is the only case with anything behind
+   * it: where the bundled asset is already the primary there is nothing to fall back to.
+   */
+  readonly photoFallbackUrl?: string;
   /** TODO(backend-contract): free text vs enum. */
   readonly gender?: string;
   readonly cuisine?: string;
