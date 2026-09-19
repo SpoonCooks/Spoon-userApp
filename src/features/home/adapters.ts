@@ -77,6 +77,30 @@ export function minutesUntil(
 }
 
 /**
+ * Minutes of service LEFT until `iso` — the live card's "Time left", and only that.
+ *
+ * Separate from `minutesUntil` because the two badges round in opposite directions. An ETA is an
+ * estimate, so "Arriving in 12 mins" is best served by the NEAREST minute. A countdown is a
+ * promise against a paid duration, so it must round UP: a 30-minute service whose card says
+ * "29 mins" before the first minute has passed reads as a minute the customer has been charged
+ * for and not given.
+ *
+ * Kept in step with `formatRemaining` on the in-service banner on purpose. The two surfaces show
+ * the same booking, and rounding them differently had Home saying 30 while the booking screen
+ * said 29.
+ */
+export function minutesRemainingUntil(
+  iso: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (iso === null || iso === undefined) return null;
+  const target = new Date(iso);
+  if (Number.isNaN(target.getTime())) return null;
+  const minutes = Math.ceil((target.getTime() - now.getTime()) / 60_000);
+  return minutes < 0 ? 0 : minutes;
+}
+
+/**
  * The other half of `minutesUntil` — minutes SINCE an instant, 0 until it passes.
  *
  * `minutesUntil` floors at zero, which is right for "Arriving in" and wrong for the live card's

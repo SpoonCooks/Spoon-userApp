@@ -51,10 +51,24 @@ export interface InServiceBodyProps {
   readonly onViewDetails?: () => void;
 }
 
+/**
+ * The countdown figure, rounded UP to the whole minute.
+ *
+ * A 30-minute service opened at "29 mins". Nothing was missing from the booking: `expectedEnd` is
+ * `actualStart + purchased duration`, written at the Start OTP, so the full 30:00 is there. The
+ * customer's screen simply renders a few seconds after the cook verifies the OTP -- at 29:57 --
+ * and truncating that read 29. "30 mins" was only ever displayable in the instant the service
+ * began, which no render can catch.
+ *
+ * Ceiling is what a countdown means. The figure is time REMAINING, so it holds at 30 until a
+ * whole minute is actually gone and then ticks to 29; flooring answers a different question
+ * ("whole minutes behind us"), which is not what the caption above it promises.
+ *
+ * `formatOverrun` keeps flooring, deliberately: 29:57 PAST the end is 29 minutes over, and
+ * rounding an overrun up would overstate how late a service is running.
+ */
 function formatRemaining(ms: number): string {
-  const { hours, minutes } = splitDuration(ms);
-  const totalMinutes = hours * 60 + minutes;
-  return `${totalMinutes} mins`;
+  return `${Math.ceil(ms / 60_000)} mins`;
 }
 
 /**
