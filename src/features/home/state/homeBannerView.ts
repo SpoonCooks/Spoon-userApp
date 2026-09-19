@@ -124,6 +124,13 @@ export interface HomeBannerInput {
   /** `timing.expectedEnd` turned into minutes. The ONLY authority for "Time left". */
   readonly minutesLeft?: number | null;
   /**
+   * The same instant, measured the other way: minutes PAST `timing.expectedEnd`.
+   *
+   * `minutesLeft` floors at zero, so a service nobody has ended showed "0 mins" indefinitely under
+   * a "Time left" caption. Above zero this replaces both.
+   */
+  readonly minutesOver?: number | null;
+  /**
    * "Arrived at 1:12 PM" (`337:4307`).
    *
    * `timing.arrivedAt`, persisted by the backend arrival transition. `actualStart` is when service
@@ -168,6 +175,8 @@ const COPY = {
   captionArrivingIn: 'Arriving in',
   captionArrivedAt: 'Arrived at',
   captionTimeLeft: 'Time left',
+  /** Past the service end. No frame draws it; agreed with the product owner 2026-09-18. */
+  captionRunningOver: 'Running over',
   badgeConfirmed: 'Confirmed!',
   attention: 'Booking needs attention',
   badgeAttention: 'Needs attention',
@@ -180,6 +189,30 @@ const COPY = {
 
 function minutesBadge(minutes: number | null | undefined, fallback: string): string {
   return minutes === null || minutes === undefined ? fallback : `${minutes} mins`;
+}
+
+/**
+ * The live card's badge — counting down to the service end, or up from it.
+ *
+ * Hours are broken out only past the end, because only an overrun is unbounded: a countdown is
+ * capped by the booking, an overrun by nothing at all, and "230 mins" in a badge this size is
+ * unreadable where "3h 50m" is not.
+ */
+function liveBadge(input: HomeBannerInput): { caption: string; value: string } {
+  const over = input.minutesOver ?? 0;
+  if (over <= 0) {
+    return {
+      caption: COPY.captionTimeLeft,
+      value: minutesBadge(input.minutesLeft, COPY.badgeUnknown),
+    };
+  }
+
+  const hours = Math.floor(over / 60);
+  const minutes = over % 60;
+  return {
+    caption: COPY.captionRunningOver,
+    value: hours === 0 ? `${minutes} mins` : `${hours}h ${minutes}m`,
+  };
 }
 
 /**
@@ -273,8 +306,8 @@ export function homeBannerFor(input: HomeBannerInput): HomeBannerViewModel | nul
         ...identity,
         variant,
         title: COPY.live,
-        badgeCaption: COPY.captionTimeLeft,
-        badgeValue: minutesBadge(input.minutesLeft, COPY.badgeUnknown),
+        badgeCaption: liveBadge(input).caption,
+        badgeValue: liveBadge(input).value,
       };
 
     case 'rate':

@@ -772,6 +772,12 @@ function AddressSearchResults({
   );
 }
 
+/** The ✕'s glyph, matched to the magnifier on the other end of the field. */
+const SEARCH_CLEAR_GLYPH = 16;
+
+/** What that 16pt glyph needs on each side to reach the 44pt target. */
+const SEARCH_CLEAR_SLOP = (lightTheme.layout.minTouchTarget - SEARCH_CLEAR_GLYPH) / 2;
+
 /**
  * The search field. Seeded from the payload, owned by the user, and OVERRIDDEN whenever the value
  * handed in changes.
@@ -794,6 +800,14 @@ function AddressSearchResults({
  * Tracking the last value SEEN resolves both: local state still owns typing, and the incoming
  * value wins exactly once each time it actually changes — which is only when something other than
  * this input decided what the field should say.
+ *
+ * That override is also what empties the box when a suggestion is CHOSEN: the hook writes `query`
+ * back to `''` and this picks it up on the next render, so the field and the resolved row below
+ * the map never state the same address twice.
+ *
+ * It renders TWO nodes, inside the caller's `53:64` row rather than a wrapper of its own — the
+ * field's border, radius and shadow belong to that row, and nesting a second flex box inside it
+ * to hold the ✕ would draw the glyph in the row's centre instead of at its trailing edge.
  */
 function SearchInput({
   value,
@@ -815,19 +829,55 @@ function SearchInput({
   }
 
   return (
-    <TextInput
-      value={text}
-      onChangeText={(next) => {
-        setText(next);
-        onChange?.(next);
-      }}
-      placeholder={placeholder}
-      placeholderTextColor={lightTheme.colors.textPlaceholder}
-      accessibilityLabel={placeholder}
-      style={styles.searchInput}
-      returnKeyType="search"
-      testID="address-search"
-    />
+    <>
+      <TextInput
+        value={text}
+        onChangeText={(next) => {
+          setText(next);
+          onChange?.(next);
+        }}
+        placeholder={placeholder}
+        placeholderTextColor={lightTheme.colors.textPlaceholder}
+        accessibilityLabel={placeholder}
+        style={styles.searchInput}
+        returnKeyType="search"
+        testID="address-search"
+      />
+
+      {/*
+        `54:280`'s ✕, drawn INSIDE the field at its trailing edge.
+
+        Only while there is something to clear — an always-on ✕ over an empty field is a control
+        that does nothing, and it would sit where the placeholder ends.
+
+        It reports an EMPTY EDIT rather than calling a clear of its own: emptying the box by
+        holding backspace and emptying it by pressing this must leave the screen in one state, and
+        `search('')` already cancels the pending debounce, drops the predictions and returns the
+        field to `idle`. A second path to the same place is a second place for the two to diverge.
+
+        What it does NOT touch is the point. The pin, the resolved row and Confirm are all still
+        whatever the customer chose — clearing a text box is not un-choosing a location, and a ✕
+        that silently emptied the map would cost them the place they had already framed.
+
+        `hitSlop` rather than padding, the way `IconButton` and `Chip` do it: the field is drawn at
+        py 7.889 around a 16pt glyph, so a 44pt box would deepen the whole bar.
+      */}
+      {text === '' ? null : (
+        <Pressable
+          onPress={() => {
+            setText('');
+            onChange?.('');
+          }}
+          hitSlop={SEARCH_CLEAR_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search"
+          style={({ pressed }) => (pressed ? styles.pressed : null)}
+          testID="address-search-clear"
+        >
+          <Icon name="close" size={SEARCH_CLEAR_GLYPH} color="textSecondary" />
+        </Pressable>
+      )}
+    </>
   );
 }
 

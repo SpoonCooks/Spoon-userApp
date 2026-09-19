@@ -311,6 +311,34 @@ export const bookingRecoverySchema = z.object({
 
 export type BookingRecoveryDto = z.infer<typeof bookingRecoverySchema>;
 
+/**
+ * The rating a booking ALREADY carries, on the detail payload.
+ *
+ * `allowedActions.canRate` says whether a booking may still be rated, which is the only thing
+ * this payload used to carry -- and the completion screen was left inferring three facts from
+ * that one bit: whether a rating exists (fair), whether it was the `5+` appreciation (it cannot
+ * know), and whether WRITTEN feedback was given (it cannot know either). The result was a 4.5
+ * rendering as a lone "5+" chip, and "Thanks for sharing your feedback!" shown to a customer who
+ * wrote nothing.
+ *
+ * BACKEND_PENDING: none of these three fields is sent today. They are declared `nullish` so the
+ * app reads them the moment the backend adds them, and degrades to the in-memory rating until
+ * then (which survives only while the screen stays open). The names here are the contract asked
+ * for -- `ratingStars`, `ratingExceptional`, `ratingFeedback` -- and a different spelling on the
+ * wire is silently stripped by Zod rather than failing loudly, so they have to match.
+ *
+ * `ratingStars` is already published on `GET /v1/me/bookings*` (`bookingSummarySchema`), so this
+ * is the same field on a payload that lacks it, not a new concept.
+ */
+export const bookingRatingSchema = z.object({
+  /** 1..5 on a half-step scale, as `PUT /v1/bookings/:id/rating` accepts it. */
+  ratingStars: z.number().nullish(),
+  /** The `5+` appreciation, which is NOT the number 5 -- see `RATING_EXCEPTIONAL`. */
+  ratingExceptional: z.boolean().nullish(),
+  /** The words the customer wrote, or null when they rated without writing any. */
+  ratingFeedback: z.string().nullish(),
+});
+
 export const allowedActionsSchema = z.object({
   canCancel: z.boolean(),
   canReschedule: z.boolean(),
@@ -338,9 +366,32 @@ export const bookingDetailSchema = z.object({
   slotType: slotTypeSchema,
   scheduledStart: z.string().datetime().nullable(),
   durationMinutes: z.number().int().positive(),
+  /**
+   * `durationMinutes` plus every CONFIRMED extension, summed by the server.
+   *
+   * `durationMinutes` is the ORIGINAL priced duration and deliberately never moves -- pricing and
+   * capacity key off it, so a later, separately-priced add-on must not rewrite it. That leaves it
+   * unable to describe an extended service: the row would read "45 mins" beside a start and end
+   * 75 minutes apart.
+   *
+   * NOT computable here as `durationMinutes + extension.minutes`. `booking_extensions_one_live`
+   * only forbids a second CONCURRENT extension, so a booking may hold several confirmed rows,
+   * and `extension.minutes` names only the most recent -- that sum would under-report a
+   * twice-extended service by the earlier extension's minutes. The server sums every confirmed
+   * row, and guarantees the result agrees with `timing.expectedEnd - timing.actualStart`.
+   *
+   * BACKEND_PENDING: committed on `fix/booking-detail-rating-cancellation-fields`, not yet
+   * deployed. `nullish` so the app reads it the moment it lands and falls back to
+   * `durationMinutes` until then -- which is the correct answer for every unextended booking.
+   */
+  totalDurationMinutes: z.number().int().positive().nullish(),
   price: priceSchema,
   /** The payment hold. Past it, an unpaid booking is released by the worker. */
   holdExpiresAt: z.string().datetime().nullish(),
+  /** What the customer already rated, and whether they wrote anything. See `bookingRatingSchema`. */
+  ratingStars: z.number().nullish(),
+  ratingExceptional: z.boolean().nullish(),
+  ratingFeedback: z.string().nullish(),
   address: bookingAddressSchema,
   mealNotes: z.string().nullable(),
   referenceUrl: z.string().nullable(),

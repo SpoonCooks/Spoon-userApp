@@ -244,6 +244,35 @@ describe('a dismissed checkout keeps its hold for the retry', () => {
   });
 
   /**
+   * The code decides how the release is ATTRIBUTED. `ABANDONED_CHECKOUT` makes the server stamp
+   * `cancelledBy: 'system'`, so an automatic release is recorded exactly as the server's own
+   * expiry sweep records one. Under the old `OTHER` it landed as a customer cancellation —
+   * indistinguishable from someone who booked a cook and changed their mind.
+   *
+   * No detail is sent with it: the code says all of it, and `requiresDetail` is false, so any
+   * text would be dropped rather than stored.
+   */
+  it('releases under the dedicated code, with no free text', async () => {
+    let body: unknown;
+    const { outcomes, getByTestId, unmount } = renderSubmission({
+      ...BASE,
+      'GET /v1/bookings/bkg-held/cancellation-preview': preview(),
+      'POST /v1/bookings/bkg-held/cancel': (requestBody) => {
+        body = requestBody;
+        return {};
+      },
+    });
+
+    await waitFor(() => expect(getByTestId('can-submit')).toHaveTextContent('true'));
+    fireEvent.press(getByTestId('submit'));
+    await waitFor(() => expect(outcomes).toEqual(['cancelled']));
+
+    unmount();
+
+    await waitFor(() => expect(body).toEqual({ reasonCode: 'ABANDONED_CHECKOUT' }));
+  });
+
+  /**
    * The regression that made the first version of this do nothing at all.
    *
    * `chargeAmountPaise` is a BAND figure — a percentage of the service amount — and the server

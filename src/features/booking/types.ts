@@ -1,6 +1,12 @@
 import type { BookingDetailsViewModel } from './components/BookingDetailsSheet';
 import type { BookingView } from './state/bookingStatusView';
-import type { CookViewModel, DetailRow, DurationHelpContent, StatusTone } from '@ui';
+import type {
+  CookViewModel,
+  DetailRow,
+  DurationHelpContent,
+  RatingSelection,
+  StatusTone,
+} from '@ui';
 
 /**
  * Booking view models — UI shape only. TODO(backend-contract) applies to every field.
@@ -180,6 +186,20 @@ export interface InServiceViewModel {
   readonly statusTitle: string;
   readonly statusMessage: string;
   /**
+   * The same banner once the service has run PAST `endsAtMs`.
+   *
+   * A separate title and message rather than a computed variation of the two above: this is a
+   * different state, not a suffix. Copy lives on the model for the same reason every other string
+   * on this screen does -- a component that invented it would be making a product decision in a
+   * render function.
+   *
+   * No Figma frame covers this state; the wording was agreed with the product owner on
+   * 2026-09-18. The overrun FIGURE is not here because it changes every second -- `useCountdown`
+   * derives it from `endsAtMs` and the skew-corrected clock, like the countdown it replaces.
+   */
+  readonly overrunTitle: string;
+  readonly overrunMessage: string;
+  /**
    * Absolute server timestamp in epoch ms — `timing.expectedEnd`. The countdown renders from this.
    *
    * `null` where the server has published no session end. `useCountdown` treats that as "nothing
@@ -269,10 +289,41 @@ export interface CompletionViewModel {
   readonly tipRowLabel: string;
   readonly bookingHeadline: string;
   /**
-   * `319:3191` — a SERVER fact: the rating and feedback are already recorded. The component never
-   * sets this from a button press; pressing Submit reports upward and the next payload decides.
+   * `319:3191` — a SERVER fact: a rating is already recorded (`allowedActions.canRate === false`).
+   * The component never sets this from a button press; pressing Submit reports upward and the next
+   * payload decides.
+   *
+   * It says a rating EXISTS. It does not say what that rating was, and it says nothing at all
+   * about written feedback — the two fields below carry those, because reading them off this one
+   * is what made a 4.5 render as "5+" and thanked customers for feedback they never wrote.
    */
   readonly submitted?: boolean;
+  /**
+   * What the customer actually rated, so `319:3284` can draw the chosen numeral filled instead of
+   * collapsing every rating onto the `5+` chip.
+   *
+   * `'exceptional'` is the `5+` appreciation and deliberately not the number 5 — see
+   * `RATING_EXCEPTIONAL`. Absent means the server has not told us (BACKEND_PENDING), and the
+   * screen falls back to the rating still held in memory from this visit.
+   */
+  readonly submittedRating?: RatingSelection;
+  /**
+   * Whether WRITTEN feedback exists — the only honest gate on the acknowledgement block.
+   *
+   * A customer may rate without writing anything, which is the common case. Absent means the
+   * server has not told us, and the screen offers the textarea rather than thanking them for
+   * words that do not exist.
+   */
+  readonly feedbackGiven?: boolean;
+  /**
+   * The words the customer actually wrote, shown UNDER the acknowledgement.
+   *
+   * `319:3252` draws only the thank-you pill, which tells a customer their feedback was received
+   * but not what it said — so they cannot check what they sent, and a booking they open weeks
+   * later says nothing about it. Absent means the server has not sent it (BACKEND_PENDING); the
+   * screen then shows what was typed in this visit, and nothing at all once that is gone.
+   */
+  readonly feedbackText?: string;
 }
 
 /**

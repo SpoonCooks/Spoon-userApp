@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
-import { BOOKING_COMPLETE_ART, RatingWidget, Text, lightTheme } from '@ui';
+import { BOOKING_COMPLETE_ART, RATING_EXCEPTIONAL, RatingWidget, Text, lightTheme } from '@ui';
 import type { CookViewModel, RatingSelection } from '@ui';
 
 import { SERVICE_SECTION_GAP, ServiceSection } from './ServiceSection';
@@ -49,7 +49,14 @@ export interface CompletionBodyProps {
   readonly cook?: CookViewModel;
   readonly rating: RatingSelection | null;
   readonly onChangeRating: (value: RatingSelection) => void;
-  readonly onSubmitFeedback: (feedback: string) => void;
+  /**
+   * Returns a promise so the acknowledgement can wait for the request to SUCCEED.
+   *
+   * A local "I pressed Submit" flag would show the thank-you state after a request that failed.
+   * Resolving is the earliest honest moment, and the server fact (`feedbackGiven`) takes over on
+   * the next payload.
+   */
+  readonly onSubmitFeedback: (feedback: string) => void | Promise<unknown>;
   /** `308:3122` — opens `306:2885`. A seam; nothing about the tip is decided here. */
   readonly onOpenTip?: () => void;
 }
@@ -63,7 +70,50 @@ export function CompletionBody({
   onOpenTip,
 }: CompletionBodyProps) {
   const [feedback, setFeedback] = useState('');
+  /**
+   * Feedback accepted by the server DURING this visit.
+   *
+   * Only set when `onSubmitFeedback` resolves, never on the press itself, so a failed request
+   * leaves the textarea and the customer's words where they were. `completion.feedbackGiven` is
+   * the durable answer and supersedes this on the next payload.
+   */
+  const [feedbackAccepted, setFeedbackAccepted] = useState(false);
+
+  /** A rating exists. It does NOT say which one, nor that anything was written. */
   const submitted = completion.submitted === true;
+
+  /**
+   * WHICH rating to draw: the server's if it has one, otherwise the choice still held in memory
+   * from this visit. Falling back matters because the payload carries no rating today
+   * (BACKEND_PENDING) -- without it, reopening a rated booking draws an empty scale.
+   */
+  const shownRating = completion.submittedRating ?? rating;
+  const exceptional = shownRating === RATING_EXCEPTIONAL;
+
+  /**
+   * `383:765` is the finished state for the `5+` APPRECIATION only. `319:3284` is the finished
+   * state for a numeric rating, and it keeps the nine-chip scale with the chosen numeral filled.
+   *
+   * Collapsing both onto `383:765` is what made a 4.5 display as a lone "5+" chip: the scale was
+   * dropped on any submission while the `5+` row was drawn unconditionally, so the only number
+   * left on screen was one the customer had not chosen.
+   *
+   * The `5+` row is a CONTROL, not a legend, so once a numeric rating is in it goes away with the
+   * rest of the choosing -- there is nothing left to choose.
+   */
+  const showExceptionalPrompt = !submitted || exceptional;
+
+  /** Written feedback exists — the only thing that earns the acknowledgement. */
+  const feedbackDone = completion.feedbackGiven === true || feedbackAccepted;
+
+  /**
+   * The words to show back, server's first.
+   *
+   * `feedback` is what is still in the textarea from this visit, which is the only copy available
+   * until the payload carries `ratingFeedback` (BACKEND_PENDING). Trimmed to the same shape the
+   * submission sent, so the card shows what was stored rather than the stray whitespace around it.
+   */
+  const shownFeedback = completion.feedbackText ?? (feedbackAccepted ? feedback.trim() : '');
 
   return (
     <View style={styles.container} testID="completion-body">
@@ -120,12 +170,17 @@ export function CompletionBody({
 
         <View style={styles.ratingScale}>
           <RatingWidget
-            value={rating}
+            value={shownRating}
             onChange={onChangeRating}
-            showExceptionalPrompt
+            showExceptionalPrompt={showExceptionalPrompt}
             promptText={submitted ? completion.ratedCaption : completion.ratingCaption}
-            /* `319:3217` — once the rating is in, the frame keeps the legend and drops the scale. */
-            showScale={!submitted}
+            /*
+             * The widget drops the scale itself when the selection is `5+` (`383:765`), so this
+             * stays open and a NUMERIC rating keeps its scale with the chosen chip filled.
+             */
+            showScale
+            /* A recorded rating cannot be changed — the server has already refused further ones. */
+            disabled={submitted}
             testID="completion-rating"
           />
         </View>
@@ -133,14 +188,34 @@ export function CompletionBody({
 
       {/* `143:286` — feedback. */}
       <View style={styles.feedback}>
+        {/*
+          The line ABOVE the box is the one that speaks to the customer; the box holds their words.
+
+          Before feedback exists it asks for some. After it exists it thanks them for it -- and the
+          box below then contains what they actually wrote and nothing else. The acknowledgement
+          used to sit INSIDE the box above the words, under a heading still asking for feedback
+          that had already been given: the card said "we appreciate any feedback" and "thanks for
+          sharing your feedback" at once, one above the other, about the same sentence.
+
+          `319:3252` is the acknowledgement, `143:286` the invitation. One or the other, never both.
+        */}
         <Text variant="bodyStrong" color="textPrimary" align="center">
-          {completion.feedbackTitle}
+          {feedbackDone ? completion.feedbackAcknowledgement : completion.feedbackTitle}
         </Text>
-        {submitted ? (
-          <View style={styles.input} testID="completion-feedback-submitted">
-            <Text variant="bodyMedium" color="textField">
-              {completion.feedbackAcknowledgement}
-            </Text>
+        {/*
+          The acknowledgement belongs to feedback that EXISTS.
+
+          It used to be drawn whenever a rating had been recorded, so a customer who rated and
+          wrote nothing was thanked for sharing feedback, in the box where their words would have
+          been. Rating and writing are separate acts; a rating does not imply a sentence.
+        */}
+        {feedbackDone ? (
+          <View style={[styles.input, styles.submittedCard]} testID="completion-feedback-submitted">
+            {shownFeedback === '' ? null : (
+              <Text variant="bodyMedium" color="textField" testID="completion-feedback-text">
+                {shownFeedback}
+              </Text>
+            )}
           </View>
         ) : (
           <TextInput
@@ -154,9 +229,25 @@ export function CompletionBody({
             testID="completion-feedback"
           />
         )}
-        {submitted ? null : (
+        {/*
+          Still offered after a rating, because writing is the half that has not happened yet.
+          The customer can come back and say something without re-rating.
+        */}
+        {feedbackDone ? null : (
           <Pressable
-            onPress={() => onSubmitFeedback(feedback)}
+            onPress={() => {
+              const words = feedback.trim();
+              if (words === '') return;
+              // Acknowledged only once the server has it — see `feedbackAccepted`.
+              void Promise.resolve(onSubmitFeedback(feedback))
+                .then(() => {
+                  setFeedbackAccepted(true);
+                })
+                .catch(() => {
+                  // Left exactly as it was, words included, so the customer can try again. The
+                  // mutation owns the error; nothing here claims the feedback landed.
+                });
+            }}
             disabled={feedback.trim().length === 0}
             accessibilityRole="button"
             accessibilityLabel={completion.submitLabel}
@@ -280,6 +371,19 @@ const styles = StyleSheet.create({
     borderColor: lightTheme.colors.surfacePositiveBright,
     backgroundColor: lightTheme.colors.surface,
   },
+  /**
+   * The same `143:289` card, holding two stacked lines instead of one centred one.
+   *
+   * `minHeight` replaces the frame's fixed 103 because the customer's own words are in here now
+   * and they are not a fixed length; `flex-start` stops a short acknowledgement floating in the
+   * middle with the feedback pushed off centre beneath it.
+   */
+  submittedCard: {
+    height: undefined,
+    minHeight: 103,
+    justifyContent: 'flex-start',
+    gap: lightTheme.space.s6,
+  },
   inputField: {
     color: lightTheme.colors.textField,
     textAlignVertical: 'top',
@@ -288,8 +392,18 @@ const styles = StyleSheet.create({
   /** `143:292` — a CENTRED 102 × 25 `#E2FF68` chip at a 5pt radius. */
   submit: {
     alignSelf: 'center',
-    width: 102,
-    height: 25,
+    /*
+     * `102 x 25` is the frame's geometry, held as a MINIMUM rather than a fixed size.
+     *
+     * At a fixed 102 with no padding the label had exactly 102pt to live in, and "SUBMIT" --
+     * uppercased by `buttonUpper` -- did not fit on a Galaxy S21 at its default font scale: the
+     * button read "SUBMI". A customer at a larger accessibility scale loses more. The box now
+     * grows with its own text and keeps the designed size wherever the text fits inside it.
+     */
+    minWidth: 102,
+    minHeight: 25,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: lightTheme.radius.r5,

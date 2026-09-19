@@ -12,6 +12,7 @@ import { assertNever } from '@core/render';
 import { useRuntime } from '@core/runtimeContext';
 import { useAddresses } from '@features/address';
 import { availabilityKeys, useInstantAvailability } from '@features/availability';
+import type { InstantAvailabilityDto } from '@features/availability';
 import { useCatalogue } from '@features/catalogue';
 import {
   CheckoutCancelledError,
@@ -325,6 +326,21 @@ function blockedIconFor(reason: string | undefined): 'moon' | 'calendar' {
  * address or no selection there is nothing to ask, and the sheet renders the catalogue's grid
  * without claiming that a cook is available.
  */
+/**
+ * "15 mins" for the arrival row, or empty where there is nothing honest to put in it.
+ *
+ * The server's per-address estimate first, its fixed promise second, nothing third. Same order
+ * Home applies, so the two screens cannot disagree about which source wins.
+ */
+function etaMinutesFor(live: InstantAvailabilityDto | null): string {
+  if (live === null || live.available !== true) return '';
+
+  const estimated = live.projectedArrival?.etaMinutes;
+  if (typeof estimated === 'number' && estimated > 0) return `${Math.round(estimated)} mins`;
+
+  return live.arrivalTargetMinutes > 0 ? `${live.arrivalTargetMinutes} mins` : '';
+}
+
 export function useInstantData(
   selection: { durationId?: string | null } = {},
 ): ScreenQuery<InstantViewModel> {
@@ -362,18 +378,30 @@ export function useInstantData(
     const base: InstantViewModel = {
       ...DEMO_INSTANT_AVAILABLE,
       /*
-       * The arrival PROMISE, not an ETA. `25:1751` draws it as "Arriving in 18 mins". Once
-       * availability answers, its own target supersedes the catalogue's.
+       * The REAL estimate, the same one Home states -- `projectedArrival.etaMinutes`, computed by
+       * the server for this address from route time to its gate, when the candidate cook comes
+       * free, and the preparation allowance.
        *
-       * EMPTY while instant is unavailable, which drops the whole row: the sheet states a time
-       * the operation can meet, and `NO_PRESENT_COOK` means there is no one to meet it. The row
-       * returns by itself the moment `available` is true again -- there is no flag to unset.
+       * `25:1751` draws this row as "Arriving in 18 mins", and it read `arrivalTargetMinutes`:
+       * the operating promise, which the backend locks to one figure for every customer and every
+       * address. So the sheet stated a fixed number beside a price and a duration that are both
+       * specific to the booking being made.
+       *
+       * It may legitimately DIFFER from Home's figure. Home probes the shortest duration the
+       * catalogue sells; this asks about the duration actually chosen, and a longer booking needs
+       * a cook free for longer, which can select a different candidate. They are answers to two
+       * different questions, and each screen shows the one it asked.
+       *
+       * The promise remains the fallback for when no candidate exists, and the row is EMPTY while
+       * instant is unavailable -- the sheet states a time the operation can meet, and
+       * `NO_PRESENT_COOK` means there is no one to meet it. It returns by itself the moment
+       * `available` is true again; there is no flag to unset.
        *
        * Unresolved availability counts as unavailable for the same reason Home treats it that
        * way: showing a promise on the strength of not having asked, then withdrawing it a moment
        * later, is a flicker and a claim with nothing behind it.
        */
-      etaLabel: live?.available === true ? `${live.arrivalTargetMinutes} mins` : '',
+      etaLabel: etaMinutesFor(live),
       durations: data.durations.map((duration) => ({
         id: durationIdFor(duration.durationMinutes),
         label: durationLabelFor(duration.durationMinutes),
@@ -769,15 +797,28 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
 /**
  * The reason a released hold is recorded under.
  *
- * BACKEND_PENDING: `GET /v1/catalogue` publishes exactly ONE cancellation reason today — `OTHER`,
- * which requires a detail — and none that means "the customer abandoned checkout". `OTHER` plus
- * an explicit detail is the honest use of what exists; borrowing a reason like "Booked by
- * mistake" would put words in the customer's mouth, and inventing a code the catalogue never
- * published is the client-side invention this app's boundary forbids. Replace both the moment a
- * dedicated code exists, so these releases stop counting as customer cancellations.
+ * This used to be `OTHER` plus a free-text detail, because the catalogue published nothing that
+ * meant "the customer abandoned checkout" — so every automatic release landed in the data as a
+ * CUSTOMER cancellation, indistinguishable from someone who booked a cook and changed their mind.
+ *
+ * The backend now publishes a dedicated code, and stamps `cancelledBy: 'system'` whenever it is
+ * used — unconditionally, not at the caller's discretion — so a release recorded through this
+ * route is identical to one the server's own expiry sweep records. No detail is sent: the code
+ * says all of it, and `requiresDetail` is false, so any text would be dropped rather than stored.
+ *
+ * NOT offered to a human — see `CLIENT_ONLY_CANCELLATION_REASONS`.
  */
-const ABANDONED_HOLD_REASON = 'OTHER';
-const ABANDONED_HOLD_DETAIL = 'Released automatically: checkout was closed without paying.';
+export const ABANDONED_HOLD_REASON = 'ABANDONED_CHECKOUT';
+
+/**
+ * Reason codes this APP sends programmatically, which the catalogue publishes like any other.
+ *
+ * Nothing on the wire marks them as machine-only, so the cancellation sheet — which renders the
+ * published list verbatim — would otherwise offer "abandoned checkout" to a customer choosing why
+ * they are cancelling a real booking. Filtering happens here, against the codes this app actually
+ * sends, so the list and the sender can never drift apart.
+ */
+export const CLIENT_ONLY_CANCELLATION_REASONS: readonly string[] = [ABANDONED_HOLD_REASON];
 
 /**
  * Give back the slot a dismissed checkout left held.
@@ -831,7 +872,7 @@ async function releaseAbandonedHold(
 
     await bookings.cancel(
       bookingId,
-      { reasonCode: ABANDONED_HOLD_REASON, reasonDetail: ABANDONED_HOLD_DETAIL },
+      { reasonCode: ABANDONED_HOLD_REASON },
       `booking.release:${bookingId}`,
     );
 
@@ -953,7 +994,27 @@ export function useExtensionData(
   selection: { bookingId?: string | null; optionId?: string | null } = {},
 ): ScreenQuery<ExtensionViewModel> {
   const catalogue = useCatalogue();
-  const bookingOptions = useExtensionOptions(selection.bookingId ?? null);
+
+  /**
+   * The per-booking read is asked for ONLY where the server says the booking can be extended.
+   *
+   * `allowedActions.canExtend` was parsed and then read by nothing, so every booking detail screen
+   * asked for extension options on mount whatever the status -- and a booking that is over cannot
+   * be extended, so the server correctly refused: 409 `INVALID_BOOKING_STATE` on a completed one,
+   * 404 on one with no session at all. Nothing broke, because the sheet falls back to the
+   * catalogue's published options, which is why it went unnoticed. What it cost was a failed round
+   * trip on every past booking anyone opened, and a log full of expected 409s for a real failure
+   * to hide in.
+   *
+   * This observes the SAME query `useBookingDetailData` already runs -- same key, same cache
+   * entry, no second request -- so the flag is read where the decision is made rather than
+   * threaded down through the screen.
+   */
+  const detail = useBookingDetail(selection.bookingId ?? null);
+  const canExtend =
+    detail.state.status === 'ready' ? detail.state.data.allowedActions.canExtend : false;
+
+  const bookingOptions = useExtensionOptions(canExtend ? (selection.bookingId ?? null) : null);
   const optionId = selection.optionId ?? null;
 
   const state = useMemo(() => {
@@ -1093,7 +1154,14 @@ export function useBookingDetailData(bookingId: string): ScreenQuery<BookingDeta
     remote.state.status === 'ready' &&
     remote.state.data.status === 'cancelled' &&
     remote.state.data.cancellation?.cancelledBy === 'system';
-  const refunds = useBookingRefunds(isDev || !autoCancelled ? null : bookingId);
+  /*
+   * `bookingId === ''` guarded explicitly, not just `!autoCancelled`: the route host
+   * (`app/(app)/booking/[id].tsx`) falls back to `''`, not `null`, while Expo Router's `id`
+   * param is momentarily unresolved -- the same reason it guards `useCallCook`/`useCancelFlow`
+   * the same way. `useBookingRefunds`'s own `enabled` check only tests `!== null`, so an empty
+   * string reached it uncaught and became `GET /v1/bookings//refunds`, a guaranteed 400.
+   */
+  const refunds = useBookingRefunds(isDev || !autoCancelled || bookingId === '' ? null : bookingId);
 
   const devSample = useMemo(() => {
     if (!isDev) return null;

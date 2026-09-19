@@ -174,6 +174,21 @@ jest.mock('react-native-maps', () => {
   };
 });
 
+/**
+ * Firebase messaging — the iOS token source.
+ *
+ * Android never reaches it (the provider branches on `Platform.OS`), but the module is imported
+ * at the top of the provider either way, so every test that touches push needs it stubbed. The
+ * default is a real-looking token: a test that cares asserts on the value, and one that does not
+ * gets a working path rather than a throw.
+ */
+jest.mock('@react-native-firebase/messaging', () => ({
+  getMessaging: jest.fn(() => ({})),
+  getToken: jest.fn(async () => 'fcm-ios-token'),
+  isDeviceRegisteredForRemoteMessages: jest.fn(() => true),
+  registerDeviceForRemoteMessages: jest.fn(async () => undefined),
+}));
+
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { DEFAULT: 3 },
   setNotificationHandler: jest.fn(),
@@ -183,6 +198,9 @@ jest.mock('expo-notifications', () => ({
   getDevicePushTokenAsync: jest.fn(async () => {
     throw new Error('No push token in the test environment');
   }),
+  // The rotation listener the push hook subscribes to. Absent here, any test that mounted the
+  // hook died on "not a function" rather than on anything it was written to check.
+  addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
 }));

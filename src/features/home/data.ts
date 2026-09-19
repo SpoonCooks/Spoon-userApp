@@ -13,6 +13,7 @@ import {
   formatDateLabel,
   formatTimeLabel,
   homeFrom,
+  minutesOverdue,
   minutesUntil,
 } from './adapters';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
@@ -203,6 +204,11 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
                     detailData.status === 'cooking'
                       ? minutesUntil(detailData.timing.expectedEnd, serverNow)
                       : null,
+                  // The same instant read the other way, so the badge can count up past it.
+                  minutesOver:
+                    detailData.status === 'cooking'
+                      ? minutesOverdue(detailData.timing.expectedEnd, serverNow)
+                      : null,
                   arrivedAtLabel: formatClockLabel(detailData.timing.arrivedAt),
                   canRate: detailData.allowedActions.canRate,
                   cancelledBy: detailData.cancellation?.cancelledBy ?? null,
@@ -236,10 +242,41 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
      */
     const instantAvailable =
       instantAvailability.state.status === 'ready' && instantAvailability.state.data.available;
-    const promiseMinutes =
-      instantAvailable && catalogue.state.status === 'ready'
+
+    /**
+     * The minutes Home states, from the REAL estimate where one exists.
+     *
+     * `projectedArrival.etaMinutes` is computed per request for this address: route time to its
+     * gate from the candidate cook, plus when that cook comes free, plus the preparation
+     * allowance. It is the only number here that reflects anything about actual supply.
+     *
+     * Both figures it replaces are the same fixed 30. `catalogue.instant.arrivalPromiseMinutes`
+     * is the published promise, and `arrivalTargetMinutes` on the availability response is that
+     * same promise echoed back -- the backend locks it to exactly 30 by DEC-019 and two
+     * validators, so reading either one could never have shown a customer anything else. Home
+     * said "Spoon in 30 mins" to everybody, everywhere, at every hour, while the honest answer
+     * was already on the wire and being dropped by a schema that did not declare it.
+     *
+     * The promise remains the FALLBACK, which is its honest use: no candidate means nothing to
+     * estimate from, and the operating promise is then the truest thing left to say. Absent both,
+     * the minutes are removed rather than invented.
+     */
+    const estimated =
+      instantAvailability.state.status === 'ready'
+        ? instantAvailability.state.data.projectedArrival?.etaMinutes
+        : null;
+    const promised =
+      catalogue.state.status === 'ready'
         ? catalogue.state.data.instant.arrivalPromiseMinutes
         : null;
+
+    const promiseMinutes = !instantAvailable
+      ? null
+      : typeof estimated === 'number' && estimated > 0
+        ? Math.round(estimated)
+        : typeof promised === 'number' && promised > 0
+          ? promised
+          : null;
 
     return ready(
       homeFrom({

@@ -77,6 +77,10 @@ function bookingDto(overrides: {
   reassignment?: unknown;
   recovery?: unknown;
   cancellation?: unknown;
+  /** What the booking already carries — see `bookingRatingSchema`. */
+  ratingStars?: number;
+  ratingExceptional?: boolean;
+  ratingFeedback?: string;
 }): Record<string, unknown> {
   return {
     id: BOOKING_ID,
@@ -86,6 +90,11 @@ function bookingDto(overrides: {
     durationMinutes: 60,
     price: PRICE,
     holdExpiresAt: null,
+    ...(overrides.ratingStars === undefined ? {} : { ratingStars: overrides.ratingStars }),
+    ...(overrides.ratingExceptional === undefined
+      ? {}
+      : { ratingExceptional: overrides.ratingExceptional }),
+    ...(overrides.ratingFeedback === undefined ? {} : { ratingFeedback: overrides.ratingFeedback }),
     address: ADDRESS,
     mealNotes: null,
     referenceUrl: null,
@@ -368,6 +377,103 @@ describe('booking lifecycle from real DTOs', () => {
     jest.useRealTimers();
   });
 
+  /**
+   * 12a past its end — the state a customer sits in when nobody has ended the service.
+   *
+   * The countdown floored at zero, so this screen read "Time left to service end / 0 mins" for as
+   * long as the session stayed open, identically at one minute over and at four hours over. Found
+   * on a booking that had been `cooking` for hours; the extension it had bought was applied
+   * correctly and the countdown still said nothing.
+   */
+  it('counts up past timing.expectedEnd rather than sitting on 0 mins', async () => {
+    jest.useFakeTimers();
+    // 3h 50m after the end below.
+    jest.setSystemTime(new Date('2026-08-20T11:35:00.000Z'));
+
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+        booking: bookingDto({
+          status: 'cooking',
+          timing: {
+            arrivedAt: '2026-08-20T06:40:00.000Z',
+            actualStart: '2026-08-20T06:45:00.000Z',
+            expectedEnd: '2026-08-20T07:45:00.000Z',
+          },
+          allowedActions: { canExtend: true },
+        }),
+      }),
+      [`GET /v1/bookings/${BOOKING_ID}/tracking`]: () =>
+        trackingDto({
+          status: 'cooking',
+          eta: { estimatedArrivalAt: null, updatedAt: null },
+          serviceOtp: { start: null, end: '907' },
+        }),
+    });
+
+    await jest.advanceTimersByTimeAsync(50);
+
+    expect(screen.getByTestId('in-service-body')).toBeTruthy();
+    expect(screen.getByText('3h 50m')).toBeTruthy();
+    expect(screen.getByText('Service time complete')).toBeTruthy();
+    expect(screen.getByText('Running over by')).toBeTruthy();
+    // The promise it can no longer keep is gone.
+    expect(screen.queryByText('Time left to service end')).toBeNull();
+    expect(screen.queryByText('0 mins')).toBeNull();
+
+    jest.useRealTimers();
+  });
+
+  /**
+   * The extension read is a question only a LIVE booking can answer.
+   *
+   * `allowedActions.canExtend` was parsed and read by nothing, so this screen asked for extension
+   * options on mount for every booking it drew. A booking that is over cannot be extended, and the
+   * server said so -- 409 `INVALID_BOOKING_STATE` on a completed one, 404 on one with no session.
+   * Nothing broke, because the sheet falls back to the catalogue's published options, so the only
+   * cost was a doomed round trip on every past booking and a log full of expected failures for a
+   * real one to hide behind. Seen on a device, twice, in one session.
+   */
+  describe('extension options are asked for only where they can exist', () => {
+    it('does not ask about extending a booking the server says cannot be extended', async () => {
+      const asked = jest.fn(() => ({ options: [] }));
+
+      renderBooking({
+        [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+          booking: bookingDto({ status: 'completed', allowedActions: { canExtend: false } }),
+        }),
+        [`GET /v1/bookings/${BOOKING_ID}/extension-options`]: asked,
+      });
+
+      await settle();
+
+      expect(screen.getByTestId('completion-body')).toBeTruthy();
+      expect(asked).not.toHaveBeenCalled();
+    });
+
+    it('still asks while the booking is live and the server allows it', async () => {
+      const asked = jest.fn(() => ({ options: [] }));
+
+      renderBooking({
+        [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+          booking: bookingDto({
+            status: 'cooking',
+            timing: {
+              arrivedAt: '2026-08-20T06:40:00.000Z',
+              actualStart: '2026-08-20T06:45:00.000Z',
+              expectedEnd: '2026-08-20T07:45:00.000Z',
+            },
+            allowedActions: { canExtend: true },
+          }),
+        }),
+        [`GET /v1/bookings/${BOOKING_ID}/extension-options`]: asked,
+      });
+
+      await settle();
+
+      expect(asked).toHaveBeenCalled();
+    });
+  });
+
   it('renders 14a Completion, and 14b once the server says it may no longer be rated', async () => {
     const { unmount } = renderBooking({
       [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
@@ -390,7 +496,7 @@ describe('booking lifecycle from real DTOs', () => {
     expect(screen.queryByText('12th April • 1:15 PM • 1 hr')).toBeNull();
     unmount();
 
-    renderBooking({
+    const { unmount: unmountRated } = renderBooking({
       [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
         booking: bookingDto({
           status: 'completed',
@@ -405,7 +511,75 @@ describe('booking lifecycle from real DTOs', () => {
     });
     await settle();
 
+    /*
+     * `canRate: false` means a RATING exists. It does not mean anything was written, and this
+     * payload carries no feedback -- so the textarea is still offered and nobody is thanked for
+     * words they never wrote. That untruth is what this assertion used to pin.
+     */
+    expect(screen.getByTestId('completion-feedback')).toBeTruthy();
+    expect(screen.queryByText('Thanks for sharing your feedback!')).toBeNull();
+    unmountRated();
+  });
+
+  /** The acknowledgement follows the server's OWN record of the words, nothing else. */
+  it('acknowledges feedback only when the payload carries some', async () => {
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+        booking: bookingDto({
+          status: 'completed',
+          timing: {
+            actualStart: '2026-08-20T06:30:00.000Z',
+            expectedEnd: '2026-08-20T07:30:00.000Z',
+            actualEnd: '2026-08-20T07:28:00.000Z',
+          },
+          allowedActions: { canRate: false, canTip: true },
+          ratingStars: 4.5,
+          ratingFeedback: 'The dal was perfect.',
+        }),
+      }),
+    });
+    await settle();
+
     expect(screen.getByText('Thanks for sharing your feedback!')).toBeTruthy();
+    /*
+     * The thanks is the line ABOVE the box, and the box holds the words alone.
+     *
+     * Both lines used to be on screen together -- "We appreciate any feedback that helps us
+     * improve!" as the heading, with "Thanks for sharing your feedback!" inside the box above the
+     * sentence it was thanking them for. The card asked for feedback and acknowledged it at the
+     * same time, about the same words.
+     */
+    expect(screen.queryByText('We appreciate any feedback that helps us improve!')).toBeNull();
+    expect(screen.getByTestId('completion-feedback-text').props.children).toBe(
+      'The dal was perfect.',
+    );
+    // And the rating drawn is the one recorded, not the `5+` chip.
+    expect(screen.getByTestId('completion-rating-4.5')).toBeTruthy();
+    expect(screen.queryByTestId('completion-rating-prompt')).toBeNull();
+  });
+
+  /** The other half: with nothing written, the card INVITES feedback and thanks nobody. */
+  it('asks for feedback, and does not thank anyone, when none was written', async () => {
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+        booking: bookingDto({
+          status: 'completed',
+          timing: {
+            actualStart: '2026-08-20T06:30:00.000Z',
+            expectedEnd: '2026-08-20T07:30:00.000Z',
+            actualEnd: '2026-08-20T07:28:00.000Z',
+          },
+          allowedActions: { canRate: false, canTip: true },
+          ratingStars: 4.5,
+        }),
+      }),
+    });
+    await settle();
+
+    expect(screen.getByText('We appreciate any feedback that helps us improve!')).toBeTruthy();
+    expect(screen.queryByText('Thanks for sharing your feedback!')).toBeNull();
+    // The box is the writable one, so a customer who rated can still come back and say something.
+    expect(screen.getByTestId('completion-feedback')).toBeTruthy();
   });
 
   /**

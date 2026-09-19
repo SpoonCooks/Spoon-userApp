@@ -152,10 +152,27 @@ const ANDROID_SIGNING_SHA1 = (process.env.ANDROID_SIGNING_SHA1 ?? '')
  * Firebase identifiers and is regenerated per app package. An absent value simply omits the key,
  * so a build without Firebase still succeeds and still runs.
  *
- * iOS needs an APNs key uploaded to EAS instead; there is no file to reference here, which is why
- * only Android has one.
+ * iOS has its own file, below.
  */
 const GOOGLE_SERVICES_JSON = process.env.GOOGLE_SERVICES_JSON ?? '';
+
+/**
+ * iOS FCM credentials — `GoogleService-Info.plist`, supplied by PATH exactly as Android's is.
+ *
+ * This file has existed at the repo root and as an EAS `production` file secret since 4 September
+ * and was referenced by NOTHING, which is a large part of why iOS push has never worked.
+ *
+ * It matters now because the app takes its iOS token from the Firebase SDK rather than from APNs.
+ * `expo-notifications`' `getDevicePushTokenAsync` returns a raw APNs device token on iOS, and the
+ * backend has one provider -- FCM -- which cannot address one: every iOS send failed with an
+ * invalid registration token, and had done since the feature shipped. The Firebase iOS SDK mints
+ * a real FCM token instead, and it needs this file baked into the native project to know which
+ * Firebase app it belongs to.
+ *
+ * An absent value omits the key, so a build without it still succeeds and still runs -- push is
+ * simply unavailable, reported as `native-unavailable` by the token provider.
+ */
+const GOOGLE_SERVICES_PLIST = process.env.GOOGLE_SERVICES_PLIST ?? '';
 
 /**
  * Production refuses to build without them, for the same reason it refuses without an API base
@@ -193,6 +210,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     bundleIdentifier: IOS_BUNDLE_IDENTIFIER,
     supportsTablet: false,
+    ...(GOOGLE_SERVICES_PLIST === '' ? {} : { googleServicesFile: GOOGLE_SERVICES_PLIST }),
     infoPlist: {
       NSPhotoLibraryUsageDescription:
         'Spoon does not access your photo library directly. This declaration is required for compatibility with a bundled system component.',
@@ -331,12 +349,55 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      * Push. The JS side is already wired — registration, the rotation listener, the received
      * handler and the tap-to-route deep link all live in `@features/notifications` — but every
      * one of them needs the NATIVE module, and on iOS the plugin is also what adds the
-     * `aps-environment` entitlement and the remote-notification background mode.
+     * `aps-environment` entitlement.
+     *
+     * VERIFIED in the shipped build (iOS #18, `7fa8f6f`): `ExpoNotifications` is bundled and
+     * `embedded.mobileprovision` carries `aps-environment: production`, so an ALERT notification
+     * displays. `UIBackgroundModes` is NOT in the built `Info.plist`, contrary to what this
+     * comment used to claim — the plugin does not add it. A visible notification does not need
+     * it; a SILENT `content-available` push does, and would be dropped while backgrounded. Left
+     * absent deliberately for now: adding a background mode is an Apple-facing declaration, and
+     * nothing in the product sends silent pushes.
      *
      * No icon or colour is configured, deliberately: the design does not specify a notification
      * icon, and choosing one here would be a visual decision made in a build file.
      */
     'expo-notifications',
+
+    /**
+     * Firebase, for ONE reason: an FCM token on iOS.
+     *
+     * `expo-notifications` returns a raw APNs device token there, and the backend has a single
+     * provider -- FCM -- with no APNs path anywhere in it, so every iOS send was addressed to a
+     * token FCM cannot deliver to. Android is untouched by this: it already mints a real FCM token
+     * through `expo-notifications` and that path keeps working exactly as it did.
+     *
+     * `messaging` is listed as well as `app` because the token API lives in it.
+     */
+    '@react-native-firebase/app',
+    '@react-native-firebase/messaging',
+
+    /**
+     * `useFrameworks: 'static'` is REQUIRED by react-native-firebase, and it changes how every
+     * CocoaPod in this project links -- not only Firebase's. `react-native-maps`,
+     * `react-native-razorpay`, `react-native-reanimated` and `react-native-webview` are all in the
+     * tree, and this setting is the usual cause of a first iOS build failing after Firebase is
+     * added. Recorded here so the next person reading a linker error knows where it came from.
+     *
+     * Android is deliberately left alone.
+     */
+    [
+      'expo-build-properties',
+      {
+        ios: { useFrameworks: 'static' },
+      },
+    ],
+
+    /**
+     * Static linkage and react-native-firebase's SPM resolution are incompatible, and the fix has
+     * to reach the Podfile, which is generated. See the plugin for the full reasoning.
+     */
+    './plugins/withRNFirebasePods',
 
     [
       'expo-splash-screen',

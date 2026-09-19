@@ -77,6 +77,25 @@ export function minutesUntil(
 }
 
 /**
+ * The other half of `minutesUntil` — minutes SINCE an instant, 0 until it passes.
+ *
+ * `minutesUntil` floors at zero, which is right for "Arriving in" and wrong for the live card's
+ * "Time left": a service nobody has ended sat on "0 mins" for hours, saying the same thing at one
+ * minute over as at four. Kept as a separate reading rather than letting `minutesUntil` go
+ * negative, because three of its four callers want the floor.
+ */
+export function minutesOverdue(
+  iso: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (iso === null || iso === undefined) return null;
+  const target = new Date(iso);
+  if (Number.isNaN(target.getTime())) return null;
+  const minutes = Math.round((now.getTime() - target.getTime()) / 60_000);
+  return minutes < 0 ? 0 : minutes;
+}
+
+/**
  * Composes the Home view model.
  *
  * `base` is the STATIC screen definition — the promo panels, the two booking tiles, the cuisine

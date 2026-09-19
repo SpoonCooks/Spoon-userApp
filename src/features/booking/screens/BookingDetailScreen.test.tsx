@@ -11,6 +11,7 @@ import {
   DEMO_BOOKING_ARRIVED,
   DEMO_BOOKING_COMPLETION,
   DEMO_BOOKING_FEEDBACK_SUBMITTED,
+  DEMO_BOOKING_RATED_NUMERIC,
   DEMO_BOOKING_CONFIRMATION,
   DEMO_BOOKING_EN_ROUTE,
   DEMO_BOOKING_EN_ROUTE_LATE,
@@ -520,11 +521,142 @@ describe('Booking host — completion (143:207)', () => {
       />,
     );
 
-    // `319:3217` keeps the "5+" legend and removes the nine chips.
+    // `319:3217` keeps the "5+" legend and removes the nine chips — for the `5+` rating, which
+    // is what this fixture records. A numeric rating is the OTHER finished state, below.
     expect(screen.getByTestId('completion-rating-prompt')).toBeTruthy();
     expect(screen.queryByTestId('completion-rating-5')).toBeNull();
     expect(screen.queryByTestId('completion-submit')).toBeNull();
     expect(screen.getByText('Thanks for sharing your feedback!')).toBeTruthy();
+  });
+
+  /**
+   * `319:3284` — a NUMERIC rating keeps its scale with the chosen numeral filled.
+   *
+   * The scale used to be dropped on ANY submission while the `5+` row was drawn unconditionally,
+   * so a customer who rated 4.5 was shown a lone "5+" chip: the only number on the screen was one
+   * they had not picked.
+   */
+  it('shows the rating the customer actually gave, not the 5+ chip', () => {
+    render(
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_RATED_NUMERIC)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
+    );
+
+    // The chip they chose is on screen...
+    const chosen = screen.getByTestId('completion-rating-4.5');
+    expect(chosen).toBeTruthy();
+    expect(chosen.props.accessibilityState).toMatchObject({ checked: true, disabled: true });
+
+    // ...and the `5+` control is gone, because there is nothing left to choose.
+    expect(screen.queryByTestId('completion-rating-prompt')).toBeNull();
+  });
+
+  /**
+   * Rating and writing are separate acts. A rating does not imply a sentence, so a customer who
+   * rated without writing is still offered the textarea — and is NOT thanked for feedback that
+   * does not exist.
+   */
+  it('keeps offering the textarea when a rating was given but nothing was written', () => {
+    render(
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_RATED_NUMERIC)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('completion-feedback')).toBeTruthy();
+    expect(screen.getByTestId('completion-submit')).toBeTruthy();
+    expect(screen.queryByTestId('completion-feedback-submitted')).toBeNull();
+    expect(screen.queryByText('Thanks for sharing your feedback!')).toBeNull();
+  });
+
+  /** The acknowledgement arrives only once the SERVER has the words. */
+  it('acknowledges feedback after a submission the server accepted', async () => {
+    const onSubmitFeedback = jest.fn(() => Promise.resolve({ ratingId: 'r-1', created: true }));
+    render(
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_RATED_NUMERIC)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onSubmitFeedback={onSubmitFeedback}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByTestId('completion-feedback'), 'Lovely food, thank you');
+    fireEvent.press(screen.getByTestId('completion-submit'));
+    await act(async () => {});
+
+    expect(onSubmitFeedback).toHaveBeenCalledWith('Lovely food, thank you', 4.5);
+    expect(screen.getByTestId('completion-feedback-submitted')).toBeTruthy();
+    expect(screen.queryByTestId('completion-feedback')).toBeNull();
+    // And it quotes what was just sent, without waiting for the payload to carry it back.
+    expect(screen.getByText('Lovely food, thank you')).toBeTruthy();
+  });
+
+  /**
+   * `319:3252` draws only the thank-you pill, which tells a customer their feedback landed but
+   * not what it said — so they cannot check what they sent, and a booking reopened later says
+   * nothing about it at all.
+   */
+  it('shows the words the customer wrote, under the acknowledgement', () => {
+    render(
+      <BookingDetailView
+        state={ready({
+          ...DEMO_BOOKING_RATED_NUMERIC,
+          completion: {
+            ...DEMO_BOOKING_RATED_NUMERIC.completion!,
+            feedbackGiven: true,
+            feedbackText: 'Amazing homestyle flavor! Roti was extremely soft.',
+          },
+        })}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Thanks for sharing your feedback!')).toBeTruthy();
+    expect(screen.getByText('Amazing homestyle flavor! Roti was extremely soft.')).toBeTruthy();
+  });
+
+  /** Acknowledged with nothing to quote is still honest — the pill alone, no empty line. */
+  it('draws no feedback line when the server acknowledged without sending the words', () => {
+    render(
+      <BookingDetailView
+        state={ready({
+          ...DEMO_BOOKING_RATED_NUMERIC,
+          completion: { ...DEMO_BOOKING_RATED_NUMERIC.completion!, feedbackGiven: true },
+        })}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('completion-feedback-submitted')).toBeTruthy();
+    expect(screen.queryByTestId('completion-feedback-text')).toBeNull();
+  });
+
+  /** A rejected submission keeps the textarea and the customer's words. Nothing is claimed. */
+  it('does not acknowledge feedback the server refused', async () => {
+    const onSubmitFeedback = jest.fn(() => Promise.reject(new Error('offline')));
+    render(
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_RATED_NUMERIC)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+        onSubmitFeedback={onSubmitFeedback}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByTestId('completion-feedback'), 'Lovely food, thank you');
+    fireEvent.press(screen.getByTestId('completion-submit'));
+    await act(async () => {});
+
+    expect(screen.getByTestId('completion-feedback')).toBeTruthy();
+    expect(screen.queryByTestId('completion-feedback-submitted')).toBeNull();
   });
 });
 

@@ -1,5 +1,6 @@
 import { formatPaise } from '@core/format';
-import type { CookViewModel, DetailRow } from '@ui';
+import { RATING_EXCEPTIONAL, RATING_VALUES } from '@ui';
+import type { CookViewModel, DetailRow, RatingSelection } from '@ui';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
 
 import { currentSkewMs } from '@core/time';
@@ -39,20 +40,70 @@ import type { BookingDetailsViewModel } from './components/BookingDetailsSheet';
  * It arrives on `GET /v1/bookings/:id/tracking` and is applied by `trackingDetailFrom` below.
  */
 
+/**
+ * "45 mins" / "1 hr", from whichever duration the caller decided is the truthful one.
+ *
+ * `servedDurationMinutes` below picks it; this only formats. Both call sites rendered these same
+ * three lines, so they share them rather than drifting apart.
+ */
+function durationTextFrom(minutes: number): string {
+  return minutes % 60 === 0 ? `${minutes / 60} hr` : `${minutes} mins`;
+}
+
+/**
+ * The duration the customer was actually served -- `totalDurationMinutes` when the server sends
+ * it, `durationMinutes` otherwise.
+ *
+ * The two differ only once a booking has been EXTENDED, and only the server can tell them apart;
+ * see `totalDurationMinutes` in `schemas.ts` for why this is not arithmetic.
+ */
+function servedDurationMinutes(dto: BookingDetailDto): number {
+  return typeof dto.totalDurationMinutes === 'number' && dto.totalDurationMinutes > 0
+    ? dto.totalDurationMinutes
+    : dto.durationMinutes;
+}
+
 /** `3:1095` — Date / Start time / Duration / End Time, formatted from server instants. */
 export function bookingRowsFrom(dto: BookingDetailDto): readonly DetailRow[] {
-  const start = dto.scheduledStart === null ? null : new Date(dto.scheduledStart);
-  const end = dto.timing.expectedEnd === null ? null : new Date(dto.timing.expectedEnd);
+  const at = (value: string | null | undefined) =>
+    typeof value === 'string' && value !== '' ? new Date(value) : null;
+
+  /**
+   * The start the customer actually experienced, not the one they booked.
+   *
+   * Service begins when the OTP is handed to the cook, which the server reports as
+   * `timing.actualStart`. This row read `scheduledStart` alone, so a cook who arrived late left
+   * the customer looking at a "Start time" that had already passed without anything happening,
+   * and an "End Time" measured from it. `scheduledStart` remains the answer BEFORE service
+   * starts, when there is no actual start to show.
+   */
+  const start = at(dto.timing.actualStart) ?? at(dto.scheduledStart);
+
+  /**
+   * And the end the server projects from it — `actualEnd` once the service is over,
+   * `expectedEnd` while it is running.
+   *
+   * NOT computed as start + duration, deliberately. An EXTENDED booking's end moves without its
+   * `durationMinutes` moving with it (`/extension-options` publishes `newExpectedEnd` for exactly
+   * this reason), so arithmetic here would quietly under-report the end of every extended
+   * service. The server owns the projection; this row picks which of its two answers applies.
+   *
+   * CONFIRMED with the backend: `expectedEnd` is written at the Start OTP as
+   * `actual_start + purchased duration`, so it is already re-based on a late start, and a
+   * confirmed extension updates the same column. Both reach here unmodified.
+   */
+  const end = at(dto.timing.actualEnd) ?? at(dto.timing.expectedEnd);
 
   const time = (date: Date | null) =>
     date === null || Number.isNaN(date.getTime())
       ? '—'
       : date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
-  const duration =
-    dto.durationMinutes % 60 === 0
-      ? `${dto.durationMinutes / 60} hr`
-      : `${dto.durationMinutes} mins`;
+  /*
+   * Beside the start and end above, so it MUST be the served duration: `durationMinutes` would
+   * label a 75-minute extended service "45 mins" between two timestamps that disagree with it.
+   */
+  const duration = durationTextFrom(servedDurationMinutes(dto));
 
   return [
     {
@@ -95,10 +146,8 @@ export function detailsSheetFrom(input: {
 
 /** `250:2951` — "Today, Aug 5 • 12:00 PM • 1 hr". Formatting, not assembly of domain facts. */
 export function scheduleLineFrom(dto: BookingDetailDto, now: Date = new Date()): string {
-  const duration =
-    dto.durationMinutes % 60 === 0
-      ? `${dto.durationMinutes / 60} hr`
-      : `${dto.durationMinutes} mins`;
+  // Same reasoning as the Duration row: an extended service ran longer than it was priced for.
+  const duration = durationTextFrom(servedDurationMinutes(dto));
 
   if (dto.scheduledStart === null) return duration;
   const start = new Date(dto.scheduledStart);
@@ -114,6 +163,26 @@ export function scheduleLineFrom(dto: BookingDetailDto, now: Date = new Date()):
   const time = start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
   return `${dayLabel} • ${time} • ${duration}`;
+}
+
+/**
+ * The rating the server says is already on this booking, as the widget's own value type.
+ *
+ * `5+` is `RATING_EXCEPTIONAL`, not the number 5 -- the backend carries the two separately
+ * (`stars: 5` plus `exceptional: true`), and collapsing them here would lose the distinction the
+ * submit path is careful to preserve.
+ *
+ * A star value off the half-step scale is DROPPED rather than rounded: the widget has nine chips
+ * and can only fill one of them, so an unrecognised number would silently fill the wrong one.
+ */
+function submittedRatingFrom(dto: BookingDetailDto): { submittedRating?: RatingSelection } {
+  if (dto.ratingExceptional === true) return { submittedRating: RATING_EXCEPTIONAL };
+
+  const stars = dto.ratingStars;
+  if (typeof stars !== 'number') return {};
+
+  const onScale = RATING_VALUES.find((value) => value === stars);
+  return onScale === undefined ? {} : { submittedRating: onScale };
 }
 
 export function summaryFrom(input: {
@@ -482,6 +551,16 @@ export function bookingDetailFrom(input: {
             ...base.completion,
             bookingHeadline: scheduleLineFrom(dto),
             submitted: !dto.allowedActions.canRate,
+            /*
+             * WHAT was rated, and whether anything was written -- both server facts, both absent
+             * from the payload today (BACKEND_PENDING, see `bookingRatingSchema`). Omitted rather
+             * than defaulted: the screen then falls back to the rating held in memory, and offers
+             * the textarea instead of an acknowledgement it cannot justify.
+             */
+            ...submittedRatingFrom(dto),
+            ...(typeof dto.ratingFeedback === 'string' && dto.ratingFeedback.trim() !== ''
+              ? { feedbackGiven: true, feedbackText: dto.ratingFeedback.trim() }
+              : {}),
           },
         }),
     // Ruling R-3 — the SERVER decides whether Reschedule is offered.

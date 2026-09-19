@@ -1,3 +1,4 @@
+import { CLIENT_ONLY_CANCELLATION_REASONS } from '@features/booking';
 import type { CancellationPreviewDto, RescheduleOptionsDto } from '@features/booking';
 import type { Catalogue } from '@features/catalogue';
 import { formatPaise } from '@core/format';
@@ -46,14 +47,24 @@ export function feeScheduleFrom(catalogue: Catalogue): readonly FeeScheduleRow[]
   });
 }
 
-/** The reasons the customer may pick, and which of them demand a free-text detail. */
+/**
+ * The reasons the customer may pick, and which of them demand a free-text detail.
+ *
+ * The published list is not all offerable. `ABANDONED_CHECKOUT` is a normal catalogue entry —
+ * nothing on the wire marks it machine-only — but the app SENDS it programmatically when it
+ * gives back a hold nobody paid for. Rendered verbatim it would sit in this sheet as a reason a
+ * customer could choose for cancelling a real booking, which reads as nonsense and would record
+ * a cancellation the server then attributes to the system.
+ */
 export function reasonsFrom(catalogue: Catalogue) {
-  return catalogue.cancellation.reasons.map((reason) => ({
-    id: reason.code,
-    label: reason.label,
-    // DATA, not a match on the label "Others".
-    ...(reason.requiresDetail ? { requiresDetail: true } : {}),
-  }));
+  return catalogue.cancellation.reasons
+    .filter((reason) => !CLIENT_ONLY_CANCELLATION_REASONS.includes(reason.code))
+    .map((reason) => ({
+      id: reason.code,
+      label: reason.label,
+      // DATA, not a match on the label "Others".
+      ...(reason.requiresDetail ? { requiresDetail: true } : {}),
+    }));
 }
 
 /**
