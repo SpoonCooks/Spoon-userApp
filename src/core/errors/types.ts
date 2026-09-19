@@ -82,10 +82,16 @@ export function isAppError(value: unknown): value is AppError {
  *
  * `RATE_LIMITED` is a 429, so the transport categorises it `validation` — but it is explicitly
  * a "try again later" answer, and the OTP cooldown is the main way a real user meets it.
- * `IDEMPOTENCY_CONFLICT` means the same key is mid-flight; the correct response is to retry the
- * SAME key, which is exactly what the idempotency store makes safe.
+ *
+ * `IDEMPOTENCY_CONFLICT` USED TO BE HERE, on the belief that it meant "the same key is still
+ * mid-flight, so retry it". The backend has since confirmed that is not what it means: it is
+ * thrown at exactly one place, for exactly one reason — the key was reused with a DIFFERENT
+ * request body — and a same-body request arriving mid-flight does not 409 at all, it blocks on a
+ * row lock and then reads the settled result. So the condition is permanent, and retrying the
+ * same key produces the same 409 indefinitely. A caller that means to try again must form a new
+ * intent with a new key, which is a decision only the caller can make.
  */
-const RETRYABLE_CODES: ReadonlySet<string> = new Set(['RATE_LIMITED', 'IDEMPOTENCY_CONFLICT']);
+const RETRYABLE_CODES: ReadonlySet<string> = new Set(['RATE_LIMITED']);
 
 /**
  * Codes that are transport-level 5xx but must NOT be retried automatically.

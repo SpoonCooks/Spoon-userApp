@@ -14,6 +14,7 @@ import { useCancelFlow } from '@features/cancellation';
 import { paymentErrorMessage } from '@features/payment';
 import { useWhatsAppHelp } from '@features/support';
 import { ErrorBoundary, isNumericRating } from '@ui';
+import { createIdempotencyKey } from '@core/api';
 import { useDeterministicBack } from '@core/navigation';
 
 /**
@@ -167,7 +168,32 @@ export default function BookingRoute() {
           // An id that carries no amount is not a tip. Rejected rather than sent as zero.
           if (amountPaise === null) return Promise.reject(new Error('Unknown tip option'));
 
-          return tip.mutateAsync({ bookingId, amountPaise, scope: `booking.tip:${bookingId}` });
+          /**
+           * A FRESH scope per checkout attempt, so each press is its own intent.
+           *
+           * It was `booking.tip:<bookingId>` -- one key for the life of the booking, released
+           * only on a fully verified tip. Two failures came out of that. A customer who dismissed
+           * checkout and then chose a different amount sent the same key with a different body,
+           * which the backend answers 409 forever ("hash mismatch"), so the amount could never be
+           * changed until the app was force-quit. And a key surviving an attempt that succeeded
+           * server-side but never reached verify would REPLAY that completed order, reopening a
+           * checkout Razorpay had already captured.
+           *
+           * Not per-amount, which was the obvious fix and the wrong one: tips are not capped per
+           * booking, so tipping ₹50 twice would replay the first ₹50 order. The key identifies an
+           * ATTEMPT, never a value. `useTipCook` releases it on every outcome.
+           *
+           * A stale `payment_pending` tip does NOT block a new attempt. Nothing server-side
+           * sweeps that row and the detail payload carries no `providerOrderId` or `keyId`, so it
+           * can neither expire nor be resumed -- blocking would strand the customer permanently
+           * on a dead row. The abandoned Razorpay session cannot be paid, so the risk it leaves
+           * is a dead row, not a stranded payment.
+           */
+          return tip.mutateAsync({
+            bookingId,
+            amountPaise,
+            scope: `booking.tip.${bookingId}.${createIdempotencyKey()}`,
+          });
         }}
         tipping={tip.isPending}
         tipError={paymentErrorMessage(tip.error)}
