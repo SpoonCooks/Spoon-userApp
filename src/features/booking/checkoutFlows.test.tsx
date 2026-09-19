@@ -8,6 +8,9 @@ import { createStubApi, createTestRuntime } from '@/test/renderWithRuntime';
 import type { StubHandlers } from '@/test/renderWithRuntime';
 import type { CheckoutLauncher } from '@features/payment';
 
+import { idempotency } from '@core/api';
+import type { ApiClient } from '@core/api';
+
 import { ratingScopeFor, useCreateExtension, useRateBooking, useTipCook } from './api';
 
 /**
@@ -351,5 +354,89 @@ describe('ratingScopeFor — writing is a different intent from rating', () => {
 
   it('never collides across bookings', () => {
     expect(ratingScopeFor('bkg-1', 'a')).not.toBe(ratingScopeFor('bkg-2', 'a'));
+  });
+});
+
+/* ------------------------------------------------- tip idempotency: one key per ATTEMPT */
+
+/** A stub that records the `Idempotency-Key` each call carried, which is the whole subject here. */
+function keyRecordingRuntime(handlers: StubHandlers) {
+  const sent: { path: string; key: string | undefined }[] = [];
+  const api: ApiClient = {
+    async request(path, options) {
+      const method = options.method ?? 'GET';
+      const handler = handlers[`${method} ${path}`];
+      if (handler === undefined) throw new Error(`No stub for ${method} ${path}`);
+      const headers = options.headers as Record<string, string> | undefined;
+      sent.push({ path, key: headers?.['Idempotency-Key'] });
+      return options.parse(handler(options.body));
+    },
+  };
+  return { runtime: createTestRuntime({ api }), sent };
+}
+
+function settledTip() {
+  const { keyId: _keyId, ...settled } = TIP_ORDER;
+  return { ...settled, status: 'captured' };
+}
+
+describe('tip idempotency — the key names an ATTEMPT, never a booking', () => {
+  it('releases the attempt key when checkout FAILS, not only when it succeeds', async () => {
+    const runtime = runtimeWith({
+      [`POST /v1/bookings/${BOOKING_ID}/tips`]: () => TIP_ORDER,
+      [`POST /v1/bookings/${BOOKING_ID}/tips/verify`]: () => settledTip(),
+    });
+
+    const { result } = renderHook(() => useTipCook(cancellingLauncher()), {
+      wrapper: wrapperFor(runtime),
+    });
+
+    const scope = `booking.tip.${BOOKING_ID}.attempt-a`;
+    await expect(
+      result.current.mutateAsync({ bookingId: BOOKING_ID, amountPaise: 5000, scope }),
+    ).rejects.toThrow();
+
+    await waitFor(() => expect(result.current.isPending).toBe(false));
+
+    /*
+     * The regression. Release used to sit at the end of the happy path, so a dismissed or failed
+     * checkout left the key held -- and the backend commits its claim as `processing` BEFORE
+     * calling Razorpay, so reusing that key mid-flight does not replay and does not 409. It falls
+     * through and mints a SECOND tip, payment and provider order. A key that outlives its attempt
+     * is the whole hazard.
+     */
+    expect(idempotency.has(scope)).toBe(false);
+    expect(idempotency.has(`${scope}.verify`)).toBe(false);
+  });
+
+  it('verifies under the ATTEMPT key, so a second tip does not collide with the first', async () => {
+    const { runtime, sent } = keyRecordingRuntime({
+      [`POST /v1/bookings/${BOOKING_ID}/tips`]: () => TIP_ORDER,
+      [`POST /v1/bookings/${BOOKING_ID}/tips/verify`]: () => settledTip(),
+    });
+
+    const { launcher } = recordingLauncher();
+    const { result } = renderHook(() => useTipCook(launcher), { wrapper: wrapperFor(runtime) });
+
+    // Tips are NOT capped per booking, so this is an ordinary thing for a customer to do.
+    for (const attempt of ['attempt-a', 'attempt-b']) {
+      await result.current.mutateAsync({
+        bookingId: BOOKING_ID,
+        amountPaise: 5000,
+        scope: `booking.tip.${BOOKING_ID}.${attempt}`,
+      });
+    }
+
+    const verifyKeys = sent.filter((call) => call.path.endsWith('/verify')).map((call) => call.key);
+    expect(verifyKeys).toHaveLength(2);
+
+    /*
+     * Verify used a scope fixed per BOOKING (`booking.tip.verify:<id>`) that nothing released, so
+     * the second tip verified under the first tip's key carrying a different Razorpay payload --
+     * a request-hash mismatch, which the backend answers 409 unconditionally. The payment was
+     * captured and the customer could never have it verified.
+     */
+    expect(verifyKeys[0]).not.toBe(verifyKeys[1]);
+    expect(verifyKeys[0]).toBeDefined();
   });
 });

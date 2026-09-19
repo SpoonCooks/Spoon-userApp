@@ -48,7 +48,10 @@ const CODE_COPY: Readonly<Record<string, string>> = {
   REFUND_ALREADY_REQUESTED: 'A refund is already on its way.',
   REFUND_NOT_ALLOWED: 'This booking is not eligible for a refund.',
   EXTENSION_CONFLICT: 'That extension is no longer available.',
-  IDEMPOTENCY_CONFLICT: 'That request is still going through. Give it a moment.',
+  // NOT "still going through" — the backend throws this only for a key reused with a different
+  // body, which waiting cannot resolve. The caller retries by forming a new intent, not by
+  // repeating this one, so the words ask for an action that actually helps.
+  IDEMPOTENCY_CONFLICT: 'That didn’t go through. Please try again.',
   RATE_LIMITED: 'Too many attempts. Please wait a moment and try again.',
   PROVIDER_TEMPORARILY_UNAVAILABLE: 'That service is briefly unavailable. Please try again.',
   DEPENDENCY_UNAVAILABLE: 'We are having trouble right now. Please try again shortly.',
