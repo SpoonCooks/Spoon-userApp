@@ -660,12 +660,25 @@ export function trackingDetailFrom(input: {
   const trackingSurface = <T extends TrackingViewModel>(surface: T): T => ({
     ...surface,
     etaLabel: safeEtaLabel,
-    ...(knownVerdict && etaCountdownLabel !== null
+    /**
+     * The VERDICT decides the tone and the copy; the countdown only decides the number.
+     *
+     * Gated on `etaClockLabel`, which is non-null whenever the server published a parseable
+     * arrival instant -- NOT on `etaCountdownLabel`, which also goes null the moment that instant
+     * elapses. Gating on the countdown suppressed `292:469` exactly when it was most warranted: a
+     * cook the server had already called LATE, whose ETA had slipped past, lost the amber fill and
+     * the "sorry for the delay" line and got a neutral "arrival time is not available yet" -- the
+     * screen for a booking with NO ETA, which is a different and much weaker claim.
+     *
+     * So an elapsed ETA now degrades the panel to "—" and nothing else. The server said late; the
+     * screen still says late.
+     */
+    ...(knownVerdict && etaClockLabel !== null
       ? { tone: late ? ('warning' as const) : ('positive' as const) }
       : {
           tone: 'neutral' as const,
           bannerMessage:
-            etaCountdownLabel === null
+            etaClockLabel === null
               ? 'Cook arrival time is not available yet.'
               : 'Cook arrival status is being updated.',
         }),
@@ -744,10 +757,10 @@ function etaClockLabelFrom(estimatedArrivalAt: string | null): string | null {
  * Accuracy: tracking refetches on the server's `refreshAfterSeconds` (30s fallback), so the figure
  * is re-derived at least twice a minute and cannot drift past the minute it names.
  *
- * `null` once the ETA is not in the future. The frames draw no "overdue" state, so rather than
- * invent copy -- or claim "0 mins" under a title promising an arrival -- this falls into the
- * SAME designed unavailable banner a missing ETA already uses. The server is polling; a fresher
- * ETA or an arrival is what resolves it.
+ * `null` once the ETA is not in the future -- the frames draw no "overdue" state and "0 mins"
+ * under a title promising an arrival is a claim, not a number. Only the PANEL degrades, to "—";
+ * the banner keeps whatever the server's `timingVerdict` says, so a late cook still reads as
+ * late. The server is polling; a fresher ETA or an arrival is what resolves it.
  */
 function etaCountdownFrom(estimatedArrivalAt: string | null, nowMs: number): string | null {
   if (estimatedArrivalAt === null) return null;

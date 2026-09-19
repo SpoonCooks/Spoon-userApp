@@ -186,9 +186,50 @@ describe('trackingDetailFrom', () => {
     expect(labelAt('2026-08-18T09:34:40.000Z')).toBe('1 mins'); // 20s floors to one
   });
 
-  it('falls back to the designed unavailable banner once the ETA is in the past', () => {
-    // No frame draws an overdue state, so this reuses the SAME banner a missing ETA already gets
-    // rather than inventing copy or claiming an arrival the server has not reported.
+  it('counts down on the LATE banner — `292:469` draws the same panel as on-time', () => {
+    // The server revises the ETA when a cook runs late, so the late screen has a number to show
+    // and must show it: `99:1413` draws "16 mins" under the apology, not a blank panel.
+    const now = new Date('2026-08-18T09:19:00.000Z').getTime();
+    const at = new Date('2026-08-18T09:35:00.000Z');
+    const view = trackingDetailFrom({
+      base: BASE,
+      nowMs: now,
+      dto: tracking({
+        timingVerdict: 'LATE',
+        eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null },
+      }),
+    });
+
+    expect(view.tracking?.etaLabel).toBe('16 mins');
+    expect(view.tracking?.tone).toBe('warning');
+    // The caller's late copy survives: nothing here overwrites it.
+    expect(view.tracking?.bannerMessage).toBe('Rekha is heading over');
+  });
+
+  it('keeps the LATE banner when the ETA elapses — only the panel degrades', () => {
+    /*
+     * The regression this pins. Gating tone on the COUNTDOWN meant a cook the server had already
+     * called late, whose ETA had slipped past, lost the amber fill and the apology and got the
+     * neutral "no ETA at all" banner instead — the weakest claim available, at the moment the
+     * strongest one was true.
+     */
+    const at = new Date('2026-08-18T09:35:00.000Z');
+    const view = trackingDetailFrom({
+      base: BASE,
+      nowMs: new Date('2026-08-18T09:36:00.000Z').getTime(),
+      dto: tracking({
+        timingVerdict: 'LATE',
+        eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null },
+      }),
+    });
+
+    expect(view.tracking?.tone).toBe('warning');
+    expect(view.tracking?.bannerMessage).toBe('Rekha is heading over');
+    // No number to state, and none invented.
+    expect(view.tracking?.etaLabel).toBe('—');
+  });
+
+  it('degrades only the panel when an ON_TIME ETA elapses', () => {
     const at = new Date('2026-08-18T09:35:00.000Z');
     const view = trackingDetailFrom({
       base: BASE,
@@ -200,8 +241,7 @@ describe('trackingDetailFrom', () => {
     });
 
     expect(view.tracking?.etaLabel).toBe('—');
-    expect(view.tracking?.tone).toBe('neutral');
-    expect(view.tracking?.bannerMessage).toBe('Cook arrival time is not available yet.');
+    expect(view.tracking?.tone).toBe('positive');
   });
 
   it('keeps the CLOCK time on Arrived — `99:1620` stops counting down at the gate', () => {
