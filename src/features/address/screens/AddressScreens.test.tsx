@@ -515,6 +515,40 @@ describe('Select service location (53:31)', () => {
     expect(onChooseSuggestion).toHaveBeenCalledWith('place-1');
   });
 
+  /**
+   * `53:58`'s resolved row and the Confirm bar sit BELOW the map, so the IME covers both — and
+   * this screen is a map with a fixed bottom block, not a scroll form, so there is nothing for
+   * `useKeyboardHeight` to shrink. Leaving the keyboard up after a choice left the customer
+   * looking at an emptied field, a pin, and no visible way forward, with the address they had
+   * just picked and the enabled Confirm both hidden. Reproduced on the simulator.
+   */
+  it('dismisses the keyboard when a suggestion is chosen', () => {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
+    const onChooseSuggestion = jest.fn();
+
+    render(
+      <AddressLocationView
+        state={ready(DEMO_ADDRESS_LOCATION)}
+        {...props}
+        map={{
+          ...mapProps,
+          onChooseSuggestion,
+          coordinates: null,
+          searchState: 'results',
+          suggestions: [{ placeId: 'place-1', primary: 'Indiranagar', secondary: 'Bengaluru' }],
+        }}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('address-suggestion-place-1'));
+
+    expect(dismiss).toHaveBeenCalled();
+    // The choice itself still happens — dismissing is in addition to it, never instead of it.
+    expect(onChooseSuggestion).toHaveBeenCalledWith('place-1');
+
+    dismiss.mockRestore();
+  });
+
   it('says WHY there are no suggestions, rather than showing an empty list', () => {
     const { rerender } = render(
       <AddressLocationView

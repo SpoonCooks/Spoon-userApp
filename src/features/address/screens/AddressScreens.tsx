@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import type { ImageSourcePropType, KeyboardTypeOptions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
@@ -760,7 +760,25 @@ function AddressSearchResults({
       {suggestions.map((suggestion) => (
         <Pressable
           key={suggestion.placeId}
-          onPress={() => onChoose(suggestion.placeId)}
+          /*
+           * Choosing ends the search, so the keyboard goes with it.
+           *
+           * `53:58`'s resolved row and the Confirm bar both sit BELOW the map, which the IME
+           * covers — and this screen is a map with a fixed bottom block, not a scroll form, so
+           * there is nothing for the `useKeyboardHeight` treatment elsewhere in this file to
+           * shrink. A customer who picked a suggestion was therefore left looking at an emptied
+           * field, a pin, and no visible way forward: the address they had just chosen and the
+           * enabled Confirm were both behind the keyboard. It read as "nothing happened".
+           *
+           * Dismissed on the TAP rather than on the Places details reply. The prediction list is
+           * torn down here too, so on either outcome the keyboard would be hovering over nothing
+           * — and unlike the query text (kept until success, so a flaky lookup cannot cost the
+           * typed phrase) a dismissed keyboard costs nothing: the field is one tap away.
+           */
+          onPress={() => {
+            Keyboard.dismiss();
+            onChoose(suggestion.placeId);
+          }}
           accessibilityRole="button"
           accessibilityLabel={`${suggestion.primary}. ${suggestion.secondary}`}
           style={({ pressed }) => [styles.suggestionRow, pressed ? styles.pressed : null]}
