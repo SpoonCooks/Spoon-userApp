@@ -621,3 +621,133 @@ describe('settling on a point', () => {
     expect(result.current.coordinates).toEqual(NEARBY);
   });
 });
+
+/**
+ * A chosen place with NO postcode still has to be savable.
+ *
+ * Google's place record and a reverse geocode of the same coordinate disagree about whether a
+ * postcode exists: the details for "Haralur Main Road" carry no `postal_code`, while reverse
+ * geocoding 12.8993442, 77.6591882 returns 560102 from the addresses around it. Choosing that
+ * suggestion therefore sent `pincode: ''` and `POST /v1/me/addresses` refused the whole address —
+ * "Couldn't save address", about a field `60:655` does not draw. Haralur is two of the three
+ * launch polygons, so this was not an edge case.
+ *
+ * The rule these pin: the postcode is BORROWED, the description is not.
+ */
+describe('a chosen place missing its postcode', () => {
+  const places = jest.requireMock('./googlePlaces') as {
+    placesAutocomplete: jest.Mock;
+    placeDetails: jest.Mock;
+    googleReverseGeocode: jest.Mock;
+  };
+
+  const HARALUR = { latitude: 12.8993442, longitude: 77.6591882 };
+
+  const chosenAddress = (pincode: string | null) => ({
+    title: 'Haralur Main Road',
+    line: 'Haralur Main Rd, Haralur, Bengaluru, Karnataka',
+    pincode,
+    street: 'Haralur Main Road',
+    city: 'Haralur',
+    region: 'Karnataka',
+    placeId: 'haralur',
+  });
+
+  async function chooseIt(result: { current: ReturnType<typeof useAddressLocation> }) {
+    act(() => result.current.search('Haralur Main Road'));
+    await act(async () => {
+      jest.advanceTimersByTime(400);
+    });
+    await flush();
+    act(() => result.current.chooseSuggestion('haralur'));
+    await flush();
+    await flush();
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    places.placesAutocomplete.mockResolvedValue({
+      ok: true,
+      value: [{ placeId: 'haralur', primary: 'Haralur Main Road', secondary: 'Bengaluru' }],
+    });
+    places.placeDetails.mockResolvedValue({
+      ok: true,
+      value: { coordinates: HARALUR, address: chosenAddress(null) },
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    places.placesAutocomplete.mockResolvedValue({ ok: true, value: [] });
+    places.placeDetails.mockResolvedValue({ ok: false, reason: 'error' });
+    places.googleReverseGeocode.mockResolvedValue({ ok: false, reason: 'error' });
+  });
+
+  it('takes the postcode from the OS geocoder and keeps the chosen description', async () => {
+    mocked.reverseGeocodeAsync.mockResolvedValue([
+      { name: 'Somewhere else entirely', city: 'Bengaluru', postalCode: '560102' },
+    ] as never);
+
+    const { result } = renderHook(() => useAddressLocation(), { wrapper });
+    await flush();
+    await chooseIt(result);
+
+    expect(result.current.geocoded?.pincode).toBe('560102');
+    // Only the postcode is borrowed. The geocoder's own re-description of the coordinate is a
+    // worse answer to "what did I pick?" than the place the customer actually tapped.
+    expect(result.current.geocoded?.title).toBe('Haralur Main Road');
+    expect(result.current.geocoded?.street).toBe('Haralur Main Road');
+    expect(result.current.geocoded?.city).toBe('Haralur');
+  });
+
+  it('falls through to Google when the OS geocoder answers WITHOUT a postcode', async () => {
+    // The wholesale path stops at any non-null OS result. This one must not: an address with no
+    // postal code leaves the save exactly as broken as before.
+    mocked.reverseGeocodeAsync.mockResolvedValue([
+      { name: 'Haralur', city: 'Bengaluru', postalCode: null },
+    ] as never);
+    places.googleReverseGeocode.mockResolvedValue({
+      ok: true,
+      value: { ...chosenAddress('560102'), title: 'Google name', street: 'Google street' },
+    });
+
+    const { result } = renderHook(() => useAddressLocation(), { wrapper });
+    await flush();
+    await chooseIt(result);
+
+    expect(result.current.geocoded?.pincode).toBe('560102');
+    expect(result.current.geocoded?.title).toBe('Haralur Main Road');
+  });
+
+  it('leaves the chosen place untouched when neither geocoder knows one', async () => {
+    mocked.reverseGeocodeAsync.mockResolvedValue([] as never);
+    places.googleReverseGeocode.mockResolvedValue({ ok: false, reason: 'error' });
+
+    const { result } = renderHook(() => useAddressLocation(), { wrapper });
+    await flush();
+    await chooseIt(result);
+
+    // The pin is real and the description is real. A postcode nobody has is not a reason to
+    // unpick a location the customer has chosen — the save may still be refused, and that is
+    // the backend's answer to give.
+    expect(result.current.geocoded?.pincode).toBeNull();
+    expect(result.current.geocoded?.title).toBe('Haralur Main Road');
+    expect(result.current.canConfirm).toBe(true);
+  });
+
+  it('asks no geocoder at all when Places already supplied a postcode', async () => {
+    places.placeDetails.mockResolvedValue({
+      ok: true,
+      value: { coordinates: HARALUR, address: chosenAddress('560102') },
+    });
+    mocked.reverseGeocodeAsync.mockClear();
+
+    const { result } = renderHook(() => useAddressLocation(), { wrapper });
+    await flush();
+    const before = mocked.reverseGeocodeAsync.mock.calls.length;
+    await chooseIt(result);
+
+    expect(result.current.geocoded?.pincode).toBe('560102');
+    expect(mocked.reverseGeocodeAsync.mock.calls.length).toBe(before);
+  });
+});

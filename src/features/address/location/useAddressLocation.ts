@@ -273,12 +273,71 @@ export function useAddressLocation(): AddressLocationState {
     setLocating(false);
     setResolving(known === undefined);
 
-    if (known !== undefined) return;
+    /**
+     * A chosen Places result can arrive with NO POSTCODE, and the save needs one.
+     *
+     * Google's place record and a reverse geocode of the same coordinate disagree about whether a
+     * postcode exists. `places:autocomplete` -> details for "Haralur Main Road" carries no
+     * `postal_code` at all; reverse geocoding 12.8993442, 77.6591882 returns 560102 from the
+     * addresses around it. Three of six queries sampled across the launch polygons behaved that
+     * way, and Haralur is two of the three.
+     *
+     * `POST /v1/me/addresses` wants a pincode, so a chosen suggestion with none sent `''` and the
+     * whole address was refused — "Couldn't save address", about a field the form does not draw
+     * and the customer cannot supply. Dragging the pin never hit it, because that path already
+     * goes through the geocoder below.
+     *
+     * So a `known` address missing only its postcode is no longer treated as finished: the same
+     * geocoders run, and ONLY the pincode is taken from them. Everything else stays as Places
+     * described it, because that is the place the customer actually tapped — the geocoder's
+     * re-description of the coordinate is a worse answer to "what did I pick?".
+     */
+    const chosen = known;
+    const needsPincode = chosen !== undefined && chosen.pincode === null;
+
+    if (chosen !== undefined && !needsPincode) return;
 
     // Display only. Nothing waits on it — Confirm is enabled by the POINT, not by its description,
     // so a slow or silent geocoder can never hold the customer up.
     void (async () => {
       const os = await reverseGeocode(point);
+
+      if (chosen !== undefined) {
+        /*
+         * Borrowing, not replacing. `resolving` was never raised for this case — the row is
+         * already showing the chosen place — so there is nothing to clear, and the row must not
+         * flicker while a field the customer cannot see is filled in behind it.
+         *
+         * The OS geocoder answering at all is NOT enough here, unlike the wholesale path below:
+         * it can return a perfectly good address that simply carries no postal code, and stopping
+         * there would leave the save as broken as before. Only a postcode ends the search.
+         */
+        const osPincode = os?.pincode ?? null;
+        if (osPincode !== null) {
+          if (!current()) return;
+          const merged = { ...chosen, pincode: osPincode };
+          latestGeocoded.current = merged;
+          setGeocoded(merged);
+          return;
+        }
+
+        const backstop = await googleReverseGeocode(point);
+        if (!current()) return;
+        const googlePincode = backstop.ok ? backstop.value.pincode : null;
+        if (googlePincode !== null) {
+          const merged = { ...chosen, pincode: googlePincode };
+          latestGeocoded.current = merged;
+          setGeocoded(merged);
+        }
+        /*
+         * Neither geocoder knew one. The chosen address stands exactly as it was: the pin is
+         * real, the description is real, and Confirm stays live — the same rule the wholesale
+         * path follows for a name it cannot find. The save may still be refused, which is the
+         * backend's to answer, not a reason to unpick a location the customer has chosen.
+         */
+        return;
+      }
+
       if (os !== null) {
         if (!current()) return;
         latestGeocoded.current = os;
