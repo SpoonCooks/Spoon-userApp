@@ -75,13 +75,14 @@ restriction (or given its own key) before a release build can render a map.
 
 The Android package and the iOS bundle identifier are the same string in development and staging,
 and **deliberately differ in production**: the Apple App ID registered for release is
-`com.spoonhelp.customer`, while Android stays on `com.spoonhelp.userapp`.
+`com.spoonhelp.customer`, and since 2026-09-21 Android matches it: the Play listing is
+registered under that package, so an AAB built as `com.spoonhelp.userapp` is refused at upload.
 
 | Environment | `android.package` | `ios.bundleIdentifier` |
 | --- | --- | --- |
 | development | `com.spoonhelp.userapp.dev` | `com.spoonhelp.userapp.dev` |
 | staging | `com.spoonhelp.userapp.staging` | `com.spoonhelp.userapp.staging` |
-| production | `com.spoonhelp.userapp` | `com.spoonhelp.customer` |
+| production | `com.spoonhelp.customer` | `com.spoonhelp.customer` |
 
 Both values are carried in `extra` as well (`extra.androidPackage`, `extra.iosBundleIdentifier`) and
 sent as `X-Android-Package` / `X-Ios-Bundle-Identifier`, so each key's application restriction must

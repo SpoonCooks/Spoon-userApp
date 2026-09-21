@@ -60,21 +60,39 @@ const DEV_FALLBACK_API_BASE_URL = 'https://spoon-api-kalc.onrender.com';
 /**
  * Native application identities — PER PLATFORM, deliberately not one shared constant.
  *
- * The Apple App ID registered for release is `com.spoonhelp.customer`, which does not match the
- * Android package. Android stays on `com.spoonhelp.userapp`: a package rename is a new listing on
- * Play rather than an update, so the two platforms diverge in production and only in production.
+ * Production is `com.spoonhelp.customer` on BOTH platforms. The non-production variants keep the
+ * `com.spoonhelp.userapp` stem, so a dev or staging build can sit on a device beside the release.
  *
  *                 Android                         iOS
  *   development   com.spoonhelp.userapp.dev       com.spoonhelp.userapp.dev
  *   staging       com.spoonhelp.userapp.staging   com.spoonhelp.userapp.staging
- *   production    com.spoonhelp.userapp           com.spoonhelp.customer
+ *   production    com.spoonhelp.customer          com.spoonhelp.customer
+ *
+ * Android used to stay on `com.spoonhelp.userapp` here, on the reasoning that a package rename is
+ * a new Play listing rather than an update. That was sound in the abstract and wrong in fact: the
+ * Play listing this app releases through is registered as `com.spoonhelp.customer`, so an AAB
+ * built as `com.spoonhelp.userapp` is refused at upload with "Your APK or Android App Bundle needs
+ * to have the package name com.spoonhelp.customer" (2026-09-21). The identity the store requires
+ * is not ours to choose, so the config follows it.
+ *
+ * The rename costs nothing here, and only because of WHEN it happened. A package rename after a
+ * release really would strand every existing install on an app Play will never update again. This
+ * app has never been released on either store -- the change landed while preparing the FIRST
+ * submission -- so there is no install base to strand. After this release ships, the production
+ * package is fixed for the life of the listing and cannot be revisited.
+ *
+ * `google-services.json` already carries a `com.spoonhelp.customer` client, so Firebase and push
+ * are unaffected by the rename.
  *
  * Both also travel in `extra`, because the Places / Geocoding REST calls send them as
  * `X-Android-Package` / `X-Ios-Bundle-Identifier` so an application-restricted Maps key keeps
- * working. The iOS key's restriction must therefore list `com.spoonhelp.customer` before a release
- * build can render a map — see docs/GOOGLE_MAPS_CONFIGURATION.md.
+ * working. BOTH keys' restrictions must now list `com.spoonhelp.customer` before a release build
+ * can render a map — see docs/GOOGLE_MAPS_CONFIGURATION.md.
  */
-const ANDROID_PACKAGE = `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
+const ANDROID_PACKAGE =
+  APP_ENV === 'production'
+    ? 'com.spoonhelp.customer'
+    : `com.spoonhelp.userapp${BUNDLE_SUFFIX[APP_ENV]}`;
 
 const IOS_BUNDLE_IDENTIFIER =
   APP_ENV === 'production'
