@@ -29,7 +29,7 @@
       },
       "android": {
         "serviceAccountKeyPath": "./service-account.json",
-        "applicationId": "com.spoonhelp.userapp",
+        "applicationId": "com.spoonhelp.customer",
         "track": "internal",
         "releaseStatus": "draft",
         "changesNotSentForReview": false

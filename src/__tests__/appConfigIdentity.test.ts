@@ -1,8 +1,12 @@
 /**
- * The native application identities are the one place where the two platforms deliberately
- * disagree: the Apple App ID registered for release is `com.spoonhelp.customer`, while Android's
- * production package stays `com.spoonhelp.userapp` (renaming a package is a new Play listing, not
- * an update). Either one being wrong is discovered at upload time at the earliest, so all six
+ * The native application identities converge in production and diverge everywhere else: BOTH
+ * stores register this app as `com.spoonhelp.customer`, while dev and staging keep the
+ * `com.spoonhelp.userapp` stem so they can sit on a device beside the release.
+ *
+ * Android used to stay on `com.spoonhelp.userapp` in production, on the reasoning that a rename is
+ * a new Play listing rather than an update. The Play listing turned out to be registered as
+ * `com.spoonhelp.customer`, which refuses any other package at upload (2026-09-21). Either
+ * identity being wrong is discovered at upload time at the earliest, so all six
  * environment/platform combinations are pinned here.
  *
  * The `extra` copies are pinned against the native values too. They are not decoration: the Places
@@ -25,7 +29,7 @@ const EXPECTED_IDENTITIES: Record<AppEnv, { android: string; ios: string }> = {
     ios: 'com.spoonhelp.userapp.staging',
   },
   production: {
-    android: 'com.spoonhelp.userapp',
+    android: 'com.spoonhelp.customer',
     ios: 'com.spoonhelp.customer',
   },
 };
@@ -111,12 +115,14 @@ describe('app.config application identities', () => {
     }
   });
 
-  it('splits the platforms in production, iOS onto the Apple App ID', () => {
+  it('puts BOTH platforms on the registered store identity in production', () => {
     const config = resolveConfig('production');
 
+    // Play refuses an AAB whose package is anything else, and the Apple App ID is the same
+    // string, so production is the one environment where the two identities must MATCH.
     expect(config.ios?.bundleIdentifier).toBe('com.spoonhelp.customer');
-    expect(config.android?.package).toBe('com.spoonhelp.userapp');
-    expect(config.ios?.bundleIdentifier).not.toBe(config.android?.package);
+    expect(config.android?.package).toBe('com.spoonhelp.customer');
+    expect(config.ios?.bundleIdentifier).toBe(config.android?.package);
   });
 
   it('leaves the EAS project and the Expo slug untouched by the iOS split', () => {
