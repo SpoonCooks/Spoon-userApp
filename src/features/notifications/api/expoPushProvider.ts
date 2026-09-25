@@ -60,13 +60,24 @@ import type { PushTokenProvider } from './pushApi';
  * `default` is deliberately the only channel: the design does not distinguish notification
  * types, and channels are customer-visible settings, so inventing categories nobody asked for
  * would leave permanent clutter in the system UI.
+ *
+ * `HIGH` because a channel's importance is what Android checks before showing a heads-up
+ * banner -- `DEFAULT` posts silently to the shade with no banner regardless of anything the
+ * app does at send time (`setNotificationHandler`'s `shouldShowBanner` included; that only
+ * runs at all while the app is foregrounded).
+ *
+ * Android importance is set-once: `setNotificationChannelAsync` on a channel id the OS has
+ * already created updates its name but leaves importance exactly as it was the first time,
+ * even calling this with a different value every launch after that. A device that already has
+ * `default` from before this change keeps `DEFAULT` importance until the customer changes it
+ * themselves in system settings, or until the app creates a channel under a new id.
  */
 export async function ensureAndroidChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   try {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Booking updates',
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: Notifications.AndroidImportance.HIGH,
     });
   } catch {
     // A channel that cannot be created is not worth failing a launch over.
