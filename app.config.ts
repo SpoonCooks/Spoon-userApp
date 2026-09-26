@@ -417,6 +417,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      */
     './plugins/withRNFirebasePods',
 
+    /**
+     * On Android, react-native-firebase's own FCM receiver otherwise outranks expo-notifications'
+     * and silently absorbs every push before expo-notifications ever sees it. See the plugin.
+     */
+    './plugins/withAndroidSingleFcmReceiver',
+
     [
       'expo-splash-screen',
       {

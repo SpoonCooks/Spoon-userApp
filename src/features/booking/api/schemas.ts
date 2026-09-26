@@ -410,6 +410,14 @@ export const bookingDetailSchema = z.object({
    * nullish on the summary: it is absent on a booking that has never been moved.
    */
   rescheduleCount: z.number().int().nullish(),
+  /**
+   * True when Ops moved this booking's time rather than the customer herself.
+   * `rescheduleCount` alone cannot carry this: it is deliberately the customer's own
+   * one-time budget and an admin move never spends it, so a booking Ops rescheduled reads
+   * identically to one that was always at its current time without this field. `nullish`
+   * for the same defensive reason `rescheduleCount` above is.
+   */
+  rescheduledByOps: z.boolean().nullish(),
   allowedActions: allowedActionsSchema,
 });
 
@@ -497,6 +505,9 @@ export const bookingSummarySchema = z.object({
   policyBand: z.string().nullish(),
   /** How many times the customer moved this booking. Capped at 1 by product policy (DEC-070). */
   rescheduleCount: z.number().int().nullish(),
+  /** True when Ops, not the customer, moved this booking's time — see `bookingDetailSchema`'s
+   * field of the same name for why `rescheduleCount` alone cannot carry this. */
+  rescheduledByOps: z.boolean().nullish(),
   /** The customer's OWN rating for this specific booking — never the cook's aggregate average
    * (`cook.ratingAverage`, a different field with different meaning). */
   ratingStars: z.number().nullish(),

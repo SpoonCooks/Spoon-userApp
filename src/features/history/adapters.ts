@@ -39,7 +39,10 @@ export function myBookingPresentationFor(
   // `cancelledBy` is accepted but deliberately unread below — see the doc comment above for why
   // it alone can never choose the label. Kept in the parameter type so a caller can pass a real
   // row (or a real example fixture) verbatim rather than stripping a field first.
-  dto: Pick<BookingSummaryDto, 'status' | 'cancelledBy' | 'policyBand' | 'rescheduleCount'>,
+  dto: Pick<
+    BookingSummaryDto,
+    'status' | 'cancelledBy' | 'policyBand' | 'rescheduleCount' | 'rescheduledByOps'
+  >,
 ): { readonly label: string; readonly tone: StatusTone } {
   if (dto.status === 'completed') return { label: 'Completed', tone: 'positive' };
 
@@ -68,7 +71,12 @@ export function myBookingPresentationFor(
   // assigned / cook_en_route / cook_arrived / cooking — one pill on this screen.
   // Deliberate: this screen is a flat historical index; Home already owns live-tracking detail
   // (arriving/arrived/in-service), so drawing that granularity again here would duplicate it.
-  return dto.rescheduleCount === 1
+  //
+  // `rescheduledByOps` sits beside `rescheduleCount === 1` rather than replacing it:
+  // `rescheduleCount` is the customer's own budget and an admin move deliberately never spends
+  // it (`reschedule-service.ts`), so a booking Ops moved would otherwise read as plain
+  // "Confirmed" — identical to one that was always at its current time.
+  return dto.rescheduleCount === 1 || dto.rescheduledByOps === true
     ? { label: 'Rescheduled', tone: 'info' }
     : { label: 'Confirmed', tone: 'info' };
 }
