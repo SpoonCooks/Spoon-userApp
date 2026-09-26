@@ -260,7 +260,22 @@ export function CompletionBody({
             ]}
             testID="completion-submit"
           >
-            <Text variant="buttonUpper" color="textPrimary" align="center">
+            {/*
+             * `paddingRight` compensates for a real Android text-measurement bug, not a
+             * layout choice: `buttonUpper`'s `letterSpacing` trails the last character, and
+             * on this device that trailing space is applied at paint time but left out of
+             * the TextView's own measured (and therefore clipped-to) width -- so the final
+             * glyph renders outside its own box and disappears, independent of how much room
+             * the surrounding `submit` Pressable has. Confirmed by temporarily zeroing
+             * `letterSpacing`, which fixed it; this keeps the token's designed spacing
+             * instead of removing it.
+             */}
+            <Text
+              variant="buttonUpper"
+              color="textPrimary"
+              align="center"
+              style={{ paddingRight: 2 }}
+            >
               {completion.submitLabel}
             </Text>
           </Pressable>
