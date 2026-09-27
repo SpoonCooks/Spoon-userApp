@@ -15,13 +15,15 @@ import {
   DEMO_INGREDIENTS,
   DEMO_MEAL_SLOTS,
 } from '../data';
+import { defaultDietFor } from '../diet';
 import type { DishDiet, LibraryDish } from '../types';
 
 /**
  * Meal Library — Figma `cCQlzTeiObQkpVBzwI8mZi` frame `1:519`.
  *
  * A sticky header (back, title, search, Book Now) over a horizontal strip of meals; below it a
- * vertical rail of ingredients beside a two-column grid of that ingredient's dishes. The rail and the grid scroll independently, as in quick-commerce category pages.
+ * vertical rail of ingredients beside a two-column grid of that ingredient's dishes. The rail and
+ * the grid scroll independently, as in quick-commerce category pages.
  *
  * STATIC ONLY, per task: renders fixture data (`data.ts`), is linked from nowhere in the app, and
  * every outward action — back, Book Now, add dish — is an unwired callback. The frame's status
@@ -33,12 +35,18 @@ import type { DishDiet, LibraryDish } from '../types';
  *    filters every ingredient's dishes by name; its back arrow closes it.
  *  - the Veg / Non-Veg SELECTED state. `1:649` draws both options idle; a selected option takes
  *    the meal strip's selected pill (`#FFD600`, `#1C1917`). Tapping it again clears the filter.
+ *
+ * The filter OPENS on the customer's profile answer (`dietaryPreference`, see `defaultDietFor`):
+ * Veg for vegan and vegetarian, Non-Veg for everyone else. It follows that answer until the
+ * customer touches the toggle, so a profile that loads after the first render still lands.
  */
 export interface MealLibraryScreenProps {
   readonly onBack?: () => void;
   /** Book Now — the booking flow or Home; the caller decides. */
   readonly onBookNow?: () => void;
   readonly onAddDish?: (dish: LibraryDish) => void;
+  /** The profile's `dietaryPreference` from `GET /v1/me`; picks the Veg / Non-Veg default. */
+  readonly dietaryPreference?: string | null | undefined;
   readonly testID?: string;
 }
 
@@ -62,11 +70,14 @@ export function MealLibraryScreen({
   onBack,
   onBookNow,
   onAddDish,
+  dietaryPreference,
   testID = 'meal-library-screen',
 }: MealLibraryScreenProps) {
   const [mealId, setMealId] = useState(DEMO_DEFAULT_MEAL_ID);
   const [ingredientId, setIngredientId] = useState(DEMO_DEFAULT_INGREDIENT_ID);
-  const [diet, setDiet] = useState<DishDiet | null>(null);
+  /** `undefined` until the customer touches the toggle; `null` is their "show both". */
+  const [dietChoice, setDiet] = useState<DishDiet | null | undefined>(undefined);
+  const diet = dietChoice === undefined ? defaultDietFor(dietaryPreference) : dietChoice;
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
   const { bottom: bottomInset } = useSafeAreaInsets();
