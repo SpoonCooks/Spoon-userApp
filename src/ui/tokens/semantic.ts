@@ -134,7 +134,7 @@ export const lightColors = {
   textFree: palette.emerald,
   /**
    * `6:789` — the Profile logout label. v4 sets it to **`#FF0404`**, the same red the OTP error
-   * uses; the superseded file drew `#C70036` (`palette.rose39`, now unused).
+   * uses; the superseded file drew `#C70036` (`palette.rose39`, now `textRemove`).
    */
   textLogout: palette.danger,
   textDisabled: palette.slate400,
@@ -211,6 +211,12 @@ export const lightColors = {
   textStoneQuiet: palette.grey777,
   textStoneFaint: palette.stone350,
   textStoneMuted: palette.stone400,
+  borderStoneDashed: palette.stone300,
+  borderStoneStrong: palette.stone500,
+  textStoneClash: palette.stone500,
+  textPartial: palette.amber31,
+  /** `4:918` — "Remove Visit 2". */
+  textRemove: palette.rose39,
 
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */
@@ -825,6 +831,62 @@ export const typography = {
     fontSize: 13,
     lineHeight: lineHeight.sm,
     fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — an idle visit tab, a time of day ("Morning"): Livvic Bold 14/18. */
+  labelStrong: {
+    fontSize: fontSize.lg,
+    lineHeight: 18,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — the line under a visit tab ("1:15 PM · 1.5 hr"): Regular 10/12. */
+  tabMeta: {
+    fontSize: fontSize.xs,
+    lineHeight: 12,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — a day cell's weekday ("Tue"): Livvic Bold 10/13. */
+  weekdayMicro: {
+    fontSize: fontSize.xs,
+    lineHeight: 13,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — a start time's coverage ("all days", "9/11 days"): Bold 10/16. */
+  slotCaption: {
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — a duration ("1.5 hr"): Livvic Black 16/22 at −0.4. */
+  durationTitle: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.tight,
+  },
+  /** Recurring setup, Step 2 — a duration's struck list price ("₹450"): Regular 11/15. */
+  priceMicro: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — a duration's price ("₹189"): Livvic Bold 11/15. */
+  priceMicroBold: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — the footer total ("11 visits · 11 days"): Livvic Bold 15/19. */
+  titleTotal: {
+    fontSize: 15,
+    lineHeight: 19,
+    fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
   /** Recurring setup, Step 1 — the day counter ("3 / 14"): Livvic Black 14/18. */

@@ -234,6 +234,12 @@ export const palette = {
   stone400: '#B5B3AA',
   /** Days outside the window. */
   stone350: '#C9C7BF',
+  /** `4:666` — the dashed edge of a start time free on only some days. */
+  stone300: '#BDBBB2',
+  /** `4:574` — the dashed "+ Add visit" tab edge; `4:1045` a clashing start time's ink. */
+  stone500: '#9A988F',
+  /** `4:671` — "9/11 days", a start time free on only some days. */
+  amber31: '#A06A00',
   /** Secondary copy — the range, "Pick 5 to 14 days". */
   grey555: '#555555',
   /** Captions — "Pick 2 more days to continue". */

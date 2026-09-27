@@ -3,10 +3,12 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
-import { Button, Screen, ScreenHeader, Text } from '@ui';
+import { Button, Screen, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { ColorToken } from '@ui/tokens/semantic';
 
+import { HatchedFill } from '../components/HatchedFill';
+import { RecurringHeader } from '../components/RecurringHeader';
 import {
   DURATION_OPTIONS,
   MAX_VISITS,
@@ -31,11 +33,11 @@ import type { RecurringDaysMode, RecurringTimeOfDay, RecurringVisitDraft } from 
  * See docs/CLAUDE_DESIGN_RECURRING_SETUP.md. One screen that grows from `2c` to `2e` as visits are
  * added, not three screens.
  *
- * Layout, sizes and copy are read off the wireframe's markup; COLOURS are the app's own, as on
- * Step 1: its grey idle cells map to `surfaceMuted`, its black selected cells to the lime
- * `surfaceTileSelected`. `ChipGroup` and `PriceTile` carry fixed Figma geometry (chip padding,
- * a 52pt compact tile, a yellow idle fill) that doesn't match these cells, so the grid cells are
- * drawn here from one local `Cell`, built on the same tokens.
+ * Figma `ZIJf639gTWHXshaa2YOeCT` frames `4:554` (`2c`), `4:724` (`2d`) and `4:932` (`2e`) — an
+ * import of that wireframe. Layout, sizes, copy AND colours follow them (the stone/ink tokens), as
+ * on Step 1. `ChipGroup` and `PriceTile` carry fixed geometry (chip padding, a 52pt compact tile,
+ * a yellow idle fill) that doesn't match these cells, so the grid cells are drawn here from one
+ * local `Cell`.
  *
  * STATIC ONLY, per task: visits, picked days and per-slot coverage are fixture data — there is no
  * availability endpoint yet, and this screen isn't wired to Step 1. What IS real: adding and
@@ -116,30 +118,40 @@ function Grid({ columns, children }: { readonly columns: number; readonly childr
 }
 
 /**
- * The wireframe's grid cell. `partial` is a start time free on only some of the visit's days (a
- * white, dashed cell); `full` and `clash` are unavailable. Colours are the app's own, see banner.
+ * The grid cell. `partial` is a start time free on only some of the visit's days (a white, dashed
+ * cell); `full` is taken; `clash` overlaps another visit and is hatched (`4:1044`).
  */
 type CellTone = 'idle' | 'selected' | 'partial' | 'full' | 'clash';
 
 const CELL_SURFACE: Record<CellTone, ViewStyle> = {
-  idle: { backgroundColor: lightTheme.colors.surfaceMuted },
-  selected: { backgroundColor: lightTheme.colors.surfaceTileSelected },
+  idle: { backgroundColor: lightTheme.colors.surfaceStone },
+  selected: { backgroundColor: lightTheme.colors.surfaceInk },
   partial: {
     backgroundColor: lightTheme.colors.surface,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: lightTheme.colors.border,
+    borderColor: lightTheme.colors.borderStoneDashed,
   },
-  full: { backgroundColor: lightTheme.colors.surfaceMuted },
-  clash: { backgroundColor: lightTheme.colors.surfaceTileDisabled },
+  full: { backgroundColor: lightTheme.colors.surfaceStone },
+  clash: { overflow: 'hidden' },
 };
 
+/** The main line's ink per tone. */
 const CELL_INK: Record<CellTone, ColorToken> = {
-  idle: 'textPrimary',
-  selected: 'textPrimary',
-  partial: 'textPrimary',
-  full: 'textDisabled',
-  clash: 'textDisabled',
+  idle: 'textInk',
+  selected: 'textInverse',
+  partial: 'textInk',
+  full: 'textStoneMuted',
+  clash: 'textStoneClash',
+};
+
+/** A start time's caption ink per tone: `4:660`, `4:685`, `4:671`, `4:697`, `4:1047`. */
+const CAPTION_INK: Record<CellTone, ColorToken> = {
+  idle: 'textStoneCaption',
+  selected: 'textBrand',
+  partial: 'textPartial',
+  full: 'textStoneMuted',
+  clash: 'textStoneClash',
 };
 
 function Cell({
@@ -174,6 +186,7 @@ function Cell({
         pressed && !disabled ? styles.pressed : null,
       ]}
     >
+      {tone === 'clash' ? <HatchedFill /> : null}
       {children}
     </Pressable>
   );
@@ -246,9 +259,7 @@ export function RecurringTimeScreen({
       contentStyle={styles.body}
       header={
         <View>
-          <View style={styles.headerWrap}>
-            <ScreenHeader title="Time & duration" onBack={onBack} testID={`${testID}-header`} />
-          </View>
+          <RecurringHeader title="Time & duration" onBack={onBack} testID={`${testID}-header`} />
 
           {/* The visit tabs sit fixed under the header, outside the scroll area, as drawn. */}
           <View style={styles.tabsWrap}>
@@ -265,12 +276,12 @@ export function RecurringTimeScreen({
                     testID={`${testID}-visit-tab-${visit.id}`}
                   >
                     <Text
-                      variant={active ? 'titleBlack' : 'title'}
-                      color={active ? 'textPrimary' : 'textSecondary'}
+                      variant={active ? 'labelCounter' : 'labelStrong'}
+                      color={active ? 'textInk' : 'textStone'}
                     >
                       {visit.label}
                     </Text>
-                    <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                    <Text variant="tabMeta" color="textStoneQuiet" numberOfLines={1}>
                       {tabTimeLabel(visit, visits.length)}
                     </Text>
                   </Pressable>
@@ -284,7 +295,7 @@ export function RecurringTimeScreen({
                   testID={`${testID}-add-visit`}
                 >
                   {/* `2c` reads "+ Add visit"; `2d`, with a second tab taking the room, "+ Visit". */}
-                  <Text variant="title" color="textSecondary">
+                  <Text variant="labelStrong" color="textStone">
                     {visits.length === 1 ? '+ Add visit' : '+ Visit'}
                   </Text>
                 </Pressable>
@@ -296,11 +307,11 @@ export function RecurringTimeScreen({
       footer={
         <View style={styles.footer}>
           <View style={styles.summaryRow}>
-            <Text variant="titleRebook" color="textPrimary">
+            <Text variant="titleTotal" color="textInk">
               {totalVisits} visits · {allDayIds.length} days
             </Text>
             <Pressable accessibilityRole="button" hitSlop={lightTheme.space.sm}>
-              <Text variant="title" color="textPrimary" style={styles.underline}>
+              <Text variant="labelStrong" color="textInk" style={styles.underline}>
                 Price details
               </Text>
             </Pressable>
@@ -308,6 +319,10 @@ export function RecurringTimeScreen({
           <Button
             label="Review plan"
             onPress={() => onContinue?.(visits)}
+            flat
+            labelVariant="titleLargeBlack"
+            labelColor="textInk"
+            style={styles.cta}
             testID={`${testID}-continue`}
           />
         </View>
@@ -316,7 +331,7 @@ export function RecurringTimeScreen({
       {isPrimary ? null : (
         <View style={styles.daysSection}>
           <View style={styles.daysHeader}>
-            <Text variant="labelBold" color="textSecondary">
+            <Text variant="labelBold" color="textStone">
               Days
             </Text>
             <View style={styles.toggleTrack} accessibilityRole="radiogroup">
@@ -337,7 +352,7 @@ export function RecurringTimeScreen({
                     style={[styles.toggleOption, active ? styles.toggleActive : null]}
                     testID={`${testID}-days-${mode}`}
                   >
-                    <Text variant="bodyBold" color={active ? 'textPrimary' : 'textSecondary'}>
+                    <Text variant="bodyBoldTight" color={active ? 'textInk' : 'textStone'}>
                       {label}
                     </Text>
                   </Pressable>
@@ -365,10 +380,14 @@ export function RecurringTimeScreen({
                     }
                     testID={`${testID}-day-${day.id}`}
                   >
-                    <Text variant="captionBold" color="textPrimary" style={styles.dayWeekday}>
+                    <Text
+                      variant="weekdayMicro"
+                      color={selected ? 'textInverse' : 'textInk'}
+                      style={styles.dayWeekday}
+                    >
                       {day.shortLabel}
                     </Text>
-                    <Text variant="titleBlack" color="textPrimary">
+                    <Text variant="labelCounter" color={selected ? 'textInverse' : 'textInk'}>
                       {day.dayOfMonth}
                     </Text>
                   </Cell>
@@ -380,63 +399,69 @@ export function RecurringTimeScreen({
       )}
 
       <View style={styles.section}>
-        <Text variant="labelBold" color="textSecondary">
+        <Text variant="labelBold" color="textStone">
           Time of day
         </Text>
         <Grid columns={3}>
-          {TIME_OF_DAY_OPTIONS.map((option) => (
-            <Cell
-              key={option.id}
-              tone={activeVisit.timeOfDay === option.id ? 'selected' : 'idle'}
-              style={styles.timeOfDayCell}
-              accessibilityLabel={option.label}
-              onPress={() =>
-                updateVisit(activeVisit.id, { timeOfDay: option.id, startMinutes: null })
-              }
-              testID={`${testID}-time-of-day-${option.id}`}
-            >
-              <Text variant="title" color="textPrimary">
-                {option.label}
-              </Text>
-            </Cell>
-          ))}
+          {TIME_OF_DAY_OPTIONS.map((option) => {
+            const tone: CellTone = activeVisit.timeOfDay === option.id ? 'selected' : 'idle';
+            return (
+              <Cell
+                key={option.id}
+                tone={tone}
+                style={styles.timeOfDayCell}
+                accessibilityLabel={option.label}
+                onPress={() =>
+                  updateVisit(activeVisit.id, { timeOfDay: option.id, startMinutes: null })
+                }
+                testID={`${testID}-time-of-day-${option.id}`}
+              >
+                <Text variant="labelStrong" color={CELL_INK[tone]}>
+                  {option.label}
+                </Text>
+              </Cell>
+            );
+          })}
         </Grid>
       </View>
 
       <View style={styles.section}>
-        <Text variant="labelBold" color="textSecondary">
+        <Text variant="labelBold" color="textStone">
           Duration
         </Text>
         <Grid columns={3}>
-          {DURATION_OPTIONS.map((option) => (
-            <Cell
-              key={option.id}
-              tone={activeVisit.durationId === option.id ? 'selected' : 'idle'}
-              style={styles.durationCell}
-              accessibilityLabel={`${option.label}, ${option.price}, reduced from ${option.strikePrice}`}
-              onPress={() =>
-                updateVisit(activeVisit.id, { durationId: option.id, startMinutes: null })
-              }
-              testID={`${testID}-duration-${option.id}`}
-            >
-              <Text variant="heading" color="textPrimary">
-                {option.label}
-              </Text>
-              <View style={styles.prices}>
-                <Text variant="bodySmall" color="textPrimary" style={styles.strike}>
-                  {option.strikePrice}
+          {DURATION_OPTIONS.map((option) => {
+            const tone: CellTone = activeVisit.durationId === option.id ? 'selected' : 'idle';
+            return (
+              <Cell
+                key={option.id}
+                tone={tone}
+                style={styles.durationCell}
+                accessibilityLabel={`${option.label}, ${option.price}, reduced from ${option.strikePrice}`}
+                onPress={() =>
+                  updateVisit(activeVisit.id, { durationId: option.id, startMinutes: null })
+                }
+                testID={`${testID}-duration-${option.id}`}
+              >
+                <Text variant="durationTitle" color={CELL_INK[tone]}>
+                  {option.label}
                 </Text>
-                <Text variant="slotLabel" color="textPrimary">
-                  {option.price}
-                </Text>
-              </View>
-            </Cell>
-          ))}
+                <View style={styles.prices}>
+                  <Text variant="priceMicro" color={CELL_INK[tone]} style={styles.strike}>
+                    {option.strikePrice}
+                  </Text>
+                  <Text variant="priceMicroBold" color={CELL_INK[tone]}>
+                    {option.price}
+                  </Text>
+                </View>
+              </Cell>
+            );
+          })}
         </Grid>
       </View>
 
       <View style={styles.section}>
-        <Text variant="labelBold" color="textSecondary">
+        <Text variant="labelBold" color="textStone">
           Start time · {activeTimeOfDayLabel}
         </Text>
         <Grid columns={4}>
@@ -479,17 +504,7 @@ export function RecurringTimeScreen({
                 <Text variant="labelBold" color={CELL_INK[tone]}>
                   {time}
                 </Text>
-                {/* Bold like the time above it — the wireframe's caption inherits the cell's 700. */}
-                <Text
-                  variant="captionBold"
-                  color={
-                    tone === 'partial'
-                      ? 'textReschedule'
-                      : tone === 'full' || tone === 'clash'
-                        ? 'textDisabled'
-                        : 'textSecondary'
-                  }
-                >
+                <Text variant="slotCaption" color={CAPTION_INK[tone]}>
                   {caption}
                 </Text>
               </Cell>
@@ -506,7 +521,7 @@ export function RecurringTimeScreen({
           hitSlop={lightTheme.space.sm}
           testID={`${testID}-different-times`}
         >
-          <Text variant="title" color="textPrimary" align="center" style={styles.underline}>
+          <Text variant="labelStrong" color="textInk" align="center" style={styles.underline}>
             Different time on some days?
           </Text>
         </Pressable>
@@ -519,7 +534,7 @@ export function RecurringTimeScreen({
           hitSlop={lightTheme.space.sm}
           testID={`${testID}-remove-visit`}
         >
-          <Text variant="hint" color="textDestructive" align="center" style={styles.underline}>
+          <Text variant="captionStep" color="textRemove" align="center" style={styles.underline}>
             Remove {activeVisit.label}
           </Text>
         </Pressable>
@@ -528,26 +543,25 @@ export function RecurringTimeScreen({
   );
 }
 
-/** The wireframe's gutter between grid cells, rows and columns alike. */
+/** `4:595` / `4:655` — the gutter between grid cells, rows and columns alike. */
 const GRID_GAP = 6;
+/** `4:560` — a 20pt gutter (not the app's 16), as on Step 1. */
+const GUTTER = 20;
 
 const styles = StyleSheet.create({
-  headerWrap: {
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
-    paddingTop: lightTheme.space.lg,
-  },
-  /** `2c` — the tab row: 4 above, 8 below, inside the screen gutter. */
+  /** `4:565` — the tab row: 4 above, 8 below, in the 20pt gutter. */
   tabsWrap: {
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
+    paddingHorizontal: GUTTER,
     paddingTop: lightTheme.space.xs,
     paddingBottom: lightTheme.space.sm,
   },
+  /** `4:566` — a stone track, 4 inset, tabs 4 apart. */
   tabTrack: {
     flexDirection: 'row',
     gap: lightTheme.space.xs,
     padding: lightTheme.space.xs,
     borderRadius: lightTheme.radius.pill,
-    backgroundColor: lightTheme.colors.surfaceMuted,
+    backgroundColor: lightTheme.colors.surfaceStone,
   },
   tab: {
     flex: 1,
@@ -556,40 +570,71 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabActive: { backgroundColor: lightTheme.colors.surface, ...lightTheme.elevation.subtle },
-  tabAdd: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: lightTheme.colors.textDisabled },
-  /** Body opens 6 under the tabs; its blocks sit 14 apart. */
-  body: { paddingTop: lightTheme.space.s6, gap: 14 },
+  /** `4:568` — white, lifted by a `0 1 1.5 rgba(0,0,0,0.12)` shadow. */
+  tabActive: {
+    backgroundColor: lightTheme.colors.surface,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 1.5,
+    elevation: 1,
+  },
+  /** `4:574` — a 1pt dashed `#9A988F` edge. */
+  tabAdd: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: lightTheme.colors.borderStoneStrong,
+  },
+  /** `4:580` — body opens 6 under the tabs; its blocks sit 14 apart. */
+  body: { paddingHorizontal: GUTTER, paddingTop: lightTheme.space.s6, gap: 14 },
   section: { gap: lightTheme.space.s6 },
+  /** `4:751` — the Days row sits 8 above its grid. */
   daysSection: { gap: lightTheme.space.sm },
   daysHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  /** `4:756` — a stone track, 3 inset, options 4 apart. */
   toggleTrack: {
     flexDirection: 'row',
     gap: lightTheme.space.xs,
     padding: 3,
     borderRadius: lightTheme.radius.pill,
-    backgroundColor: lightTheme.colors.surfaceMuted,
+    backgroundColor: lightTheme.colors.surfaceStone,
   },
   toggleOption: {
     paddingVertical: 5,
     paddingHorizontal: lightTheme.space.s10,
     borderRadius: lightTheme.radius.pill,
   },
-  toggleActive: { backgroundColor: lightTheme.colors.surface, ...lightTheme.elevation.subtle },
+  /** `4:759` — white, lifted by a `0 1 1 rgba(0,0,0,0.1)` shadow. */
+  toggleActive: {
+    backgroundColor: lightTheme.colors.surface,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
   grid: { gap: GRID_GAP },
   gridRow: { flexDirection: 'row', gap: GRID_GAP },
   gridCell: { flex: 1 },
   cell: { borderRadius: lightTheme.radius.sm, alignItems: 'center', justifyContent: 'center' },
+  /** `4:762` — py 6 at a 10pt radius: 6 + 13 + 18 + 6 = 43. */
   dayCell: { paddingVertical: lightTheme.space.s6, borderRadius: lightTheme.radius.r10 },
   dayWeekday: { opacity: 0.7 },
+  /** `4:586` — py 11 around an 18pt line: 40. */
   timeOfDayCell: { paddingVertical: 11 },
+  /** `4:596` — pt 5 / pb 8 / px 4 around 22 + 15: 50. */
   durationCell: {
     minHeight: 50,
-    paddingVertical: 5,
+    paddingTop: 5,
+    paddingBottom: lightTheme.space.sm,
     paddingHorizontal: lightTheme.space.xs,
   },
   prices: { flexDirection: 'row', gap: lightTheme.space.xs },
   strike: { textDecorationLine: 'line-through', opacity: 0.6 },
+  /**
+   * `4:1036` — pt 8 / pb 6 / px 2 around 16 + 16: 46. A dashed cell adds its 1pt edge (48), and
+   * the rest of its row stretches to match, as `4:655` draws.
+   */
   slotCell: {
     paddingTop: lightTheme.space.sm,
     paddingBottom: lightTheme.space.s6,
@@ -597,18 +642,20 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.8 },
   /**
-   * `2c` — the footer's own top rule, edge to edge: pulled out over `Screen`'s 16 gutter and 8 of
-   * top padding, then padded back in.
+   * `4:713` — the footer's own 1pt stone rule, edge to edge: pulled out over `Screen`'s 16 gutter
+   * and 8 of top padding, then padded back in to 20 / 11.
    */
   footer: {
     gap: lightTheme.space.sm,
     marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
     marginTop: -lightTheme.space.sm,
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
-    paddingTop: lightTheme.space.s10,
-    borderTopWidth: 1.5,
-    borderTopColor: lightTheme.colors.surfaceMuted,
+    paddingHorizontal: GUTTER,
+    paddingTop: 11,
+    borderTopWidth: 1,
+    borderTopColor: lightTheme.colors.surfaceStone,
   },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  /** `4:720` — a flat 52pt bar at a 16pt radius. */
+  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
   underline: { textDecorationLine: 'underline' },
 });

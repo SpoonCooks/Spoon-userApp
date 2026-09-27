@@ -16,7 +16,7 @@ import type { RecurringDayCell } from '../types';
  * Source: Figma `ZIJf639gTWHXshaa2YOeCT` ("Version 1"), frames `4:282` (under minimum) and `4:439`
  * (valid) — an import of the Claude Design wireframe, so its values are that markup's. Layout,
  * sizes, copy AND colours follow it (the stone/ink tokens). One deliberate departure, per review:
- * the no-cooks day is greyed rather than struck through.
+ * the no-cooks day keeps black ink, neither greyed nor struck through.
  *
  * STATIC ONLY, per task: the calendar is local fixture data (`buildDemoCalendar`), the min/max
  * gate and the "no cook" day are demonstrated locally, and `onContinue` is left to the caller.
@@ -174,7 +174,7 @@ function DayCell({ day, selected, onPress }: DayCellProps) {
         ? styles.cellSelected
         : styles.cellIdle;
   const textColor: ColorToken = day.unavailable
-    ? 'textStoneMuted'
+    ? 'textInk'
     : day.disabled
       ? 'textStoneFaint'
       : selected
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   cellSelected: { backgroundColor: lightTheme.colors.surfaceInk },
   /** Outside the window: number only, no cell. */
   cellDisabled: { backgroundColor: 'transparent' },
-  /** Inside the window but no cooks (Oct 10): the cell stays, the number is greyed, not struck. */
+  /** Inside the window but no cooks (Oct 10): the cell and its black number stay; it just can't be picked. */
   cellUnavailable: { backgroundColor: lightTheme.colors.surfaceStone },
   cellPressed: { opacity: 0.8 },
 });
