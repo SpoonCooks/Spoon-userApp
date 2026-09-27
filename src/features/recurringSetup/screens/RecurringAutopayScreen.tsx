@@ -14,7 +14,7 @@ import { AUTOPAY_METHODS, buildDemoAutopayDetails } from '../data';
  * ("Step 5 · Autopay"). See docs/CLAUDE_DESIGN_RECURRING_SETUP.md. Figma `ZIJf639gTWHXshaa2YOeCT`
  * frame `4:1937` (`2h`) — an import of that wireframe. Layout, sizes, copy AND colours follow it,
  * as on Steps 1–4: the selected option has a 2pt ink edge, and the radios are drawn locally as
- * Figma draws them (a 26pt ink ring, a 10pt dot when chosen).
+ * Figma draws them (a 26pt ink rounded square, a 10pt dot when chosen).
  *
  * STATIC ONLY, per task: the two methods and the mandate terms are local fixture data
  * (`AUTOPAY_METHODS`, `buildDemoAutopayDetails`) — there is no Razorpay integration wired up yet,
@@ -143,11 +143,11 @@ const styles = StyleSheet.create({
   /** `4:1952` — the chosen option's edge is 2pt ink: 67 tall. */
   methodSelected: { borderWidth: 2, borderColor: lightTheme.colors.surfaceInk },
   methodText: { flex: 1 },
-  /** `4:1953` — a 26pt ring, 2pt ink. */
+  /** `4:1953` — a 26pt rounded square (an 11pt radius, not a circle), 2pt ink. */
   radio: {
     width: 26,
     height: 26,
-    borderRadius: 13,
+    borderRadius: 11,
     borderWidth: 2,
     borderColor: lightTheme.colors.surfaceInk,
     alignItems: 'center',
