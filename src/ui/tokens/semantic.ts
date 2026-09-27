@@ -1012,12 +1012,17 @@ export const typography = {
     letterSpacing: -0.275,
   },
   /**
-   * `1:569` — an ingredient drawn as an emoji, 30/30. The frame sets it in Inter; the platform's
+   * `1:569` — an ingredient drawn as an emoji at 30pt. The frame sets it in Inter; the platform's
    * emoji face renders it either way, so no family is named.
+   *
+   * The frame's line height is also 30, but an emoji glyph is TALLER than its point size: a 30pt
+   * line box gives the text a frame shorter than the glyph, and iOS clips the glyph to that frame,
+   * which shaved the top and bottom off every rail emoji. The line box is the rail's full 36pt art
+   * slot instead, which holds the whole glyph and keeps it centred.
    */
   railEmoji: {
     fontSize: 30,
-    lineHeight: lineHeight.xxxl,
+    lineHeight: 36,
     letterSpacing: letterSpacing.none,
   },
   /** `1:671` dish names — Livvic Medium 11/15.13. */

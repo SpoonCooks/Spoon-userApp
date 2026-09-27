@@ -1,22 +1,23 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-
-import { Button, EmptyState, Icon, IconButton, Screen, Text } from '@ui';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import {
+  Button,
+  CategoryRail,
+  DishTileGrid,
+  EmptyState,
+  Icon,
+  IconButton,
+  PillTabs,
+  Screen,
+  SegmentedToggle,
+  Text,
+} from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { DishCard } from '../components/DishCard';
-import { IngredientRail } from '../components/IngredientRail';
-import { MealTabs } from '../components/MealTabs';
-import {
-  DEMO_DEFAULT_INGREDIENT_ID,
-  DEMO_DEFAULT_MEAL_ID,
-  DEMO_DISHES_BY_INGREDIENT,
-  DEMO_INGREDIENTS,
-  DEMO_MEAL_SLOTS,
-} from '../data';
 import { defaultDietFor } from '../diet';
-import type { DishDiet, LibraryDish } from '../types';
+import type { DishDiet, LibraryDish, LibraryIngredient, MealSlot } from '../types';
 
 /**
  * Meal Library — Figma `cCQlzTeiObQkpVBzwI8mZi` frame `1:519`.
@@ -25,28 +26,47 @@ import type { DishDiet, LibraryDish } from '../types';
  * vertical rail of ingredients beside a two-column grid of that ingredient's dishes. The rail and
  * the grid scroll independently, as in quick-commerce category pages.
  *
- * STATIC ONLY, per task: renders fixture data (`data.ts`), is linked from nowhere in the app, and
- * every outward action — back, Book Now, add dish — is an unwired callback. The frame's status
- * bar, notch and home indicator are device mockup and are not reproduced, and its bottom nav
- * (`1:770`) is deliberately left out: the app has no tab shell, and it belongs to one.
+ * DATA-DRIVEN. The screen owns no catalogue: it draws exactly the `meals`, `ingredients` and
+ * `dishes` it is handed, so their counts are whatever the backend returns. The selection is
+ * CONTROLLED — the caller holds the selected meal and ingredient and supplies the dishes for
+ * them — because changing either is a new fetch, and the fetch belongs to the caller. The same
+ * goes for search: the screen reports the query, and draws `searchResults`.
+ *
+ * What the screen does own is presentation state: whether search is open, its text, and the
+ * Veg / Non-Veg filter, which is applied here to whichever list is showing.
+ *
+ * STATIC ONLY, per task: linked from nowhere in the app, and back, Book Now and add-dish are
+ * unwired callbacks. The frame's status bar, notch and home indicator are device mockup, and its
+ * bottom nav (`1:770`) is deliberately left out: the app has no tab shell, and it belongs to one.
  *
  * NOT IN THE FRAME, built per the brief:
- *  - the search bar the search icon opens. It takes the title's place in the header row and
- *    filters every ingredient's dishes by name; its back arrow closes it.
- *  - the Veg / Non-Veg SELECTED state. `1:649` draws both options idle; a selected option takes
- *    the meal strip's selected pill (`#FFD600`, `#1C1917`). Tapping it again clears the filter.
+ *  - the search bar the search icon opens. It takes the title's place in the header row; its
+ *    back arrow closes it.
+ *  - the Veg / Non-Veg SELECTED state — see `SegmentedToggle`. Tapping it again clears it.
  *
  * The filter OPENS on the customer's profile answer (`dietaryPreference`, see `defaultDietFor`):
  * Veg for vegan and vegetarian, Non-Veg for everyone else. It follows that answer until the
  * customer touches the toggle, so a profile that loads after the first render still lands.
  */
 export interface MealLibraryScreenProps {
+  readonly meals: readonly MealSlot[];
+  readonly selectedMealId: string | null;
+  readonly onSelectMeal: (id: string) => void;
+  readonly ingredients: readonly LibraryIngredient[];
+  readonly selectedIngredientId: string | null;
+  readonly onSelectIngredient: (id: string) => void;
+  /** The dishes for the selected meal and ingredient. */
+  readonly dishes: readonly LibraryDish[];
+  /** Called with the trimmed query as it changes, and with `''` when search closes. */
+  readonly onSearchChange?: (query: string) => void;
+  /** The dishes matching the current query; drawn in place of `dishes` while one is typed. */
+  readonly searchResults?: readonly LibraryDish[];
+  /** The profile's `dietaryPreference` from `GET /v1/me`; picks the Veg / Non-Veg default. */
+  readonly dietaryPreference?: string | null | undefined;
   readonly onBack?: () => void;
   /** Book Now — the booking flow or Home; the caller decides. */
   readonly onBookNow?: () => void;
   readonly onAddDish?: (dish: LibraryDish) => void;
-  /** The profile's `dietaryPreference` from `GET /v1/me`; picks the Veg / Non-Veg default. */
-  readonly dietaryPreference?: string | null | undefined;
   readonly testID?: string;
 }
 
@@ -55,26 +75,24 @@ const DIETS: readonly { id: DishDiet; label: string }[] = [
   { id: 'nonVeg', label: 'Non-Veg' },
 ];
 
-const ALL_DISHES: readonly LibraryDish[] = Object.values(DEMO_DISHES_BY_INGREDIENT).flat();
-
-/** Pairs the dishes into grid rows; a lone last dish keeps half the width, as a grid cell would. */
-function toRows(dishes: readonly LibraryDish[]): (readonly [LibraryDish, LibraryDish | null])[] {
-  const rows: (readonly [LibraryDish, LibraryDish | null])[] = [];
-  for (let i = 0; i < dishes.length; i += 2) {
-    rows.push([dishes[i] as LibraryDish, dishes[i + 1] ?? null]);
-  }
-  return rows;
-}
+const NO_RESULTS: readonly LibraryDish[] = [];
 
 export function MealLibraryScreen({
+  meals,
+  selectedMealId,
+  onSelectMeal,
+  ingredients,
+  selectedIngredientId,
+  onSelectIngredient,
+  dishes,
+  onSearchChange,
+  searchResults = NO_RESULTS,
+  dietaryPreference,
   onBack,
   onBookNow,
   onAddDish,
-  dietaryPreference,
   testID = 'meal-library-screen',
 }: MealLibraryScreenProps) {
-  const [mealId, setMealId] = useState(DEMO_DEFAULT_MEAL_ID);
-  const [ingredientId, setIngredientId] = useState(DEMO_DEFAULT_INGREDIENT_ID);
   /** `undefined` until the customer touches the toggle; `null` is their "show both". */
   const [dietChoice, setDiet] = useState<DishDiet | null | undefined>(undefined);
   const diet = dietChoice === undefined ? defaultDietFor(dietaryPreference) : dietChoice;
@@ -82,16 +100,21 @@ export function MealLibraryScreen({
   const [query, setQuery] = useState('');
   const { bottom: bottomInset } = useSafeAreaInsets();
 
-  const ingredient = DEMO_INGREDIENTS.find((item) => item.id === ingredientId);
-  const trimmed = query.trim().toLowerCase();
+  const trimmed = query.trim();
   const searchActive = searching && trimmed.length > 0;
 
-  const dishes = useMemo(() => {
-    const source = searchActive
-      ? ALL_DISHES.filter((dish) => dish.name.toLowerCase().includes(trimmed))
-      : (DEMO_DISHES_BY_INGREDIENT[ingredientId] ?? []);
-    return diet === null ? source : source.filter((dish) => dish.diet === diet);
-  }, [searchActive, trimmed, ingredientId, diet]);
+  useEffect(() => {
+    onSearchChange?.(trimmed);
+    // Report the QUERY, not every re-render of a caller that passes a fresh callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trimmed]);
+
+  const ingredient = ingredients.find((item) => item.id === selectedIngredientId);
+  const source = searchActive ? searchResults : dishes;
+  const shown = diet === null ? source : source.filter((dish) => dish.diet === diet);
+  const title = searchActive
+    ? `Results for “${trimmed}”`
+    : (ingredient?.title ?? ingredient?.label);
 
   const closeSearch = () => {
     setSearching(false);
@@ -166,10 +189,11 @@ export function MealLibraryScreen({
         />
       </View>
 
-      <MealTabs
-        meals={DEMO_MEAL_SLOTS}
-        selectedId={mealId}
-        onSelect={setMealId}
+      <PillTabs
+        items={meals}
+        selectedId={selectedMealId}
+        onSelect={onSelectMeal}
+        bleed={HEADER_GUTTER}
         testID={`${testID}-meals`}
       />
     </View>
@@ -178,16 +202,18 @@ export function MealLibraryScreen({
   return (
     <Screen padded={false} header={header} testID={testID}>
       <View style={styles.body}>
-        <IngredientRail
-          ingredients={DEMO_INGREDIENTS}
-          selectedId={ingredientId}
-          bottomInset={bottomInset}
-          onSelect={(id) => {
-            closeSearch();
-            setIngredientId(id);
-          }}
-          testID={`${testID}-ingredients`}
-        />
+        {ingredients.length === 0 ? null : (
+          <CategoryRail
+            items={ingredients}
+            selectedId={selectedIngredientId}
+            bottomInset={bottomInset}
+            onSelect={(id) => {
+              closeSearch();
+              onSelectIngredient(id);
+            }}
+            testID={`${testID}-ingredients`}
+          />
+        )}
 
         <ScrollView
           style={styles.main}
@@ -204,31 +230,19 @@ export function MealLibraryScreen({
               numberOfLines={1}
               style={styles.sectionTitle}
             >
-              {searchActive ? `Results for “${query.trim()}”` : (ingredient?.title ?? '')}
+              {title ?? ''}
             </Text>
-            <View style={styles.dietToggle}>
-              {DIETS.map((option) => {
-                const selected = option.id === diet;
-                return (
-                  <Pressable
-                    key={option.id}
-                    onPress={() => setDiet(selected ? null : option.id)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    testID={`${testID}-diet-${option.id}`}
-                    style={[styles.dietOption, selected ? styles.dietOptionSelected : null]}
-                  >
-                    <Text variant="bodyBold" color={selected ? 'textWarmInk' : 'textWarmQuiet'}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <SegmentedToggle
+              options={DIETS}
+              selectedId={diet}
+              onSelect={(id) => setDiet(id as DishDiet | null)}
+              allowDeselect
+              accessibilityLabel="Diet"
+              testID={`${testID}-diet`}
+            />
           </View>
 
-          {dishes.length === 0 ? (
+          {shown.length === 0 ? (
             <EmptyState
               icon="search"
               title="No dishes here yet"
@@ -238,22 +252,12 @@ export function MealLibraryScreen({
               testID={`${testID}-empty`}
             />
           ) : (
-            <View style={styles.grid}>
-              {toRows(dishes).map(([left, right]) => (
-                <View key={left.id} style={styles.gridRow}>
-                  <DishCard dish={left} onAdd={onAddDish} testID={`${testID}-dish-${left.id}`} />
-                  {right === null ? (
-                    <View style={styles.gridSpacer} />
-                  ) : (
-                    <DishCard
-                      dish={right}
-                      onAdd={onAddDish}
-                      testID={`${testID}-dish-${right.id}`}
-                    />
-                  )}
-                </View>
-              ))}
-            </View>
+            <DishTileGrid
+              dishes={shown}
+              // Always drawn, as the frame draws it, even before a caller handles the press.
+              onAdd={(dish) => onAddDish?.(dish)}
+              testID={`${testID}-dish`}
+            />
           )}
         </ScrollView>
       </View>
@@ -261,10 +265,13 @@ export function MealLibraryScreen({
   );
 }
 
+/** `1:522` — the header's 12pt gutter, which the meal strip bleeds through. */
+const HEADER_GUTTER = lightTheme.space.md;
+
 const styles = StyleSheet.create({
   /** `1:522` — cream at 95%, 12 / 8 inside. */
   header: {
-    paddingHorizontal: lightTheme.space.md,
+    paddingHorizontal: HEADER_GUTTER,
     paddingVertical: lightTheme.space.sm,
     backgroundColor: lightTheme.colors.surfaceHeaderGlass,
   },
@@ -310,8 +317,8 @@ const styles = StyleSheet.create({
   body: { flex: 1, flexDirection: 'row' },
   /** `1:643` — the cream ground, 10 inside. */
   main: { flex: 1, backgroundColor: lightTheme.colors.background },
-  /** `1:654` — the grid closes on 64 of padding. */
-  mainContent: { padding: lightTheme.space.s10, paddingBottom: 64 },
+  /** `1:654` — the grid closes on 64 of padding (plus the bottom inset, applied inline). */
+  mainContent: { padding: lightTheme.space.s10 },
   /** `1:644` / `1:645` — title and toggle pushed apart, 16 in all below them (8 + 8). */
   sectionHeader: {
     flexDirection: 'row',
@@ -321,24 +328,4 @@ const styles = StyleSheet.create({
     paddingBottom: lightTheme.space.lg,
   },
   sectionTitle: { flexShrink: 1 },
-  /** `1:649` — white at 80%, 2 inside, options 4 apart, a 12pt radius and the 1pt ledge. */
-  dietToggle: {
-    flexDirection: 'row',
-    gap: lightTheme.space.xs,
-    padding: lightTheme.space.xxs,
-    borderRadius: lightTheme.radius.r12,
-    backgroundColor: lightTheme.colors.surfaceToggleTrack,
-    ...lightTheme.elevation.ledge,
-  },
-  /** `1:650` — 12 / 4 inside an 8pt radius. */
-  dietOption: {
-    paddingHorizontal: lightTheme.space.md,
-    paddingVertical: lightTheme.space.xs,
-    borderRadius: lightTheme.radius.xs,
-  },
-  dietOptionSelected: { backgroundColor: lightTheme.colors.surfaceCta },
-  /** `1:654` — two columns, 8 apart both ways. */
-  grid: { gap: lightTheme.space.sm },
-  gridRow: { flexDirection: 'row', alignItems: 'flex-start', gap: lightTheme.space.sm },
-  gridSpacer: { flex: 1 },
 });

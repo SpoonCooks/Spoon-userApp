@@ -1,53 +1,64 @@
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
-import { Text } from '@ui';
+import { Text } from '@ui/primitives/Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import type { MealSlot } from '../types';
-
 /**
- * The horizontal meal strip under the header — Figma `1:540`.
+ * A horizontally scrolling strip of pill tabs — first drawn as the Meal Library's meal strip
+ * (Figma `cCQlzTeiObQkpVBzwI8mZi` `1:540`: Breakfast, Lunch, Dinner, …).
  *
  * Pills 6 apart, each 14 / 6 inside a full radius with a Livvic Bold 12/12 label: white behind
  * `#57534E` idle, `#FFD600` behind `#1C1917` with a `0 1 1 rgba(0,0,0,0.05)` lift selected. The
  * strip is 34 tall with the pills sitting 8 below its top.
  *
- * It bleeds to the screen edges, so the last tab scrolls out from under the edge (as "Drinks"
- * does in the frame) rather than stopping at the header's 12pt gutter.
+ * Renders exactly the `items` it is given, in order — the count is the data's, not the design's.
+ *
+ * `bleed` cancels the parent's horizontal gutter so the strip scrolls out from under the screen
+ * edge (as "Drinks" does in the frame) while its first pill still lines up with that gutter.
  */
-export interface MealTabsProps {
-  readonly meals: readonly MealSlot[];
-  readonly selectedId: string;
+export interface PillTabItem {
+  readonly id: string;
+  readonly label: string;
+}
+
+export interface PillTabsProps {
+  readonly items: readonly PillTabItem[];
+  readonly selectedId: string | null;
   readonly onSelect: (id: string) => void;
+  /** The parent's horizontal padding, which the strip bleeds through. */
+  readonly bleed?: number;
   readonly testID?: string;
 }
 
 /** A 24pt pill needs 10 each side to reach the 44pt minimum. */
 const TOUCH_SLOP = { top: 10, bottom: 10, left: 3, right: 3 };
 
-export function MealTabs({ meals, selectedId, onSelect, testID }: MealTabsProps) {
+export function PillTabs({ items, selectedId, onSelect, bleed = 0, testID }: PillTabsProps) {
+  if (items.length === 0) return null;
+
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={styles.strip}
-      contentContainerStyle={styles.content}
+      style={[styles.strip, { marginHorizontal: -bleed }]}
+      contentContainerStyle={[styles.content, { paddingHorizontal: bleed }]}
+      accessibilityRole="tablist"
       testID={testID}
     >
-      {meals.map((meal) => {
-        const selected = meal.id === selectedId;
+      {items.map((item) => {
+        const selected = item.id === selectedId;
         return (
           <Pressable
-            key={meal.id}
-            onPress={() => onSelect(meal.id)}
+            key={item.id}
+            onPress={() => onSelect(item.id)}
             hitSlop={TOUCH_SLOP}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            testID={testID === undefined ? undefined : `${testID}-${meal.id}`}
+            testID={testID === undefined ? undefined : `${testID}-${item.id}`}
             style={[styles.tab, selected ? styles.tabSelected : null]}
           >
             <Text variant="mealTab" color={selected ? 'textWarmInk' : 'textWarmMuted'}>
-              {meal.label}
+              {item.label}
             </Text>
           </Pressable>
         );
@@ -56,15 +67,11 @@ export function MealTabs({ meals, selectedId, onSelect, testID }: MealTabsProps)
   );
 }
 
-/** The header's own 12pt gutter, which the strip cancels and then re-applies inside itself. */
-const GUTTER = lightTheme.space.md;
-
 const styles = StyleSheet.create({
-  strip: { flexGrow: 0, marginHorizontal: -GUTTER },
+  strip: { flexGrow: 0 },
   /** `1:541` — the pills' centre sits 3 below the strip's: 8 above them, 2 below, in 34. */
   content: {
     gap: lightTheme.space.s6,
-    paddingHorizontal: GUTTER,
     paddingTop: lightTheme.space.sm,
     paddingBottom: lightTheme.space.xxs,
   },

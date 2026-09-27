@@ -1,25 +1,35 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
-import { Icon, Text } from '@ui';
+import { Icon } from '@ui/primitives/Icon';
+import { Text } from '@ui/primitives/Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import type { LibraryDish } from '../types';
-
 /**
- * A dish in the Meal Library grid — Figma `1:655`.
+ * A dish tile — first drawn in the Meal Library grid (Figma `cCQlzTeiObQkpVBzwI8mZi` `1:655`).
  *
  * A white card (6 inside, 12pt radius) holding a SQUARE photo tile — the frame's 113.22 × 113.22
  * in a 125.22 column — with the cook-time badge bottom-left and the add button bottom-right, and
- * the dish name 6 below it. The photo comes from the backend; until it does the tile keeps the
+ * the dish name 6 below it. The photo is a remote `imageUrl`; without one the tile keeps the
  * frame's plain `#FFF7CC`, which is all `1:658` draws.
+ *
+ * The tile fills its parent's width (`flex: 1`), so a grid decides the column width.
  */
-export interface DishCardProps {
-  readonly dish: LibraryDish;
-  readonly onAdd?: ((dish: LibraryDish) => void) | undefined;
-  readonly testID?: string;
+export interface DishTileItem {
+  readonly id: string;
+  readonly name: string;
+  /** Minutes to cook, shown in the badge on the photo — "20m" (`1:664`). */
+  readonly cookMinutes: number;
+  readonly imageUrl?: string | undefined;
 }
 
-export function DishCard({ dish, onAdd, testID }: DishCardProps) {
+export interface DishTileProps {
+  readonly dish: DishTileItem;
+  /** Omit to draw the tile without its add button. */
+  readonly onAdd?: (() => void) | undefined;
+  readonly testID?: string | undefined;
+}
+
+export function DishTile({ dish, onAdd, testID }: DishTileProps) {
   return (
     <View style={styles.card} testID={testID}>
       <View style={styles.photo}>
@@ -39,16 +49,18 @@ export function DishCard({ dish, onAdd, testID }: DishCardProps) {
           </Text>
         </View>
 
-        <Pressable
-          onPress={() => onAdd?.(dish)}
-          hitSlop={9}
-          accessibilityRole="button"
-          accessibilityLabel={`Add ${dish.name}`}
-          testID={testID === undefined ? undefined : `${testID}-add`}
-          style={({ pressed }) => [styles.add, pressed ? styles.pressed : null]}
-        >
-          <Icon name="plus" size={14} color="textWarmInk" />
-        </Pressable>
+        {onAdd === undefined ? null : (
+          <Pressable
+            onPress={onAdd}
+            hitSlop={9}
+            accessibilityRole="button"
+            accessibilityLabel={`Add ${dish.name}`}
+            testID={testID === undefined ? undefined : `${testID}-add`}
+            style={({ pressed }) => [styles.add, pressed ? styles.pressed : null]}
+          >
+            <Icon name="plus" size={14} color="textWarmInk" />
+          </Pressable>
+        )}
       </View>
 
       <Text variant="dishName" color="textWarmDish" align="center" numberOfLines={1}>
