@@ -166,6 +166,11 @@ export const DEV_ROUTES: readonly DevRoute[] = [
     label: 'Recurring setup · 6 Plan confirmed (preview)',
     note: 'IN PROGRESS · dev preview, no session needed — see docs/CLAUDE_DESIGN_RECURRING_SETUP.md',
   },
+  {
+    path: '/meal-library',
+    label: 'Meal Library (preview)',
+    note: 'STATIC · Figma cCQlzTeiObQkpVBzwI8mZi 1:519 — dev preview, not wired',
+  },
 ];
 
 export interface DevRouteMenuProps {
