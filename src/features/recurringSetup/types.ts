@@ -89,13 +89,23 @@ export interface RecurringDateRow {
   readonly visits: readonly RecurringDateVisitTime[];
 }
 
-/** One row of Step 4 "Review plan" — a date collapsed to its visit-time summary. */
+/** One row of Step 4's "Day by day" list — a date and each visit's time on it. */
 export interface RecurringReviewDateRow {
   readonly id: string;
   /** e.g. "Fri, Oct 2". */
   readonly label: string;
-  /** e.g. "1:15 PM" for one visit, "1:15 PM – 7:00 PM" for the day's first-to-last span. */
-  readonly timeSummary: string;
+  /** One entry per visit that day, e.g. ["1:15 PM", "7:00 PM"] — separate times, not a span. */
+  readonly times: readonly string[];
+}
+
+/** The top of Step 4 — plan totals, then one summary line per visit. */
+export interface RecurringReviewSummary {
+  readonly daysCount: number;
+  readonly visitsCount: number;
+  /** e.g. "Sep 29 – Oct 15". */
+  readonly rangeLabel: string;
+  /** e.g. { label: "Visit 1 · 1:15 PM · 1.5 hr · all 11 days", price: "₹189" } — excl. tax. */
+  readonly visits: readonly { readonly label: string; readonly price: string }[];
 }
 
 /** One visit's per-charge line in Step 4's footer note — server-priced, pre-formatted. */

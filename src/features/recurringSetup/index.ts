@@ -30,6 +30,7 @@ export type {
   RecurringPickedDay,
   RecurringPlanConfirmation,
   RecurringReviewDateRow,
+  RecurringReviewSummary,
   RecurringTimeOfDay,
   RecurringVisitCharge,
   RecurringVisitDraft,

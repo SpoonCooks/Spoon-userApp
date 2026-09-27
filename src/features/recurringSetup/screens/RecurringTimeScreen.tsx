@@ -24,6 +24,7 @@ import {
   buildStartMinutesFor,
   coverageFor,
   defaultSomeDayIds,
+  durationLabel,
   durationMinutes,
   formatClock,
   visitDayIds,
@@ -55,6 +56,8 @@ export interface RecurringTimeScreenProps {
   readonly onBack: () => void;
   /** Left unwired by the route for now — see the file banner. */
   readonly onContinue?: (visits: readonly RecurringVisitDraft[]) => void;
+  /** "Different time on some days?" — opens Step 3. Left unwired for now, like `onContinue`. */
+  readonly onDifferentTimes?: () => void;
   readonly testID?: string;
 }
 
@@ -91,9 +94,20 @@ function renumbered(visits: readonly RecurringVisitDraft[]): readonly RecurringV
   return visits.map((visit, index) => ({ ...visit, label: `Visit ${index + 1}` }));
 }
 
+/**
+ * The line under a tab's name. `2c` / `2d` read "1:15 PM · 1.5 hr"; `2e`, with three tabs and no
+ * add tab left, drops the duration and reads "1:15 PM".
+ */
+function tabTimeLabel(visit: RecurringVisitDraft, visitCount: number): string {
+  if (visit.startMinutes === null) return 'Pick time';
+  const time = formatClock(visit.startMinutes);
+  return visitCount < MAX_VISITS ? `${time} · ${durationLabel(visit.durationId)}` : time;
+}
+
 export function RecurringTimeScreen({
   onBack,
   onContinue,
+  onDifferentTimes,
   testID = 'recurring-time-screen',
 }: RecurringTimeScreenProps) {
   const pickedDays = useMemo(() => buildDemoPickedDays(), []);
@@ -153,7 +167,7 @@ export function RecurringTimeScreen({
     return {
       id: String(minutes),
       caption: conflict ?? coverage!.label,
-      label: formatClock(minutes),
+      label: formatClock(minutes, true),
       disabled: !alreadyChosen && (conflict !== null || coverage!.disabled),
     };
   });
@@ -193,7 +207,7 @@ export function RecurringTimeScreen({
           <Chip
             key={visit.id}
             caption={visit.label}
-            label={visit.startMinutes === null ? 'Pick time' : formatClock(visit.startMinutes)}
+            label={tabTimeLabel(visit, visits.length)}
             selected={visit.id === activeVisitId}
             onPress={() => setActiveVisitId(visit.id)}
             testID={`${testID}-visit-tab-${visit.id}`}
@@ -208,8 +222,9 @@ export function RecurringTimeScreen({
             testID={`${testID}-add-visit`}
           >
             <Icon name="plus" size={14} color="textPrimary" />
+            {/* `2c` reads "+ Add visit"; `2d`, with a second tab taking the room, "+ Visit". */}
             <Text variant="bodyBlack" color="textPrimary">
-              Add visit
+              {visits.length === 1 ? 'Add visit' : 'Visit'}
             </Text>
           </Pressable>
         )}
@@ -322,6 +337,19 @@ export function RecurringTimeScreen({
         />
       </View>
 
+      {/* `2c` — the entry into Step 3. Drawn on every tab, since Step 3 edits every visit. */}
+      <Pressable
+        onPress={onDifferentTimes}
+        accessibilityRole="button"
+        hitSlop={lightTheme.space.sm}
+        style={styles.differentTimes}
+        testID={`${testID}-different-times`}
+      >
+        <Text variant="label" color="textPrimary" style={styles.underline}>
+          Different time on some days?
+        </Text>
+      </Pressable>
+
       {isPrimary ? null : (
         <Button
           label={`Remove ${activeVisit.label}`}
@@ -343,6 +371,7 @@ const styles = StyleSheet.create({
     paddingTop: lightTheme.space.lg,
   },
   section: { gap: lightTheme.space.s6 },
+  differentTimes: { alignSelf: 'flex-start' },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: lightTheme.space.sm },
   addVisit: {
     flexDirection: 'row',

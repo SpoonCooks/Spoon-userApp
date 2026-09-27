@@ -8,6 +8,7 @@ import type {
   RecurringPickedDay,
   RecurringPlanConfirmation,
   RecurringReviewDateRow,
+  RecurringReviewSummary,
   RecurringTimeOfDay,
   RecurringVisitCharge,
   RecurringVisitDraft,
@@ -117,26 +118,34 @@ export function durationMinutes(durationId: string | null): number {
 export const MAX_VISITS = 3;
 
 /**
- * The 11 days Step 1 would have handed over, had the two screens been wired together (they are
- * not — see the file banners). This is what Step 2's "Some" day-subset picker offers, and what
- * every visit's own day-count is measured against.
+ * The 11 days Step 1 would have handed over, had the steps been wired together (they are not —
+ * see the file banners). Every later step's fixture is built on these same days: Step 2's "Some"
+ * picker, Step 3's per-date rows and Step 4's day-by-day list.
  */
+const PICKED_DATES: readonly Date[] = [
+  new Date(2026, 8, 29),
+  new Date(2026, 8, 30),
+  new Date(2026, 9, 1),
+  new Date(2026, 9, 2),
+  new Date(2026, 9, 6),
+  new Date(2026, 9, 7),
+  new Date(2026, 9, 8),
+  new Date(2026, 9, 9),
+  new Date(2026, 9, 13),
+  new Date(2026, 9, 14),
+  new Date(2026, 9, 15),
+];
+
+/** "Tue, Sep 29" — the date label Steps 3 and 4 use. */
+const DATE_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+});
+
 export function buildDemoPickedDays(): readonly RecurringPickedDay[] {
-  const dates = [
-    new Date(2026, 8, 29),
-    new Date(2026, 8, 30),
-    new Date(2026, 9, 1),
-    new Date(2026, 9, 2),
-    new Date(2026, 9, 6),
-    new Date(2026, 9, 7),
-    new Date(2026, 9, 8),
-    new Date(2026, 9, 9),
-    new Date(2026, 9, 13),
-    new Date(2026, 9, 14),
-    new Date(2026, 9, 15),
-  ];
   const shortFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
-  return dates.map((date) => ({
+  return PICKED_DATES.map((date) => ({
     id: toId(date),
     shortLabel: shortFormatter.format(date),
     dayOfMonth: date.getDate(),
@@ -217,113 +226,149 @@ export function coverageFor(
   return { label: `${covered}/${dayCount} days`, disabled: false };
 }
 
-export function formatClock(minutes: number): string {
+export function durationLabel(durationId: string | null): string {
+  return DURATION_OPTIONS.find((option) => option.id === durationId)?.label ?? '';
+}
+
+/**
+ * "1:15 PM", or "01:15 PM" with `padHour`. The wireframe pads the hour ONLY in Step 2's
+ * start-time grid, where it keeps the four columns aligned; its tabs and Steps 3–4 don't.
+ */
+export function formatClock(minutes: number, padHour = false): string {
   const hour24 = Math.floor(minutes / 60);
   const minute = minutes % 60;
   const period = hour24 >= 12 ? 'PM' : 'AM';
   const hour12 = ((hour24 + 11) % 12) + 1;
-  return `${String(hour12).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`;
+  const hour = padHour ? String(hour12).padStart(2, '0') : String(hour12);
+  return `${hour}:${String(minute).padStart(2, '0')} ${period}`;
 }
 
 /**
- * Step 3 ("Times by date") fixtures.
- *
- * `buildDemoVisitPlans` reproduces the wireframe's own 3-visit example (45 min / 7:30 AM,
- * 1.5 hr / 1:15 PM, 1 hr / 7:00 PM) rather than reusing Step 2's fixture: the two screens aren't
- * wired together yet (see the file banners), and Step 2's own Visit 3 has no default time yet
- * ("Pick time"), which Step 3 has nothing sensible to show. `count` exists only so the dev preview
- * can show the wireframe's 1/2/3-visit variants; the real screen always renders however many
- * plans it's given.
+ * Step 3 ("Times by date") fixtures — `2f1` / `2f2` / `2f3` transcribed as drawn, one per visit
+ * count, rather than slicing one list: each state has its own visits, its own booked-out dates and
+ * (`2f2` only) two per-date overrides. Indexes are into `PICKED_DATES`. `count` exists only so the
+ * dev preview can show all three; the real screen renders however many plans it's given.
  */
-const DATE_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  weekday: 'short',
-  month: 'short',
-  day: 'numeric',
-});
+const TIMES_BY_DATE_STATES: Record<
+  1 | 2 | 3,
+  {
+    readonly plans: readonly RecurringDateVisitPlan[];
+    readonly unavailable: readonly { readonly day: number; readonly visit: number }[];
+    readonly overrides: readonly {
+      readonly day: number;
+      readonly visit: number;
+      readonly minutes: number;
+    }[];
+  }
+> = {
+  // `2f1` — one visit a day carries no number: "Visit", not "Visit 1".
+  1: {
+    plans: [
+      {
+        visitId: 'visit-1',
+        visitLabel: 'Visit',
+        durationLabel: '1.5 hr',
+        defaultMinutes: 13 * 60 + 15,
+      },
+    ],
+    unavailable: [
+      { day: 2, visit: 0 }, // Thu Oct 1
+      { day: 5, visit: 0 }, // Wed Oct 7
+    ],
+    overrides: [],
+  },
+  // `2f2`
+  2: {
+    plans: [
+      {
+        visitId: 'visit-1',
+        visitLabel: 'Visit 1',
+        durationLabel: '1.5 hr',
+        defaultMinutes: 13 * 60 + 15,
+      },
+      { visitId: 'visit-2', visitLabel: 'Visit 2', durationLabel: '1 hr', defaultMinutes: 19 * 60 },
+    ],
+    unavailable: [
+      { day: 2, visit: 0 }, // Thu Oct 1, 1:15 PM
+      { day: 5, visit: 1 }, // Wed Oct 7, 7:00 PM
+    ],
+    overrides: [
+      { day: 4, visit: 0, minutes: 12 * 60 + 45 }, // Tue Oct 6 → 12:45 PM
+      { day: 9, visit: 1, minutes: 19 * 60 + 30 }, // Wed Oct 14 → 7:30 PM
+    ],
+  },
+  // `2f3`
+  3: {
+    plans: [
+      {
+        visitId: 'visit-1',
+        visitLabel: 'Visit 1',
+        durationLabel: '45 min',
+        defaultMinutes: 7 * 60 + 30,
+      },
+      {
+        visitId: 'visit-2',
+        visitLabel: 'Visit 2',
+        durationLabel: '1.5 hr',
+        defaultMinutes: 13 * 60 + 15,
+      },
+      { visitId: 'visit-3', visitLabel: 'Visit 3', durationLabel: '1 hr', defaultMinutes: 19 * 60 },
+    ],
+    unavailable: [
+      { day: 2, visit: 1 }, // Thu Oct 1, 1:15 PM
+      { day: 5, visit: 2 }, // Wed Oct 7, 7:00 PM
+      { day: 8, visit: 0 }, // Tue Oct 13, 7:30 AM
+    ],
+    overrides: [],
+  },
+};
 
-export function buildDemoVisitPlans(count: 1 | 2 | 3 = 3): readonly RecurringDateVisitPlan[] {
-  const all: readonly RecurringDateVisitPlan[] = [
-    {
-      visitId: 'visit-1',
-      visitLabel: 'Visit 1',
-      durationLabel: '45 mins',
-      defaultMinutes: 7 * 60 + 30,
-    },
-    {
-      visitId: 'visit-2',
-      visitLabel: 'Visit 2',
-      durationLabel: '1.5 hr',
-      defaultMinutes: 13 * 60 + 15,
-    },
-    { visitId: 'visit-3', visitLabel: 'Visit 3', durationLabel: '1 hr', defaultMinutes: 19 * 60 },
-  ];
-  const plans = all.slice(0, count);
-  // A single visit a day carries no number — "Visit", not "Visit 1".
-  return count === 1 ? [{ ...plans[0]!, visitLabel: 'Visit' }] : plans;
-}
-
-/** The wireframe's own worked dates — a subset of Step 1's window, not all of it. */
-function buildDemoDates(): readonly Date[] {
-  return [
-    new Date(2026, 8, 29),
-    new Date(2026, 8, 30),
-    new Date(2026, 9, 1),
-    new Date(2026, 9, 2),
-    new Date(2026, 9, 6),
-    new Date(2026, 9, 7),
-  ];
-}
-
-/**
- * Two dates come back from the server as "the default time is already booked out here" — the
- * wireframe's Thu Oct 1 and Wed Oct 7 rows. Which visit that hits rotates with how many exist so
- * every visit count still demonstrates the state.
- */
-export function buildDemoDateRows(
-  visitPlans: readonly RecurringDateVisitPlan[],
-): readonly RecurringDateRow[] {
-  const dates = buildDemoDates();
-  const unavailable = new Map<number, number>([
-    [2, Math.min(1, visitPlans.length - 1)], // Thu Oct 1
-    [5, Math.min(2, visitPlans.length - 1)], // Wed Oct 7
-  ]);
-
-  return dates.map((date, dateIndex) => {
-    const unavailableVisitIndex = unavailable.get(dateIndex);
-    return {
-      id: toId(date),
-      label: DATE_LABEL_FORMATTER.format(date),
-      visits: visitPlans.map((plan, visitIndex) => ({
-        ...plan,
-        overrideMinutes: null,
-        unavailableAtDefault: visitIndex === unavailableVisitIndex,
-      })),
-    };
-  });
-}
-
-/**
- * Step 4 ("Review plan") fixtures — the wireframe's own worked example: 8 dates, alternating a
- * single-visit day ("1:15 PM") with a two-visit day shown as a first-to-last span
- * ("1:15 PM – 7:00 PM"), plus the two per-visit charges its footer note states.
- */
-export function buildDemoReviewDates(): readonly RecurringReviewDateRow[] {
-  const dates: readonly { date: Date; twoVisits: boolean }[] = [
-    { date: new Date(2026, 9, 2), twoVisits: false },
-    { date: new Date(2026, 9, 6), twoVisits: true },
-    { date: new Date(2026, 9, 7), twoVisits: false },
-    { date: new Date(2026, 9, 8), twoVisits: true },
-    { date: new Date(2026, 9, 9), twoVisits: false },
-    { date: new Date(2026, 9, 13), twoVisits: true },
-    { date: new Date(2026, 9, 14), twoVisits: false },
-    { date: new Date(2026, 9, 15), twoVisits: true },
-  ];
-
-  return dates.map(({ date, twoVisits }) => ({
+export function buildDemoTimesByDate(count: 1 | 2 | 3): {
+  readonly plans: readonly RecurringDateVisitPlan[];
+  readonly rows: readonly RecurringDateRow[];
+} {
+  const { plans, unavailable, overrides } = TIMES_BY_DATE_STATES[count];
+  const rows = PICKED_DATES.map((date, day) => ({
     id: toId(date),
     label: DATE_LABEL_FORMATTER.format(date),
-    timeSummary: twoVisits ? '1:15 PM – 7:00 PM' : '1:15 PM',
+    visits: plans.map((plan, visit) => ({
+      ...plan,
+      overrideMinutes:
+        overrides.find((entry) => entry.day === day && entry.visit === visit)?.minutes ?? null,
+      unavailableAtDefault: unavailable.some((entry) => entry.day === day && entry.visit === visit),
+    })),
   }));
+  return { plans, rows };
+}
+
+/**
+ * Step 4 ("Review plan") fixtures — `2g` as drawn: a two-visit plan where Visit 1 runs all 11 days
+ * and Visit 2 runs 6 of them, so 17 visits. Every day is listed, each visit's time separately.
+ */
+export function buildDemoReviewPlan(): {
+  readonly summary: RecurringReviewSummary;
+  readonly dates: readonly RecurringReviewDateRow[];
+} {
+  const visit2Days = new Set([0, 2, 4, 6, 8, 10]); // Sep 29, Oct 1, 6, 8, 13, 15
+  const dates = PICKED_DATES.map((date, day) => ({
+    id: toId(date),
+    label: DATE_LABEL_FORMATTER.format(date),
+    times: visit2Days.has(day) ? ['1:15 PM', '7:00 PM'] : ['1:15 PM'],
+  }));
+  const visitsCount = dates.reduce((sum, row) => sum + row.times.length, 0);
+
+  return {
+    summary: {
+      daysCount: dates.length,
+      visitsCount,
+      rangeLabel: 'Sep 29 – Oct 15',
+      visits: [
+        { label: 'Visit 1 · 1:15 PM · 1.5 hr · all 11 days', price: '₹189' },
+        { label: 'Visit 2 · 7:00 PM · 1 hr · 6 days', price: '₹129' },
+      ],
+    },
+    dates,
+  };
 }
 
 export function buildDemoVisitCharges(): readonly RecurringVisitCharge[] {

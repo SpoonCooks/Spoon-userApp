@@ -66,36 +66,48 @@ signed-in session they redirect to `/login`. For review without a session, use t
 
 ### Step 1 — Pick days (`2a`, `2b`)
 
-One interactive screen. It opens with 3 days picked (`2a`: Continue disabled, "Need a cook in the
-next 2 days? Use One-time › Schedule" shown). Picking 5 or more reaches `2b`: the counter turns
-yellow and the CTA reads "Continue with N days". Selection locks at 14. The fixture follows the
-board's own example: opened Sat Sep 26, window Sep 29 – Oct 19, Oct 10 struck through as a day
-with no cooks.
+One interactive screen. It opens with 3 days picked (`2a`: Continue disabled, "Pick 2 more days to
+continue" above it, "Need a cook in the next 2 days? Use One-time › Schedule" shown). Picking 5 or
+more reaches `2b`: the caption goes, the counter turns yellow and the CTA reads "Continue with N
+days". Selection locks at 14. The fixture follows the board's own example: opened Sat Sep 26,
+window Sep 29 – Oct 19, Oct 10 struck through as a day with no cooks.
 
 ### Step 2 — Time & duration (`2c`, `2d`, `2e`)
 
 One screen that grows from `2c` to `2e`, not three separate screens:
 
-- Opens on `2c`: Visit 1 only (1:15 PM, 1.5 hr), with a "+ Add visit" tab.
-- "+ Add visit" adds a visit, up to 3; the tab disappears at 3. Visits 2 and 3 show "Remove
-  Visit N", and the remaining visits are renumbered after a removal.
+- Opens on `2c`: Visit 1 only, its tab reading "1:15 PM · 1.5 hr", with a "+ Add visit" tab.
+- "+ Add visit" adds a visit, up to 3. The add tab reads "+ Visit" at two visits (`2d`) and
+  disappears at three, where the tabs drop the duration and show the time only (`2e`). Visits 2 and
+  3 show "Remove Visit N", and the remaining visits are renumbered after a removal.
 - Visit 1 has no Days row; it runs on every picked day. Visits 2 and 3 have "All 11" / "Some". "Some"
   opens individual day chips, with the first 6 days picked the first time (`2d`'s "Some · 6").
 - The footer total is computed: the sum of each visit's day count. `2c` gives "11 visits",
   `2d` gives "17 visits", both matching the board.
 - Start-time slots overlapping another visit **on a shared day** are disabled and labelled with
-  that visit's name. Other slots show "All days", "N/M days" or "Full".
+  that visit's name. Other slots show "All days", "N/M days" or "Full". The grid pads the hour
+  ("01:15 PM"), as the board does; everywhere else times are unpadded ("1:15 PM").
+- "Different time on some days?" sits under the start-time grid. It is the entry into Step 3.
 
 ### Step 3 — Times by date (`2f1`, `2f2`, `2f3`)
 
-One screen that renders one row per visit on each date, so the 1-, 2- and 3-visit states are the
-same component with different data. Thu Oct 1 and Wed Oct 7 show the "Not available at …"
-highlight with a "Pick time" placeholder, as on the board.
+Every chosen day (all 11) is a card, and each visit is a column in that card's single row: one
+full-width time (`2f1`), two side by side (`2f2`) or three compact ones (`2f3`). A day where a
+visit's usual time is booked out is highlighted as a whole, says "Not available at …" beside the
+date, and shows that visit's time as a black "Pick time" pill. Each state uses the board's own data:
+
+- `2f1`: 1:15 PM / 1.5 hr; booked out Thu Oct 1 and Wed Oct 7.
+- `2f2`: 1:15 PM / 1.5 hr and 7:00 PM / 1 hr; booked out Oct 1 (Visit 1) and Oct 7 (Visit 2);
+  per-day overrides on Tue Oct 6 (12:45 PM) and Wed Oct 14 (7:30 PM).
+- `2f3`: 7:30 AM / 45 min, 1:15 PM / 1.5 hr and 7:00 PM / 1 hr; booked out Oct 1 (Visit 2), Oct 7
+  (Visit 3) and Tue Oct 13 (Visit 1). Like the board, it drops the intro's second sentence.
 
 ### Steps 4–6 (`2g`, `2h`, `2i`)
 
-- **Review plan:** date/time table (`DetailRows`), "Keep my plan going" toggle, per-visit charge
-  note, "Set up autopay".
+- **Review plan:** "11 days · 17 visits" and the date range, one line per visit ("Visit 1 · 1:15 PM
+  · 1.5 hr · all 11 days", ₹189) in `DetailRows`, "Edit days or times", then "Day by day": all 11
+  days, each visit's time as its own pill (`ListRow` + `Badge`). Then "Keep my plan going", the
+  per-visit charge note incl. tax, and "Set up autopay".
 - **Autopay:** UPI Autopay / Credit or debit card radio rows (reusing the cancellation sheet's radio
   glyphs), mandate-terms table, "Approve with UPI" / "Approve with card".
 - **Plan confirmed:** no header or back control (a terminal screen, like booking Confirmation),
@@ -104,17 +116,19 @@ highlight with a "Pick time" placeholder, as on the board.
 ## Known gaps and open questions
 
 1. **Nothing is wired.** Steps don't pass selections forward, no CTA navigates to the next step,
-   and nothing links into the flow from Home. Where the flow is entered from is undecided (the
-   board's section B suggests a "Recurring" tab on Home).
+   and neither "Different time on some days?" nor "Edit days or times" opens anything. Nothing links
+   into the flow from Home either; where it's entered from is undecided (the board's section B
+   suggests a "Recurring" tab on Home).
 2. **All availability and pricing is placeholder data.** The Step 1 calendar, Step 2's "N/M days"
    and "Full" labels, Step 3's unavailable dates, and every price and charge come from fixtures.
    There are no endpoints for them yet.
-3. **Step 1's "Pick 2 more days to continue" caption** under the disabled CTA is on the board but
-   not built.
-4. **Step 3's time pills open nothing.** No time-picker exists yet.
-5. **Step 2's Days rule for Visit 1 is an interpretation.** The board only says Visit 1 has no
-   Days control in the one-visit state (`2c`). The build keeps it hidden for Visit 1 even when
-   there are more visits.
+3. **Step 3's time pills open nothing.** No time-picker exists yet.
+4. **Three Step 2 rules are interpretations**, since the board draws only one state of each:
+   - Visit 1 never gets a Days row. The board only says so for the one-visit state (`2c`).
+   - "Different time on some days?" shows on every tab. The board only draws it in `2c`.
+   - "Remove Visit N" shows on Visits 2 and 3. `2d` draws it; `2e` draws neither control.
+5. **Step 2's demo "Full" slot can land on a visit's own time.** Visit 1's 1:15 PM falls on a
+   placeholder "Full" slot; it stays selectable and highlighted, but carries the "Full" label.
 6. **Step 5's mandate terms** (charge at T-24h, SMS alert at T-48h, ₹1,000 cap) are labelled
    "Proposed" on the board, and the cook-assignment timing on Step 6 ("a day before") is marked
    as an assumption to confirm.

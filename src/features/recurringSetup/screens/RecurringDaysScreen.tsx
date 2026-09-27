@@ -74,12 +74,19 @@ export function RecurringDaysScreen({
         </View>
       }
       footer={
-        <Button
-          label={complete ? `Continue with ${count} day${count === 1 ? '' : 's'}` : 'Continue'}
-          onPress={() => complete && onContinue?.(Array.from(selected))}
-          disabled={!complete}
-          testID={`${testID}-continue`}
-        />
+        <View style={styles.footer}>
+          {count >= MIN_DAYS ? null : (
+            <Text variant="caption" color="textSecondary" align="center">
+              Pick {MIN_DAYS - count} more day{MIN_DAYS - count === 1 ? '' : 's'} to continue
+            </Text>
+          )}
+          <Button
+            label={complete ? `Continue with ${count} day${count === 1 ? '' : 's'}` : 'Continue'}
+            onPress={() => complete && onContinue?.(Array.from(selected))}
+            disabled={!complete}
+            testID={`${testID}-continue`}
+          />
+        </View>
       }
     >
       <View style={styles.summaryRow}>
@@ -196,6 +203,7 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.md,
   },
   summaryText: { flex: 1, gap: lightTheme.space.xxs },
+  footer: { gap: lightTheme.space.sm },
   weekdayRow: { flexDirection: 'row' },
   weekdayCell: { flex: 1 },
   grid: { gap: lightTheme.space.sm },
