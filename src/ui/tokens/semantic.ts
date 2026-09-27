@@ -212,6 +212,7 @@ export const lightColors = {
   textStoneFaint: palette.stone350,
   textStoneMuted: palette.stone400,
   borderStoneDashed: palette.stone300,
+  borderStoneMid: palette.stone250,
   borderStoneStrong: palette.stone500,
   textStoneClash: palette.stone500,
   textPartial: palette.amber31,
@@ -907,6 +908,27 @@ export const typography = {
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
+  /** Recurring setup, Step 4 — a visit line's detail and price ("· 1:15 PM · 1.5 hr"): 14/18. */
+  bodyTight: {
+    fontSize: fontSize.lg,
+    lineHeight: 18,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 4 — the charge note above the CTA: Livvic Regular 13/18. */
+  footnote: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 4 — the amounts inside that note ("₹198"): Livvic Bold 13/18. */
+  footnoteBold: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
   /** Recurring setup, Step 1 — the day counter ("3 / 14"): Livvic Black 14/18. */
   labelCounter: {
     fontSize: fontSize.lg,
@@ -935,10 +957,10 @@ export const typography = {
     fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.none,
   },
-  /** Recurring setup, Step 4 — the plan total ("11 days · 17 visits"): Livvic Bold 17/22. */
+  /** Recurring setup, Step 4 — the plan total ("11 days · 17 visits"): Livvic Bold 17/21. */
   titleLarge: {
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 21,
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },

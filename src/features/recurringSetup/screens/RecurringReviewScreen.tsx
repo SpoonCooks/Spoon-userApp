@@ -1,9 +1,10 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, ScreenHeader, Text } from '@ui';
+import { Button, Card, Screen, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
+import { RecurringHeader } from '../components/RecurringHeader';
 import { buildDemoReviewPlan, buildDemoVisitCharges } from '../data';
 
 /**
@@ -16,9 +17,10 @@ import { buildDemoReviewPlan, buildDemoVisitCharges } from '../data';
  * visit's time as its own pill; then "Keep my plan going"; and above the CTA the per-visit charge
  * incl. tax.
  *
- * Layout, sizes and copy are read off the wireframe's markup; COLOURS are the app's own, as on
- * Steps 1–3. Built from `Card`, `Text`, `Button` and React Native's `Switch` (no toggle exists in
- * `@ui`).
+ * Figma `ZIJf639gTWHXshaa2YOeCT` frame `4:1802` (`2g`) — an import of that wireframe. Layout,
+ * sizes, copy AND colours follow it, as on Steps 1–3. Built from `Card`, `Text` and `Button`; the
+ * "Keep my plan going" toggle is drawn locally at Figma's 46 × 28, since no toggle exists in `@ui`
+ * and React Native's `Switch` is a fixed 51 × 31.
  *
  * STATIC ONLY, per task: the plan and the charges are fixture data (`buildDemoReviewPlan`,
  * `buildDemoVisitCharges`) — this step isn't wired to Steps 1–3. "Edit days or times" is left
@@ -47,22 +49,19 @@ export function RecurringReviewScreen({
   return (
     <Screen
       scroll
+      showsScrollIndicator={false}
       tone="plain"
       testID={testID}
       contentStyle={styles.body}
-      header={
-        <View style={styles.headerWrap}>
-          <ScreenHeader title="Review plan" onBack={onBack} testID={`${testID}-header`} />
-        </View>
-      }
+      header={<RecurringHeader title="Review plan" onBack={onBack} testID={`${testID}-header`} />}
       footer={
         <View style={styles.footer}>
-          <Text variant="hint" color="textSecondary">
+          <Text variant="footnote" color="textStone">
             Nothing is charged today. Each visit is charged before it happens:{' '}
             {charges.map((charge, index) => (
               <Fragment key={charge.visitLabel}>
                 {index === 0 ? '' : ' · '}
-                <Text variant="hintBold" color="textPrimary">
+                <Text variant="footnoteBold" color="textInk">
                   {charge.amount}
                 </Text>{' '}
                 ({charge.visitLabel})
@@ -73,6 +72,10 @@ export function RecurringReviewScreen({
           <Button
             label="Set up autopay"
             onPress={() => onContinue?.(keepPlanGoing)}
+            flat
+            labelVariant="titleLargeBlack"
+            labelColor="textInk"
+            style={styles.cta}
             testID={`${testID}-continue`}
           />
         </View>
@@ -80,22 +83,22 @@ export function RecurringReviewScreen({
     >
       <Card tone="muted" padded={false} style={styles.summary} testID={`${testID}-summary`}>
         <View style={styles.summaryHeader}>
-          <Text variant="titleLarge" color="textPrimary">
+          <Text variant="titleLarge" color="textInk">
             {summary.daysCount} days · {summary.visitsCount} visits
           </Text>
-          <Text variant="labelMedium" color="textSecondary" style={styles.range}>
+          <Text variant="captionStep" color="textStoneCaption">
             {summary.rangeLabel}
           </Text>
         </View>
         {summary.visits.map((visit) => (
           <View key={visit.label} style={styles.visitLine}>
-            <Text variant="bodyLarge" color="textPrimary" style={styles.visitDetail}>
-              <Text variant="title" color="textPrimary">
+            <Text variant="bodyTight" color="textInk" style={styles.visitDetail}>
+              <Text variant="labelStrong" color="textInk">
                 {visit.label}
               </Text>
               {` · ${visit.detail}`}
             </Text>
-            <Text variant="bodyLarge" color="textPrimary">
+            <Text variant="bodyTight" color="textInk">
               {visit.price}
             </Text>
           </View>
@@ -107,89 +110,85 @@ export function RecurringReviewScreen({
           style={styles.editLink}
           testID={`${testID}-edit`}
         >
-          <Text variant="hint" color="textPrimary" style={styles.underline}>
+          <Text variant="captionStep" color="textInk" style={styles.underline}>
             Edit days or times
           </Text>
         </Pressable>
       </Card>
 
-      <Text variant="title" color="textSecondary">
+      <Text variant="labelStrong" color="textStone">
         Day by day
       </Text>
 
       {dates.map((row) => (
-        <Card
-          key={row.id}
-          tone="surface"
-          padded={false}
-          style={styles.dayCard}
-          testID={`${testID}-day-${row.id}`}
-        >
-          <Text variant="title" color="textPrimary">
+        <View key={row.id} style={styles.dayCard} testID={`${testID}-day-${row.id}`}>
+          <Text variant="labelStrong" color="textInk">
             {row.label}
           </Text>
           <View style={styles.times}>
             {row.times.map((time, index) => (
               <View key={`${row.id}-${index}`} style={styles.timePill}>
-                <Text variant="labelBold" color="textPrimary">
+                <Text variant="labelBold" color="textInk">
                   {time}
                 </Text>
               </View>
             ))}
           </View>
-        </Card>
+        </View>
       ))}
 
-      <Card
-        tone="surface"
-        padded={false}
-        style={styles.keepGoing}
-        testID={`${testID}-keep-going-card`}
-      >
+      <View style={styles.keepGoing} testID={`${testID}-keep-going-card`}>
         <View style={styles.keepGoingText}>
-          <Text variant="title" color="textPrimary">
+          <Text variant="title" color="textInk">
             Keep my plan going
           </Text>
-          <Text variant="hint" color="textSecondary">
+          <Text variant="bodyLarge" color="textStoneCaption">
             When a day is done, add the next one on the same pattern (stays within 14 days)
           </Text>
         </View>
-        <Switch
-          value={keepPlanGoing}
-          onValueChange={setKeepPlanGoing}
-          trackColor={{
-            false: lightTheme.colors.surfaceMuted,
-            true: lightTheme.colors.surfaceTileSelected,
-          }}
-          thumbColor={lightTheme.colors.surface}
+        <Pressable
+          onPress={() => setKeepPlanGoing((on) => !on)}
+          accessibilityRole="switch"
+          accessibilityLabel="Keep my plan going"
+          accessibilityState={{ checked: keepPlanGoing }}
+          hitSlop={lightTheme.space.sm}
+          style={[styles.toggle, keepPlanGoing ? styles.toggleOn : styles.toggleOff]}
           testID={`${testID}-keep-going`}
-        />
-      </Card>
+        >
+          <View style={styles.toggleThumb} />
+        </Pressable>
+      </View>
     </Screen>
   );
 }
 
+/** `4:1808` — a 20pt gutter (not the app's 16), as on Steps 1–3. */
+const GUTTER = 20;
+
 const styles = StyleSheet.create({
-  headerWrap: {
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
-    paddingTop: lightTheme.space.lg,
+  /** `4:1813` — the body opens 6 under the header; its blocks sit 12 apart. */
+  body: { paddingHorizontal: GUTTER, paddingTop: lightTheme.space.s6, gap: lightTheme.space.md },
+  /** `4:1814` — the `#F2F1EC` summary card: 14 padding, a 16pt radius, 10 between lines. */
+  summary: {
+    padding: 14,
+    borderRadius: lightTheme.radius.md,
+    gap: lightTheme.space.s10,
+    backgroundColor: lightTheme.colors.surfaceStoneSoft,
   },
-  /** `2g` — the body opens 6 under the header; its blocks sit 12 apart. */
-  body: { paddingTop: lightTheme.space.s6, gap: lightTheme.space.md },
-  /** `2g` — the grey summary card: 14 padding, a 16pt radius, 10 between lines. */
-  summary: { padding: 14, borderRadius: lightTheme.radius.md, gap: lightTheme.space.s10 },
   summaryHeader: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: lightTheme.space.sm,
   },
-  range: { fontSize: 13 },
   visitLine: { flexDirection: 'row', justifyContent: 'space-between', gap: lightTheme.space.sm },
   visitDetail: { flexShrink: 1 },
   editLink: { alignSelf: 'flex-start' },
   underline: { textDecorationLine: 'underline' },
-  /** `2g` — a day row: py 10 / px 12, a 12pt radius and a 1.5pt edge. */
+  /**
+   * `4:1837` — a day row: a 1pt `#E4E2DA` edge, py 10 / px 12 inside it (Figma's 11 / 13 include
+   * the edge), a 12pt radius: 46 tall.
+   */
   dayCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -198,16 +197,19 @@ const styles = StyleSheet.create({
     paddingVertical: lightTheme.space.s10,
     paddingHorizontal: lightTheme.space.md,
     borderRadius: lightTheme.radius.sm,
-    borderWidth: 1.5,
+    borderWidth: 1,
+    borderColor: lightTheme.colors.borderStone,
   },
+  /** `4:1841` — time pills 6 apart. */
   times: { flexDirection: 'row', gap: lightTheme.space.s6 },
-  /** `2g` — a time pill: py 4 / px 8 at an 8pt radius. */
+  /** `4:1842` — py 4 / px 8 at an 8pt radius, on stone. */
   timePill: {
     paddingVertical: lightTheme.space.xs,
     paddingHorizontal: lightTheme.space.sm,
     borderRadius: lightTheme.radius.xs,
-    backgroundColor: lightTheme.colors.surfaceMuted,
+    backgroundColor: lightTheme.colors.surfaceStone,
   },
+  /** `4:1924` — a 1pt `#CFCDC4` edge, 14 inside it (Figma's 15 includes the edge), a 14pt radius. */
   keepGoing: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -215,17 +217,40 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.md,
     padding: 14,
     borderRadius: 14,
-    borderWidth: 1.5,
+    borderWidth: 1,
+    borderColor: lightTheme.colors.borderStoneMid,
   },
-  keepGoingText: { flex: 1, gap: lightTheme.space.xxs },
-  /** `2g` — the footer's own top rule, edge to edge, as on Steps 2–3. */
+  /** `4:1925` — the copy column keeps 14 clear of the toggle. */
+  keepGoingText: { flex: 1, paddingRight: 14 },
+  /** `4:1927` — a 46 × 28 ink track, 3 inset, around a 22pt white thumb. */
+  toggle: {
+    width: 46,
+    height: 28,
+    padding: 3,
+    borderRadius: 14,
+    justifyContent: 'center',
+  },
+  toggleOn: { backgroundColor: lightTheme.colors.surfaceInk, alignItems: 'flex-end' },
+  toggleOff: { backgroundColor: lightTheme.colors.borderStoneMid, alignItems: 'flex-start' },
+  toggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: lightTheme.colors.surface,
+  },
+  /**
+   * `4:1929` — the footer's own 1pt stone rule, edge to edge: pulled out over `Screen`'s 16 gutter
+   * and 8 of top padding, then padded back in to 20 / 11. Note and CTA sit 8 apart.
+   */
   footer: {
     gap: lightTheme.space.sm,
     marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
     marginTop: -lightTheme.space.sm,
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
-    paddingTop: lightTheme.space.s10,
-    borderTopWidth: 1.5,
-    borderTopColor: lightTheme.colors.surfaceMuted,
+    paddingHorizontal: GUTTER,
+    paddingTop: 11,
+    borderTopWidth: 1,
+    borderTopColor: lightTheme.colors.surfaceStone,
   },
+  /** `4:1933` — a flat 52pt bar at a 16pt radius. */
+  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
 });

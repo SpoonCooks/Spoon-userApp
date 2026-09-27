@@ -234,6 +234,8 @@ export const palette = {
   stone400: '#B5B3AA',
   /** Days outside the window. */
   stone350: '#C9C7BF',
+  /** `4:1924` — the "Keep my plan going" card's edge. */
+  stone250: '#CFCDC4',
   /** `4:666` — the dashed edge of a start time free on only some days. */
   stone300: '#BDBBB2',
   /** `4:574` — the dashed "+ Add visit" tab edge; `4:1045` a clashing start time's ink. */
