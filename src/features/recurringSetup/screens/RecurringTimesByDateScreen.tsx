@@ -1,9 +1,10 @@
 import { Fragment, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, ScreenHeader, Text } from '@ui';
+import { Button, Card, Screen, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
+import { RecurringHeader } from '../components/RecurringHeader';
 import { buildDemoTimesByDate, formatClock } from '../data';
 import type { RecurringDateRow, RecurringDateVisitTime } from '../types';
 
@@ -19,9 +20,10 @@ import type { RecurringDateRow, RecurringDateVisitTime } from '../types';
  * three compact ones. A day where a visit's usual time is booked out is highlighted as a whole,
  * says "Not available at …" beside the date, and leaves only that visit's time empty ("Pick time").
  *
- * Layout, sizes and copy are read off the wireframe's markup; COLOURS are the app's own, as on
- * Steps 1–2 (grey pills, the accent card and notice border for a clash, amber for its text). No
- * select/dropdown component exists in `@ui`, so the time pill is local.
+ * Figma `ZIJf639gTWHXshaa2YOeCT` frames `4:1115` (`2f1`), `4:1272` (`2f2`) and `4:1495` (`2f3`) —
+ * an import of that wireframe. Layout, sizes, copy AND colours follow them, as on Steps 1–2: stone
+ * pills on white cards, and a cream card with an amber edge and ink for a clash. No select/dropdown
+ * component exists in `@ui`, so the time pill is local.
  *
  * STATIC ONLY, per task: every date, time and booked-out day is fixture data
  * (`buildDemoTimesByDate`), and the time pills open nothing — no time-picker exists yet.
@@ -56,8 +58,8 @@ function TimePill({
 }) {
   const pick = needsPick(visit);
   const label = pick ? 'Pick time' : formatClock(visit.overrideMinutes ?? visit.defaultMinutes);
-  const color = pick ? 'textBrand' : 'textPrimary';
-  const variant = roomy ? 'title' : 'labelBold';
+  const color = pick ? 'textBrand' : 'textInk';
+  const variant = roomy ? 'labelStrong' : 'labelBold';
 
   return (
     <Pressable
@@ -93,27 +95,27 @@ export function RecurringTimesByDateScreen({
       tone="plain"
       testID={testID}
       contentStyle={styles.body}
-      header={
-        <View style={styles.headerWrap}>
-          <ScreenHeader title="Times by date" onBack={onBack} testID={`${testID}-header`} />
-        </View>
-      }
+      header={<RecurringHeader title="Times by date" onBack={onBack} testID={`${testID}-header`} />}
       footer={
         <View style={styles.footer}>
           <Button
             label="Save times"
             onPress={() => onContinue?.(rows)}
+            flat
+            labelVariant="titleLargeBlack"
+            labelColor="textInk"
+            style={styles.cta}
             testID={`${testID}-continue`}
           />
         </View>
       }
     >
-      <Text variant="bodyLarge" color="textSecondary" style={styles.intro}>
+      <Text variant="bodyLarge" color="textStone" style={styles.intro}>
         Most days use{' '}
         {usualTimes.map((time, index) => (
           <Fragment key={`usual-${index}`}>
             {index === 0 ? '' : index === usualTimes.length - 1 ? ' and ' : ', '}
-            <Text variant="title" color="textPrimary">
+            <Text variant="title" color="textInk">
               {time}
             </Text>
           </Fragment>
@@ -127,17 +129,17 @@ export function RecurringTimesByDateScreen({
         return (
           <Card
             key={row.id}
-            tone={clash === undefined ? 'surface' : 'accent'}
+            tone="surface"
             padded={false}
             style={clash === undefined ? styles.card : [styles.card, styles.cardClash]}
             testID={`${testID}-date-${row.id}`}
           >
             <View style={styles.dateRow}>
-              <Text variant="titleRebook" color="textPrimary" style={styles.dateLabel}>
+              <Text variant="titleTotal" color="textInk" style={styles.dateLabel}>
                 {row.label}
               </Text>
               {clash === undefined ? null : (
-                <Text variant="body" color="textReschedule">
+                <Text variant="noticeSmall" color="textClash">
                   Not available at {formatClock(clash.defaultMinutes)}
                 </Text>
               )}
@@ -147,10 +149,9 @@ export function RecurringTimesByDateScreen({
                 <View key={visit.visitId} style={styles.visitColumn}>
                   {/* Only the visit that clashes takes the amber; the others stay grey. */}
                   <Text
-                    variant="slotLabel"
-                    color={needsPick(visit) ? 'textReschedule' : 'textSecondary'}
+                    variant="labelMicro"
+                    color={needsPick(visit) ? 'textClash' : 'textStoneQuiet'}
                     numberOfLines={1}
-                    style={styles.visitLabel}
                   >
                     {visit.visitLabel} · {visit.durationLabel}
                   </Text>
@@ -169,40 +170,44 @@ export function RecurringTimesByDateScreen({
   );
 }
 
+/** `4:1121` — a 20pt gutter (not the app's 16), as on Steps 1–2. */
+const GUTTER = 20;
+
 const styles = StyleSheet.create({
-  headerWrap: {
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
-    paddingTop: lightTheme.space.lg,
-  },
-  /** `2f` — the list opens 6 under the header, days 8 apart. */
-  body: { paddingTop: lightTheme.space.s6, gap: lightTheme.space.sm },
-  /** The intro sits 4 further from the first day than the days sit from each other. */
+  /** `4:1126` — the list opens 6 under the header, days 8 apart. */
+  body: { paddingHorizontal: GUTTER, paddingTop: lightTheme.space.s6, gap: lightTheme.space.sm },
+  /** `4:1127` — the intro carries 4 more below it than the days sit apart. */
   intro: { marginBottom: lightTheme.space.xs },
-  /** `2f` — each day: py 10 / px 12, a 14pt radius, a 1.5pt edge, 8 between date and times. */
+  /**
+   * `4:1131` — each day: a 1pt `#E4E2DA` edge, then py 10 / px 12 inside it (Figma's 11 / 13
+   * include the edge), a 14pt radius, 8 between date and times.
+   */
   card: {
     paddingVertical: lightTheme.space.s10,
     paddingHorizontal: lightTheme.space.md,
     borderRadius: 14,
-    borderWidth: 1.5,
+    borderWidth: 1,
+    borderColor: lightTheme.colors.borderStone,
     gap: lightTheme.space.sm,
   },
-  /** A clash outlines the whole day in the notice yellow, on `Card`'s own accent fill. */
-  cardClash: { borderColor: lightTheme.colors.borderNotice },
+  /** `4:1156` — a booked-out day: cream, with an amber edge. */
+  cardClash: {
+    backgroundColor: lightTheme.colors.surfaceClash,
+    borderColor: lightTheme.colors.borderClash,
+  },
   dateRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: lightTheme.space.sm,
   },
-  /**
-   * The wireframe sets these at the browser's default line height (~1.2), tighter than the
-   * app's 15/24 and 11/16.5 tokens; without this each day card grows ~10pt taller than drawn.
-   */
-  dateLabel: { lineHeight: 18 },
-  visitLabel: { lineHeight: 13 },
+  dateLabel: { flexShrink: 1 },
+  /** `4:1134` / `4:1290` — one column per visit: 6 apart, or 8 when there are two. */
   visitRow: { flexDirection: 'row', gap: lightTheme.space.s6 },
   visitRowRoomy: { gap: lightTheme.space.sm },
+  /** `4:1135` — the label 3 above its pill. */
   visitColumn: { flex: 1, minWidth: 0, gap: 3 },
+  /** `4:1140` — a stone pill, 8 all round at a 10pt radius: 32 tall. */
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -210,19 +215,25 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.xxs,
     padding: lightTheme.space.sm,
     borderRadius: lightTheme.radius.r10,
-    backgroundColor: lightTheme.colors.surfaceMuted,
+    backgroundColor: lightTheme.colors.surfaceStone,
   },
+  /** `4:1294` — two per row: 10 at the sides around 14pt type, 34 tall. */
   pillRoomy: { paddingHorizontal: lightTheme.space.s10 },
   pillLabel: { flexShrink: 1 },
-  /** `2f` draws the empty pick as black with brand-yellow type — the Home booking card's pairing. */
-  pillPick: { backgroundColor: lightTheme.colors.surfaceInverse },
-  /** `2f` — the footer's own top rule, edge to edge, as on Step 2. */
+  /** `4:1172` — the empty pick is ink with brand-yellow type. */
+  pillPick: { backgroundColor: lightTheme.colors.surfaceInk },
+  /**
+   * `4:1267` — the footer's own 1pt stone rule, edge to edge: pulled out over `Screen`'s 16 gutter
+   * and 8 of top padding, then padded back in to 20 / 11.
+   */
   footer: {
     marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
     marginTop: -lightTheme.space.sm,
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
-    paddingTop: lightTheme.space.s10,
-    borderTopWidth: 1.5,
-    borderTopColor: lightTheme.colors.surfaceMuted,
+    paddingHorizontal: GUTTER,
+    paddingTop: 11,
+    borderTopWidth: 1,
+    borderTopColor: lightTheme.colors.surfaceStone,
   },
+  /** `4:1268` — a flat 52pt bar at a 16pt radius. */
+  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
 });

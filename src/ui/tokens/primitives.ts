@@ -240,6 +240,10 @@ export const palette = {
   stone500: '#9A988F',
   /** `4:671` — "9/11 days", a start time free on only some days. */
   amber31: '#A06A00',
+  /** `4:1156` — a date whose usual time is booked out: its fill, edge and ink. */
+  cream50: '#FFF8DB',
+  amber44: '#E0A800',
+  amber27: '#8A5A00',
   /** Secondary copy — the range, "Pick 5 to 14 days". */
   grey555: '#555555',
   /** Captions — "Pick 2 more days to continue". */

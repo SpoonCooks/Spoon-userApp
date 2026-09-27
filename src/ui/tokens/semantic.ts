@@ -217,6 +217,10 @@ export const lightColors = {
   textPartial: palette.amber31,
   /** `4:918` — "Remove Visit 2". */
   textRemove: palette.rose39,
+  /** `4:1156` — Step 3's booked-out date card. */
+  surfaceClash: palette.cream50,
+  borderClash: palette.amber44,
+  textClash: palette.amber27,
 
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */
@@ -886,6 +890,20 @@ export const typography = {
   titleTotal: {
     fontSize: 15,
     lineHeight: 19,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 3 — "Not available at 1:15 PM": Livvic Regular 12/15. */
+  noticeSmall: {
+    fontSize: fontSize.md,
+    lineHeight: 15,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 3 — a visit's label over its time ("Visit 1 · 1.5 hr"): Bold 11/14. */
+  labelMicro: {
+    fontSize: 11,
+    lineHeight: 14,
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
