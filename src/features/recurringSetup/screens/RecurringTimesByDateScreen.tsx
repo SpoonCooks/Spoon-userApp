@@ -92,6 +92,7 @@ export function RecurringTimesByDateScreen({
   return (
     <Screen
       scroll
+      showsScrollIndicator={false}
       tone="plain"
       testID={testID}
       contentStyle={styles.body}

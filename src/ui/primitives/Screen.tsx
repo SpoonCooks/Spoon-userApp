@@ -50,6 +50,11 @@ export interface ScreenProps {
    * already solve this themselves and are deliberately left alone.
    */
   readonly keyboardAware?: boolean;
+  /**
+   * The scroll bar at the right edge while scrolling. On by default; the recurring-setup screens
+   * (Figma `ZIJf639gTWHXshaa2YOeCT`) draw none, so they turn it off.
+   */
+  readonly showsScrollIndicator?: boolean;
   readonly testID?: string;
 }
 
@@ -191,6 +196,7 @@ export function Screen({
   footer,
   contentStyle,
   keyboardAware = false,
+  showsScrollIndicator = true,
   testID,
   children,
 }: PropsWithChildren<ScreenProps>) {
@@ -227,6 +233,7 @@ export function Screen({
             contentContainerStyle={[styles.scrollContent, content, contentStyle]}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={showsScrollIndicator}
             onScroll={onScroll}
             scrollEventThrottle={16}
           >
@@ -238,6 +245,7 @@ export function Screen({
           style={keyboardHeight === 0 ? undefined : { marginBottom: keyboardHeight }}
           contentContainerStyle={[styles.scrollContent, content, contentStyle]}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={showsScrollIndicator}
         >
           {children}
         </ScrollView>

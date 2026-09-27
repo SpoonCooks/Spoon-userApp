@@ -254,6 +254,7 @@ export function RecurringTimeScreen({
   return (
     <Screen
       scroll
+      showsScrollIndicator={false}
       tone="plain"
       testID={testID}
       contentStyle={styles.body}

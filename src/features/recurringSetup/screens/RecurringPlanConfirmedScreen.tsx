@@ -40,6 +40,7 @@ export function RecurringPlanConfirmedScreen({
   return (
     <Screen
       scroll
+      showsScrollIndicator={false}
       tone="plain"
       testID={testID}
       contentStyle={styles.body}

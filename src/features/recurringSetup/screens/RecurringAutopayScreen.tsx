@@ -39,6 +39,7 @@ export function RecurringAutopayScreen({
   return (
     <Screen
       scroll
+      showsScrollIndicator={false}
       tone="plain"
       testID={testID}
       contentStyle={styles.body}
