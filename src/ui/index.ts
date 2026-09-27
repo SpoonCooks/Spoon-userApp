@@ -132,7 +132,7 @@ export type { OverlayProps } from './overlays/Overlay';
 export { Avatar } from './primitives/Avatar';
 export type { AvatarProps, AvatarSize } from './primitives/Avatar';
 export { Badge } from './primitives/Badge';
-export type { BadgeProps } from './primitives/Badge';
+export type { BadgeProps, BadgeSize } from './primitives/Badge';
 export { Button } from './primitives/Button';
 export type { ButtonProps, ButtonSize, ButtonVariant } from './primitives/Button';
 export { Card } from './primitives/Card';
