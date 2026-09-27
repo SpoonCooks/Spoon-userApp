@@ -214,6 +214,8 @@ export const lightColors = {
   textStoneMuted: palette.stone400,
   borderStoneDashed: palette.stone300,
   borderStoneMid: palette.stone250,
+  surfaceStoneDisc: palette.stone230,
+  surfaceStoneTile: palette.stone150,
   borderStoneStrong: palette.stone500,
   textStoneClash: palette.stone500,
   textPartial: palette.amber31,
@@ -965,10 +967,10 @@ export const typography = {
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
-  /** Recurring setup, Step 6 — the first-visit time: Livvic Black 17/22. */
+  /** Recurring setup — the CTA labels and Step 6's first-visit time: Livvic Black 17/21. */
   titleLargeBlack: {
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 21,
     fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.none,
   },

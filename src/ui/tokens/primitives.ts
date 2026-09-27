@@ -234,6 +234,10 @@ export const palette = {
   stone400: '#B5B3AA',
   /** Days outside the window. */
   stone350: '#C9C7BF',
+  /** `4:2014` — Step 6's confirmation disc. */
+  stone230: '#E0DED6',
+  /** `4:2024` — Step 6's first-visit tile. */
+  stone150: '#E6E5DF',
   /** `4:1924` — the "Keep my plan going" card's edge. */
   stone250: '#CFCDC4',
   /** `4:666` — the dashed edge of a start time free on only some days. */
