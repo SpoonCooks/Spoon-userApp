@@ -246,6 +246,8 @@ export const palette = {
   cream50: '#FFF8DB',
   amber44: '#E0A800',
   amber27: '#8A5A00',
+  /** `4:1950` — Step 5's intro ("Approve once. …"). */
+  grey444: '#444444',
   /** Secondary copy — the range, "Pick 5 to 14 days". */
   grey555: '#555555',
   /** Captions — "Pick 2 more days to continue". */

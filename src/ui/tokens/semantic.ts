@@ -206,6 +206,7 @@ export const lightColors = {
   surfaceStoneSoft: palette.stone50,
   borderStone: palette.stone200,
   textInk: palette.ink,
+  textStoneDeep: palette.grey444,
   textStone: palette.grey555,
   textStoneCaption: palette.grey666,
   textStoneQuiet: palette.grey777,
@@ -950,10 +951,10 @@ export const typography = {
     fontFamily: fontFamily.regular,
     letterSpacing: letterSpacing.none,
   },
-  /** Recurring setup, Step 5 — a payment option's name ("UPI Autopay"): Livvic Black 15/20. */
+  /** Recurring setup, Step 5 — a payment option's name ("UPI Autopay"): Livvic Black 15/19. */
   optionTitle: {
     fontSize: 15,
-    lineHeight: lineHeight.lg,
+    lineHeight: 19,
     fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.none,
   },

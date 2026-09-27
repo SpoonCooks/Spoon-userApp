@@ -1,19 +1,20 @@
 import { useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, CANCEL_RADIO_OFF, CANCEL_RADIO_ON, Card, Screen, ScreenHeader, Text } from '@ui';
+import { Button, Card, Screen, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
+import { RecurringHeader } from '../components/RecurringHeader';
 import { AUTOPAY_METHODS, buildDemoAutopayDetails } from '../data';
 
 /**
  * Recurring setup — Step 5 "Autopay".
  *
  * Source: Claude Design artifact `https://claude.ai/artifact/Dfom3zAZoxPW2rV7osfdNu`, state `2h`
- * ("Step 5 · Autopay"). See docs/CLAUDE_DESIGN_RECURRING_SETUP.md. Layout, sizes and copy are
- * read off the wireframe's markup; COLOURS are the app's own, as on Steps 1–4: the selected
- * option is outlined in the notice yellow rather than the wireframe's black, and the radio glyphs
- * are the app's own (`CANCEL_RADIO_ON` / `_OFF`, as in `CancelBookingSheet`).
+ * ("Step 5 · Autopay"). See docs/CLAUDE_DESIGN_RECURRING_SETUP.md. Figma `ZIJf639gTWHXshaa2YOeCT`
+ * frame `4:1937` (`2h`) — an import of that wireframe. Layout, sizes, copy AND colours follow it,
+ * as on Steps 1–4: the selected option has a 2pt ink edge, and the radios are drawn locally as
+ * Figma draws them (a 26pt ink ring, a 10pt dot when chosen).
  *
  * STATIC ONLY, per task: the two methods and the mandate terms are local fixture data
  * (`AUTOPAY_METHODS`, `buildDemoAutopayDetails`) — there is no Razorpay integration wired up yet,
@@ -44,21 +45,23 @@ export function RecurringAutopayScreen({
       testID={testID}
       contentStyle={styles.body}
       header={
-        <View style={styles.headerWrap}>
-          <ScreenHeader title="Set up autopay" onBack={onBack} testID={`${testID}-header`} />
-        </View>
+        <RecurringHeader title="Set up autopay" onBack={onBack} testID={`${testID}-header`} />
       }
       footer={
         <View style={styles.footer}>
           <Button
             label={`Approve with ${method.ctaLabel}`}
             onPress={() => onContinue?.(methodId)}
+            flat
+            labelVariant="titleLargeBlack"
+            labelColor="textInk"
+            style={styles.cta}
             testID={`${testID}-continue`}
           />
         </View>
       }
     >
-      <Text variant="bodyRelaxed" color="textSecondary">
+      <Text variant="bodyRelaxed" color="textStoneDeep">
         Approve once. We’ll charge each visit automatically before it starts.
       </Text>
 
@@ -83,17 +86,12 @@ export function RecurringAutopayScreen({
               ]}
               testID={`${testID}-method-${option.id}`}
             >
-              <Image
-                source={selected ? CANCEL_RADIO_ON : CANCEL_RADIO_OFF}
-                style={styles.radio}
-                resizeMode="contain"
-                accessibilityIgnoresInvertColors
-              />
+              <View style={styles.radio}>{selected ? <View style={styles.radioDot} /> : null}</View>
               <View style={styles.methodText}>
-                <Text variant="optionTitle" color="textPrimary">
+                <Text variant="optionTitle" color="textInk">
                   {option.label}
                 </Text>
-                <Text variant="hint" color="textSecondary">
+                <Text variant="captionStep" color="textStoneCaption">
                   {option.description}
                 </Text>
               </View>
@@ -105,57 +103,85 @@ export function RecurringAutopayScreen({
       <Card tone="muted" padded={false} style={styles.details} testID={`${testID}-details`}>
         {details.map((row) => (
           <View key={row.label} style={styles.detailRow}>
-            <Text variant="bodyLarge" color="textPrimary">
+            <Text variant="bodyTight" color="textInk">
               {row.label}
             </Text>
-            <Text variant="title" color="textPrimary" align="right" style={styles.detailValue}>
+            <Text variant="labelStrong" color="textInk" align="right" style={styles.detailValue}>
               {row.value}
             </Text>
           </View>
         ))}
       </Card>
 
-      <Text variant="hint" color="textSecondary">
+      <Text variant="hint" color="textStoneCaption">
         Cancel autopay anytime from Manage plan. You’ll get a notification before every charge.
       </Text>
     </Screen>
   );
 }
 
+/** `4:1943` — a 20pt gutter (not the app's 16), as on Steps 1–4. */
+const GUTTER = 20;
+
 const styles = StyleSheet.create({
-  headerWrap: {
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
-    paddingTop: lightTheme.space.lg,
-  },
-  /** `2h` — the body opens 6 under the header; its blocks sit 12 apart. */
-  body: { paddingTop: lightTheme.space.s6, gap: lightTheme.space.md },
+  /** `4:1948` — the body opens 6 under the header; its blocks sit 12 apart. */
+  body: { paddingHorizontal: GUTTER, paddingTop: lightTheme.space.s6, gap: lightTheme.space.md },
   methods: { gap: lightTheme.space.md },
-  /** `2h` — an option card: 14 padding, a 16pt radius, 12 between radio and text. */
+  /**
+   * `4:1960` — an option card: a 1pt `#CFCDC4` edge, 14 inside it, a 16pt radius, 12 between
+   * radio and text: 65 tall.
+   */
   method: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: lightTheme.space.md,
     padding: 14,
     borderRadius: lightTheme.radius.md,
-    borderWidth: 1.5,
-    borderColor: lightTheme.colors.border,
+    borderWidth: 1,
+    borderColor: lightTheme.colors.borderStoneMid,
   },
-  /** The chosen option's edge thickens to 2, as drawn, in the notice yellow. */
-  methodSelected: { borderWidth: 2, borderColor: lightTheme.colors.borderNotice },
+  /** `4:1952` — the chosen option's edge is 2pt ink: 67 tall. */
+  methodSelected: { borderWidth: 2, borderColor: lightTheme.colors.surfaceInk },
   methodText: { flex: 1 },
-  radio: { width: 22, height: 22 },
+  /** `4:1953` — a 26pt ring, 2pt ink. */
+  radio: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: lightTheme.colors.surfaceInk,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /** `4:1954` — the 10pt ink dot inside the chosen ring. */
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: lightTheme.colors.surfaceInk,
+  },
   pressed: { opacity: 0.7 },
-  /** `2h` — the terms: a grey card, 14 padding, a 16pt radius, rows 8 apart. */
-  details: { padding: 14, borderRadius: lightTheme.radius.md, gap: lightTheme.space.sm },
+  /** `4:1967` — the terms: `#F2F1EC`, 14 padding, a 16pt radius, rows 8 apart. */
+  details: {
+    padding: 14,
+    borderRadius: lightTheme.radius.md,
+    gap: lightTheme.space.sm,
+    backgroundColor: lightTheme.colors.surfaceStoneSoft,
+  },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: lightTheme.space.md },
   detailValue: { flexShrink: 1 },
-  /** `2h` — the footer's own top rule, edge to edge, as on Steps 2–4. */
+  /**
+   * `4:2000` — the footer's own 1pt stone rule, edge to edge: pulled out over `Screen`'s 16 gutter
+   * and 8 of top padding, then padded back in to 20 / 11.
+   */
   footer: {
     marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
     marginTop: -lightTheme.space.sm,
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
-    paddingTop: lightTheme.space.s10,
-    borderTopWidth: 1.5,
-    borderTopColor: lightTheme.colors.surfaceMuted,
+    paddingHorizontal: GUTTER,
+    paddingTop: 11,
+    borderTopWidth: 1,
+    borderTopColor: lightTheme.colors.surfaceStone,
   },
+  /** `4:2001` — a flat 52pt bar at a 16pt radius. */
+  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
 });
