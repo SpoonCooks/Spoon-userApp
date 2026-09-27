@@ -172,7 +172,10 @@ export function buildDemoVisits(): readonly RecurringVisitDraft[] {
   ];
 }
 
-/** A new visit added via "+ Add visit" — no time chosen yet, same shape `2c`'s note describes. */
+/**
+ * A visit added via "+ Add visit" — as `2e` draws the one just added: all days, afternoon,
+ * 45 mins, and no time yet ("Pick time").
+ */
 export function buildNewVisit(id: string, label: string): RecurringVisitDraft {
   return {
     id,
@@ -180,7 +183,7 @@ export function buildNewVisit(id: string, label: string): RecurringVisitDraft {
     daysMode: 'all',
     selectedDayIds: [],
     timeOfDay: 'afternoon',
-    durationId: 'd60',
+    durationId: 'd45',
     startMinutes: null,
   };
 }
@@ -226,22 +229,33 @@ export type SlotCoverage = 'all' | 'partial' | 'full';
 /**
  * Per-slot coverage as the board draws it: `'all'`, `'full'`, or how many of the visit's days the
  * slot is NOT free on — so `2c`'s "9/11 days" is `2`, and `2d`'s "5/6 days" is `1`. Stored as
- * days-missing so the label stays right whatever day count the visit has. Afternoon is `2c`'s
- * grid (extended to 3:45, which `2e` shows); evening is `2d`'s; morning is not drawn, so it reuses
- * a repeating pattern.
+ * days-missing so the label stays right whatever day count the visit has.
+ *
+ * The board's placeholder data differs per state, so it's split by visit the same way: Visit 1's
+ * afternoon is `2c`'s grid; an added visit's afternoon is `2e`'s, where every slot not taken by
+ * another visit is free (2:45 PM included); evening is `2d`'s for both. Morning is never drawn,
+ * so it reuses a repeating pattern.
  */
-const COVERAGE: Record<RecurringTimeOfDay, readonly ('all' | 'full' | number)[]> = {
+type CoverageEntry = 'all' | 'full' | number;
+
+const PRIMARY_COVERAGE: Record<RecurringTimeOfDay, readonly CoverageEntry[]> = {
   morning: ['all', 'all', 2, 'all', 'all', 'full', 'all', 1],
   afternoon: ['all', 'all', 2, 'all', 'all', 'all', 'all', 4, 'full', 'all', 1, 'full'],
   evening: ['all', 'all', 'all', 1, 'all', 'full', 'all', 'all'],
+};
+
+const ADDED_COVERAGE: Record<RecurringTimeOfDay, readonly CoverageEntry[]> = {
+  ...PRIMARY_COVERAGE,
+  afternoon: [],
 };
 
 export function coverageFor(
   timeOfDay: RecurringTimeOfDay,
   slotIndex: number,
   dayCount: number,
+  isPrimary: boolean,
 ): { kind: SlotCoverage; label: string } {
-  const pattern = COVERAGE[timeOfDay];
+  const pattern = (isPrimary ? PRIMARY_COVERAGE : ADDED_COVERAGE)[timeOfDay];
   const entry = timeOfDay === 'morning' ? pattern[slotIndex % pattern.length] : pattern[slotIndex];
   if (entry === undefined || entry === 'all') return { kind: 'all', label: 'all days' };
   if (entry === 'full') return { kind: 'full', label: 'full' };

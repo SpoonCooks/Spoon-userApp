@@ -449,7 +449,12 @@ export function RecurringTimeScreen({
               minutes,
               activeDurationMinutes,
             );
-            const coverage = coverageFor(activeVisit.timeOfDay, slotIndex, activeDayIds.length);
+            const coverage = coverageFor(
+              activeVisit.timeOfDay,
+              slotIndex,
+              activeDayIds.length,
+              isPrimary,
+            );
             const chosen = activeVisit.startMinutes === minutes;
             const tone: CellTone = chosen
               ? 'selected'

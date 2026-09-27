@@ -1,7 +1,7 @@
 import { Fragment, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Icon, Screen, ScreenHeader, Text } from '@ui';
+import { Button, Card, Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { buildDemoTimesByDate, formatClock } from '../data';
@@ -12,16 +12,16 @@ import type { RecurringDateRow, RecurringDateVisitTime } from '../types';
  *
  * Source: Claude Design artifact `https://claude.ai/artifact/Dfom3zAZoxPW2rV7osfdNu`, states
  * `2f1` / `2f2` / `2f3` ("Times by date · 1/2/3 visits a day"). See
- * docs/CLAUDE_DESIGN_RECURRING_SETUP.md — a wireframe, not a pixel-accurate mock.
+ * docs/CLAUDE_DESIGN_RECURRING_SETUP.md.
  *
  * The three states are one layout with a different number of columns: every chosen day is a card,
  * and each visit is a column in that card's single row — one full-width time, two side by side, or
  * three compact ones. A day where a visit's usual time is booked out is highlighted as a whole,
  * says "Not available at …" beside the date, and leaves only that visit's time empty ("Pick time").
  *
- * Built from `Card`, `Text`, `Icon` and `Button`. `ListRow` (title left, one trailing control) no
- * longer fits: the visits sit side by side under the date, not one per row. No select/dropdown
- * component exists in `@ui`, so the time pill is local.
+ * Layout, sizes and copy are read off the wireframe's markup; COLOURS are the app's own, as on
+ * Steps 1–2 (grey pills, the accent card and notice border for a clash, amber for its text). No
+ * select/dropdown component exists in `@ui`, so the time pill is local.
  *
  * STATIC ONLY, per task: every date, time and booked-out day is fixture data
  * (`buildDemoTimesByDate`), and the time pills open nothing — no time-picker exists yet.
@@ -41,28 +41,38 @@ function needsPick(visit: RecurringDateVisitTime): boolean {
   return visit.unavailableAtDefault && visit.overrideMinutes === null;
 }
 
+/**
+ * `2f` — a grey pill, text left, "▾" right. `2f2`'s two-up pill is the roomier one: 14pt text and
+ * 10pt side padding, against 13pt and 8pt when there are one or three per row.
+ */
 function TimePill({
   visit,
+  roomy,
   testID,
 }: {
   readonly visit: RecurringDateVisitTime;
+  readonly roomy: boolean;
   readonly testID: string;
 }) {
   const pick = needsPick(visit);
   const label = pick ? 'Pick time' : formatClock(visit.overrideMinutes ?? visit.defaultMinutes);
+  const color = pick ? 'textBrand' : 'textPrimary';
+  const variant = roomy ? 'title' : 'labelBold';
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${visit.visitLabel}, ${label}`}
       hitSlop={lightTheme.space.xs}
-      style={[styles.pill, pick ? styles.pillPick : null]}
+      style={[styles.pill, roomy ? styles.pillRoomy : null, pick ? styles.pillPick : null]}
       testID={testID}
     >
-      <Text variant="bodyBold" color={pick ? 'textBrand' : 'textPrimary'} numberOfLines={1}>
+      <Text variant={variant} color={color} numberOfLines={1} style={styles.pillLabel}>
         {label}
       </Text>
-      <Icon name="down" size={14} color={pick ? 'textBrand' : 'textSecondary'} />
+      <Text variant={variant} color={color}>
+        ▾
+      </Text>
     </Pressable>
   );
 }
@@ -75,31 +85,35 @@ export function RecurringTimesByDateScreen({
 }: RecurringTimesByDateScreenProps) {
   const { plans, rows } = useMemo(() => buildDemoTimesByDate(visitCount), [visitCount]);
   const usualTimes = plans.map((plan) => formatClock(plan.defaultMinutes));
+  const roomy = plans.length === 2;
 
   return (
     <Screen
       scroll
       tone="plain"
       testID={testID}
+      contentStyle={styles.body}
       header={
         <View style={styles.headerWrap}>
           <ScreenHeader title="Times by date" onBack={onBack} testID={`${testID}-header`} />
         </View>
       }
       footer={
-        <Button
-          label="Save times"
-          onPress={() => onContinue?.(rows)}
-          testID={`${testID}-continue`}
-        />
+        <View style={styles.footer}>
+          <Button
+            label="Save times"
+            onPress={() => onContinue?.(rows)}
+            testID={`${testID}-continue`}
+          />
+        </View>
       }
     >
-      <Text variant="body" color="textSecondary">
+      <Text variant="bodyLarge" color="textSecondary" style={styles.intro}>
         Most days use{' '}
         {usualTimes.map((time, index) => (
           <Fragment key={`usual-${index}`}>
             {index === 0 ? '' : index === usualTimes.length - 1 ? ' and ' : ', '}
-            <Text variant="bodyBold" color="textPrimary">
+            <Text variant="title" color="textPrimary">
               {time}
             </Text>
           </Fragment>
@@ -114,26 +128,37 @@ export function RecurringTimesByDateScreen({
           <Card
             key={row.id}
             tone={clash === undefined ? 'surface' : 'accent'}
+            padded={false}
             style={clash === undefined ? styles.card : [styles.card, styles.cardClash]}
             testID={`${testID}-date-${row.id}`}
           >
             <View style={styles.dateRow}>
-              <Text variant="bodyStrong" color="textPrimary">
+              <Text variant="titleRebook" color="textPrimary" style={styles.dateLabel}>
                 {row.label}
               </Text>
               {clash === undefined ? null : (
-                <Text variant="caption" color="textSecondary">
+                <Text variant="body" color="textReschedule">
                   Not available at {formatClock(clash.defaultMinutes)}
                 </Text>
               )}
             </View>
-            <View style={styles.visitRow}>
+            <View style={[styles.visitRow, roomy ? styles.visitRowRoomy : null]}>
               {row.visits.map((visit) => (
                 <View key={visit.visitId} style={styles.visitColumn}>
-                  <Text variant="captionBold" color="textSecondary" numberOfLines={1}>
+                  {/* Only the visit that clashes takes the amber; the others stay grey. */}
+                  <Text
+                    variant="slotLabel"
+                    color={needsPick(visit) ? 'textReschedule' : 'textSecondary'}
+                    numberOfLines={1}
+                    style={styles.visitLabel}
+                  >
                     {visit.visitLabel} · {visit.durationLabel}
                   </Text>
-                  <TimePill visit={visit} testID={`${testID}-date-${row.id}-${visit.visitId}`} />
+                  <TimePill
+                    visit={visit}
+                    roomy={roomy}
+                    testID={`${testID}-date-${row.id}-${visit.visitId}`}
+                  />
                 </View>
               ))}
             </View>
@@ -149,28 +174,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
     paddingTop: lightTheme.space.lg,
   },
-  /** Overrides `Card`'s 16pt padding for a denser list of eleven days. */
-  card: { padding: lightTheme.space.md, gap: lightTheme.space.sm },
+  /** `2f` — the list opens 6 under the header, days 8 apart. */
+  body: { paddingTop: lightTheme.space.s6, gap: lightTheme.space.sm },
+  /** The intro sits 4 further from the first day than the days sit from each other. */
+  intro: { marginBottom: lightTheme.space.xs },
+  /** `2f` — each day: py 10 / px 12, a 14pt radius, a 1.5pt edge, 8 between date and times. */
+  card: {
+    paddingVertical: lightTheme.space.s10,
+    paddingHorizontal: lightTheme.space.md,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    gap: lightTheme.space.sm,
+  },
   /** A clash outlines the whole day in the notice yellow, on `Card`'s own accent fill. */
-  cardClash: { borderWidth: lightTheme.stroke.thin, borderColor: lightTheme.colors.borderNotice },
+  cardClash: { borderColor: lightTheme.colors.borderNotice },
   dateRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: lightTheme.space.sm,
   },
-  visitRow: { flexDirection: 'row', gap: lightTheme.space.sm },
-  visitColumn: { flex: 1, minWidth: 0, gap: lightTheme.space.xxs },
+  /**
+   * The wireframe sets these at the browser's default line height (~1.2), tighter than the
+   * app's 15/24 and 11/16.5 tokens; without this each day card grows ~10pt taller than drawn.
+   */
+  dateLabel: { lineHeight: 18 },
+  visitLabel: { lineHeight: 13 },
+  visitRow: { flexDirection: 'row', gap: lightTheme.space.s6 },
+  visitRowRoomy: { gap: lightTheme.space.sm },
+  visitColumn: { flex: 1, minWidth: 0, gap: 3 },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: lightTheme.space.xxs,
-    paddingHorizontal: lightTheme.space.sm,
-    paddingVertical: lightTheme.space.s6,
-    borderRadius: lightTheme.radius.xs,
+    padding: lightTheme.space.sm,
+    borderRadius: lightTheme.radius.r10,
     backgroundColor: lightTheme.colors.surfaceMuted,
   },
+  pillRoomy: { paddingHorizontal: lightTheme.space.s10 },
+  pillLabel: { flexShrink: 1 },
   /** `2f` draws the empty pick as black with brand-yellow type — the Home booking card's pairing. */
   pillPick: { backgroundColor: lightTheme.colors.surfaceInverse },
+  /** `2f` — the footer's own top rule, edge to edge, as on Step 2. */
+  footer: {
+    marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
+    marginTop: -lightTheme.space.sm,
+    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
+    paddingTop: lightTheme.space.s10,
+    borderTopWidth: 1.5,
+    borderTopColor: lightTheme.colors.surfaceMuted,
+  },
 });
