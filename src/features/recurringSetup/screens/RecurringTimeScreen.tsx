@@ -3,12 +3,12 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
-import { Button, Screen, Text } from '@ui';
+import { Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { ColorToken } from '@ui/tokens/semantic';
 
 import { HatchedFill } from '../components/HatchedFill';
-import { RecurringHeader } from '../components/RecurringHeader';
+import { RecurringFooter } from '../components/RecurringFooter';
 import {
   DURATION_OPTIONS,
   MAX_VISITS,
@@ -260,7 +260,12 @@ export function RecurringTimeScreen({
       contentStyle={styles.body}
       header={
         <View>
-          <RecurringHeader title="Time & duration" onBack={onBack} testID={`${testID}-header`} />
+          <ScreenHeader
+            density="step"
+            title="Time & duration"
+            onBack={onBack}
+            testID={`${testID}-header`}
+          />
 
           {/* The visit tabs sit fixed under the header, outside the scroll area, as drawn. */}
           <View style={styles.tabsWrap}>
@@ -306,7 +311,11 @@ export function RecurringTimeScreen({
         </View>
       }
       footer={
-        <View style={styles.footer}>
+        <RecurringFooter
+          label="Review plan"
+          onPress={() => onContinue?.(visits)}
+          testID={`${testID}-continue`}
+        >
           <View style={styles.summaryRow}>
             <Text variant="titleTotal" color="textInk">
               {totalVisits} visits · {allDayIds.length} days
@@ -317,16 +326,7 @@ export function RecurringTimeScreen({
               </Text>
             </Pressable>
           </View>
-          <Button
-            label="Review plan"
-            onPress={() => onContinue?.(visits)}
-            flat
-            labelVariant="titleLargeBlack"
-            labelColor="textInk"
-            style={styles.cta}
-            testID={`${testID}-continue`}
-          />
-        </View>
+        </RecurringFooter>
       }
     >
       {isPrimary ? null : (
@@ -642,21 +642,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: lightTheme.space.xxs,
   },
   pressed: { opacity: 0.8 },
-  /**
-   * `4:713` — the footer's own 1pt stone rule, edge to edge: pulled out over `Screen`'s 16 gutter
-   * and 8 of top padding, then padded back in to 20 / 11.
-   */
-  footer: {
-    gap: lightTheme.space.sm,
-    marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
-    marginTop: -lightTheme.space.sm,
-    paddingHorizontal: GUTTER,
-    paddingTop: 11,
-    borderTopWidth: 1,
-    borderTopColor: lightTheme.colors.surfaceStone,
-  },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  /** `4:720` — a flat 52pt bar at a 16pt radius. */
-  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
   underline: { textDecorationLine: 'underline' },
 });

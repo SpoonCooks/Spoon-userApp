@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, Text } from '@ui';
+import { Card, DetailRows, Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { RecurringHeader } from '../components/RecurringHeader';
+import { RecurringFooter } from '../components/RecurringFooter';
 import { AUTOPAY_METHODS, buildDemoAutopayDetails } from '../data';
 
 /**
@@ -45,20 +45,19 @@ export function RecurringAutopayScreen({
       testID={testID}
       contentStyle={styles.body}
       header={
-        <RecurringHeader title="Set up autopay" onBack={onBack} testID={`${testID}-header`} />
+        <ScreenHeader
+          density="step"
+          title="Set up autopay"
+          onBack={onBack}
+          testID={`${testID}-header`}
+        />
       }
       footer={
-        <View style={styles.footer}>
-          <Button
-            label={`Approve with ${method.ctaLabel}`}
-            onPress={() => onContinue?.(methodId)}
-            flat
-            labelVariant="titleLargeBlack"
-            labelColor="textInk"
-            style={styles.cta}
-            testID={`${testID}-continue`}
-          />
-        </View>
+        <RecurringFooter
+          label={`Approve with ${method.ctaLabel}`}
+          onPress={() => onContinue?.(methodId)}
+          testID={`${testID}-continue`}
+        />
       }
     >
       <Text variant="bodyRelaxed" color="textStoneDeep">
@@ -101,16 +100,7 @@ export function RecurringAutopayScreen({
       </View>
 
       <Card tone="muted" padded={false} style={styles.details} testID={`${testID}-details`}>
-        {details.map((row) => (
-          <View key={row.label} style={styles.detailRow}>
-            <Text variant="bodyTight" color="textInk">
-              {row.label}
-            </Text>
-            <Text variant="labelStrong" color="textInk" align="right" style={styles.detailValue}>
-              {row.value}
-            </Text>
-          </View>
-        ))}
+        <DetailRows rows={details} variant="terms" testID={`${testID}-terms`} />
       </Card>
 
       <Text variant="hint" color="textStoneCaption">
@@ -161,27 +151,10 @@ const styles = StyleSheet.create({
     backgroundColor: lightTheme.colors.surfaceInk,
   },
   pressed: { opacity: 0.7 },
-  /** `4:1967` — the terms: `#F2F1EC`, 14 padding, a 16pt radius, rows 8 apart. */
+  /** `4:1967` — the terms: `#F2F1EC`, 14 padding, a 16pt radius; `DetailRows terms` spaces the rows. */
   details: {
     padding: 14,
     borderRadius: lightTheme.radius.md,
-    gap: lightTheme.space.sm,
     backgroundColor: lightTheme.colors.surfaceStoneSoft,
   },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: lightTheme.space.md },
-  detailValue: { flexShrink: 1 },
-  /**
-   * `4:2000` — the footer's own 1pt stone rule, edge to edge: pulled out over `Screen`'s 16 gutter
-   * and 8 of top padding, then padded back in to 20 / 11.
-   */
-  footer: {
-    marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
-    marginTop: -lightTheme.space.sm,
-    paddingHorizontal: GUTTER,
-    paddingTop: 11,
-    borderTopWidth: 1,
-    borderTopColor: lightTheme.colors.surfaceStone,
-  },
-  /** `4:2001` — a flat 52pt bar at a 16pt radius. */
-  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
 });

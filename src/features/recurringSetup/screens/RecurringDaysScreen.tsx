@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
-import { Badge, Button, Card, Screen, Text } from '@ui';
+import { Badge, Card, Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { ColorToken } from '@ui/tokens/semantic';
 
-import { RecurringHeader } from '../components/RecurringHeader';
+import { RecurringFooter } from '../components/RecurringFooter';
 import { WEEKDAY_LABELS, buildDemoCalendar } from '../data';
 import type { RecurringDayCell } from '../types';
 
@@ -71,26 +71,27 @@ export function RecurringDaysScreen({
       testID={testID}
       contentStyle={styles.body}
       header={
-        <RecurringHeader title="Pick your days" onBack={onBack} testID={`${testID}-header`} />
+        <ScreenHeader
+          density="step"
+          title="Pick your days"
+          onBack={onBack}
+          testID={`${testID}-header`}
+        />
       }
       footer={
-        <View style={styles.footer}>
+        <RecurringFooter
+          layout="plain"
+          label={complete ? `Continue with ${count} day${count === 1 ? '' : 's'}` : 'Continue'}
+          onPress={() => complete && onContinue?.(Array.from(selected))}
+          disabled={!complete}
+          testID={`${testID}-continue`}
+        >
           {count >= MIN_DAYS ? null : (
             <Text variant="captionStep" color="textStoneCaption" align="center">
               Pick {MIN_DAYS - count} more day{MIN_DAYS - count === 1 ? '' : 's'} to continue
             </Text>
           )}
-          <Button
-            label={complete ? `Continue with ${count} day${count === 1 ? '' : 's'}` : 'Continue'}
-            onPress={() => complete && onContinue?.(Array.from(selected))}
-            disabled={!complete}
-            flat
-            labelVariant="titleLargeBlack"
-            labelColor="textInk"
-            style={styles.cta}
-            testID={`${testID}-continue`}
-          />
-        </View>
+        </RecurringFooter>
       }
     >
       <View style={styles.summaryRow}>
@@ -226,14 +227,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: lightTheme.space.md,
   },
-  /** `4:282` — the footer: py 12 / px 20, caption 8 above the button. */
-  footer: {
-    gap: lightTheme.space.sm,
-    paddingTop: lightTheme.space.xs,
-    paddingHorizontal: GUTTER - lightTheme.layout.screenPaddingHorizontal,
-  },
-  /** `4:282` — a flat 52pt bar at a 16pt radius. */
-  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
   weekdayRow: { flexDirection: 'row', gap: CELL_GAP },
   weekdayCell: { flex: 1 },
   grid: { gap: CELL_GAP },

@@ -1,10 +1,10 @@
 import { Fragment, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, Text } from '@ui';
+import { Card, Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { RecurringHeader } from '../components/RecurringHeader';
+import { RecurringFooter } from '../components/RecurringFooter';
 import { buildDemoTimesByDate, formatClock } from '../data';
 import type { RecurringDateRow, RecurringDateVisitTime } from '../types';
 
@@ -96,19 +96,20 @@ export function RecurringTimesByDateScreen({
       tone="plain"
       testID={testID}
       contentStyle={styles.body}
-      header={<RecurringHeader title="Times by date" onBack={onBack} testID={`${testID}-header`} />}
+      header={
+        <ScreenHeader
+          density="step"
+          title="Times by date"
+          onBack={onBack}
+          testID={`${testID}-header`}
+        />
+      }
       footer={
-        <View style={styles.footer}>
-          <Button
-            label="Save times"
-            onPress={() => onContinue?.(rows)}
-            flat
-            labelVariant="titleLargeBlack"
-            labelColor="textInk"
-            style={styles.cta}
-            testID={`${testID}-continue`}
-          />
-        </View>
+        <RecurringFooter
+          label="Save times"
+          onPress={() => onContinue?.(rows)}
+          testID={`${testID}-continue`}
+        />
       }
     >
       <Text variant="bodyLarge" color="textStone" style={styles.intro}>
@@ -223,18 +224,4 @@ const styles = StyleSheet.create({
   pillLabel: { flexShrink: 1 },
   /** `4:1172` — the empty pick is ink with brand-yellow type. */
   pillPick: { backgroundColor: lightTheme.colors.surfaceInk },
-  /**
-   * `4:1267` — the footer's own 1pt stone rule, edge to edge: pulled out over `Screen`'s 16 gutter
-   * and 8 of top padding, then padded back in to 20 / 11.
-   */
-  footer: {
-    marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
-    marginTop: -lightTheme.space.sm,
-    paddingHorizontal: GUTTER,
-    paddingTop: 11,
-    borderTopWidth: 1,
-    borderTopColor: lightTheme.colors.surfaceStone,
-  },
-  /** `4:1268` — a flat 52pt bar at a 16pt radius. */
-  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
 });

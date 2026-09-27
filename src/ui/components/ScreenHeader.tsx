@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import type { ReactNode } from 'react';
 
 import { DirectionalDisc } from '@ui/primitives/DirectionalDisc';
@@ -21,7 +22,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
  * This is NOT the booking-lifecycle header (`39:5324`), which carries an address pair and the Help
  * pill instead of a single title, nor the sheet header (`1:735`).
  */
-export type ScreenHeaderDensity = 'default' | 'band';
+export type ScreenHeaderDensity = 'default' | 'band' | 'step';
 
 export interface ScreenHeaderProps {
   readonly title: string;
@@ -52,6 +53,10 @@ export interface ScreenHeaderProps {
    *   `band`    — 45: the `65:35` instance on `6:227` Past bookings is overridden to 45 tall,
    *               which opens the vertical padding to (45 − 32) / 2 = 6.5. Horizontal padding
    *               and gap are untouched.
+   *   `step`    — the recurring-setup header (Figma `ZIJf639gTWHXshaa2YOeCT`, e.g. `4:299`): a
+   *               36pt disc, a 12pt gap and a Livvic Black 22/28 `#1A1A1A` title, in its OWN 20pt
+   *               gutter, 8 below the safe area and 6 above the content (the frame's pt 52 less
+   *               its 44pt status bar). Drawn full-bleed — no wrapper supplies the gutter.
    */
   readonly density?: ScreenHeaderDensity;
   readonly trailing?: ReactNode;
@@ -66,23 +71,26 @@ export function ScreenHeader({
   trailing,
   testID = 'screen-header',
 }: ScreenHeaderProps) {
+  const step = density === 'step';
   return (
     <View
-      style={[
-        styles.header,
-        density === 'band' ? styles.band : null,
-        divider ? styles.divider : null,
-      ]}
+      style={[styles.header, DENSITY_STYLE[density], divider ? styles.divider : null]}
       testID={testID}
     >
-      {/* `54:289` — the exported 32pt disc, mirrored to face back. Absent by design on a
-          first-run `53:31`; see `onBack`. */}
+      {/* `54:289` — the exported 32pt disc, mirrored to face back (36pt on `step`). Absent by
+          design on a first-run `53:31`; see `onBack`. */}
       {onBack === undefined ? null : (
-        <DirectionalDisc direction="back" label="Back" onPress={onBack} testID={`${testID}-back`} />
+        <DirectionalDisc
+          direction="back"
+          label="Back"
+          onPress={onBack}
+          {...(step ? { size: STEP_DISC } : {})}
+          testID={`${testID}-back`}
+        />
       )}
       <Text
-        variant="headingScreen"
-        color="textPrimary"
+        variant={step ? 'headingStep' : 'headingScreen'}
+        color={step ? 'textInk' : 'textPrimary'}
         accessibilityRole="header"
         numberOfLines={1}
         style={styles.title}
@@ -94,27 +102,42 @@ export function ScreenHeader({
   );
 }
 
+/** `4:300` — the recurring-setup back disc. */
+const STEP_DISC = 36;
+
 const styles = StyleSheet.create({
+  /** Shared by every density: a white row, 12pt gap. */
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: lightTheme.space.md,
+    backgroundColor: lightTheme.colors.surface,
+  },
   /**
-   * `63:783` — **38** tall, px 4, 12pt gap.
+   * `63:783` — **38** tall, px 4.
    *
    * The height is pinned rather than derived: the node's own `py-6` around a 32pt control would
    * measure 44, so honouring the padding would miss the drawn height by 6. Figma's autolayout
    * lets the control overflow its padding; RN does not, so the frame's height wins.
    */
-  header: {
-    height: 38,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: lightTheme.space.md,
-    paddingHorizontal: lightTheme.space.xs,
-    backgroundColor: lightTheme.colors.surface,
-  },
+  default: { height: 38, paddingHorizontal: lightTheme.space.xs },
   /** `65:35` as instanced on `6:227` — 45 tall. px and gap unchanged. */
-  band: { height: 45 },
+  band: { height: 45, paddingHorizontal: lightTheme.space.xs },
+  /** `4:299` — px 20, pt 8, pb 6 around the 36pt disc: 50 tall. */
+  step: {
+    paddingHorizontal: 20,
+    paddingTop: lightTheme.space.sm,
+    paddingBottom: lightTheme.space.s6,
+  },
   divider: {
     borderBottomWidth: lightTheme.stroke.hairline,
     borderBottomColor: lightTheme.colors.borderField,
   },
   title: { flexShrink: 1 },
 });
+
+const DENSITY_STYLE: Record<ScreenHeaderDensity, ViewStyle> = {
+  default: styles.default,
+  band: styles.band,
+  step: styles.step,
+};

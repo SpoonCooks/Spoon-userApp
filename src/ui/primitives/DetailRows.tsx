@@ -41,10 +41,14 @@ export type DetailRowEmphasis = 'quiet' | 'normal' | 'hero' | 'total';
  * `payment`  — `257:3439`, the lime payment table on the same screen. Identical typography to
  *             `booking`; only the rules differ, at `#CFFF04`.
  *
+ * `terms`    — `4:1967`, the recurring-setup autopay terms (Figma `ZIJf639gTWHXshaa2YOeCT`): no
+ *             rules, rows 8 apart, Livvic Regular 14/18 labels and Bold 14/18 values, all
+ *             `#1A1A1A`. The value is not capped at 60% — "SMS 24 hrs before the charge" takes 65%.
+ *
  * `summary` is LEFT as it was: its remaining consumer is the auto-cancel refund block
  * (`201:550`), a different node that has not been re-read.
  */
-export type DetailRowsVariant = 'summary' | 'refund' | 'booking' | 'payment';
+export type DetailRowsVariant = 'summary' | 'refund' | 'booking' | 'payment' | 'terms';
 
 export interface DetailRow {
   readonly label: string;
@@ -66,6 +70,8 @@ const LABEL_VARIANT: Record<DetailRowsVariant, Record<DetailRowEmphasis, Typogra
   booking: { quiet: 'labelUpperQuiet', normal: 'label', hero: 'label', total: 'label' },
   /** `257:3442` — SemiBold 11/16.5 throughout; the lime table has no quiet row. */
   payment: { quiet: 'label', normal: 'label', hero: 'label', total: 'label' },
+  /** `4:1971` — Livvic Regular 14/18 throughout. */
+  terms: { quiet: 'bodyTight', normal: 'bodyTight', hero: 'bodyTight', total: 'bodyTight' },
 };
 
 const VALUE_VARIANT: Record<DetailRowsVariant, Record<DetailRowEmphasis, TypographyToken>> = {
@@ -81,15 +87,33 @@ const VALUE_VARIANT: Record<DetailRowsVariant, Record<DetailRowEmphasis, Typogra
   booking: { quiet: 'bodyMedium', normal: 'bodyBold', hero: 'bodyBold', total: 'bodyBold' },
   /** `257:3444` / `257:3489` / `257:3496` — Livvic Bold 12/16 on every line. */
   payment: { quiet: 'bodyBold', normal: 'bodyBold', hero: 'bodyBold', total: 'bodyBold' },
+  /** `4:1973` — Livvic Bold 14/18 on every line. */
+  terms: {
+    quiet: 'labelStrong',
+    normal: 'labelStrong',
+    hero: 'labelStrong',
+    total: 'labelStrong',
+  },
 };
 
 export function DetailRows({ rows, variant = 'summary', testID }: DetailRowsProps) {
   return (
-    <View style={variant === 'refund' ? styles.tableRefund : styles.table} testID={testID}>
+    <View
+      style={
+        variant === 'refund'
+          ? styles.tableRefund
+          : variant === 'terms'
+            ? styles.tableTerms
+            : styles.table
+      }
+      testID={testID}
+    >
       {rows.map((row, index) => {
         const emphasis = row.emphasis ?? 'normal';
         // `3:1095` / `257:3439` rule every row; `104:2364` rules only the total.
-        const ruled = index > 0 && (variant !== 'refund' || emphasis === 'total');
+        // `4:1967` rules nothing.
+        const ruled =
+          index > 0 && variant !== 'terms' && (variant !== 'refund' || emphasis === 'total');
 
         return (
           <Fragment key={row.label}>
@@ -113,7 +137,11 @@ export function DetailRows({ rows, variant = 'summary', testID }: DetailRowsProp
               <Text
                 variant={LABEL_VARIANT[variant][emphasis]}
                 color={
-                  variant === 'refund' && emphasis === 'total' ? 'textPrimary' : 'textSecondary'
+                  variant === 'terms'
+                    ? 'textInk'
+                    : variant === 'refund' && emphasis === 'total'
+                      ? 'textPrimary'
+                      : 'textSecondary'
                 }
                 numberOfLines={1}
                 style={styles.label}
@@ -123,15 +151,17 @@ export function DetailRows({ rows, variant = 'summary', testID }: DetailRowsProp
               <Text
                 variant={VALUE_VARIANT[variant][emphasis]}
                 color={
-                  emphasis === 'quiet'
-                    ? 'textSecondary'
-                    : variant === 'refund' && emphasis === 'total'
-                      ? 'textPrimary'
-                      : 'textStrong'
+                  variant === 'terms'
+                    ? 'textInk'
+                    : emphasis === 'quiet'
+                      ? 'textSecondary'
+                      : variant === 'refund' && emphasis === 'total'
+                        ? 'textPrimary'
+                        : 'textStrong'
                 }
                 align="right"
                 numberOfLines={1}
-                style={styles.value}
+                style={variant === 'terms' ? styles.valueTerms : styles.value}
               >
                 {row.value}
               </Text>
@@ -172,6 +202,9 @@ const styles = StyleSheet.create({
     backgroundColor: lightTheme.colors.borderHairline,
   },
   rowRuled: { paddingTop: lightTheme.space.s6 },
+  /** `4:1967` — 8pt between rows, no lead-in. */
+  tableTerms: { alignSelf: 'stretch', gap: lightTheme.space.sm },
   label: { flexShrink: 1 },
   value: { flexShrink: 0, maxWidth: '60%' },
+  valueTerms: { flexShrink: 0 },
 });

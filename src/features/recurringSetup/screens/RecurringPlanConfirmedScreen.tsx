@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button, Card, Icon, Screen, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
+import { RecurringFooter } from '../components/RecurringFooter';
 import { buildDemoPlanConfirmation } from '../data';
 
 /**
@@ -46,26 +47,23 @@ export function RecurringPlanConfirmedScreen({
       testID={testID}
       contentStyle={styles.body}
       footer={
-        <View style={styles.footer}>
-          <Button
-            label="View my plan"
-            onPress={() => onViewPlan?.()}
-            flat
-            labelVariant="titleLargeBlack"
-            labelColor="textInk"
-            style={styles.cta}
-            testID={`${testID}-view-plan`}
-          />
-          <Button
-            label="Share recipes on WhatsApp"
-            onPress={() => onShareRecipes?.()}
-            variant="secondary"
-            labelVariant="headingBold"
-            labelColor="textInk"
-            style={styles.shareButton}
-            testID={`${testID}-share`}
-          />
-        </View>
+        <RecurringFooter
+          layout="stacked"
+          label="View my plan"
+          onPress={() => onViewPlan?.()}
+          testID={`${testID}-view-plan`}
+          secondary={
+            <Button
+              label="Share recipes on WhatsApp"
+              onPress={() => onShareRecipes?.()}
+              variant="secondary"
+              labelVariant="headingBold"
+              labelColor="textInk"
+              style={styles.shareButton}
+              testID={`${testID}-share`}
+            />
+          }
+        />
       }
     >
       <View style={styles.avatar}>
@@ -153,17 +151,6 @@ const styles = StyleSheet.create({
   firstVisitText: { flex: 1 },
   /** `4:2032` — the note: `#F2F1EC`, 14 padding, a 14pt radius. */
   note: { padding: 14, borderRadius: 14, backgroundColor: lightTheme.colors.surfaceStoneSoft },
-  /**
-   * `4:2034` — the buttons sit 10 apart, 14 below the content (`Screen`'s 8 plus 6), in the 20pt
-   * gutter. No top rule on this step.
-   */
-  footer: {
-    gap: lightTheme.space.s10,
-    paddingTop: lightTheme.space.s6,
-    paddingHorizontal: GUTTER - lightTheme.layout.screenPaddingHorizontal,
-  },
-  /** `4:2035` — a flat 52pt bar at a 16pt radius. */
-  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
   /** `4:2037` — the share button: 50 tall, a 1pt `#CFCDC4` edge, a 16pt radius, white. */
   shareButton: {
     height: 50,

@@ -1,10 +1,10 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, Text } from '@ui';
+import { Card, Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { RecurringHeader } from '../components/RecurringHeader';
+import { RecurringFooter } from '../components/RecurringFooter';
 import { buildDemoReviewPlan, buildDemoVisitCharges } from '../data';
 
 /**
@@ -18,7 +18,7 @@ import { buildDemoReviewPlan, buildDemoVisitCharges } from '../data';
  * incl. tax.
  *
  * Figma `ZIJf639gTWHXshaa2YOeCT` frame `4:1802` (`2g`) — an import of that wireframe. Layout,
- * sizes, copy AND colours follow it, as on Steps 1–3. Built from `Card`, `Text` and `Button`; the
+ * sizes, copy AND colours follow it, as on Steps 1–3. Built from `Card`, `Text` and the shared footer; the
  * "Keep my plan going" toggle is drawn locally at Figma's 46 × 28, since no toggle exists in `@ui`
  * and React Native's `Switch` is a fixed 51 × 31.
  *
@@ -53,9 +53,20 @@ export function RecurringReviewScreen({
       tone="plain"
       testID={testID}
       contentStyle={styles.body}
-      header={<RecurringHeader title="Review plan" onBack={onBack} testID={`${testID}-header`} />}
+      header={
+        <ScreenHeader
+          density="step"
+          title="Review plan"
+          onBack={onBack}
+          testID={`${testID}-header`}
+        />
+      }
       footer={
-        <View style={styles.footer}>
+        <RecurringFooter
+          label="Set up autopay"
+          onPress={() => onContinue?.(keepPlanGoing)}
+          testID={`${testID}-continue`}
+        >
           <Text variant="footnote" color="textStone">
             Nothing is charged today. Each visit is charged before it happens:{' '}
             {charges.map((charge, index) => (
@@ -69,16 +80,7 @@ export function RecurringReviewScreen({
             ))}
             , incl. 5% tax.
           </Text>
-          <Button
-            label="Set up autopay"
-            onPress={() => onContinue?.(keepPlanGoing)}
-            flat
-            labelVariant="titleLargeBlack"
-            labelColor="textInk"
-            style={styles.cta}
-            testID={`${testID}-continue`}
-          />
-        </View>
+        </RecurringFooter>
       }
     >
       <Card tone="muted" padded={false} style={styles.summary} testID={`${testID}-summary`}>
@@ -121,7 +123,13 @@ export function RecurringReviewScreen({
       </Text>
 
       {dates.map((row) => (
-        <View key={row.id} style={styles.dayCard} testID={`${testID}-day-${row.id}`}>
+        <Card
+          key={row.id}
+          tone="surface"
+          padded={false}
+          style={styles.dayCard}
+          testID={`${testID}-day-${row.id}`}
+        >
           <Text variant="labelStrong" color="textInk">
             {row.label}
           </Text>
@@ -134,10 +142,15 @@ export function RecurringReviewScreen({
               </View>
             ))}
           </View>
-        </View>
+        </Card>
       ))}
 
-      <View style={styles.keepGoing} testID={`${testID}-keep-going-card`}>
+      <Card
+        tone="surface"
+        padded={false}
+        style={styles.keepGoing}
+        testID={`${testID}-keep-going-card`}
+      >
         <View style={styles.keepGoingText}>
           <Text variant="title" color="textInk">
             Keep my plan going
@@ -157,7 +170,7 @@ export function RecurringReviewScreen({
         >
           <View style={styles.toggleThumb} />
         </Pressable>
-      </View>
+      </Card>
     </Screen>
   );
 }
@@ -238,19 +251,4 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: lightTheme.colors.surface,
   },
-  /**
-   * `4:1929` — the footer's own 1pt stone rule, edge to edge: pulled out over `Screen`'s 16 gutter
-   * and 8 of top padding, then padded back in to 20 / 11. Note and CTA sit 8 apart.
-   */
-  footer: {
-    gap: lightTheme.space.sm,
-    marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
-    marginTop: -lightTheme.space.sm,
-    paddingHorizontal: GUTTER,
-    paddingTop: 11,
-    borderTopWidth: 1,
-    borderTopColor: lightTheme.colors.surfaceStone,
-  },
-  /** `4:1933` — a flat 52pt bar at a 16pt radius. */
-  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
 });
