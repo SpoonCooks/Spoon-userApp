@@ -200,6 +200,18 @@ export const lightColors = {
   /** The Delete Account confirmation prompt's rose block — `rose600` at 30%, per the inspector. */
   surfaceCritical: palette.rose600Surface,
 
+  /** Recurring setup (Figma `ZIJf639gTWHXshaa2YOeCT`) — see `palette.ink` / `palette.stone*`. */
+  surfaceInk: palette.ink,
+  surfaceStone: palette.stone100,
+  surfaceStoneSoft: palette.stone50,
+  borderStone: palette.stone200,
+  textInk: palette.ink,
+  textStone: palette.grey555,
+  textStoneCaption: palette.grey666,
+  textStoneQuiet: palette.grey777,
+  textStoneFaint: palette.stone350,
+  textStoneMuted: palette.stone400,
+
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */
   scrimSheet: palette.black65,
@@ -221,6 +233,9 @@ export const toneColors = {
   warning: { surface: palette.yellow400, text: lightColors.textOnAccent },
   info: { surface: palette.yellow200, text: lightColors.textPrimary },
   danger: { surface: lightColors.dangerSurface, text: lightColors.danger },
+  /** Recurring setup — the day counter under the minimum, and once valid. */
+  stone: { surface: palette.stone100, text: palette.grey555 },
+  ink: { surface: palette.ink, text: palette.yellow500 },
 } as const;
 
 export type Tone = keyof typeof toneColors;
@@ -803,6 +818,27 @@ export const typography = {
     fontSize: 13,
     lineHeight: lineHeight.sm,
     fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 1 — the footer caption ("Pick 2 more days to continue"): Regular 13/16. */
+  captionStep: {
+    fontSize: 13,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 1 — the day counter ("3 / 14"): Livvic Black 14/18. */
+  labelCounter: {
+    fontSize: fontSize.lg,
+    lineHeight: 18,
+    fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup — the screen title ("Pick your days"): Livvic Black 22/28. */
+  headingStep: {
+    fontSize: fontSize.xxxl,
+    lineHeight: lineHeight.xxl,
+    fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.none,
   },
   /** Recurring setup, Steps 5–6 — intro and subtitle copy: Livvic Regular 15/22. */

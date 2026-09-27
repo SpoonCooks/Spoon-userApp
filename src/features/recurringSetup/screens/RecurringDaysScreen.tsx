@@ -2,22 +2,21 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
-import { Badge, Button, Card, Screen, ScreenHeader, Text } from '@ui';
+import { Badge, Button, Card, Screen, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { ColorToken } from '@ui/tokens/semantic';
 
+import { RecurringHeader } from '../components/RecurringHeader';
 import { WEEKDAY_LABELS, buildDemoCalendar } from '../data';
 import type { RecurringDayCell } from '../types';
 
 /**
  * Recurring setup — Step 1 "Pick your days".
  *
- * Source: Claude Design artifact `https://claude.ai/artifact/Dfom3zAZoxPW2rV7osfdNu`, states `2a`
- * ("Pick your days (under minimum)") and `2b` ("valid"). See docs/CLAUDE_DESIGN_RECURRING_SETUP.md.
- * Layout, shapes, spacing and copy follow the wireframe; COLOURS deliberately don't. The
- * wireframe's black selected days, black counter and grey hint are placeholder styling, so they
- * take this app's own tokens instead: the lime selected fill `Chip` uses, `Badge`'s tones and the
- * accent note surface.
+ * Source: Figma `ZIJf639gTWHXshaa2YOeCT` ("Version 1"), frames `4:282` (under minimum) and `4:439`
+ * (valid) — an import of the Claude Design wireframe, so its values are that markup's. Layout,
+ * sizes, copy AND colours follow it (the stone/ink tokens). One deliberate departure, per review:
+ * the no-cooks day is greyed rather than struck through.
  *
  * STATIC ONLY, per task: the calendar is local fixture data (`buildDemoCalendar`), the min/max
  * gate and the "no cook" day are demonstrated locally, and `onContinue` is left to the caller.
@@ -71,14 +70,12 @@ export function RecurringDaysScreen({
       testID={testID}
       contentStyle={styles.body}
       header={
-        <View style={styles.headerWrap}>
-          <ScreenHeader title="Pick your days" onBack={onBack} testID={`${testID}-header`} />
-        </View>
+        <RecurringHeader title="Pick your days" onBack={onBack} testID={`${testID}-header`} />
       }
       footer={
         <View style={styles.footer}>
           {count >= MIN_DAYS ? null : (
-            <Text variant="hint" color="textSecondary" align="center">
+            <Text variant="captionStep" color="textStoneCaption" align="center">
               Pick {MIN_DAYS - count} more day{MIN_DAYS - count === 1 ? '' : 's'} to continue
             </Text>
           )}
@@ -86,6 +83,10 @@ export function RecurringDaysScreen({
             label={complete ? `Continue with ${count} day${count === 1 ? '' : 's'}` : 'Continue'}
             onPress={() => complete && onContinue?.(Array.from(selected))}
             disabled={!complete}
+            flat
+            labelVariant="titleLargeBlack"
+            labelColor="textInk"
+            style={styles.cta}
             testID={`${testID}-continue`}
           />
         </View>
@@ -93,16 +94,16 @@ export function RecurringDaysScreen({
     >
       <View style={styles.summaryRow}>
         <View>
-          <Text variant="bodyLarge" color="textSecondary">
+          <Text variant="bodyLarge" color="textStone">
             {calendar.rangeLabel}
           </Text>
-          <Text variant="body" color="textSecondary">
+          <Text variant="body" color="textStone" style={styles.rangeHint}>
             Pick {MIN_DAYS} to {MAX_DAYS} days
           </Text>
         </View>
         <Badge
           label={`${count} / ${MAX_DAYS}`}
-          tone={complete ? 'warning' : 'neutral'}
+          tone={complete ? 'ink' : 'stone'}
           size="md"
           testID={`${testID}-counter`}
         />
@@ -113,8 +114,8 @@ export function RecurringDaysScreen({
           // Two Tuesdays and two Thursdays share a label; position, not text, is the key.
           <Text
             key={`weekday-${index}`}
-            variant="bodyBold"
-            color="textSecondary"
+            variant="bodyBoldTight"
+            color="textStoneQuiet"
             align="center"
             style={styles.weekdayCell}
           >
@@ -140,11 +141,10 @@ export function RecurringDaysScreen({
 
       {count >= MIN_DAYS ? null : (
         // A plain box, no icon — `NoteCard` always draws one, and can't bold part of its body.
-        // Grey, like the idle day cells: the wireframe draws both in the same neutral.
         <Card tone="muted" padded={false} style={styles.hint} testID={`${testID}-onetime-hint`}>
-          <Text variant="hint" color="textPrimary">
+          <Text variant="hint" color="textInk">
             Need a cook in the next 2 days? Use{' '}
-            <Text variant="hintBold" color="textPrimary">
+            <Text variant="hintBold" color="textInk">
               One-time Schedule
             </Text>
             .
@@ -173,7 +173,13 @@ function DayCell({ day, selected, onPress }: DayCellProps) {
       : selected
         ? styles.cellSelected
         : styles.cellIdle;
-  const textColor: ColorToken = locked ? 'textDisabled' : selected ? 'textOnAccent' : 'textPrimary';
+  const textColor: ColorToken = day.unavailable
+    ? 'textStoneMuted'
+    : day.disabled
+      ? 'textStoneFaint'
+      : selected
+        ? 'textInverse'
+        : 'textInk';
 
   return (
     <Pressable
@@ -198,32 +204,42 @@ function DayCell({ day, selected, onPress }: DayCellProps) {
 }
 
 /**
- * `2a` / `2b`, read off the wireframe's markup: square cells with a 15pt Bold number at a 12pt
- * radius, 5 apart both ways; every block on the body is 14 apart. Cells take a seventh of the row
- * and `aspectRatio: 1` sets their height from that, so they stay square on any screen width.
+ * `4:282` / `4:439`: cells with a 15pt Bold number at a 12pt radius, 5 apart both ways.
  */
 const CELL_GAP = 5;
+const GUTTER = 20;
+/**
+ * `4:282` — each cell is 43.57 × 39 in the 375 frame: a seventh of the 335pt row less its gaps,
+ * by 10 + 19 + 10. Held as a ratio so the cells keep Figma's shape on wider phones.
+ */
+const CELL_ASPECT = (335 - 6 * CELL_GAP) / 7 / 39;
 
 const styles = StyleSheet.create({
-  headerWrap: {
-    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
-    paddingTop: lightTheme.space.lg,
-  },
-  body: { gap: 14 },
+  /** `4:282` — a 20pt gutter (not the app's 16), 8 under the header, blocks 14 apart. */
+  body: { paddingHorizontal: GUTTER, paddingTop: lightTheme.space.sm, gap: 14 },
+  /** `4:282` — the 12pt line sits in the range's 20pt line box. */
+  rangeHint: { lineHeight: 20 },
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: lightTheme.space.md,
   },
-  footer: { gap: lightTheme.space.sm },
+  /** `4:282` — the footer: py 12 / px 20, caption 8 above the button. */
+  footer: {
+    gap: lightTheme.space.sm,
+    paddingTop: lightTheme.space.xs,
+    paddingHorizontal: GUTTER - lightTheme.layout.screenPaddingHorizontal,
+  },
+  /** `4:282` — a flat 52pt bar at a 16pt radius. */
+  cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
   weekdayRow: { flexDirection: 'row', gap: CELL_GAP },
   weekdayCell: { flex: 1 },
   grid: { gap: CELL_GAP },
   weekRow: { flexDirection: 'row', gap: CELL_GAP },
   cell: {
     flex: 1,
-    aspectRatio: 1,
+    aspectRatio: CELL_ASPECT,
     borderRadius: lightTheme.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -233,12 +249,13 @@ const styles = StyleSheet.create({
     paddingVertical: lightTheme.space.md,
     paddingHorizontal: 14,
     borderRadius: 14,
+    backgroundColor: lightTheme.colors.surfaceStoneSoft,
   },
-  cellIdle: { backgroundColor: lightTheme.colors.surfaceMuted },
-  cellSelected: { backgroundColor: lightTheme.colors.surfaceTileSelected },
+  cellIdle: { backgroundColor: lightTheme.colors.surfaceStone },
+  cellSelected: { backgroundColor: lightTheme.colors.surfaceInk },
   /** Outside the window: number only, no cell. */
   cellDisabled: { backgroundColor: 'transparent' },
   /** Inside the window but no cooks (Oct 10): the cell stays, the number is greyed, not struck. */
-  cellUnavailable: { backgroundColor: lightTheme.colors.surfaceMuted },
+  cellUnavailable: { backgroundColor: lightTheme.colors.surfaceStone },
   cellPressed: { opacity: 0.8 },
 });

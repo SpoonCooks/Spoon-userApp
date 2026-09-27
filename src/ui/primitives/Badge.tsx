@@ -17,7 +17,7 @@ import type { Tone } from '@ui/tokens/semantic';
 
 /**
  * `sm` is every existing status pill. `md` is the recurring-setup day counter ("3 / 14"): px 12 /
- * py 6 and a Livvic Black 14/20 label.
+ * py 6 and a Livvic Black 14/18 label (`4:318`, 30 tall).
  */
 export type BadgeSize = 'sm' | 'md';
 
@@ -51,7 +51,7 @@ export function Badge({
     >
       {icon === undefined ? null : <Icon name={icon} size={12} />}
       <Text
-        variant={md ? 'titleBlack' : uppercase ? 'labelUpper' : 'label'}
+        variant={md ? 'labelCounter' : uppercase ? 'labelUpper' : 'label'}
         style={{ color: palette.text }}
         numberOfLines={1}
       >

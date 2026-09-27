@@ -79,6 +79,11 @@ export interface ButtonProps {
    * not always a function of the geometry.
    */
   readonly labelVariant?: TypographyToken;
+  /**
+   * Overrides the variant's label ink while the bar is enabled; disabled keeps `textCtaDisabled`.
+   * The recurring-setup CTA (`4:545`) sets `#1A1A1A` on the `#FFD600` bar where `primary` is black.
+   */
+  readonly labelColor?: ColorToken;
   /** Trailing slot inside the bar — `37:3912`, the inset black `Pay →` pill on Scheduled. */
   readonly trailing?: ReactNode;
   /** Overrides the visible label for screen readers when the label alone is ambiguous. */
@@ -144,6 +149,7 @@ export function Button({
   fullWidth = true,
   flat = false,
   labelVariant,
+  labelColor: labelColorOverride,
   accessibilityLabel,
   accessibilityHint,
   testID,
@@ -154,7 +160,9 @@ export function Button({
    * `275:4690` — the file's one drawn disabled CTA: `rgba(0,0,0,0.07)` behind a `rgba(0,0,0,0.5)`
    * label. NOT the slate `textDisabled`, which belongs to list rows and icons.
    */
-  const labelColor: ColorToken = inactive ? 'textCtaDisabled' : LABEL_COLOR[variant];
+  const labelColor: ColorToken = inactive
+    ? 'textCtaDisabled'
+    : (labelColorOverride ?? LABEL_COLOR[variant]);
 
   return (
     <Pressable

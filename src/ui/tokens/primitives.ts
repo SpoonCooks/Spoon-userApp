@@ -217,6 +217,29 @@ export const palette = {
   dangerSurface: 'rgba(255,4,4,0.07)',
   /** The Account screen's Delete Account row — `#FF0404` at 30%, read off the Figma inspector. */
   dangerSurfaceStrong: 'rgba(255,4,4,0.3)',
+
+  // ---------------------------------------------------------------------------
+  // Recurring setup — Figma `ZIJf639gTWHXshaa2YOeCT` ("Version 1"), frames `4:282` … `4:2005`.
+  // A warm stone ramp plus a near-black ink, used across all six steps.
+  // ---------------------------------------------------------------------------
+  /** Selected cells and tabs, the valid counter, primary copy. */
+  ink: '#1A1A1A',
+  /** Idle cells, pills and toggles. */
+  stone100: '#EEEDE8',
+  /** Hint and summary boxes. */
+  stone50: '#F2F1EC',
+  /** Card and footer edges. */
+  stone200: '#E4E2DA',
+  /** Unavailable ink ("full" slots, the no-cooks day). */
+  stone400: '#B5B3AA',
+  /** Days outside the window. */
+  stone350: '#C9C7BF',
+  /** Secondary copy — the range, "Pick 5 to 14 days". */
+  grey555: '#555555',
+  /** Captions — "Pick 2 more days to continue". */
+  grey666: '#666666',
+  /** Quiet labels — the weekday letters. */
+  grey777: '#777777',
 } as const;
 
 /**
