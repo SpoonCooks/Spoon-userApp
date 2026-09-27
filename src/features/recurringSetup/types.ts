@@ -104,8 +104,12 @@ export interface RecurringReviewSummary {
   readonly visitsCount: number;
   /** e.g. "Sep 29 – Oct 15". */
   readonly rangeLabel: string;
-  /** e.g. { label: "Visit 1 · 1:15 PM · 1.5 hr · all 11 days", price: "₹189" } — excl. tax. */
-  readonly visits: readonly { readonly label: string; readonly price: string }[];
+  /** e.g. { label: "Visit 1", detail: "1:15 PM · 1.5 hr · all 11 days", price: "₹189" }, excl. tax. */
+  readonly visits: readonly {
+    readonly label: string;
+    readonly detail: string;
+    readonly price: string;
+  }[];
 }
 
 /** One visit's per-charge line in Step 4's footer note — server-priced, pre-formatted. */

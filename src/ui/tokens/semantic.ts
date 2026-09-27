@@ -805,6 +805,41 @@ export const typography = {
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
+  /** Recurring setup, Steps 5–6 — intro and subtitle copy: Livvic Regular 15/22. */
+  bodyRelaxed: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 5 — a payment option's name ("UPI Autopay"): Livvic Black 15/20. */
+  optionTitle: {
+    fontSize: 15,
+    lineHeight: lineHeight.lg,
+    fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 4 — the plan total ("11 days · 17 visits"): Livvic Bold 17/22. */
+  titleLarge: {
+    fontSize: 17,
+    lineHeight: 22,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 6 — the first-visit time: Livvic Black 17/22. */
+  titleLargeBlack: {
+    fontSize: 17,
+    lineHeight: 22,
+    fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 6 — "Plan confirmed!": Livvic Black 26/32. */
+  displayConfirm: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.none,
+  },
   /** Recurring setup, Step 1 — the "Sep 29 – Oct 19" range: Livvic Regular 14/20. */
   bodyLarge: {
     fontSize: fontSize.lg,

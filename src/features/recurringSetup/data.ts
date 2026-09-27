@@ -399,8 +399,8 @@ export function buildDemoReviewPlan(): {
       visitsCount,
       rangeLabel: 'Sep 29 – Oct 15',
       visits: [
-        { label: 'Visit 1 · 1:15 PM · 1.5 hr · all 11 days', price: '₹189' },
-        { label: 'Visit 2 · 7:00 PM · 1 hr · 6 days', price: '₹129' },
+        { label: 'Visit 1', detail: '1:15 PM · 1.5 hr · all 11 days', price: '₹189' },
+        { label: 'Visit 2', detail: '7:00 PM · 1 hr · 6 days', price: '₹129' },
       ],
     },
     dates,

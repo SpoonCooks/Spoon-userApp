@@ -1,16 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
-import {
-  Button,
-  CANCEL_RADIO_OFF,
-  CANCEL_RADIO_ON,
-  Card,
-  DetailRows,
-  Screen,
-  ScreenHeader,
-  Text,
-} from '@ui';
+import { Button, CANCEL_RADIO_OFF, CANCEL_RADIO_ON, Card, Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { AUTOPAY_METHODS, buildDemoAutopayDetails } from '../data';
@@ -18,11 +9,11 @@ import { AUTOPAY_METHODS, buildDemoAutopayDetails } from '../data';
 /**
  * Recurring setup — Step 5 "Autopay".
  *
- * Source: Claude Design artifact `https://claude.ai/artifact/Dfom3zAZoxPW2rV7osfdNu`, state 2h
- * ("Step 5 · Autopay"). See docs/CLAUDE_DESIGN_RECURRING_SETUP.md — a wireframe, not a
- * pixel-accurate mock, so the method choice reuses the app's existing radio treatment
- * (`CANCEL_RADIO_ON` / `_OFF`, the same glyphs `CancelBookingSheet` uses for its reason list)
- * rather than inventing a new one, and the mandate terms reuse `DetailRows`.
+ * Source: Claude Design artifact `https://claude.ai/artifact/Dfom3zAZoxPW2rV7osfdNu`, state `2h`
+ * ("Step 5 · Autopay"). See docs/CLAUDE_DESIGN_RECURRING_SETUP.md. Layout, sizes and copy are
+ * read off the wireframe's markup; COLOURS are the app's own, as on Steps 1–4: the selected
+ * option is outlined in the notice yellow rather than the wireframe's black, and the radio glyphs
+ * are the app's own (`CANCEL_RADIO_ON` / `_OFF`, as in `CancelBookingSheet`).
  *
  * STATIC ONLY, per task: the two methods and the mandate terms are local fixture data
  * (`AUTOPAY_METHODS`, `buildDemoAutopayDetails`) — there is no Razorpay integration wired up yet,
@@ -50,6 +41,7 @@ export function RecurringAutopayScreen({
       scroll
       tone="plain"
       testID={testID}
+      contentStyle={styles.body}
       header={
         <View style={styles.headerWrap}>
           <ScreenHeader title="Set up autopay" onBack={onBack} testID={`${testID}-header`} />
@@ -57,9 +49,6 @@ export function RecurringAutopayScreen({
       }
       footer={
         <View style={styles.footer}>
-          <Text variant="caption" color="textSecondary">
-            Cancel autopay anytime from Manage plan. You’ll get a notification before every charge.
-          </Text>
           <Button
             label={`Approve with ${method.ctaLabel}`}
             onPress={() => onContinue?.(methodId)}
@@ -68,7 +57,7 @@ export function RecurringAutopayScreen({
         </View>
       }
     >
-      <Text variant="body" color="textSecondary">
+      <Text variant="bodyRelaxed" color="textSecondary">
         Approve once. We’ll charge each visit automatically before it starts.
       </Text>
 
@@ -86,8 +75,11 @@ export function RecurringAutopayScreen({
               accessibilityRole="radio"
               accessibilityLabel={option.label}
               accessibilityState={{ selected, checked: selected }}
-              hitSlop={lightTheme.space.xs}
-              style={({ pressed }) => [styles.methodRow, pressed ? styles.pressed : null]}
+              style={({ pressed }) => [
+                styles.method,
+                selected ? styles.methodSelected : null,
+                pressed ? styles.pressed : null,
+              ]}
               testID={`${testID}-method-${option.id}`}
             >
               <Image
@@ -97,10 +89,10 @@ export function RecurringAutopayScreen({
                 accessibilityIgnoresInvertColors
               />
               <View style={styles.methodText}>
-                <Text variant="bodyStrong" color="textPrimary">
+                <Text variant="optionTitle" color="textPrimary">
                   {option.label}
                 </Text>
-                <Text variant="caption" color="textSecondary">
+                <Text variant="hint" color="textSecondary">
                   {option.description}
                 </Text>
               </View>
@@ -109,9 +101,22 @@ export function RecurringAutopayScreen({
         })}
       </View>
 
-      <Card tone="surface" testID={`${testID}-details`}>
-        <DetailRows rows={details} variant="booking" />
+      <Card tone="muted" padded={false} style={styles.details} testID={`${testID}-details`}>
+        {details.map((row) => (
+          <View key={row.label} style={styles.detailRow}>
+            <Text variant="bodyLarge" color="textPrimary">
+              {row.label}
+            </Text>
+            <Text variant="title" color="textPrimary" align="right" style={styles.detailValue}>
+              {row.value}
+            </Text>
+          </View>
+        ))}
       </Card>
+
+      <Text variant="hint" color="textSecondary">
+        Cancel autopay anytime from Manage plan. You’ll get a notification before every charge.
+      </Text>
     </Screen>
   );
 }
@@ -121,10 +126,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
     paddingTop: lightTheme.space.lg,
   },
+  /** `2h` — the body opens 6 under the header; its blocks sit 12 apart. */
+  body: { paddingTop: lightTheme.space.s6, gap: lightTheme.space.md },
   methods: { gap: lightTheme.space.md },
-  methodRow: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.md },
-  methodText: { flex: 1, gap: lightTheme.space.xxs },
-  radio: { width: 20, height: 20 },
+  /** `2h` — an option card: 14 padding, a 16pt radius, 12 between radio and text. */
+  method: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: lightTheme.space.md,
+    padding: 14,
+    borderRadius: lightTheme.radius.md,
+    borderWidth: 1.5,
+    borderColor: lightTheme.colors.border,
+  },
+  /** The chosen option's edge thickens to 2, as drawn, in the notice yellow. */
+  methodSelected: { borderWidth: 2, borderColor: lightTheme.colors.borderNotice },
+  methodText: { flex: 1 },
+  radio: { width: 22, height: 22 },
   pressed: { opacity: 0.7 },
-  footer: { gap: lightTheme.space.sm },
+  /** `2h` — the terms: a grey card, 14 padding, a 16pt radius, rows 8 apart. */
+  details: { padding: 14, borderRadius: lightTheme.radius.md, gap: lightTheme.space.sm },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: lightTheme.space.md },
+  detailValue: { flexShrink: 1 },
+  /** `2h` — the footer's own top rule, edge to edge, as on Steps 2–4. */
+  footer: {
+    marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
+    marginTop: -lightTheme.space.sm,
+    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
+    paddingTop: lightTheme.space.s10,
+    borderTopWidth: 1.5,
+    borderTopColor: lightTheme.colors.surfaceMuted,
+  },
 });
