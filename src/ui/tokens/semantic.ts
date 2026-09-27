@@ -795,6 +795,16 @@ export const typography = {
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
+  /**
+   * Recurring setup, Step 2 — section labels ("Time of day", "Duration") and start-time slot times:
+   * Livvic Bold 13/16.
+   */
+  labelBold: {
+    fontSize: 13,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
   /** Recurring setup, Step 1 — the "Sep 29 – Oct 19" range: Livvic Regular 14/20. */
   bodyLarge: {
     fontSize: fontSize.lg,

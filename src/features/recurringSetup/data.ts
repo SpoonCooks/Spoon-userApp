@@ -195,9 +195,12 @@ export function visitDayIds(
   return visit.selectedDayIds;
 }
 
-/** `2d`'s own default the first time a visit switches to "Some" — the first 6 of the 11 days. */
+/**
+ * `2d`'s own default the first time a visit switches to "Some": every other day — Sep 29, Oct 1,
+ * 6, 8, 13 and 15 — the same six Step 4's Visit 2 runs on.
+ */
 export function defaultSomeDayIds(allDayIds: readonly string[]): readonly string[] {
-  return allDayIds.slice(0, 6);
+  return allDayIds.filter((_, index) => index % 2 === 0);
 }
 
 /** Each time-of-day's own start-time grid — afternoon is the wireframe's own noon–3:45 PM. */
@@ -205,7 +208,7 @@ export function buildStartMinutesFor(timeOfDay: RecurringTimeOfDay): readonly nu
   const RANGE: Record<RecurringTimeOfDay, { start: number; count: number }> = {
     morning: { start: 6 * 60, count: 20 }, // 6:00 – 10:45 AM
     afternoon: { start: 12 * 60, count: 16 }, // 12:00 – 3:45 PM
-    evening: { start: 18 * 60, count: 16 }, // 6:00 – 9:45 PM
+    evening: { start: 18 * 60 + 30, count: 8 }, // 6:30 – 8:15 PM, as `2d` draws it
   };
   const { start, count } = RANGE[timeOfDay];
   return Array.from({ length: count }, (_, index) => start + index * 15);
@@ -218,17 +221,31 @@ export function buildStartMinutesFor(timeOfDay: RecurringTimeOfDay): readonly nu
  * many days THIS visit runs on, and the occasional fully-booked slot, matching the shape (not the
  * exact numbers) of `2c` / `2d`'s own "9/11 days" / "5/6 days" / "full" captions.
  */
+export type SlotCoverage = 'all' | 'partial' | 'full';
+
+/**
+ * Per-slot coverage as the board draws it: `'all'`, `'full'`, or how many of the visit's days the
+ * slot is NOT free on — so `2c`'s "9/11 days" is `2`, and `2d`'s "5/6 days" is `1`. Stored as
+ * days-missing so the label stays right whatever day count the visit has. Afternoon is `2c`'s
+ * grid (extended to 3:45, which `2e` shows); evening is `2d`'s; morning is not drawn, so it reuses
+ * a repeating pattern.
+ */
+const COVERAGE: Record<RecurringTimeOfDay, readonly ('all' | 'full' | number)[]> = {
+  morning: ['all', 'all', 2, 'all', 'all', 'full', 'all', 1],
+  afternoon: ['all', 'all', 2, 'all', 'all', 'all', 'all', 4, 'full', 'all', 1, 'full'],
+  evening: ['all', 'all', 'all', 1, 'all', 'full', 'all', 'all'],
+};
+
 export function coverageFor(
+  timeOfDay: RecurringTimeOfDay,
   slotIndex: number,
   dayCount: number,
-): { label: string; disabled: boolean } {
-  const pattern = ['all', 'all', 'partial', 'all', 'all', 'full', 'all', 'partial'] as const;
-  const kind = pattern[slotIndex % pattern.length];
-  if (kind === 'all') return { label: 'All days', disabled: false };
-  if (kind === 'full') return { label: 'Full', disabled: true };
-  const span = Math.max(1, dayCount - 1);
-  const covered = Math.max(1, dayCount - 1 - (slotIndex % span));
-  return { label: `${covered}/${dayCount} days`, disabled: false };
+): { kind: SlotCoverage; label: string } {
+  const pattern = COVERAGE[timeOfDay];
+  const entry = timeOfDay === 'morning' ? pattern[slotIndex % pattern.length] : pattern[slotIndex];
+  if (entry === undefined || entry === 'all') return { kind: 'all', label: 'all days' };
+  if (entry === 'full') return { kind: 'full', label: 'full' };
+  return { kind: 'partial', label: `${Math.max(1, dayCount - entry)}/${dayCount} days` };
 }
 
 export function durationLabel(durationId: string | null): string {

@@ -1,19 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import type { ReactNode } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
 
-import {
-  Button,
-  Chip,
-  ChipGroup,
-  Icon,
-  PriceTile,
-  Screen,
-  ScreenHeader,
-  SectionHeader,
-  Text,
-} from '@ui';
-import type { ChipOption } from '@ui';
+import { Button, Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
+import type { ColorToken } from '@ui/tokens/semantic';
 
 import {
   DURATION_OPTIONS,
@@ -35,21 +27,20 @@ import type { RecurringDaysMode, RecurringTimeOfDay, RecurringVisitDraft } from 
  * Recurring setup — Step 2 "Time & duration".
  *
  * Source: Claude Design artifact `https://claude.ai/artifact/Dfom3zAZoxPW2rV7osfdNu`, states `2c`
- * (one visit, the default), `2d` (two visits, the second scoped to "Some" days) and `2e` (three
- * visits, all on every day). See docs/CLAUDE_DESIGN_RECURRING_SETUP.md — a wireframe, not a
- * pixel-accurate mock, and NOT three separate screens: it's one screen that grows from `2c` to
- * `2e` as "+ Add visit" is tapped, which is what this renders. Reuses the app's existing pieces —
- * `ChipGroup` for every single-select row (Days mode, Time of day, Start time, exactly like
- * `ScheduleScreen`), `PriceTile`'s duration grid, `SectionHeader`, `Button`. The visit tabs and
- * the day-subset picker fall back to the bare `Chip` primitive instead: the tabs mix a radio
- * group with a trailing "+ Add visit" action, and the day picker is multi-select — neither shape
- * fits `ChipGroup`, which is single-select only.
+ * (one visit, the default), `2d` (two visits, the second on "Some" days) and `2e` (three visits).
+ * See docs/CLAUDE_DESIGN_RECURRING_SETUP.md. One screen that grows from `2c` to `2e` as visits are
+ * added, not three screens.
  *
- * STATIC ONLY, per task: visits, the picked-day list and the per-slot "day coverage" figures are
- * local fixture data (`buildDemoVisits`, `buildDemoPickedDays`, `coverageFor`) — there is no
- * availability endpoint yet, and this screen isn't wired to Step 1's actual selection. What IS
- * real: adding/removing visits (up to 3), scoping a visit to a day subset, and the conflict check
- * between visits that share a day and an overlapping time.
+ * Layout, sizes and copy are read off the wireframe's markup; COLOURS are the app's own, as on
+ * Step 1: its grey idle cells map to `surfaceMuted`, its black selected cells to the lime
+ * `surfaceTileSelected`. `ChipGroup` and `PriceTile` carry fixed Figma geometry (chip padding,
+ * a 52pt compact tile, a yellow idle fill) that doesn't match these cells, so the grid cells are
+ * drawn here from one local `Cell`, built on the same tokens.
+ *
+ * STATIC ONLY, per task: visits, picked days and per-slot coverage are fixture data — there is no
+ * availability endpoint yet, and this screen isn't wired to Step 1. What IS real: adding and
+ * removing visits (up to 3), scoping a visit to some days, and the clash check between visits
+ * that share a day and overlap in time.
  */
 
 export interface RecurringTimeScreenProps {
@@ -104,6 +95,90 @@ function tabTimeLabel(visit: RecurringVisitDraft, visitCount: number): string {
   return visitCount < MAX_VISITS ? `${time} · ${durationLabel(visit.durationId)}` : time;
 }
 
+/** Splits cells into rows of `columns`, padding the last row so its cells keep the same width. */
+function Grid({ columns, children }: { readonly columns: number; readonly children: ReactNode[] }) {
+  const rows: ReactNode[][] = [];
+  for (let index = 0; index < children.length; index += columns) {
+    rows.push(children.slice(index, index + columns));
+  }
+  return (
+    <View style={styles.grid}>
+      {rows.map((row, rowIndex) => (
+        <View key={`row-${rowIndex}`} style={styles.gridRow}>
+          {row}
+          {Array.from({ length: columns - row.length }, (_, spacer) => (
+            <View key={`spacer-${spacer}`} style={styles.gridCell} />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * The wireframe's grid cell. `partial` is a start time free on only some of the visit's days (a
+ * white, dashed cell); `full` and `clash` are unavailable. Colours are the app's own, see banner.
+ */
+type CellTone = 'idle' | 'selected' | 'partial' | 'full' | 'clash';
+
+const CELL_SURFACE: Record<CellTone, ViewStyle> = {
+  idle: { backgroundColor: lightTheme.colors.surfaceMuted },
+  selected: { backgroundColor: lightTheme.colors.surfaceTileSelected },
+  partial: {
+    backgroundColor: lightTheme.colors.surface,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: lightTheme.colors.border,
+  },
+  full: { backgroundColor: lightTheme.colors.surfaceMuted },
+  clash: { backgroundColor: lightTheme.colors.surfaceTileDisabled },
+};
+
+const CELL_INK: Record<CellTone, ColorToken> = {
+  idle: 'textPrimary',
+  selected: 'textPrimary',
+  partial: 'textPrimary',
+  full: 'textDisabled',
+  clash: 'textDisabled',
+};
+
+function Cell({
+  tone,
+  onPress,
+  style,
+  accessibilityLabel,
+  testID,
+  children,
+}: {
+  readonly tone: CellTone;
+  readonly onPress: () => void;
+  readonly style?: StyleProp<ViewStyle>;
+  readonly accessibilityLabel: string;
+  readonly testID: string;
+  readonly children: ReactNode;
+}) {
+  const disabled = tone === 'full' || tone === 'clash';
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected: tone === 'selected', disabled }}
+      testID={testID}
+      style={({ pressed }) => [
+        styles.gridCell,
+        styles.cell,
+        CELL_SURFACE[tone],
+        style,
+        pressed && !disabled ? styles.pressed : null,
+      ]}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 export function RecurringTimeScreen({
   onBack,
   onContinue,
@@ -120,6 +195,8 @@ export function RecurringTimeScreen({
   const isPrimary = activeIndex <= 0;
   const activeDayIds = visitDayIds(activeVisit, isPrimary, allDayIds);
   const activeDurationMinutes = durationMinutes(activeVisit.durationId);
+  const activeTimeOfDayLabel =
+    TIME_OF_DAY_OPTIONS.find((option) => option.id === activeVisit.timeOfDay)?.label ?? '';
   const startMinutesGrid = useMemo(
     () => buildStartMinutesFor(activeVisit.timeOfDay),
     [activeVisit.timeOfDay],
@@ -146,50 +223,84 @@ export function RecurringTimeScreen({
     });
   }
 
+  function setDaysMode(mode: RecurringDaysMode) {
+    updateVisit(activeVisit.id, {
+      daysMode: mode,
+      selectedDayIds:
+        mode === 'some' && activeVisit.selectedDayIds.length === 0
+          ? defaultSomeDayIds(allDayIds)
+          : activeVisit.selectedDayIds,
+    });
+  }
+
   const totalVisits = visits.reduce(
     (sum, visit, index) => sum + visitDayIds(visit, index === 0, allDayIds).length,
     0,
   );
-
-  const startTimeOptions: readonly ChipOption[] = startMinutesGrid.map((minutes, slotIndex) => {
-    const conflict = conflictLabel(
-      visits,
-      allDayIds,
-      activeVisit.id,
-      activeDayIds,
-      minutes,
-      activeDurationMinutes,
-    );
-    const coverage = conflict === null ? coverageFor(slotIndex, activeDayIds.length) : null;
-    // Already chosen, so never greyed out — a past pick doesn't retroactively become invalid
-    // just because this fixture's illustrative coverage pattern lands on it.
-    const alreadyChosen = activeVisit.startMinutes === minutes;
-    return {
-      id: String(minutes),
-      caption: conflict ?? coverage!.label,
-      label: formatClock(minutes, true),
-      disabled: !alreadyChosen && (conflict !== null || coverage!.disabled),
-    };
-  });
 
   return (
     <Screen
       scroll
       tone="plain"
       testID={testID}
+      contentStyle={styles.body}
       header={
-        <View style={styles.headerWrap}>
-          <ScreenHeader title="Time & duration" onBack={onBack} testID={`${testID}-header`} />
+        <View>
+          <View style={styles.headerWrap}>
+            <ScreenHeader title="Time & duration" onBack={onBack} testID={`${testID}-header`} />
+          </View>
+
+          {/* The visit tabs sit fixed under the header, outside the scroll area, as drawn. */}
+          <View style={styles.tabsWrap}>
+            <View style={styles.tabTrack} accessibilityRole="tablist">
+              {visits.map((visit) => {
+                const active = visit.id === activeVisitId;
+                return (
+                  <Pressable
+                    key={visit.id}
+                    onPress={() => setActiveVisitId(visit.id)}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
+                    style={[styles.tab, active ? styles.tabActive : null]}
+                    testID={`${testID}-visit-tab-${visit.id}`}
+                  >
+                    <Text
+                      variant={active ? 'titleBlack' : 'title'}
+                      color={active ? 'textPrimary' : 'textSecondary'}
+                    >
+                      {visit.label}
+                    </Text>
+                    <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                      {tabTimeLabel(visit, visits.length)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              {visits.length >= MAX_VISITS ? null : (
+                <Pressable
+                  onPress={addVisit}
+                  accessibilityRole="button"
+                  style={[styles.tab, styles.tabAdd]}
+                  testID={`${testID}-add-visit`}
+                >
+                  {/* `2c` reads "+ Add visit"; `2d`, with a second tab taking the room, "+ Visit". */}
+                  <Text variant="title" color="textSecondary">
+                    {visits.length === 1 ? '+ Add visit' : '+ Visit'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
         </View>
       }
       footer={
         <View style={styles.footer}>
           <View style={styles.summaryRow}>
-            <Text variant="caption" color="textSecondary">
+            <Text variant="titleRebook" color="textPrimary">
               {totalVisits} visits · {allDayIds.length} days
             </Text>
             <Pressable accessibilityRole="button" hitSlop={lightTheme.space.sm}>
-              <Text variant="micro" color="textPrimary" style={styles.underline}>
+              <Text variant="title" color="textPrimary" style={styles.underline}>
                 Price details
               </Text>
             </Pressable>
@@ -202,71 +313,49 @@ export function RecurringTimeScreen({
         </View>
       }
     >
-      <View style={styles.tabs}>
-        {visits.map((visit) => (
-          <Chip
-            key={visit.id}
-            caption={visit.label}
-            label={tabTimeLabel(visit, visits.length)}
-            selected={visit.id === activeVisitId}
-            onPress={() => setActiveVisitId(visit.id)}
-            testID={`${testID}-visit-tab-${visit.id}`}
-          />
-        ))}
-        {visits.length >= MAX_VISITS ? null : (
-          <Pressable
-            onPress={addVisit}
-            accessibilityRole="button"
-            accessibilityLabel="Add visit"
-            style={({ pressed }) => [styles.addVisit, pressed ? styles.pressed : null]}
-            testID={`${testID}-add-visit`}
-          >
-            <Icon name="plus" size={14} color="textPrimary" />
-            {/* `2c` reads "+ Add visit"; `2d`, with a second tab taking the room, "+ Visit". */}
-            <Text variant="bodyBlack" color="textPrimary">
-              {visits.length === 1 ? 'Add visit' : 'Visit'}
-            </Text>
-          </Pressable>
-        )}
-      </View>
-
       {isPrimary ? null : (
-        <View style={styles.section}>
-          <SectionHeader title="Days" />
-          <ChipGroup
-            options={[
-              { id: 'all', label: `All ${allDayIds.length}` },
-              {
-                id: 'some',
-                label:
-                  activeVisit.daysMode === 'some'
-                    ? `Some · ${activeVisit.selectedDayIds.length}`
-                    : 'Some',
-              },
-            ]}
-            selectedId={activeVisit.daysMode}
-            onSelect={(id) =>
-              updateVisit(activeVisit.id, {
-                daysMode: id as RecurringDaysMode,
-                selectedDayIds:
-                  id === 'some' && activeVisit.selectedDayIds.length === 0
-                    ? defaultSomeDayIds(allDayIds)
-                    : activeVisit.selectedDayIds,
-              })
-            }
-            testID={`${testID}-days-mode`}
-          />
+        <View style={styles.daysSection}>
+          <View style={styles.daysHeader}>
+            <Text variant="labelBold" color="textSecondary">
+              Days
+            </Text>
+            <View style={styles.toggleTrack} accessibilityRole="radiogroup">
+              {(['all', 'some'] as const).map((mode) => {
+                const active = activeVisit.daysMode === mode;
+                const label =
+                  mode === 'all'
+                    ? `All ${allDayIds.length}`
+                    : active
+                      ? `Some · ${activeVisit.selectedDayIds.length}`
+                      : 'Some';
+                return (
+                  <Pressable
+                    key={mode}
+                    onPress={() => setDaysMode(mode)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    style={[styles.toggleOption, active ? styles.toggleActive : null]}
+                    testID={`${testID}-days-${mode}`}
+                  >
+                    <Text variant="bodyBold" color={active ? 'textPrimary' : 'textSecondary'}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
           {activeVisit.daysMode !== 'some' ? null : (
-            <View style={styles.dayGrid}>
+            <Grid columns={6}>
               {pickedDays.map((day) => {
                 const selected = activeVisit.selectedDayIds.includes(day.id);
                 return (
-                  <Chip
+                  <Cell
                     key={day.id}
-                    caption={day.shortLabel}
-                    label={String(day.dayOfMonth)}
-                    selected={selected}
+                    tone={selected ? 'selected' : 'idle'}
+                    style={styles.dayCell}
+                    accessibilityLabel={`${day.shortLabel} ${day.dayOfMonth}`}
                     onPress={() =>
                       updateVisit(activeVisit.id, {
                         selectedDayIds: selected
@@ -275,127 +364,246 @@ export function RecurringTimeScreen({
                       })
                     }
                     testID={`${testID}-day-${day.id}`}
-                  />
+                  >
+                    <Text variant="captionBold" color="textPrimary" style={styles.dayWeekday}>
+                      {day.shortLabel}
+                    </Text>
+                    <Text variant="titleBlack" color="textPrimary">
+                      {day.dayOfMonth}
+                    </Text>
+                  </Cell>
                 );
               })}
-            </View>
+            </Grid>
           )}
         </View>
       )}
 
       <View style={styles.section}>
-        <SectionHeader title="Time of day" />
-        <ChipGroup
-          options={TIME_OF_DAY_OPTIONS}
-          selectedId={activeVisit.timeOfDay}
-          onSelect={(id) =>
-            updateVisit(activeVisit.id, {
-              timeOfDay: id as RecurringTimeOfDay,
-              startMinutes: null,
-            })
-          }
-          columns={3}
-          testID={`${testID}-time-of-day`}
-        />
-      </View>
-
-      <View style={styles.section}>
-        <SectionHeader title="Duration" />
-        <View style={styles.durationGrid}>
-          {DURATION_OPTIONS.map((option) => (
-            <View key={option.id} style={styles.durationCell}>
-              <PriceTile
-                label={option.label}
-                price={option.price}
-                strikePrice={option.strikePrice}
-                selected={activeVisit.durationId === option.id}
-                onPress={() =>
-                  updateVisit(activeVisit.id, { durationId: option.id, startMinutes: null })
-                }
-                testID={`${testID}-duration-${option.id}`}
-              />
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <SectionHeader
-          title="Start time"
-          subtitle={
-            TIME_OF_DAY_OPTIONS.find((option) => option.id === activeVisit.timeOfDay)!.label
-          }
-        />
-        <ChipGroup
-          options={startTimeOptions}
-          selectedId={activeVisit.startMinutes === null ? null : String(activeVisit.startMinutes)}
-          onSelect={(id) => updateVisit(activeVisit.id, { startMinutes: Number(id) })}
-          columns={4}
-          density="slot"
-          accessibilityLabel="Start time"
-          testID={`${testID}-start-time`}
-        />
-      </View>
-
-      {/* `2c` — the entry into Step 3. Drawn on every tab, since Step 3 edits every visit. */}
-      <Pressable
-        onPress={onDifferentTimes}
-        accessibilityRole="button"
-        hitSlop={lightTheme.space.sm}
-        style={styles.differentTimes}
-        testID={`${testID}-different-times`}
-      >
-        <Text variant="label" color="textPrimary" style={styles.underline}>
-          Different time on some days?
+        <Text variant="labelBold" color="textSecondary">
+          Time of day
         </Text>
-      </Pressable>
+        <Grid columns={3}>
+          {TIME_OF_DAY_OPTIONS.map((option) => (
+            <Cell
+              key={option.id}
+              tone={activeVisit.timeOfDay === option.id ? 'selected' : 'idle'}
+              style={styles.timeOfDayCell}
+              accessibilityLabel={option.label}
+              onPress={() =>
+                updateVisit(activeVisit.id, { timeOfDay: option.id, startMinutes: null })
+              }
+              testID={`${testID}-time-of-day-${option.id}`}
+            >
+              <Text variant="title" color="textPrimary">
+                {option.label}
+              </Text>
+            </Cell>
+          ))}
+        </Grid>
+      </View>
+
+      <View style={styles.section}>
+        <Text variant="labelBold" color="textSecondary">
+          Duration
+        </Text>
+        <Grid columns={3}>
+          {DURATION_OPTIONS.map((option) => (
+            <Cell
+              key={option.id}
+              tone={activeVisit.durationId === option.id ? 'selected' : 'idle'}
+              style={styles.durationCell}
+              accessibilityLabel={`${option.label}, ${option.price}, reduced from ${option.strikePrice}`}
+              onPress={() =>
+                updateVisit(activeVisit.id, { durationId: option.id, startMinutes: null })
+              }
+              testID={`${testID}-duration-${option.id}`}
+            >
+              <Text variant="heading" color="textPrimary">
+                {option.label}
+              </Text>
+              <View style={styles.prices}>
+                <Text variant="bodySmall" color="textPrimary" style={styles.strike}>
+                  {option.strikePrice}
+                </Text>
+                <Text variant="slotLabel" color="textPrimary">
+                  {option.price}
+                </Text>
+              </View>
+            </Cell>
+          ))}
+        </Grid>
+      </View>
+
+      <View style={styles.section}>
+        <Text variant="labelBold" color="textSecondary">
+          Start time · {activeTimeOfDayLabel}
+        </Text>
+        <Grid columns={4}>
+          {startMinutesGrid.map((minutes, slotIndex) => {
+            const clash = conflictLabel(
+              visits,
+              allDayIds,
+              activeVisit.id,
+              activeDayIds,
+              minutes,
+              activeDurationMinutes,
+            );
+            const coverage = coverageFor(activeVisit.timeOfDay, slotIndex, activeDayIds.length);
+            const chosen = activeVisit.startMinutes === minutes;
+            const tone: CellTone = chosen
+              ? 'selected'
+              : clash !== null
+                ? 'clash'
+                : coverage.kind === 'full'
+                  ? 'full'
+                  : coverage.kind === 'partial'
+                    ? 'partial'
+                    : 'idle';
+            const caption = clash ?? coverage.label;
+            const time = formatClock(minutes, true);
+            return (
+              <Cell
+                key={minutes}
+                tone={tone}
+                style={styles.slotCell}
+                accessibilityLabel={`${time}, ${caption}`}
+                onPress={() => updateVisit(activeVisit.id, { startMinutes: minutes })}
+                testID={`${testID}-start-time-${minutes}`}
+              >
+                <Text variant="labelBold" color={CELL_INK[tone]}>
+                  {time}
+                </Text>
+                {/* Bold like the time above it — the wireframe's caption inherits the cell's 700. */}
+                <Text
+                  variant="captionBold"
+                  color={
+                    tone === 'partial'
+                      ? 'textReschedule'
+                      : tone === 'full' || tone === 'clash'
+                        ? 'textDisabled'
+                        : 'textSecondary'
+                  }
+                >
+                  {caption}
+                </Text>
+              </Cell>
+            );
+          })}
+        </Grid>
+      </View>
+
+      {/* `2c` only: with one visit this is the way into Step 3. `2d` / `2e` draw no such link. */}
+      {visits.length > 1 ? null : (
+        <Pressable
+          onPress={onDifferentTimes}
+          accessibilityRole="button"
+          hitSlop={lightTheme.space.sm}
+          testID={`${testID}-different-times`}
+        >
+          <Text variant="title" color="textPrimary" align="center" style={styles.underline}>
+            Different time on some days?
+          </Text>
+        </Pressable>
+      )}
 
       {isPrimary ? null : (
-        <Button
-          label={`Remove ${activeVisit.label}`}
+        <Pressable
           onPress={() => removeVisit(activeVisit.id)}
-          variant="link"
-          fullWidth={false}
+          accessibilityRole="button"
+          hitSlop={lightTheme.space.sm}
           testID={`${testID}-remove-visit`}
-        />
+        >
+          <Text variant="hint" color="textDestructive" align="center" style={styles.underline}>
+            Remove {activeVisit.label}
+          </Text>
+        </Pressable>
       )}
     </Screen>
   );
 }
 
-const HALF_GAP = lightTheme.space.sm / 2;
+/** The wireframe's gutter between grid cells, rows and columns alike. */
+const GRID_GAP = 6;
 
 const styles = StyleSheet.create({
   headerWrap: {
     paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
     paddingTop: lightTheme.space.lg,
   },
-  section: { gap: lightTheme.space.s6 },
-  differentTimes: { alignSelf: 'flex-start' },
-  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: lightTheme.space.sm },
-  addVisit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: lightTheme.space.xxs,
-    paddingHorizontal: lightTheme.space.md,
-    paddingVertical: lightTheme.space.s10,
-    borderRadius: lightTheme.layout.optionRadius,
-    backgroundColor: lightTheme.colors.surfaceTileIdle,
-  },
-  pressed: { opacity: 0.8 },
-  dayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: lightTheme.space.sm },
-  durationGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -HALF_GAP,
-    marginBottom: -lightTheme.space.sm,
-  },
-  durationCell: {
-    width: '33.33%',
-    paddingHorizontal: HALF_GAP,
+  /** `2c` — the tab row: 4 above, 8 below, inside the screen gutter. */
+  tabsWrap: {
+    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
+    paddingTop: lightTheme.space.xs,
     paddingBottom: lightTheme.space.sm,
   },
-  footer: { gap: lightTheme.space.sm },
+  tabTrack: {
+    flexDirection: 'row',
+    gap: lightTheme.space.xs,
+    padding: lightTheme.space.xs,
+    borderRadius: lightTheme.radius.pill,
+    backgroundColor: lightTheme.colors.surfaceMuted,
+  },
+  tab: {
+    flex: 1,
+    height: 44,
+    borderRadius: lightTheme.radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabActive: { backgroundColor: lightTheme.colors.surface, ...lightTheme.elevation.subtle },
+  tabAdd: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: lightTheme.colors.textDisabled },
+  /** Body opens 6 under the tabs; its blocks sit 14 apart. */
+  body: { paddingTop: lightTheme.space.s6, gap: 14 },
+  section: { gap: lightTheme.space.s6 },
+  daysSection: { gap: lightTheme.space.sm },
+  daysHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  toggleTrack: {
+    flexDirection: 'row',
+    gap: lightTheme.space.xs,
+    padding: 3,
+    borderRadius: lightTheme.radius.pill,
+    backgroundColor: lightTheme.colors.surfaceMuted,
+  },
+  toggleOption: {
+    paddingVertical: 5,
+    paddingHorizontal: lightTheme.space.s10,
+    borderRadius: lightTheme.radius.pill,
+  },
+  toggleActive: { backgroundColor: lightTheme.colors.surface, ...lightTheme.elevation.subtle },
+  grid: { gap: GRID_GAP },
+  gridRow: { flexDirection: 'row', gap: GRID_GAP },
+  gridCell: { flex: 1 },
+  cell: { borderRadius: lightTheme.radius.sm, alignItems: 'center', justifyContent: 'center' },
+  dayCell: { paddingVertical: lightTheme.space.s6, borderRadius: lightTheme.radius.r10 },
+  dayWeekday: { opacity: 0.7 },
+  timeOfDayCell: { paddingVertical: 11 },
+  durationCell: {
+    minHeight: 50,
+    paddingVertical: 5,
+    paddingHorizontal: lightTheme.space.xs,
+  },
+  prices: { flexDirection: 'row', gap: lightTheme.space.xs },
+  strike: { textDecorationLine: 'line-through', opacity: 0.6 },
+  slotCell: {
+    paddingTop: lightTheme.space.sm,
+    paddingBottom: lightTheme.space.s6,
+    paddingHorizontal: lightTheme.space.xxs,
+  },
+  pressed: { opacity: 0.8 },
+  /**
+   * `2c` — the footer's own top rule, edge to edge: pulled out over `Screen`'s 16 gutter and 8 of
+   * top padding, then padded back in.
+   */
+  footer: {
+    gap: lightTheme.space.sm,
+    marginHorizontal: -lightTheme.layout.screenPaddingHorizontal,
+    marginTop: -lightTheme.space.sm,
+    paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
+    paddingTop: lightTheme.space.s10,
+    borderTopWidth: 1.5,
+    borderTopColor: lightTheme.colors.surfaceMuted,
+  },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   underline: { textDecorationLine: 'underline' },
 });
