@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
-import { Badge, Button, NoteCard, Screen, ScreenHeader, Text } from '@ui';
+import { Badge, Button, Card, Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { ColorToken } from '@ui/tokens/semantic';
 
@@ -12,11 +12,12 @@ import type { RecurringDayCell } from '../types';
 /**
  * Recurring setup — Step 1 "Pick your days".
  *
- * Source: Claude Design artifact `https://claude.ai/artifact/Dfom3zAZoxPW2rV7osfdNu`, state 2b
- * ("Pick your days (valid)") and 2a ("under minimum"). See
- * docs/CLAUDE_DESIGN_RECURRING_SETUP.md — this is a wireframe, not a pixel-accurate mock, so the
- * layout below follows this app's own token system (Chip's selected/disabled treatment, the
- * standard screen header and CTA) rather than the wireframe's placeholder black/grey styling.
+ * Source: Claude Design artifact `https://claude.ai/artifact/Dfom3zAZoxPW2rV7osfdNu`, states `2a`
+ * ("Pick your days (under minimum)") and `2b` ("valid"). See docs/CLAUDE_DESIGN_RECURRING_SETUP.md.
+ * Layout, shapes, spacing and copy follow the wireframe; COLOURS deliberately don't. The
+ * wireframe's black selected days, black counter and grey hint are placeholder styling, so they
+ * take this app's own tokens instead: the lime selected fill `Chip` uses, `Badge`'s tones and the
+ * accent note surface.
  *
  * STATIC ONLY, per task: the calendar is local fixture data (`buildDemoCalendar`), the min/max
  * gate and the "no cook" day are demonstrated locally, and `onContinue` is left to the caller.
@@ -68,6 +69,7 @@ export function RecurringDaysScreen({
       scroll
       tone="plain"
       testID={testID}
+      contentStyle={styles.body}
       header={
         <View style={styles.headerWrap}>
           <ScreenHeader title="Pick your days" onBack={onBack} testID={`${testID}-header`} />
@@ -76,7 +78,7 @@ export function RecurringDaysScreen({
       footer={
         <View style={styles.footer}>
           {count >= MIN_DAYS ? null : (
-            <Text variant="caption" color="textSecondary" align="center">
+            <Text variant="hint" color="textSecondary" align="center">
               Pick {MIN_DAYS - count} more day{MIN_DAYS - count === 1 ? '' : 's'} to continue
             </Text>
           )}
@@ -90,17 +92,18 @@ export function RecurringDaysScreen({
       }
     >
       <View style={styles.summaryRow}>
-        <View style={styles.summaryText}>
-          <Text variant="bodyStrong" color="textPrimary">
+        <View>
+          <Text variant="bodyLarge" color="textSecondary">
             {calendar.rangeLabel}
           </Text>
-          <Text variant="caption" color="textSecondary">
+          <Text variant="body" color="textSecondary">
             Pick {MIN_DAYS} to {MAX_DAYS} days
           </Text>
         </View>
         <Badge
           label={`${count} / ${MAX_DAYS}`}
           tone={complete ? 'warning' : 'neutral'}
+          size="md"
           testID={`${testID}-counter`}
         />
       </View>
@@ -110,7 +113,7 @@ export function RecurringDaysScreen({
           // Two Tuesdays and two Thursdays share a label; position, not text, is the key.
           <Text
             key={`weekday-${index}`}
-            variant="labelUpper"
+            variant="bodyBold"
             color="textSecondary"
             align="center"
             style={styles.weekdayCell}
@@ -124,35 +127,44 @@ export function RecurringDaysScreen({
         {calendar.weeks.map((week, weekIndex) => (
           <View key={`week-${weekIndex}`} style={styles.weekRow}>
             {week.map((day) => (
-              <View key={day.id} style={styles.dayCell}>
-                <DayCircle day={day} selected={selected.has(day.id)} onPress={() => toggle(day)} />
-              </View>
+              <DayCell
+                key={day.id}
+                day={day}
+                selected={selected.has(day.id)}
+                onPress={() => toggle(day)}
+              />
             ))}
           </View>
         ))}
       </View>
 
       {count >= MIN_DAYS ? null : (
-        <NoteCard
-          tone="accent"
-          body="Need a cook in the next 2 days? Use One-time › Schedule."
-          testID={`${testID}-onetime-hint`}
-        />
+        // A plain box, no icon — `NoteCard` always draws one, and can't bold part of its body.
+        // Grey, like the idle day cells: the wireframe draws both in the same neutral.
+        <Card tone="muted" padded={false} style={styles.hint} testID={`${testID}-onetime-hint`}>
+          <Text variant="hint" color="textPrimary">
+            Need a cook in the next 2 days? Use{' '}
+            <Text variant="hintBold" color="textPrimary">
+              One-time Schedule
+            </Text>
+            .
+          </Text>
+        </Card>
       )}
     </Screen>
   );
 }
 
-interface DayCircleProps {
+interface DayCellProps {
   readonly day: RecurringDayCell;
   readonly selected: boolean;
   readonly onPress: () => void;
 }
 
-/** Touch-target correction, same pattern as `Chip`: the drawn circle stays 40, the target is 44. */
-const TOUCH_SLOP = 2;
+/** Touch-target correction, same pattern as `Chip`, for narrow phones where a cell is under 44. */
+const TOUCH_SLOP = 3;
 
-function DayCircle({ day, selected, onPress }: DayCircleProps) {
+function DayCell({ day, selected, onPress }: DayCellProps) {
   const locked = day.disabled || day.unavailable;
   const surface: StyleProp<ViewStyle> = day.unavailable
     ? styles.cellUnavailable
@@ -178,51 +190,55 @@ function DayCircle({ day, selected, onPress }: DayCircleProps) {
         pressed && !locked ? styles.cellPressed : null,
       ]}
     >
-      <Text
-        variant="bodyBold"
-        color={textColor}
-        style={day.unavailable ? styles.strike : undefined}
-      >
+      <Text variant="titleRebook" color={textColor}>
         {day.dayOfMonth}
       </Text>
     </Pressable>
   );
 }
 
-const CELL_SIZE = 40;
+/**
+ * `2a` / `2b`, read off the wireframe's markup: square cells with a 15pt Bold number at a 12pt
+ * radius, 5 apart both ways; every block on the body is 14 apart. Cells take a seventh of the row
+ * and `aspectRatio: 1` sets their height from that, so they stay square on any screen width.
+ */
+const CELL_GAP = 5;
 
 const styles = StyleSheet.create({
   headerWrap: {
     paddingHorizontal: lightTheme.layout.screenPaddingHorizontal,
     paddingTop: lightTheme.space.lg,
   },
+  body: { gap: 14 },
   summaryRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: lightTheme.space.md,
   },
-  summaryText: { flex: 1, gap: lightTheme.space.xxs },
   footer: { gap: lightTheme.space.sm },
-  weekdayRow: { flexDirection: 'row' },
+  weekdayRow: { flexDirection: 'row', gap: CELL_GAP },
   weekdayCell: { flex: 1 },
-  grid: { gap: lightTheme.space.sm },
-  weekRow: { flexDirection: 'row' },
-  dayCell: { flex: 1, alignItems: 'center', paddingVertical: lightTheme.space.xxs },
+  grid: { gap: CELL_GAP },
+  weekRow: { flexDirection: 'row', gap: CELL_GAP },
   cell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    borderRadius: lightTheme.radius.pill,
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: lightTheme.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cellIdle: { backgroundColor: lightTheme.colors.surfaceMuted },
-  cellSelected: {
-    backgroundColor: lightTheme.colors.surfaceTileSelected,
-    ...lightTheme.elevation.tile,
+  /** The wireframe's hint box: py 12 / px 14 at a 14pt radius, not `Card`'s 16 / 24. */
+  hint: {
+    paddingVertical: lightTheme.space.md,
+    paddingHorizontal: 14,
+    borderRadius: 14,
   },
+  cellIdle: { backgroundColor: lightTheme.colors.surfaceMuted },
+  cellSelected: { backgroundColor: lightTheme.colors.surfaceTileSelected },
+  /** Outside the window: number only, no cell. */
   cellDisabled: { backgroundColor: 'transparent' },
-  cellUnavailable: { backgroundColor: 'transparent' },
+  /** Inside the window but no cooks (Oct 10): the cell stays, the number is greyed, not struck. */
+  cellUnavailable: { backgroundColor: lightTheme.colors.surfaceMuted },
   cellPressed: { opacity: 0.8 },
-  strike: { textDecorationLine: 'line-through' },
 });

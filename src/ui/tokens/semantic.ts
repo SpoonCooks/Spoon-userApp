@@ -779,6 +779,30 @@ export const typography = {
     letterSpacing: letterSpacing.none,
   },
   /**
+   * Recurring setup, Step 1 (Claude Design wireframe, not Figma) — the "Need a cook in the next 2
+   * days?" hint and the "Pick N more days" caption: Livvic Regular 13/19. `hintBold` is the same
+   * ramp one weight up, for the bold run inside the hint, so the two share a baseline.
+   */
+  hint: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  hintBold: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 1 — the "Sep 29 – Oct 19" range: Livvic Regular 14/20. */
+  bodyLarge: {
+    fontSize: fontSize.lg,
+    lineHeight: lineHeight.lg,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /**
    * `104:2284` — a cancellation reason row: Livvic Medium 13/16 at 70 % black.
    *
    * 13 appears nowhere else in the file, so it stays a literal rather than joining `fontSize`.

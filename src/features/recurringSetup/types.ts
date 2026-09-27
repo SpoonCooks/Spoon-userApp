@@ -18,7 +18,7 @@ export interface RecurringDayCell {
   readonly label: string;
   /** Outside the bookable window (past, one-time-Schedule-owned, or beyond the 21-day horizon). */
   readonly disabled: boolean;
-  /** Inside the window but with no cook coverage — struck through, and also non-selectable. */
+  /** Inside the window but with no cook coverage — greyed out and non-selectable. */
   readonly unavailable: boolean;
 }
 

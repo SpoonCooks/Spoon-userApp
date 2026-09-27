@@ -19,6 +19,11 @@ export const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 const WEEKDAY_FORMATTER = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
 const MONTH_DAY_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' });
+/** "Sep 29" — the visible range label. Screen-reader labels keep the full month. */
+const SHORT_MONTH_DAY_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+});
 
 export interface RecurringCalendarDemo {
   readonly rangeLabel: string;
@@ -87,7 +92,7 @@ export function buildDemoCalendar(): RecurringCalendarDemo {
   }
 
   return {
-    rangeLabel: `${MONTH_DAY_FORMATTER.format(windowStart)} – ${MONTH_DAY_FORMATTER.format(windowEnd)}`,
+    rangeLabel: `${SHORT_MONTH_DAY_FORMATTER.format(windowStart)} – ${SHORT_MONTH_DAY_FORMATTER.format(windowEnd)}`,
     weeks: chunk(days, 7),
     preselectedIds: [0, 1, 2].map((offset) => toId(addDays(windowStart, offset))),
   };

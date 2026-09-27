@@ -67,10 +67,10 @@ signed-in session they redirect to `/login`. For review without a session, use t
 ### Step 1 — Pick days (`2a`, `2b`)
 
 One interactive screen. It opens with 3 days picked (`2a`: Continue disabled, "Pick 2 more days to
-continue" above it, "Need a cook in the next 2 days? Use One-time › Schedule" shown). Picking 5 or
+continue" above it, "Need a cook in the next 2 days? Use One-time Schedule" shown). Picking 5 or
 more reaches `2b`: the caption goes, the counter turns yellow and the CTA reads "Continue with N
 days". Selection locks at 14. The fixture follows the board's own example: opened Sat Sep 26,
-window Sep 29 – Oct 19, Oct 10 struck through as a day with no cooks.
+window Sep 29 – Oct 19, Oct 10 greyed out as a day with no cooks (the board strikes it through; the app does not).
 
 ### Step 2 — Time & duration (`2c`, `2d`, `2e`)
 
@@ -132,5 +132,5 @@ date, and shows that visit's time as a black "Pick time" pill. Each state uses t
 6. **Step 5's mandate terms** (charge at T-24h, SMS alert at T-48h, ₹1,000 cap) are labelled
    "Proposed" on the board, and the cook-assignment timing on Step 6 ("a day before") is marked
    as an assumption to confirm.
-7. **The struck-out day on Step 1** needs a real data source: whether a day is unavailable because
+7. **The greyed-out no-cooks day on Step 1** needs a real data source: whether a day is unavailable because
    of cook capacity or something else is not specified.
