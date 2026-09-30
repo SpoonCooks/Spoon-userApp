@@ -45,7 +45,6 @@ export interface InServiceBodyProps {
   readonly cook?: CookViewModel;
   readonly onCallCook?: () => void;
   readonly onExtend: () => void;
-  readonly onEndService: () => void;
   /** Called when the countdown reaches zero. Must refetch, not transition. */
   readonly onElapsed: () => void;
   readonly onViewDetails?: () => void;
@@ -89,7 +88,6 @@ export function InServiceBody({
   cook,
   onCallCook,
   onExtend,
-  onEndService,
   onElapsed,
   onViewDetails,
 }: InServiceBodyProps) {
@@ -150,7 +148,6 @@ export function InServiceBody({
       <ServiceSection>
         <ServiceHandoverBlock
           ctaLabel={inService.endCtaLabel}
-          onPress={onEndService}
           otpCode={inService.otpCode}
           otpTitle={inService.otpTitle}
           otpCaption={inService.otpCaption}

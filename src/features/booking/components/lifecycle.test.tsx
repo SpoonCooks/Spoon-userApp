@@ -34,7 +34,6 @@ describe('Service handover — `21:1091` / `101:1893`', () => {
         state={ready(DEMO_BOOKING_ARRIVED)}
         onRetry={onRetry}
         onBack={jest.fn()}
-        onStartService={jest.fn()}
       />,
     );
     expect(flatten(screen.getByTestId('arrived-handover-otp')).backgroundColor).toBe(
@@ -55,7 +54,6 @@ describe('Service handover — `21:1091` / `101:1893`', () => {
         state={ready(DEMO_BOOKING_ARRIVED)}
         onRetry={onRetry}
         onBack={jest.fn()}
-        onStartService={jest.fn()}
       />,
     );
 
