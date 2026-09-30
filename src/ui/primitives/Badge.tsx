@@ -15,16 +15,31 @@ import type { Tone } from '@ui/tokens/semantic';
  * `Completed | Unfulfilled` and `Processing | Refunded`, with no `Cancelled` and no `Failed`.)
  */
 
+/**
+ * `sm` is every existing status pill. `md` is the recurring-setup day counter ("3 / 14"): px 12 /
+ * py 6 and a Livvic Black 14/20 label.
+ */
+export type BadgeSize = 'sm' | 'md';
+
 export interface BadgeProps {
   readonly label: string;
   readonly tone?: Tone;
   readonly icon?: IconName;
   readonly uppercase?: boolean;
+  readonly size?: BadgeSize;
   readonly testID?: string;
 }
 
-export function Badge({ label, tone = 'neutral', icon, uppercase = false, testID }: BadgeProps) {
+export function Badge({
+  label,
+  tone = 'neutral',
+  icon,
+  uppercase = false,
+  size = 'sm',
+  testID,
+}: BadgeProps) {
   const palette = lightTheme.tones[tone];
+  const md = size === 'md';
 
   return (
     <View
@@ -32,11 +47,11 @@ export function Badge({ label, tone = 'neutral', icon, uppercase = false, testID
       accessible
       accessibilityRole="text"
       accessibilityLabel={label}
-      style={[styles.base, { backgroundColor: palette.surface }]}
+      style={[styles.base, md ? styles.md : null, { backgroundColor: palette.surface }]}
     >
       {icon === undefined ? null : <Icon name={icon} size={12} />}
       <Text
-        variant={uppercase ? 'labelUpper' : 'label'}
+        variant={md ? 'titleBlack' : uppercase ? 'labelUpper' : 'label'}
         style={{ color: palette.text }}
         numberOfLines={1}
       >
@@ -56,4 +71,5 @@ const styles = StyleSheet.create({
     paddingVertical: lightTheme.space.xs,
     borderRadius: lightTheme.layout.pillRadius,
   },
+  md: { paddingHorizontal: lightTheme.space.md, paddingVertical: lightTheme.space.s6 },
 });

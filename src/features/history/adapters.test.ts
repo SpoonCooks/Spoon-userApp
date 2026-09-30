@@ -92,6 +92,21 @@ describe('myBookingPresentationFor — the six My-bookings states', () => {
     expect(label).not.toBe('Rescheduled');
   });
 
+  it('reads Rescheduled for an admin-moved booking, even though rescheduleCount is still 0', () => {
+    // An admin move deliberately never spends the customer's own one-time budget
+    // (`reschedule-service.ts`), so `rescheduleCount` alone would read this as plain
+    // "Confirmed" — identical to a booking that was always at its current time.
+    const label = myBookingPresentationFor({
+      status: 'assigned',
+      cancelledBy: null,
+      policyBand: null,
+      rescheduleCount: 0,
+      rescheduledByOps: true,
+    }).label;
+
+    expect(label).toBe('Rescheduled');
+  });
+
   it('collapses every SETTLED live status to one Confirmed/Rescheduled pill, not four distinct ones', () => {
     // Deliberate: this screen is a flat historical index; Home already owns live-tracking detail
     // (arriving/arrived/in-service), so this screen must not draw that granularity again.

@@ -106,6 +106,8 @@ function MealBriefForm({
     >
       <Screen
         scroll
+        // The KeyboardAvoidingView above already clears the keyboard for this form.
+        keyboardAware={false}
         tone="form"
         testID="meal-brief-screen"
         header={
