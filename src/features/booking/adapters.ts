@@ -652,7 +652,10 @@ export function trackingDetailFrom(input: {
   readonly nowMs?: number;
 }): BookingDetailViewModel {
   const { base, dto } = input;
-  const nowMs = input.nowMs ?? Date.now();
+  // The SERVER's now, not the handset's: the ETA is a server instant, and a phone clock a few
+  // seconds fast reached it early and blanked the panel (2026-09-30). Same store every other
+  // countdown in the app reads (§29).
+  const nowMs = input.nowMs ?? Date.now() - currentSkewMs();
 
   const start = dto.serviceOtp?.start;
   const end = dto.serviceOtp?.end;
@@ -764,10 +767,11 @@ function etaClockLabelFrom(estimatedArrivalAt: string | null): string | null {
  * Accuracy: tracking refetches on the server's `refreshAfterSeconds` (30s fallback), so the figure
  * is re-derived at least twice a minute and cannot drift past the minute it names.
  *
- * `null` once the ETA is not in the future -- the frames draw no "overdue" state and "0 mins"
- * under a title promising an arrival is a claim, not a number. Only the PANEL degrades, to "—";
- * the banner keeps whatever the server's `timingVerdict` says, so a late cook still reads as
- * late. The server is polling; a fresher ETA or an arrival is what resolves it.
+ * Once the ETA is reached it reads "0 mins", and past it the minutes past it, as a POSITIVE number
+ * that keeps growing -- the same rule the Cook App's "Location ki duri" follows (founder,
+ * 2026-09-30). The panel used to degrade to "—" the moment the instant passed, which on the
+ * customer's screen read as the app having lost the cook while she was standing at the gate. The
+ * banner still carries the server's `timingVerdict`, so a late cook still reads as late.
  */
 function etaCountdownFrom(estimatedArrivalAt: string | null, nowMs: number): string | null {
   if (estimatedArrivalAt === null) return null;
@@ -775,9 +779,10 @@ function etaCountdownFrom(estimatedArrivalAt: string | null, nowMs: number): str
   if (Number.isNaN(at.getTime())) return null;
 
   const remainingMs = at.getTime() - nowMs;
-  if (remainingMs <= 0) return null;
+  // Reached or passed: how far past it, never negative.
+  if (remainingMs <= 0) return `${Math.round(-remainingMs / 60_000)} mins`;
 
-  // Floored at one: a cook 20 seconds away is "1 mins", never "0 mins" under "arriving in".
+  // Still ahead: floored at one, so a cook 20 seconds away is "1 mins" under "arriving in".
   // The plural is the house form -- `etaMinutesFor` and `InServiceBody` both write "mins" flat.
   return `${Math.max(1, Math.round(remainingMs / 60_000))} mins`;
 }

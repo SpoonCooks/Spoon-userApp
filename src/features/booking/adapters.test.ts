@@ -225,11 +225,25 @@ describe('trackingDetailFrom', () => {
 
     expect(view.tracking?.tone).toBe('warning');
     expect(view.tracking?.bannerMessage).toBe('Rekha is heading over');
-    // No number to state, and none invented.
-    expect(view.tracking?.etaLabel).toBe('—');
+    // One minute past the ETA: the minutes past it, positive, as the Cook App shows.
+    expect(view.tracking?.etaLabel).toBe('1 mins');
   });
 
-  it('degrades only the panel when an ON_TIME ETA elapses', () => {
+  it('reads "0 mins" at the ETA and counts up past it, never "—"', () => {
+    const at = new Date('2026-08-18T09:35:00.000Z');
+    const labelAt = (nowIso: string) =>
+      trackingDetailFrom({
+        base: BASE,
+        nowMs: new Date(nowIso).getTime(),
+        dto: tracking({ eta: { estimatedArrivalAt: at.toISOString(), updatedAt: null } }),
+      }).tracking?.etaLabel;
+
+    expect(labelAt('2026-08-18T09:35:00.000Z')).toBe('0 mins');
+    expect(labelAt('2026-08-18T09:35:10.000Z')).toBe('0 mins');
+    expect(labelAt('2026-08-18T09:41:00.000Z')).toBe('6 mins');
+  });
+
+  it('keeps the tone when an ON_TIME ETA elapses', () => {
     const at = new Date('2026-08-18T09:35:00.000Z');
     const view = trackingDetailFrom({
       base: BASE,
@@ -240,7 +254,7 @@ describe('trackingDetailFrom', () => {
       }),
     });
 
-    expect(view.tracking?.etaLabel).toBe('—');
+    expect(view.tracking?.etaLabel).toBe('1 mins');
     expect(view.tracking?.tone).toBe('positive');
   });
 
