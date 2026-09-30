@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text, lightTheme, useBottomGutter } from '@ui';
+import { Text, lightTheme, useBottomGutter, useKeyboardHeight } from '@ui';
 
 import { AUTH_HERO, AUTH_LOGO_LOCKUP } from '../assets';
 import type { LoginViewModel } from '../types';
@@ -148,13 +148,32 @@ export function LoginScreen({
    * screen, so on a handset the gesture strip decides the real figure — see `useBottomGutter`.
    */
   const bottomGutter = useBottomGutter(lightTheme.space.lg);
-  const heroHeight = Math.max(
-    HERO_MIN_HEIGHT,
-    Math.min(
-      windowWidth / HERO_ASPECT_RATIO,
-      availableHeight - HERO_GAP - COLUMN_CHROME - BRAND_BLOCK_HEIGHT - FORM_BLOCK_HEIGHT,
-    ),
-  );
+  /**
+   * The IME's own height while the field is focused, 0 otherwise (`useKeyboardHeight`, `Screen.tsx`).
+   *
+   * `windowHeight` above is `useWindowDimensions()`'s figure, which does not move when the
+   * keyboard opens — it reports the WINDOW, not the space the IME leaves under it. The clamp below
+   * this was computed only against that static figure, so a "genuinely short viewport" never
+   * looked short while the keyboard was up: the hero kept trying to draw its full un-keyboarded
+   * height, `revealField`'s `scrollToEnd` could only carry it partway off-screen, and what showed
+   * at the top was a stray sliver of the photograph rather than either the whole scene or none of
+   * it — reported live on device. The hero has no reason to hold any height once the phone field
+   * has focus: it is decoration ahead of a form the keyboard is there to fill in, not content the
+   * customer is still reading. Collapsing it to 0 the instant the IME reports itself open removes
+   * the sliver outright instead of shrinking toward `HERO_MIN_HEIGHT`, which would still have left
+   * a smaller version of the same artifact.
+   */
+  const keyboardHeight = useKeyboardHeight();
+  const heroHeight =
+    keyboardHeight > 0
+      ? 0
+      : Math.max(
+          HERO_MIN_HEIGHT,
+          Math.min(
+            windowWidth / HERO_ASPECT_RATIO,
+            availableHeight - HERO_GAP - COLUMN_CHROME - BRAND_BLOCK_HEIGHT - FORM_BLOCK_HEIGHT,
+          ),
+        );
 
   /**
    * The field and the CTA are the LAST things in the scroll, and the 364pt hero above them is
@@ -191,15 +210,18 @@ export function LoginScreen({
           onLayout={revealField}
         >
           {/* `250:2434` — full-bleed, at the node's own aspect ratio. Clipped, never
-              letterboxed, and the only block that yields height on a short viewport. */}
-          <View style={[styles.hero, { height: heroHeight }]}>
-            <Image
-              source={AUTH_HERO}
-              style={styles.heroImage}
-              resizeMode="cover"
-              accessibilityIgnoresInvertColors
-            />
-          </View>
+              letterboxed, and the only block that yields height on a short viewport — and the
+              first thing gone once the keyboard is up, see `heroHeight` above. */}
+          {heroHeight === 0 ? null : (
+            <View style={[styles.hero, { height: heroHeight }]} testID={`${testID}-hero`}>
+              <Image
+                source={AUTH_HERO}
+                style={styles.heroImage}
+                resizeMode="cover"
+                accessibilityIgnoresInvertColors
+              />
+            </View>
+          )}
 
           {/* `250:2384` — the padded content column the brand block and the form sit in. */}
           <View style={[styles.column, { paddingBottom: bottomGutter }]}>

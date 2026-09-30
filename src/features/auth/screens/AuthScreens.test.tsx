@@ -1,6 +1,6 @@
-import { StyleSheet } from 'react-native';
+import { Keyboard, StyleSheet } from 'react-native';
 
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import {
   DEMO_LOGIN,
@@ -41,6 +41,38 @@ describe('LoginScreen — 250:2383', () => {
 
     fireEvent.changeText(screen.getByTestId('login-screen-phone'), '98a76-543 21x0');
     expect(screen.getByTestId('login-screen-phone').props.value).toBe('9876543210');
+  });
+
+  /**
+   * Reported live on device: focusing the phone field left a stray sliver of the hero photograph
+   * at the top of the screen instead of either the whole scene or none of it.
+   *
+   * `heroHeight`'s clamp only ever looked at `useWindowDimensions()`, which does not move when the
+   * keyboard opens, so the hero kept trying to draw its full un-keyboarded height and
+   * `revealField`'s `scrollToEnd` could only carry it partway off-screen. The hero now collapses
+   * to 0 — and unmounts outright — the instant the IME reports itself open, and comes back
+   * exactly as it was once the field blurs.
+   */
+  it('hides the hero once the keyboard opens, and restores it on blur', () => {
+    const handlers: Record<string, (event: unknown) => void> = {};
+    jest
+      .spyOn(Keyboard, 'addListener')
+      .mockImplementation((event: string, handler: (payload: never) => void) => {
+        handlers[event] = handler as (payload: unknown) => void;
+        return { remove: jest.fn() } as never;
+      });
+
+    render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} />);
+    expect(screen.getByTestId('login-screen-hero')).toBeTruthy();
+
+    fireEvent(screen.getByTestId('login-screen-phone'), 'focus');
+    act(() => handlers['keyboardDidShow']?.({ endCoordinates: { height: 291 } }));
+    expect(screen.queryByTestId('login-screen-hero')).toBeNull();
+
+    act(() => handlers['keyboardDidHide']?.({}));
+    expect(screen.getByTestId('login-screen-hero')).toBeTruthy();
+
+    jest.restoreAllMocks();
   });
 });
 
