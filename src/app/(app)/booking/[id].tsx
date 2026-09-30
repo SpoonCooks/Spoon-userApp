@@ -103,10 +103,10 @@ export default function BookingRoute() {
   const cancelFlow = useCancelFlow(bookingId === '' ? null : bookingId, {
     onReschedule: () => router.push(`/reschedule/${bookingId}`),
     onHelp: () => openHelp('Hi Spoon, I need help cancelling my booking.'),
-    // PRODUCT_DESIGN_CONFLICT (§37): `115:2703` labels this "Book Now", but a cancellation flow
-    // must not create a booking. It closes and returns the customer to Home, where booking
-    // actually starts. Recorded, not obeyed.
-    onCancelled: () => router.replace('/home'),
+    // `115:2703`'s "book again?" prompt: "Yes" opens Schedule so the customer completes a new
+    // booking themselves — this never creates one on their behalf — and "No" returns them to
+    // Home, where booking normally starts from.
+    onCancelled: (bookAgain) => router.replace(bookAgain ? '/scheduled' : '/home'),
   });
 
   /**
