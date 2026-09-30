@@ -9,18 +9,18 @@ import type { ImageSourcePropType } from 'react-native';
 
 /** `225:1640` — the 364pt Login hero band, exported composed so the `object-cover` crop is exact. */
 export const AUTH_HERO =
-  require('../../../assets/figma/auth/login-hero.jpg') as ImageSourcePropType;
+  require('../../../assets/figma/auth/login-hero.webp') as ImageSourcePropType;
 
 /**
  * `225:1630` / `227:1668` — the 134 × 93 logo lockup. The node clips a taller source
  * (`h 143.37% / top −14.87%`), so the NODE is exported, not the raw image.
  */
 export const AUTH_LOGO_LOCKUP =
-  require('../../../assets/figma/auth/logo-lockup.png') as ImageSourcePropType;
+  require('../../../assets/figma/auth/logo-lockup.webp') as ImageSourcePropType;
 
 /**
  * `227:1700` — the 14pt "change number" pencil. A FILLED `#FFD600` glyph with an underline bar;
  * Feather's stroked `edit-2` is not the same mark, so the asset is used (task §6).
  */
 export const AUTH_EDIT_PHONE =
-  require('../../../assets/figma/auth/edit-phone.png') as ImageSourcePropType;
+  require('../../../assets/figma/auth/edit-phone.webp') as ImageSourcePropType;

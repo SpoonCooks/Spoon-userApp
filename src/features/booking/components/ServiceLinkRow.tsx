@@ -31,7 +31,7 @@ export type ServiceLinkTrailing = 'chevron' | 'whatsapp';
 
 /** `383:752` — the WhatsApp mark, exported with transparency. */
 const WHATSAPP_MARK =
-  require('../../../../assets/figma/booking/whatsapp-mark.png') as ImageSourcePropType;
+  require('../../../../assets/figma/booking/whatsapp-mark.webp') as ImageSourcePropType;
 
 export interface ServiceLinkRowProps {
   readonly label: string;

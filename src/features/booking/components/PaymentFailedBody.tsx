@@ -17,7 +17,7 @@ import { formatPaise } from '@core/format';
 
 /** The exported mark, `89.72 × 91.28` in Figma. */
 const PAYMENT_FAILED_MARK =
-  require('../../../../assets/figma/payment/payment-failed.png') as ImageSourcePropType;
+  require('../../../../assets/figma/payment/payment-failed.webp') as ImageSourcePropType;
 
 export interface PaymentFailedBodyProps {
   readonly amountPaise: number;

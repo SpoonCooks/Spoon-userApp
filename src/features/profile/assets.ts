@@ -13,7 +13,7 @@ import type { ImageSourcePropType } from 'react-native';
  * Exported at 4× — 64px for a 15pt box — matching `icons/back.png`'s 129px for 32pt.
  */
 export const PROFILE_CHIP_REMOVE =
-  require('../../../assets/figma/profile/chip-remove.png') as ImageSourcePropType;
+  require('../../../assets/figma/profile/chip-remove.webp') as ImageSourcePropType;
 
 /**
  * `222:1582` — the 15 × 32 exclamation mark on the INCOMPLETE completion card (`222:1570`).
@@ -28,4 +28,4 @@ export const PROFILE_CHIP_REMOVE =
  * is left alone rather than deleted (task §0 — preserve existing work).
  */
 export const PROFILE_INCOMPLETE_MARK =
-  require('../../../assets/figma/profile/incomplete-mark.png') as ImageSourcePropType;
+  require('../../../assets/figma/profile/incomplete-mark.webp') as ImageSourcePropType;

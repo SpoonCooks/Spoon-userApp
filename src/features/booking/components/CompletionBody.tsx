@@ -10,7 +10,7 @@ import { ServiceLinkRow } from './ServiceLinkRow';
 import type { CompletionViewModel } from '../types';
 
 /** `308:3130` — the 35 × 35 "Receive Cash" mark on the tip row. */
-const TIP_GLYPH = require('../../../../assets/figma/booking/tip-cook.png') as ImageSourcePropType;
+const TIP_GLYPH = require('../../../../assets/figma/booking/tip-cook.webp') as ImageSourcePropType;
 
 /**
  * Completion — Figma `299:1424` ("Page 14a"), with `319:3191` ("Page 14b") as its SUBMITTED
