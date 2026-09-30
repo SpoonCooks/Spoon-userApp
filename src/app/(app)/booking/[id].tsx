@@ -18,7 +18,7 @@ import { paymentErrorMessage } from '@features/payment';
 import { useWhatsAppHelp } from '@features/support';
 import { ErrorBoundary, isNumericRating } from '@ui';
 import { createIdempotencyKey } from '@core/api';
-import { useDeterministicBack } from '@core/navigation';
+import { useDeterministicBack, useSafeBack } from '@core/navigation';
 
 /**
  * Booking lifecycle host - Confirmation (`3:1041`), En route (`3:1381` / `99:1413`), Arrived
@@ -58,7 +58,7 @@ function payNoticeFor(outcome: PaymentOutcome): string | null {
 
 export default function BookingRoute() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const bookingId = id ?? '';
 
   const callCook = useCallCook(bookingId === '' ? null : bookingId);
@@ -110,22 +110,30 @@ export default function BookingRoute() {
   });
 
   /**
-   * HOME, always — and now DETERMINISTICALLY so (V7 founder comment, task §11: "all these back
-   * buttons take the user to the home page").
+   * HOME, always, UNLESS this booking was opened from History ("My bookings") — task §11's "all
+   * these back buttons take the user to the home page" (V7 founder comment) plus the fix for the
+   * bug it caused there.
    *
-   * This one route renders every service-lifecycle screen — `3:1041` Confirm, `289:6607` Confirm
-   * reassign, `201:278` Auto cancelled, `3:1381` / `292:469` Arriving, `201:100` / `292:657`
-   * Reassigned, `3:1658` Arrived, `101:1812` / `292:1197` In service, `299:1424` Completion — and
-   * it is entered from a Home banner, from history, from a reschedule and from a PUSH
-   * NOTIFICATION that launched the app straight into it.
+   * The founder's reasoning is sound for the service lifecycle proper: a booking moves through
+   * confirm -> arriving -> reassigned -> arrived -> in-service under the customer, and popping to
+   * a screen drawn before that advance would show a lie — an "Arriving" banner for a cook who has
+   * since arrived. `useDeterministicBack` (dismiss + replace to `/home`) is still correct for every
+   * entry point that reasoning actually covers: a Home banner, a push notification, a reschedule
+   * confirmation, a `spoon://` deep link — see `service lifecycle — every back button goes Home`
+   * in `v7Flow.test.tsx` (task §11), which this must keep passing unchanged.
    *
-   * `useSafeBack` popped, and popping is wrong here in a way that is specific to a live booking:
-   * the state advances underneath the customer. A booking that was "Arriving" when they opened it
-   * can be "In service" by the time they press back, and popping would show them a stack entry
-   * describing a state the booking has already left. Home reads the CURRENT state and draws the
-   * banner for it, so it is both the founder's answer and the only one that cannot be stale.
+   * It never covered History. A Past booking cannot advance at all, and an Upcoming one reached
+   * from there is exactly as live as one reached from Home — but landing on Home instead of the
+   * list the customer just walked down made "back" from a booking opened via My bookings behave
+   * as if the list screen behind it did not exist. `history.tsx` tags its push with `?from=history`
+   * for exactly this; `useSafeBack('/history')` pops there when it can (always, in practice — the
+   * push notification and deep-link cases that need a fallback never carry this tag) and replaces
+   * to `/history` on the rare stack-less path so the fallback still lands somewhere sensible rather
+   * than reusing Home's.
    */
-  const goBack = useDeterministicBack('/home');
+  const goHome = useDeterministicBack('/home');
+  const goToHistory = useSafeBack('/history');
+  const goBack = from === 'history' ? goToHistory : goHome;
 
   return (
     <ErrorBoundary scope="booking-host">
