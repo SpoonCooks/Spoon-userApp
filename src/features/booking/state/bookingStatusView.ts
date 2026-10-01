@@ -163,7 +163,10 @@ export function viewForBooking(input: {
   const base = resolveBookingView(input.status, input.onUnknown);
 
   if (base.view === 'cancelled') {
-    return { ...base, view: input.cancelledBy === 'system' ? 'autoCancelled' : 'customerCancelled' };
+    return {
+      ...base,
+      view: input.cancelledBy === 'system' ? 'autoCancelled' : 'customerCancelled',
+    };
   }
   if (input.reassigned === true && base.view === 'enRoute') {
     return { ...base, view: 'reassigned' };

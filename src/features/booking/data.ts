@@ -1241,8 +1241,7 @@ export function useBookingDetailData(bookingId: string): ScreenQuery<BookingDeta
    * Fetched ONLY for a cancelled booking, whoever cancelled it. Every other lifecycle state
    * passes `null` and makes no request.
    */
-  const cancelled =
-    remote.state.status === 'ready' && remote.state.data.status === 'cancelled';
+  const cancelled = remote.state.status === 'ready' && remote.state.data.status === 'cancelled';
   /*
    * `bookingId === ''` guarded explicitly, not just `!cancelled`: the route host
    * (`app/(app)/booking/[id].tsx`) falls back to `''`, not `null`, while Expo Router's `id`
