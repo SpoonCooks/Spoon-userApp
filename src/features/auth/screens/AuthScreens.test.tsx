@@ -44,6 +44,20 @@ describe('LoginScreen — 250:2383', () => {
   });
 
   /**
+   * The field's `dial` chip already shows "+91" on its own, but the device's own-number
+   * autofill suggestion (`textContentType="telephoneNumber"`) fills whatever it has on
+   * file for the owner, which commonly still carries that same country code. Keeping the
+   * LAST `phoneMaxLength` digits rather than the first takes the prefix off instead of
+   * truncating the real number — see the field's own `onChangeText` comment.
+   */
+  it('drops a leading country code from an autofilled number instead of truncating it', () => {
+    render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} />);
+
+    fireEvent.changeText(screen.getByTestId('login-screen-phone'), '+91 98765 43210');
+    expect(screen.getByTestId('login-screen-phone').props.value).toBe('9876543210');
+  });
+
+  /**
    * Reported live on device: focusing the phone field left a stray sliver of the hero photograph
    * at the top of the screen instead of either the whole scene or none of it.
    *

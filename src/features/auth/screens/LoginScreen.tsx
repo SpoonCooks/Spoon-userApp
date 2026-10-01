@@ -268,7 +268,19 @@ export function LoginScreen({
                     </View>
                     <TextInput
                       value={phone}
-                      onChangeText={(next) => setPhone(next.replace(/\D/g, ''))}
+                      /**
+                       * The device's own-number autofill suggestion (`textContentType`
+                       * below) fills the FULL number it has on file, which usually still
+                       * carries the `+91` this field's `dial` chip already shows
+                       * separately. A native `maxLength` truncates before this handler
+                       * ever sees the text, so it would cut "+91 98765 43210" down to
+                       * "+91 987654" and strip that into the wrong ten digits. Stripping
+                       * first and keeping the last `phoneMaxLength` digits takes the
+                       * country code off the front instead, however it arrived.
+                       */
+                      onChangeText={(next) =>
+                        setPhone(next.replace(/\D/g, '').slice(-login.phoneMaxLength))
+                      }
                       placeholder={login.phonePlaceholder}
                       placeholderTextColor={lightTheme.colors.textPlaceholder}
                       onFocus={() => {
@@ -279,7 +291,8 @@ export function LoginScreen({
                         focusedRef.current = false;
                       }}
                       keyboardType="phone-pad"
-                      maxLength={login.phoneMaxLength}
+                      textContentType="telephoneNumber"
+                      autoComplete="tel"
                       style={styles.input}
                       accessibilityLabel={login.subtitle}
                       testID={`${testID}-phone`}
