@@ -55,8 +55,6 @@ export interface BookingDetailActions {
   readonly onViewDetails?: () => void;
   /** `383:748` — the WhatsApp disc on "Share recipe/ special requests" (`8a` / `8b`, task §15). */
   readonly onShareRecipe?: () => void;
-  readonly onStartService?: () => void;
-  readonly onEndService?: () => void;
   /**
    * `275:4265` — "Extend • ₹16". Carries the chosen option's MINUTES, which the catalogue
    * published and the option id encodes; the new end time comes from the server's response and is
@@ -399,9 +397,6 @@ export function BookingDetailView({
             tracking={booking.arrived}
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
             {...callCookSeam(booking)}
-            {...(actions.onStartService === undefined
-              ? {}
-              : { onStartService: actions.onStartService })}
             {...detailsSeam(booking)}
           />
         );
@@ -415,7 +410,6 @@ export function BookingDetailView({
             {...(booking.cook === undefined ? {} : { cook: booking.cook })}
             {...callCookSeam(booking)}
             onExtend={() => setExtensionOpen(true)}
-            onEndService={actions.onEndService ?? noop}
             {...detailsSeam(booking)}
             // Reaching zero asks the server what happens next; it never ends the session.
             onElapsed={onRetry}
@@ -480,10 +474,6 @@ function unknownView(view: string) {
       testID="booking-unknown-view"
     />
   );
-}
-
-function noop() {
-  // Intentionally inert until the corresponding backend action exists.
 }
 
 function noopFeedback(_value: string, _rating: RatingSelection | null) {

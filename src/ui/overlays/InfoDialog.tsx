@@ -30,7 +30,7 @@ import { Dialog } from './Dialog';
  */
 
 /** `47:6622` — the banknote glyph. Feather has no banknote; `credit-card` is a different object. */
-const MONEY_GLYPH = require('../../../assets/figma/icons/money.png') as ImageSourcePropType;
+const MONEY_GLYPH = require('../../../assets/figma/icons/money.webp') as ImageSourcePropType;
 
 export interface InfoDialogProps {
   readonly visible: boolean;

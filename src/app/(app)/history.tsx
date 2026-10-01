@@ -43,13 +43,17 @@ export default function HistoryRoute() {
    *
    * Every status is a valid destination — the host draws the whole lifecycle, including cancelled
    * and completed — so no filtering is applied here.
+   *
+   * Tagged `?from=history` so the booking host's own back control pops here instead of replacing
+   * to Home — see the matching comment on `goBack` in `booking/[id].tsx` for why that was wrong for
+   * an entry from this list specifically.
    */
   return (
     <BookingListView
       state={active.state}
       onRetry={active.refetch}
       onBack={goBack}
-      onSelect={(bookingId) => router.push(`/booking/${bookingId}` as Href)}
+      onSelect={(bookingId) => router.push(`/booking/${bookingId}?from=history` as Href)}
       variant="history"
       tabs={{
         active: activeTab,

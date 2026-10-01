@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { getDeviceId } from '@core/auth';
+import { getDeviceId, writeLastPhone } from '@core/auth';
 import { useApiQuery } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 import { useRuntime } from '@core/runtimeContext';
@@ -43,7 +43,7 @@ export function useSendOtp() {
  * app is signed in" the same event.
  */
 export function useVerifyOtp() {
-  const { authApi, session } = useRuntime();
+  const { authApi, session, logger } = useRuntime();
   const queryClient = useQueryClient();
   const api = createAuthApi(authApi);
 
@@ -58,6 +58,17 @@ export function useVerifyOtp() {
         // The server's own instant, parsed — never a TTL the client assumed.
         expiresAt: Date.parse(result.accessTokenExpiresAt),
       });
+
+      // Best-effort, same reasoning as `useSignOut`'s swallowed `auth.logout()` failure: the
+      // sign-in already succeeded against the server, and Login's own prefill next time is a
+      // convenience, never a reason to strand this customer on a mutation error.
+      try {
+        await writeLastPhone(phone);
+      } catch (error) {
+        logger.warn('Failed to remember the phone number for next sign-in', {
+          error: String(error),
+        });
+      }
 
       return result;
     },

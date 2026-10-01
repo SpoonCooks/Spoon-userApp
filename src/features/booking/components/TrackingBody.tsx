@@ -48,7 +48,6 @@ export interface TrackingBodyProps {
   readonly tracking: TrackingViewModel | ArrivedViewModel | ReassignedViewModel;
   readonly cook?: CookViewModel;
   readonly onCallCook?: () => void;
-  readonly onStartService?: () => void;
   readonly onViewDetails?: () => void;
   readonly onReschedule?: () => void;
   readonly onCancel?: () => void;
@@ -68,7 +67,6 @@ export function TrackingBody({
   tracking,
   cook,
   onCallCook,
-  onStartService,
   onViewDetails,
   onReschedule,
   onCancel,
@@ -105,13 +103,11 @@ export function TrackingBody({
       )}
 
       {/* `21:1091` is drawn UNCONDITIONALLY on `3:1658`, so it renders whenever the server says
-          the booking has arrived. An unwired host gets an inert CTA rather than a missing block —
-          the same rule the Help pill follows. */}
+          the booking has arrived. */}
       {arrived === undefined ? null : (
         <ServiceSection>
           <ServiceHandoverBlock
             ctaLabel={arrived.startCtaLabel}
-            onPress={onStartService ?? noop}
             otpCode={arrived.otpCode}
             otpTitle={arrived.otpTitle}
             otpCaption={arrived.otpCaption}
@@ -185,10 +181,6 @@ export function TrackingBody({
       ) : null}
     </View>
   );
-}
-
-function noop() {
-  // Inert until the backend exposes a start-service action. The client never starts a session.
 }
 
 const styles = StyleSheet.create({

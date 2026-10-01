@@ -309,9 +309,17 @@ describe('Saved addresses back target follows its entry point', () => {
 
 /**
  * A push notification opens `/booking/:id` DIRECTLY — the app is launched into it — so the
- * booking host is the route most likely to be the only entry on the stack.
+ * booking host is the route most likely to be the only entry on the stack. Every OTHER entry
+ * point — a Home banner, a reschedule confirmation, a bare deep link — is deterministically Home
+ * too (`v7Flow.test.tsx`'s "service lifecycle — every back button goes Home", task §11): the
+ * booking advances under the customer, so a stack entry can describe a state it has already left.
+ *
+ * History ("My bookings") is the one exception, tagged `?from=history` by `history.tsx`. A Past
+ * booking cannot advance, and an Upcoming one reached from there is no more live than one reached
+ * from Home — but replacing to Home unconditionally made "back" from a booking opened via My
+ * bookings behave as if the list behind it did not exist (the reported bug this closes).
  */
-describe('booking host — the notification entry point', () => {
+describe('booking host — back follows the stack shape', () => {
   it('backs out to Home when the app was launched straight into a booking', async () => {
     mockRouter = makeRouter(false);
     mockSearchParams = { id: 'bk-1' };
@@ -322,6 +330,43 @@ describe('booking host — the notification entry point', () => {
 
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/home');
+  });
+
+  it('backs out to Home even with a history, for any entry point other than History', async () => {
+    mockRouter = makeRouter(true);
+    mockSearchParams = { id: 'bk-1' };
+
+    render(<BookingRoute />);
+
+    fireEvent.press(await screen.findByTestId('booking-back'));
+
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/home');
+  });
+
+  it('pops back to My bookings when opened from there, with a history to pop', async () => {
+    mockRouter = makeRouter(true);
+    mockSearchParams = { id: 'bk-1', from: 'history' };
+
+    render(<BookingRoute />);
+
+    fireEvent.press(await screen.findByTestId('booking-back'));
+
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(mockRouter.dismissAll).not.toHaveBeenCalled();
+  });
+
+  it('falls back to /history when opened from there with no history to pop', async () => {
+    mockRouter = makeRouter(false);
+    mockSearchParams = { id: 'bk-1', from: 'history' };
+
+    render(<BookingRoute />);
+
+    fireEvent.press(await screen.findByTestId('booking-back'));
+
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/history');
   });
 
   it('is the route a notification targets, and falls back to Home without an id', () => {
@@ -632,7 +677,9 @@ describe('My bookings opens the booking it lists', () => {
 
     fireEvent.press(await screen.findByTestId('history-screen-card-bk-live-1'));
 
-    expect(mockRouter.push).toHaveBeenCalledWith('/booking/bk-live-1');
+    // Tagged so the booking host's back control pops here instead of replacing to Home — see
+    // "booking host — back follows the stack shape" above.
+    expect(mockRouter.push).toHaveBeenCalledWith('/booking/bk-live-1?from=history');
   });
 });
 

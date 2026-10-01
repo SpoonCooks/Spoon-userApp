@@ -13,10 +13,10 @@ import type { ImageSourcePropType } from 'react-native';
  */
 
 export const HOME_CUISINE_ART: Record<string, ImageSourcePropType> = {
-  daily: require('../../../assets/figma/home/cuisine-daily.png') as ImageSourcePropType,
-  north: require('../../../assets/figma/home/cuisine-north.png') as ImageSourcePropType,
-  south: require('../../../assets/figma/home/cuisine-south.png') as ImageSourcePropType,
-  asian: require('../../../assets/figma/home/cuisine-chinese.png') as ImageSourcePropType,
+  daily: require('../../../assets/figma/home/cuisine-daily.webp') as ImageSourcePropType,
+  north: require('../../../assets/figma/home/cuisine-north.webp') as ImageSourcePropType,
+  south: require('../../../assets/figma/home/cuisine-south.webp') as ImageSourcePropType,
+  asian: require('../../../assets/figma/home/cuisine-chinese.webp') as ImageSourcePropType,
 };
 
 /**
@@ -32,28 +32,28 @@ export const HOME_CUISINE_ART: Record<string, ImageSourcePropType> = {
  * so exporting the raw image and fitting it in code would not reproduce what Figma draws.
  */
 export const HOME_REASON_ART: Record<string, ImageSourcePropType> = {
-  trained: require('../../../assets/figma/home/reason-trained.png') as ImageSourcePropType,
-  verified: require('../../../assets/figma/home/reason-verified.png') as ImageSourcePropType,
-  hygienic: require('../../../assets/figma/home/reason-hygienic.png') as ImageSourcePropType,
-  reliable: require('../../../assets/figma/home/reason-reliable.png') as ImageSourcePropType,
-  available: require('../../../assets/figma/home/reason-available.png') as ImageSourcePropType,
-  compliant: require('../../../assets/figma/home/reason-compliant.png') as ImageSourcePropType,
+  trained: require('../../../assets/figma/home/reason-trained.webp') as ImageSourcePropType,
+  verified: require('../../../assets/figma/home/reason-verified.webp') as ImageSourcePropType,
+  hygienic: require('../../../assets/figma/home/reason-hygienic.webp') as ImageSourcePropType,
+  reliable: require('../../../assets/figma/home/reason-reliable.webp') as ImageSourcePropType,
+  available: require('../../../assets/figma/home/reason-available.webp') as ImageSourcePropType,
+  compliant: require('../../../assets/figma/home/reason-compliant.webp') as ImageSourcePropType,
 };
 
 export const HOME_EXCLUSION_ART: Record<string, ImageSourcePropType> = {
-  utensils: require('../../../assets/figma/home/excl-utensils.png') as ImageSourcePropType,
-  stove: require('../../../assets/figma/home/excl-stove.png') as ImageSourcePropType,
-  electronics: require('../../../assets/figma/home/excl-electronics.png') as ImageSourcePropType,
-  kitchen: require('../../../assets/figma/home/excl-kitchen.png') as ImageSourcePropType,
+  utensils: require('../../../assets/figma/home/excl-utensils.webp') as ImageSourcePropType,
+  stove: require('../../../assets/figma/home/excl-stove.webp') as ImageSourcePropType,
+  electronics: require('../../../assets/figma/home/excl-electronics.webp') as ImageSourcePropType,
+  kitchen: require('../../../assets/figma/home/excl-kitchen.webp') as ImageSourcePropType,
 };
 
 /** `59:518` / `59:391` — the bolt used in the banner headline and on the Instant tile. */
 export const HOME_ICON_BOLT =
-  require('../../../assets/figma/icons/lightning-bolt.png') as ImageSourcePropType;
+  require('../../../assets/figma/icons/lightning-bolt.webp') as ImageSourcePropType;
 
 /** `129:40` — the Schedule tile glyph. */
 export const HOME_ICON_CALENDAR =
-  require('../../../assets/figma/icons/calendar.png') as ImageSourcePropType;
+  require('../../../assets/figma/icons/calendar.webp') as ImageSourcePropType;
 
 /**
  * `59:397` — the 25 × 26 profile glyph. The current file drops the separate ring: `59:400` is a
@@ -64,7 +64,7 @@ export { BANNER_AVATAR_GLYPH as HOME_ICON_CUSTOMER } from '@ui';
 
 /** `156:44` — the Spoon mark closing the page. */
 export const HOME_APP_LOGO =
-  require('../../../assets/figma/home/app-logo.png') as ImageSourcePropType;
+  require('../../../assets/figma/home/app-logo.webp') as ImageSourcePropType;
 
 /**
  * The Home carousel — `378:189` "usecase sliders" (eight cards) plus `406:1325` "assist", all
@@ -100,59 +100,59 @@ export const HOME_USECASE_SLIDES: readonly HomeUsecaseSlide[] = [
   {
     // `367:56` "snacks"
     id: 'snacks',
-    source: require('../../../assets/figma/home/usecase/snacks.png') as ImageSourcePropType,
+    source: require('../../../assets/figma/home/usecase/snacks.webp') as ImageSourcePropType,
     label: 'Crave guilt free! Your favourite snacks made healthy',
   },
   {
     // `378:184` "absent"
     id: 'absent',
-    source: require('../../../assets/figma/home/usecase/absent.png') as ImageSourcePropType,
+    source: require('../../../assets/figma/home/usecase/absent.webp') as ImageSourcePropType,
     label: "Cook absent? Daily meals sorted with Spoon's versatile cooks",
   },
   {
     // `367:66` "tiffin"
     id: 'tiffin',
-    source: require('../../../assets/figma/home/usecase/tiffin.png') as ImageSourcePropType,
+    source: require('../../../assets/figma/home/usecase/tiffin.webp') as ImageSourcePropType,
     label: 'Sleep for longer! Healthy tiffin cooked & packed for kids, everyday',
   },
   {
     // `406:1325` "assist" — NEW in V7, and the card that lives outside the `378:189` grid.
     id: 'assist',
-    source: require('../../../assets/figma/home/usecase/assist.png') as ImageSourcePropType,
+    source: require('../../../assets/figma/home/usecase/assist.webp') as ImageSourcePropType,
     label: "You don't have to do it all! Assistance with chopping, preparation etc.",
   },
   {
     // `375:169` "guests"
     id: 'guests',
-    source: require('../../../assets/figma/home/usecase/guests.png') as ImageSourcePropType,
+    source: require('../../../assets/figma/home/usecase/guests.webp') as ImageSourcePropType,
     label: "Tension free gatherings! Party food that's both guest & wallet friendly",
   },
   {
     // `375:120` "dry snacks"
     id: 'drysnacks',
-    source: require('../../../assets/figma/home/usecase/drysnacks.png') as ImageSourcePropType,
+    source: require('../../../assets/figma/home/usecase/drysnacks.webp') as ImageSourcePropType,
     label: 'Munch as much as you want! Snacks made healthy with good ingredients',
   },
   {
     // `375:124` "breakfast"
     id: 'breakfast',
-    source: require('../../../assets/figma/home/usecase/breakfast.png') as ImageSourcePropType,
+    source: require('../../../assets/figma/home/usecase/breakfast.webp') as ImageSourcePropType,
     label: 'Breakfast only when required! Because breakfast are a waste on brunch days',
   },
   {
     // `367:77` "roti/rice"
     id: 'roti',
-    source: require('../../../assets/figma/home/usecase/roti.png') as ImageSourcePropType,
+    source: require('../../../assets/figma/home/usecase/roti.webp') as ImageSourcePropType,
     label: 'You deserve to eat it hot! Upgrade your meals with fresh & warm rotis',
   },
   {
     // `375:164` "meal prep"
     id: 'mealprep',
-    source: require('../../../assets/figma/home/usecase/mealprep.png') as ImageSourcePropType,
+    source: require('../../../assets/figma/home/usecase/mealprep.webp') as ImageSourcePropType,
     label: 'Sorted for days! Curries prepared and packed, ready to eat',
   },
 ];
 
 /** `393:1205` — the 32pt Sad Cloud on the cancelled banner's apology row (`393:1202`). */
 export const HOME_BANNER_SAD_CLOUD =
-  require('../../../assets/figma/home/banner-sad-cloud.png') as ImageSourcePropType;
+  require('../../../assets/figma/home/banner-sad-cloud.webp') as ImageSourcePropType;

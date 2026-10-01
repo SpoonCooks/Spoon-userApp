@@ -44,15 +44,16 @@ export interface ScreenProps {
    * out of view rather than into it, and the customer types blind — which is what happened to
    * Completion's feedback box, the last control on a long page.
    *
-   * OPT-IN rather than automatic. Turning it on inserts a flex wrapper around the scroll view,
-   * and `Screen scroll` backs several screens that have no text input at all and no reason to
-   * absorb a layout change they cannot benefit from. `ProfileDetailsScreen` and `LoginScreen`
-   * already solve this themselves and are deliberately left alone.
+   * ON by default for every scrolling screen (2026-09-30). It used to be opt-in, and screens
+   * that had not opted in shrank for the IME but never brought the focused field into view -- it
+   * stayed behind the keyboard until the customer scrolled by hand. On a screen with no text
+   * input it measures nothing and scrolls nothing, so the default costs those screens nothing.
+   * Pass `false` for a screen that manages the keyboard itself.
    */
   readonly keyboardAware?: boolean;
   /**
    * The scroll bar at the right edge while scrolling. On by default; the recurring-setup screens
-   * (Figma `ZIJf639gTWHXshaa2YOeCT`) draw none, so they turn it off.
+   * draw none, so they turn it off.
    */
   readonly showsScrollIndicator?: boolean;
   readonly testID?: string;
@@ -125,9 +126,19 @@ export interface KeyboardAwareScroll {
   readonly onInputFocus: () => void;
 }
 
+/**
+ * Room kept visible BELOW a focused field: enough for the action that follows it.
+ *
+ * Revealing only the field plus a 16pt gap left the control after it behind the keyboard -- on
+ * Completion the SUBMIT chip sits 6pt under the feedback box and is 25pt tall, so the customer
+ * typed feedback she could see and could not send (2026-09-30). 64pt covers a chip or a
+ * standard CTA with its margin.
+ */
+const TRAILING_ACTION_ROOM = 64;
+
 export function useKeyboardAwareScroll(
   keyboardHeight: number,
-  gap: number = lightTheme.space.lg,
+  gap: number = TRAILING_ACTION_ROOM,
 ): KeyboardAwareScroll {
   const scrollRef = useRef<ScrollView>(null);
   const viewportRef = useRef<View>(null);
@@ -151,9 +162,12 @@ export function useKeyboardAwareScroll(
 
     viewport.measureInWindow((_x, viewportY, _width, viewportHeight) => {
       input.measureInWindow((_inputX, inputY, _inputWidth, inputHeight) => {
-        // How far the field's bottom edge (plus the breathing room the frames leave under a
-        // control) falls past the bottom of what the customer can still see.
-        const covered = inputY + inputHeight + gap - (viewportY + viewportHeight);
+        // How far the field's bottom edge, plus room for the action under it, falls past the
+        // bottom of what the customer can still see...
+        const wanted = inputY + inputHeight + gap - (viewportY + viewportHeight);
+        // ...but never so far that the field's own top leaves the viewport: a tall field in a
+        // short viewport keeps its first line, where the caret is.
+        const covered = Math.min(wanted, inputY - viewportY - lightTheme.space.sm);
         if (covered <= 0) return;
         scrollRef.current?.scrollTo({ y: offset.current + covered, animated: true });
       });
@@ -195,7 +209,7 @@ export function Screen({
   header,
   footer,
   contentStyle,
-  keyboardAware = false,
+  keyboardAware = true,
   showsScrollIndicator = true,
   testID,
   children,
@@ -209,6 +223,13 @@ export function Screen({
    */
   const { scrollRef, viewportRef, onViewportLayout, onScroll } =
     useKeyboardAwareScroll(keyboardHeight);
+  /*
+   * Where the keyboard's room is taken. With a footer, the FOOTER is lifted onto the keyboard and
+   * the content above it shrinks by itself -- lifting both would count the keyboard twice. The
+   * footer used to stay below a shrunken scroll area, which is to say behind the keyboard: every
+   * pinned CTA was covered the moment a field was focused.
+   */
+  const contentLift = footer === undefined ? keyboardHeight : 0;
 
   return (
     <SafeAreaView
@@ -226,7 +247,7 @@ export function Screen({
         <View
           ref={viewportRef}
           onLayout={onViewportLayout}
-          style={[styles.flex, keyboardHeight === 0 ? null : { marginBottom: keyboardHeight }]}
+          style={[styles.flex, contentLift === 0 ? null : { marginBottom: contentLift }]}
         >
           <ScrollView
             ref={scrollRef}
@@ -242,7 +263,7 @@ export function Screen({
         </View>
       ) : scroll ? (
         <ScrollView
-          style={keyboardHeight === 0 ? undefined : { marginBottom: keyboardHeight }}
+          style={contentLift === 0 ? undefined : { marginBottom: contentLift }}
           contentContainerStyle={[styles.scrollContent, content, contentStyle]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={showsScrollIndicator}
@@ -250,11 +271,27 @@ export function Screen({
           {children}
         </ScrollView>
       ) : (
-        <View style={[styles.flex, content]}>{children}</View>
+        // A screen that does not scroll still has to clear the keyboard, or its lower half --
+        // fields and buttons alike -- sits under it.
+        <View
+          style={[styles.flex, content, contentLift === 0 ? null : { marginBottom: contentLift }]}
+        >
+          {children}
+        </View>
       )}
 
       {footer === undefined ? null : (
-        <View style={[styles.footer, TONE_STYLE[tone], { paddingBottom: footerGutter }]}>
+        <View
+          style={[
+            styles.footer,
+            TONE_STYLE[tone],
+            // With the keyboard up the footer rides ON it: the space below it is the keyboard's,
+            // and the home-indicator gutter is under the keyboard too.
+            keyboardHeight === 0
+              ? { paddingBottom: footerGutter }
+              : { paddingBottom: lightTheme.space.sm, marginBottom: keyboardHeight },
+          ]}
+        >
           {footer}
         </View>
       )}

@@ -28,10 +28,10 @@ import type { TipSheetViewModel } from '../types';
 
 /** `144:434` — the same Trust mark the extension notes use. */
 const TIP_TRUST_ART =
-  require('../../../../assets/figma/booking/note-shield.png') as ImageSourcePropType;
+  require('../../../../assets/figma/booking/note-shield.webp') as ImageSourcePropType;
 
 /** `308:3133` — the thank-you band. */
-const TIP_ART = require('../../../../assets/figma/booking/tip-thanks.png') as ImageSourcePropType;
+const TIP_ART = require('../../../../assets/figma/booking/tip-thanks.webp') as ImageSourcePropType;
 
 export interface TipSheetProps {
   readonly visible: boolean;

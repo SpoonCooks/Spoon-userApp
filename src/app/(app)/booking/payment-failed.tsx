@@ -57,17 +57,21 @@ export default function PaymentFailedRoute() {
   const left = useRef(false);
 
   const cancelFlow = useCancelFlow(bookingId, {
-    onCancelled: () => {
+    onCancelled: (bookAgain) => {
       if (left.current) return;
-      /**
-       * HOME, the same answer `[id].tsx` gives after a cancellation, and for a second reason
-       * here: `/booking/:id` has no view for a customer-cancelled booking — `cancelled` falls
-       * through to the "This booking is being updated" fallback — so sending them there after
-       * they had just been told the booking was cancelled contradicted the receipt they had
-       * only now read. PRODUCT_DESIGN_CONFLICT (§37) still applies: this flow creates no
-       * booking, so both answers to "book again?" land in the same place.
-       */
       left.current = true;
+      /**
+       * "Yes" opens Schedule so the customer completes a new booking themselves; "No" is HOME,
+       * the same answer `[id].tsx` gives. Neither is `/booking/:id`, and for a second reason
+       * here beyond the general one: that route has no view for a customer-cancelled booking —
+       * `cancelled` falls through to the "This booking is being updated" fallback — so sending
+       * them there after they had just been told the booking was cancelled would contradict the
+       * receipt they had only now read.
+       */
+      if (bookAgain) {
+        router.replace('/scheduled');
+        return;
+      }
       goHome();
     },
   });

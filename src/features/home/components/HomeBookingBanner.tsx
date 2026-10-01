@@ -268,19 +268,19 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   /**
-   * `337:4364` — the portrait is drawn 79 × 118.5 from x −4 / y −5.5, i.e. wider and taller than
-   * the 67 × 70 box and lifted, so the crop lands on the face rather than centring the body.
+   * The portrait fills the 67 × 70 box and is centre-cropped by `resizeMode="cover"`.
    *
-   * Stated as PERCENTAGES of the box (118 % × 169.29 % at −6 % / −7.857 %), which reproduce
-   * −4 / −5.5 / 79 / 118.5 exactly at the drawn size and keep the same crop window for whatever
-   * photo the server sends, at whatever aspect ratio, under `cover`.
+   * `337:4364` drew it 79 × 118.5 from x −4 / y −5.5 — a crop window sized for the one bundled
+   * placeholder the frame was built around. Applied to a real cook photo (see `CookCard`'s
+   * `photoImage`, fixed the same way) it over-zooms and crops through the face. `cover` at 100 %
+   * is the honest generalisation: fill the box, preserve aspect ratio, crop the overflow.
    */
   photoImage: {
     position: 'absolute',
-    left: '-6%',
-    top: '-7.857%',
-    width: '118%',
-    height: '169.29%',
+    left: 0,
+    top: 0,
+    width: '100%',
+    height: '100%',
   },
   /** `337:4365` — 117 × 70, three lines at a 2pt gap, vertically centred. */
   lines: {

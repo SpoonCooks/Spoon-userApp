@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { Pressable, StyleSheet } from 'react-native';
 
+import { readLastPhone } from '@core/auth';
 import { isAppError } from '@core/errors';
 import type { AppError } from '@core/errors';
 import { LoginScreen, loginWithError, toE164, useSendOtp } from '@features/auth';
@@ -28,6 +30,23 @@ export default function LoginRoute() {
 
   const error: AppError | null = isAppError(sendOtp.error) ? sendOtp.error : null;
 
+  /**
+   * The number from this device's last sign-in, if `core/auth/lastPhoneStore` has one — read
+   * once, off the splash the boot gate (`app/index.tsx`) already held. `undefined` while the
+   * read is in flight and `LoginScreen` just waits; there is deliberately no second loading
+   * surface here (task §13/§25 — the boot splash is the only one).
+   */
+  const [initialPhone, setInitialPhone] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    void readLastPhone().then((stored) => {
+      if (!cancelled) setInitialPhone(stored ?? '');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <>
       <LoginScreen
@@ -35,6 +54,7 @@ export default function LoginRoute() {
           ...loginWithError(DEMO_LOGIN, error),
           submitting: sendOtp.isPending,
         }}
+        {...(initialPhone === undefined ? {} : { initialPhone })}
         /**
          * `250:2423` — the two legal links under the CTA, which used to do NOTHING.
          *

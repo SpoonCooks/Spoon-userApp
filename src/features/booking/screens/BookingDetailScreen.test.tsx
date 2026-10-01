@@ -294,23 +294,7 @@ describe('Booking host — en route on time and late (3:1381 / 99:1413)', () => 
 });
 
 describe('Booking host — arrived (3:1658)', () => {
-  it('shows the Start OTP and the Start Service CTA', () => {
-    const onStartService = jest.fn();
-    render(
-      <BookingDetailView
-        state={ready(DEMO_BOOKING_ARRIVED)}
-        onRetry={onRetry}
-        onBack={jest.fn()}
-        onStartService={onStartService}
-      />,
-    );
-
-    expect(screen.getByTestId('arrived-handover-otp')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('arrived-handover-cta'));
-    expect(onStartService).toHaveBeenCalledTimes(1);
-  });
-
-  it('draws the handover even when no host has wired the CTA (it is drawn unconditionally)', () => {
+  it('shows the Start OTP and the Start Service label, drawn unconditionally', () => {
     render(
       <BookingDetailView
         state={ready(DEMO_BOOKING_ARRIVED)}
@@ -323,13 +307,32 @@ describe('Booking host — arrived (3:1658)', () => {
     expect(screen.getByTestId('arrived-handover-cta')).toBeTruthy();
   });
 
+  /**
+   * Starting and ending a service are the COOK's actions, made on the cook's own device — this
+   * pill only labels the OTP panel beneath it. A `Pressable` that looked identical to every real
+   * CTA in the app but silently did nothing on press read as broken rather than as a label, so it
+   * carries no accessibility button role and nothing to press.
+   */
+  it('is a label, not a control — no button role, nothing to press', () => {
+    render(
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_ARRIVED)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
+    );
+
+    const cta = screen.getByTestId('arrived-handover-cta');
+    expect(cta.props.accessibilityRole).not.toBe('button');
+    expect(cta.props.onPress).toBeUndefined();
+  });
+
   it('draws the OTP panel in the lime `start` tone, not the In-service yellow', () => {
     render(
       <BookingDetailView
         state={ready(DEMO_BOOKING_ARRIVED)}
         onRetry={onRetry}
         onBack={jest.fn()}
-        onStartService={jest.fn()}
       />,
     );
 

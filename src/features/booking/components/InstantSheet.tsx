@@ -48,7 +48,7 @@ import type { InstantViewModel } from '../types';
 
 /** `22:1151` — the 25 × 33 bolt in the sheet header. */
 const SHEET_BOLT =
-  require('../../../../assets/figma/icons/lightning-bolt.png') as ImageSourcePropType;
+  require('../../../../assets/figma/icons/lightning-bolt.webp') as ImageSourcePropType;
 
 /** `25:1848` / `44:5634` — the blocked-state illustrations, at their Figma boxes. */
 const UNAVAILABLE_ART: Record<
@@ -57,13 +57,13 @@ const UNAVAILABLE_ART: Record<
 > = {
   moon: {
     source:
-      require('../../../../assets/figma/instant/unavailable-out-of-shift.png') as ImageSourcePropType,
+      require('../../../../assets/figma/instant/unavailable-out-of-shift.webp') as ImageSourcePropType,
     width: 109,
     height: 80,
   },
   calendar: {
     source:
-      require('../../../../assets/figma/instant/unavailable-no-slots.png') as ImageSourcePropType,
+      require('../../../../assets/figma/instant/unavailable-no-slots.webp') as ImageSourcePropType,
     width: 96,
     height: 78,
   },
