@@ -34,10 +34,22 @@ export interface PlanHeaderProps {
   readonly onSelect: (id: string) => void;
   /** Omit to hide the "+". Step 1 always shows it: there is no cap on plans. */
   readonly onAdd?: (() => void) | undefined;
+  /**
+   * Shows the "+" but refuses it — while a plan has no day yet, another can't be started. Drawn
+   * at 40 % so it reads as unavailable rather than missing.
+   */
+  readonly addDisabled?: boolean;
   readonly testID: string;
 }
 
-export function PlanHeader({ plans, activeId, onSelect, onAdd, testID }: PlanHeaderProps) {
+export function PlanHeader({
+  plans,
+  activeId,
+  onSelect,
+  onAdd,
+  addDisabled = false,
+  testID,
+}: PlanHeaderProps) {
   const layout = plans.length > 1 ? 'shared' : onAdd === undefined ? 'alone' : 'besideAdd';
   return (
     <View style={styles.header} testID={testID}>
@@ -59,7 +71,9 @@ export function PlanHeader({ plans, activeId, onSelect, onAdd, testID }: PlanHea
           />
         ))}
       </ScrollView>
-      {onAdd === undefined ? null : <AddButton onPress={onAdd} testID={`${testID}-add`} />}
+      {onAdd === undefined ? null : (
+        <AddButton onPress={onAdd} disabled={addDisabled} testID={`${testID}-add`} />
+      )}
     </View>
   );
 }
@@ -130,7 +144,15 @@ function PlanTile({ plan, active, layout, onPress, testID }: PlanTileProps) {
 }
 
 /** `444:10424` — 32 × 56 at an 8pt radius, the 16pt plus centred. */
-function AddButton({ onPress, testID }: { readonly onPress: () => void; readonly testID: string }) {
+function AddButton({
+  onPress,
+  disabled,
+  testID,
+}: {
+  readonly onPress: () => void;
+  readonly disabled: boolean;
+  readonly testID: string;
+}) {
   const add = lightTheme.gradients.planAdd;
   const axis = gradientAxis(add.angleDeg, ADD_WIDTH, TILE_HEIGHT);
   return (
@@ -139,7 +161,9 @@ function AddButton({ onPress, testID }: { readonly onPress: () => void; readonly
       accessibilityRole="button"
       accessibilityLabel="Add another plan"
       hitSlop={ADD_SLOP}
-      style={styles.add}
+      disabled={disabled}
+      accessibilityState={{ disabled }}
+      style={[styles.add, disabled ? styles.addDisabled : null]}
       testID={testID}
     >
       <LinearGradient
@@ -243,6 +267,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  addDisabled: { opacity: 0.4 },
   /** `444:10424` — a 1.2pt edge and a `0 -2 4` glow. */
   addEdge: {
     borderRadius: lightTheme.radius.xs,

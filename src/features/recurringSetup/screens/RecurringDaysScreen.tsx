@@ -29,7 +29,9 @@ import type { RecurringWindowDay } from '../types';
  *
  *  - Everything picked on the first calendar is Plan 1, and each plan's tile counts its days.
  *  - The "+" is always shown (owner direction, overriding the frame's "appears after one tap"):
- *    it starts the next plan on a blank calendar. There is no cap on plans.
+ *    it starts the next plan on a blank calendar. There is no cap on plans, but a new plan can
+ *    only be started once every plan has at least one day — until then the "+" is dimmed and
+ *    does nothing (owner direction).
  *  - Days already in another plan are greyed out and cannot be picked.
  *  - The CTA unlocks once all plans together have 5 days, and until then reads "Pick N more days".
  *
@@ -182,7 +184,10 @@ export function RecurringDaysScreen({
     setActiveId(id);
   };
 
+  const canAddPlan = plans.every((plan) => plan.days.size > 0);
+
   const addPlan = () => {
+    if (plansRef.current.some((plan) => plan.days.size === 0)) return;
     // Ids never repeat, even after a plan is deleted on the Summary and the numbering closes up.
     const taken = new Set(plansRef.current.map((plan) => plan.id));
     let serial = plansRef.current.length + 1;
@@ -241,6 +246,7 @@ export function RecurringDaysScreen({
           activeId={activeId}
           onSelect={select}
           onAdd={addPlan}
+          addDisabled={!canAddPlan}
           testID={`${testID}-plans`}
         />
 
