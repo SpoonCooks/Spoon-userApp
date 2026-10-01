@@ -628,3 +628,39 @@ export function withoutVisitDay(
     visits,
   };
 }
+
+/** "Afternoon", "60 minutes", "9:00 AM" — a visit as the dialogs' tags list it (`586:4379`). */
+export function visitTags(visit: RecurringVisitChoice): readonly string[] {
+  const band = TIME_OF_DAY_BANDS.find((entry) => entry.id === visit.timeOfDay);
+  return [
+    band?.label ?? '',
+    `${durationMinutes(visit.durationId)} minutes`,
+    formatStartTime(visit.startMinutes),
+  ];
+}
+
+/** "Afternoon · 60 minutes · 9:00 AM" — a visit as the Delete plan rows detail it (`542:1681`). */
+export function visitDetail(visit: RecurringVisitChoice): string {
+  return visitTags(visit).join(' · ');
+}
+
+/** "4 days · 2 visits" — a plan as the Start over rows detail it (`542:1757`). */
+export function planDetail(plan: RecurringPlanDraft): string {
+  const days = plan.dayIds.length;
+  const visits = plan.visits.length;
+  return `${days} day${days === 1 ? '' : 's'} · ${visits} visit${visits === 1 ? '' : 's'}`;
+}
+
+/**
+ * A plan with one visit removed (`542:1534`). The plan keeps only the days a remaining visit
+ * still runs on. Null when it was the plan's only visit — that is deleting the plan.
+ */
+export function withoutVisit(
+  plan: RecurringPlanDraft,
+  visitIndex: number,
+): RecurringPlanDraft | null {
+  const visits = plan.visits.filter((_, index) => index !== visitIndex);
+  if (visits.length === 0) return null;
+  const booked = new Set(visits.flatMap((visit) => visitDays(plan.dayIds, visit)));
+  return { ...plan, dayIds: plan.dayIds.filter((id) => booked.has(id)), visits };
+}

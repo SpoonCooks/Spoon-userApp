@@ -213,6 +213,8 @@ export const lightColors = {
   borderPlanTile: palette.yellow200,
   /** Spoon — User `color/border/strong` — the outlined "Delete date" button (`586:4386`). */
   borderInk: palette.black,
+  /** Spoon — User `--disabled` (`#00000040`) as a fill: the undo banner's tick badge (`567:1031`). */
+  surfaceDisabledStrong: palette.black25,
 
   danger: palette.danger,
   dangerSurface: palette.dangerSurface,

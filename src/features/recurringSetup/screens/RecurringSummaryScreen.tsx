@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -7,15 +8,30 @@ import { Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import {
+  CALENDAR_REMOVE_ICON,
+  COOK_VISIT_ICON,
   DURATION_PHOTOS,
   PLUS_ICON,
+  RESTART_ICON,
   START_TIME_PHOTOS,
   TIME_OF_DAY_PHOTOS,
   TRASH_ICON,
 } from '../art';
+import { ManagePlansSheet } from '../components/ManagePlansSheet';
+import { DialogDays, DialogRows, DialogTags, RecurringDialog } from '../components/RecurringDialog';
 import { RecurringFooter } from '../components/RecurringFooter';
 import { SelectedDays } from '../components/SelectedDays';
-import { TIME_OF_DAY_BANDS, durationMinutes, formatStartTime, ordinal, visitDays } from '../data';
+import { UndoBanner } from '../components/UndoBanner';
+import {
+  TIME_OF_DAY_BANDS,
+  durationMinutes,
+  formatStartTime,
+  ordinal,
+  planDetail,
+  visitDays,
+  visitDetail,
+  visitTags,
+} from '../data';
 import type { RecurringPlanDraft } from '../types';
 
 /**
@@ -33,7 +49,9 @@ import type { RecurringPlanDraft } from '../types';
  *  - The pencil (`494:1039`) puts the dates into edit mode: it turns gold, the heading asks which
  *    date to edit, and tapping one opens Edit date for it. Tapping the pencil again, or moving to
  *    another plan or visit, leaves edit mode.
- *  - The bin removes the visit shown, or the plan if it is that plan's only visit.
+ *  - The bin (`542:1442`) opens "Manage your plans": delete the visit shown, delete its plan, or
+ *    start over — each confirmed in a dialog. After a delete the Summary shows an undo banner
+ *    (`568:2909`).
  *
  * The frame's header (`542:1341`, `Nav header 3`) has no back chevron — the title sits on the
  * gutter — so `onBack` is reached by Android's hardware back only.
@@ -47,7 +65,20 @@ export interface RecurringSummaryScreenProps {
   readonly onAddVisit: (planIndex: number) => void;
   /** Edit mode's date tap: edit that one date of the visit shown. */
   readonly onEditDate: (planIndex: number, visitIndex: number, dayId: string) => void;
-  readonly onDelete: (planIndex: number, visitIndex: number) => void;
+  /** "Delete visit" confirmed (`542:1534`). */
+  readonly onDeleteVisit: (planIndex: number, visitIndex: number) => void;
+  /** "Delete plan" confirmed (`542:1611`). */
+  readonly onDeletePlan: (planIndex: number) => void;
+  /** "Start over" confirmed (`542:1688`). */
+  readonly onStartOver: () => void;
+  /** `567:1030` — what the last delete took, with Undo; omitted when there is nothing to undo. */
+  readonly undo?:
+    | {
+        readonly message: string;
+        readonly onUndo: () => void;
+        readonly onDismiss: () => void;
+      }
+    | undefined;
   readonly onBook: () => void;
   /** Android hardware back; the header draws no chevron. */
   readonly onBack: () => void;
@@ -62,7 +93,10 @@ export function RecurringSummaryScreen({
   onAddPlan,
   onAddVisit,
   onEditDate,
-  onDelete,
+  onDeleteVisit,
+  onDeletePlan,
+  onStartOver,
+  undo,
   onBook,
   onBack,
   testID = 'recurring-summary-screen',
@@ -75,6 +109,88 @@ export function RecurringSummaryScreen({
   const shown = `${planIndex}:${visitIndex}`;
   const [editingFor, setEditingFor] = useState<string | null>(null);
   const editing = editingFor === shown;
+  /** The bin's sheet (`542:1442`), or the confirm dialog one of its rows opened. */
+  const [managing, setManaging] = useState<'sheet' | 'visit' | 'plan' | 'startOver' | null>(null);
+  const visitCount = plans.reduce((total, entry) => total + entry.visits.length, 0);
+  const planCount = plans.length;
+  const hasOtherVisit = (plan?.visits.length ?? 0) > 1;
+  /** `542:1531` — "all 2 plans and 3 visits"; "1 plan and 2 visits" when there is only one. */
+  const everything = `${planCount > 1 ? 'all ' : ''}${planCount} plan${planCount === 1 ? '' : 's'} and ${visitCount} visit${visitCount === 1 ? '' : 's'}`;
+  /** The confirm dialog a sheet row opened, or null. */
+  const manageDialog = (): ReactNode => {
+    const close = () => setManaging(null);
+    if (managing === 'visit' && plan !== undefined && visit !== undefined) {
+      return (
+        <RecurringDialog
+          visible
+          icon={COOK_VISIT_ICON}
+          title={`Delete ${ordinal(visitIndex + 1)} Visit from Plan ${planIndex + 1}?`}
+          keepLabel="Keep visit"
+          confirmLabel="Delete visit"
+          onKeep={close}
+          onConfirm={() => {
+            close();
+            onDeleteVisit(planIndex, visitIndex);
+          }}
+          testID={`${testID}-delete-visit`}
+        >
+          <DialogDays dayIds={visitDays(plan.dayIds, visit)} />
+          <DialogTags tags={visitTags(visit)} />
+        </RecurringDialog>
+      );
+    }
+    if (managing === 'plan' && plan !== undefined) {
+      return (
+        <RecurringDialog
+          visible
+          icon={CALENDAR_REMOVE_ICON}
+          title={`Delete Plan ${planIndex + 1}?`}
+          keepLabel="Keep plan"
+          confirmLabel="Delete plan"
+          onKeep={close}
+          onConfirm={() => {
+            close();
+            onDeletePlan(planIndex);
+          }}
+          testID={`${testID}-delete-plan`}
+        >
+          <DialogDays dayIds={plan.dayIds} />
+          <DialogRows
+            rows={plan.visits.map((entry, index) => ({
+              label: `${ordinal(index + 1)} Visit`,
+              detail: visitDetail(entry),
+            }))}
+          />
+        </RecurringDialog>
+      );
+    }
+    if (managing === 'startOver') {
+      return (
+        <RecurringDialog
+          visible
+          icon={RESTART_ICON}
+          title="Start over?"
+          body={`You'll lose ${everything}, then go back to choosing days, as if booking for the first time.`}
+          keepLabel="Keep plans"
+          confirmLabel="Start over"
+          onKeep={close}
+          onConfirm={() => {
+            close();
+            onStartOver();
+          }}
+          testID={`${testID}-start-over`}
+        >
+          <DialogRows
+            rows={plans.map((entry, index) => ({
+              label: `Plan ${index + 1}`,
+              detail: planDetail(entry),
+            }))}
+          />
+        </RecurringDialog>
+      );
+    }
+    return null;
+  };
   useAndroidBackHandler(() => {
     onBack();
     return true;
@@ -92,11 +208,9 @@ export function RecurringSummaryScreen({
             title="Summary"
             trailing={
               <Pressable
-                onPress={() => onDelete(planIndex, visitIndex)}
+                onPress={() => setManaging('sheet')}
                 accessibilityRole="button"
-                accessibilityLabel={
-                  (plan?.visits.length ?? 0) > 1 ? 'Delete this visit' : 'Delete this plan'
-                }
+                accessibilityLabel="Manage your plans"
                 style={styles.trash}
                 testID={`${testID}-delete`}
               >
@@ -126,6 +240,14 @@ export function RecurringSummaryScreen({
       }
     >
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {undo === undefined ? null : (
+          <UndoBanner
+            message={undo.message}
+            onUndo={undo.onUndo}
+            onDismiss={undo.onDismiss}
+            testID={`${testID}-undo`}
+          />
+        )}
         {plan === undefined ? null : (
           <SelectedDays
             dayIds={visit === undefined ? plan.dayIds : visitDays(plan.dayIds, visit)}
@@ -189,6 +311,20 @@ export function RecurringSummaryScreen({
           </View>
         )}
       </ScrollView>
+      <ManagePlansSheet
+        visible={managing === 'sheet'}
+        visitLine={
+          hasOtherVisit ? `${ordinal(visitIndex + 1)} Visit · Plan ${planIndex + 1}` : undefined
+        }
+        planLine={`Plan ${planIndex + 1} · ${plan?.visits.length ?? 0} visit${(plan?.visits.length ?? 0) === 1 ? '' : 's'}`}
+        startOverLine={`Deletes ${everything} and takes you back to choosing days`}
+        onDeleteVisit={() => setManaging('visit')}
+        onDeletePlan={() => setManaging('plan')}
+        onStartOver={() => setManaging('startOver')}
+        onClose={() => setManaging(null)}
+        testID={`${testID}-manage`}
+      />
+      {manageDialog()}
     </Screen>
   );
 }

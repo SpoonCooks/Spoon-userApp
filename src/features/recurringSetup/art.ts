@@ -73,3 +73,17 @@ export const CHIP_CLOCK_ICON =
 /** `558:170` — `Cook/ Visit`, 24pt, the delete dialog's badge. */
 export const COOK_VISIT_ICON =
   require('../../../assets/figma/recurring/cook-visit.png') as ImageSourcePropType;
+/** `547:2535` — `Calendar / Calendar_Remove`, 24pt: the "Delete plan" row and dialog. */
+export const CALENDAR_REMOVE_ICON =
+  require('../../../assets/figma/recurring/calendar-remove.png') as ImageSourcePropType;
+/** `543:2325` — `Interface / Restart`, 24pt: the sheet's "Start over" row. */
+export const RESTART_ROW_ICON =
+  require('../../../assets/figma/recurring/restart-sheet.png') as ImageSourcePropType;
+/** `542:1748` — the "Start over?" dialog's 24pt restart arrow. */
+export const RESTART_ICON =
+  require('../../../assets/figma/recurring/restart.png') as ImageSourcePropType;
+/** `568:2994` — `Done_round`, 20pt white tick in the undo banner's badge. */
+export const DONE_ICON = require('../../../assets/figma/recurring/done.png') as ImageSourcePropType;
+/** `43:67` — `Icon/Close`, 24pt: the undo banner's dismiss. */
+export const CLOSE_ICON =
+  require('../../../assets/figma/recurring/close.png') as ImageSourcePropType;

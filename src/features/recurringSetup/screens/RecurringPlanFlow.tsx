@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { busyWindowsFor, visitCaption, withoutVisitDay } from '../data';
+import { busyWindowsFor, ordinal, visitCaption, withoutVisit, withoutVisitDay } from '../data';
 import type { RecurringPlanDraft, RecurringVisitChoice } from '../types';
 import { RecurringDaysScreen } from './RecurringDaysScreen';
 import { RecurringEditDateScreen } from './RecurringEditDateScreen';
@@ -87,8 +87,19 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
   const [stage, setStage] = useState<Stage>({ kind: 'days' });
   /** Remounts the calendar each time the flow returns to it, so it opens on the plans given. */
   const [daysVisit, setDaysVisit] = useState(0);
+  /**
+   * `568:2909` — the Summary's undo banner after a delete: what to say and everything needed to
+   * put it back. Cleared by dismissing it or by leaving the Summary.
+   */
+  const [undo, setUndo] = useState<{
+    readonly message: string;
+    readonly plans: readonly RecurringPlanDraft[];
+    readonly planIndex: number;
+    readonly visitIndex: number;
+  } | null>(null);
 
   const goToDays = (next: readonly RecurringPlanDraft[], activeId?: string) => {
+    setUndo(null);
     setPlans(next);
     setDaysVisit((count) => count + 1);
     setStage({ kind: 'days', activeId });
@@ -296,30 +307,62 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
       onAddVisit={(planIndex) => {
         const plan = plans[planIndex];
         if (plan === undefined) return;
+        setUndo(null);
         setStage({ kind: 'visitDays', planId: plan.id, visitIndex: plan.visits.length });
       }}
       onEditDate={(planIndex, visitIndex, dayId) => {
         const plan = plans[planIndex];
         if (plan === undefined) return;
+        setUndo(null);
         setStage({ kind: 'editDate', planId: plan.id, visitIndex, dayId });
       }}
-      onDelete={(planIndex, visitIndex) => {
+      onDeleteVisit={(planIndex, visitIndex) => {
         const plan = plans[planIndex];
         if (plan === undefined) return;
-        if (plan.visits.length > 1) {
-          const visits = plan.visits.filter((_, index) => index !== visitIndex);
-          setPlans(plans.map((entry) => (entry === plan ? { ...entry, visits } : entry)));
-          setStage({ kind: 'summary', planIndex, visitIndex: Math.max(0, visitIndex - 1) });
-          return;
-        }
-        const next = plans.filter((entry) => entry !== plan);
+        const kept = withoutVisit(plan, visitIndex);
+        if (kept === null) return;
+        setUndo({
+          message: `${ordinal(visitIndex + 1)} Visit deleted from Plan ${planIndex + 1}`,
+          plans,
+          planIndex,
+          visitIndex,
+        });
+        setPlans(plans.map((entry) => (entry === plan ? kept : entry)));
+        setStage({ kind: 'summary', planIndex, visitIndex: Math.max(0, visitIndex - 1) });
+      }}
+      onDeletePlan={(planIndex) => {
+        const next = plans.filter((_, index) => index !== planIndex);
         if (next.length === 0) {
           goToDays([]);
           return;
         }
+        setUndo({
+          message: `Plan ${planIndex + 1} deleted`,
+          plans,
+          planIndex,
+          visitIndex: stage.visitIndex,
+        });
         setPlans(next);
         setStage({ kind: 'summary', planIndex: Math.max(0, planIndex - 1), visitIndex: 0 });
       }}
+      onStartOver={() => goToDays([])}
+      undo={
+        undo === null
+          ? undefined
+          : {
+              message: undo.message,
+              onUndo: () => {
+                setPlans(undo.plans);
+                setStage({
+                  kind: 'summary',
+                  planIndex: undo.planIndex,
+                  visitIndex: undo.visitIndex,
+                });
+                setUndo(null);
+              },
+              onDismiss: () => setUndo(null),
+            }
+      }
       onBook={() => onComplete?.(plans)}
       onBack={() => goToDays(plans, plans[stage.planIndex]?.id)}
     />
