@@ -3,7 +3,6 @@ import type {
   RecurringAutopayMethod,
   RecurringDateRow,
   RecurringDateVisitPlan,
-  RecurringDayCell,
   RecurringDurationOption,
   RecurringPickedDay,
   RecurringPlanConfirmation,
@@ -12,25 +11,35 @@ import type {
   RecurringTimeOfDay,
   RecurringVisitCharge,
   RecurringVisitDraft,
+  RecurringWindow,
+  RecurringWindowDay,
+  RecurringWindowRow,
 } from './types';
 
-/** `M T W T F S S` — the calendar header on Step 1. */
-export const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
+/** Step 1's header row (`144:2414`), Monday first. The eighth column carries no heading. */
+export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 const WEEKDAY_FORMATTER = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
 const MONTH_DAY_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' });
-/** "Sep 29" — the visible range label. Screen-reader labels keep the full month. */
-const SHORT_MONTH_DAY_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-});
 
-export interface RecurringCalendarDemo {
-  readonly rangeLabel: string;
-  readonly weeks: readonly (readonly RecurringDayCell[])[];
-  /** A 3-day starting selection — the wireframe's own "under minimum" state (2a). */
-  readonly preselectedIds: readonly string[];
-}
+/**
+ * The month column's labels. Figma (`144:2474`) writes September as "Sept"; every other month
+ * takes its usual three letters.
+ */
+const MONTH_LABELS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sept',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
 
 function addDays(date: Date, amount: number): Date {
   const next = new Date(date);
@@ -38,64 +47,65 @@ function addDays(date: Date, amount: number): Date {
   return next;
 }
 
-/** Monday of the week containing `date` — the grid's own week starts Monday, per the wireframe. */
-function mondayOfWeek(date: Date): Date {
-  const sinceMonday = (date.getDay() + 6) % 7;
-  return addDays(date, -sinceMonday);
-}
-
-function sundayOfWeek(date: Date): Date {
-  return addDays(mondayOfWeek(date), 6);
-}
-
 function toId(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function chunk<T>(items: readonly T[], size: number): readonly (readonly T[])[] {
-  const rows: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    rows.push(items.slice(index, index + size));
-  }
-  return rows;
+/** A local calendar date as `yyyy-mm-dd` — not `toISOString`, which shifts IST midnight a day back. */
+function toLocalId(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
+/** Recurring's window (DEC-084): it opens today + 3 and runs 21 days. */
+export const RECURRING_WINDOW_OFFSET_DAYS = 3;
+export const RECURRING_WINDOW_LENGTH_DAYS = 21;
+
 /**
- * Fixture for Step 1 ("Pick your days"), reproducing the wireframe's own worked example rather
- * than reading `today` — there is no availability endpoint yet for this to be a real read of, and
- * a fixture that quietly drifted with the clock would fall out of sync with the one-time-Schedule
- * carve-out and the "no cooks" day the design calls out by name.
+ * Step 1 ("Pick your days", `144:2404`): exactly the 21 bookable dates and nothing else.
  *
- * Global rules the wireframe states: recurring window opens today + 3 and runs 21 days; today and
- * the following 2 days belong to the existing one-time Schedule flow and never overlap with it.
+ * Per the frame's logic note, dates are NOT padded out to fill a week. Rows run Monday to Sunday,
+ * and a row also breaks where the month changes, so each row's eighth column can name one month
+ * ("Sept", "Oct"). Slots outside the window are `null` and draw nothing.
  */
-export function buildDemoCalendar(): RecurringCalendarDemo {
-  const opened = new Date(2026, 8, 26); // Sat Sep 26 — "opened on" in the wireframe
-  const windowStart = addDays(opened, 3); // Sep 29 — today + 3
-  const windowEnd = addDays(windowStart, 20); // Oct 19 — a 21-day window
-  const noCookId = toId(new Date(2026, 9, 10)); // Oct 10 — the wireframe's "day with no cooks"
+export function buildRecurringWindow(today: Date): RecurringWindow {
+  const first = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const windowStart = addDays(first, RECURRING_WINDOW_OFFSET_DAYS);
 
-  const gridStart = mondayOfWeek(opened);
-  const gridEnd = sundayOfWeek(windowEnd);
-
-  const days: RecurringDayCell[] = [];
-  for (let cursor = gridStart; cursor <= gridEnd; cursor = addDays(cursor, 1)) {
-    const id = toId(cursor);
-    const inWindow = cursor >= windowStart && cursor <= windowEnd;
+  const days: RecurringWindowDay[] = [];
+  for (let offset = 0; offset < RECURRING_WINDOW_LENGTH_DAYS; offset += 1) {
+    const date = addDays(windowStart, offset);
     days.push({
-      id,
-      dayOfMonth: cursor.getDate(),
-      label: `${WEEKDAY_FORMATTER.format(cursor)}, ${MONTH_DAY_FORMATTER.format(cursor)}`,
-      disabled: !inWindow,
-      unavailable: id === noCookId,
+      id: toLocalId(date),
+      dayOfMonth: date.getDate(),
+      weekday: (date.getDay() + 6) % 7,
+      month: date.getMonth(),
+      label: `${WEEKDAY_FORMATTER.format(date)}, ${MONTH_DAY_FORMATTER.format(date)}`,
     });
   }
 
-  return {
-    rangeLabel: `${SHORT_MONTH_DAY_FORMATTER.format(windowStart)} – ${SHORT_MONTH_DAY_FORMATTER.format(windowEnd)}`,
-    weeks: chunk(days, 7),
-    preselectedIds: [0, 1, 2].map((offset) => toId(addDays(windowStart, offset))),
+  const rows: RecurringWindowRow[] = [];
+  let slots: (RecurringWindowDay | null)[] = [];
+  let rowMonth = days[0]?.month ?? 0;
+  const flush = () => {
+    if (slots.some((slot) => slot !== null)) {
+      rows.push({ monthLabel: MONTH_LABELS[rowMonth] ?? '', days: slots });
+    }
+    slots = [];
   };
+  for (const day of days) {
+    // A new Monday, or a new month mid-week, starts a new row.
+    if (slots.length > 0 && (day.weekday === 0 || day.month !== rowMonth)) flush();
+    if (slots.length === 0) {
+      rowMonth = day.month;
+      slots = Array.from({ length: 7 }, () => null);
+    }
+    slots[day.weekday] = day;
+  }
+  flush();
+
+  return { rows, orderedIds: days.map((day) => day.id) };
 }
 
 /**

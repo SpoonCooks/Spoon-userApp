@@ -16,15 +16,18 @@ export { RecurringAutopayScreen } from './screens/RecurringAutopayScreen';
 export type { RecurringAutopayScreenProps } from './screens/RecurringAutopayScreen';
 export { RecurringPlanConfirmedScreen } from './screens/RecurringPlanConfirmedScreen';
 export type { RecurringPlanConfirmedScreenProps } from './screens/RecurringPlanConfirmedScreen';
-export { buildDemoCalendar, WEEKDAY_LABELS } from './data';
-export type { RecurringCalendarDemo } from './data';
+export {
+  buildRecurringWindow,
+  RECURRING_WINDOW_LENGTH_DAYS,
+  RECURRING_WINDOW_OFFSET_DAYS,
+  WEEKDAY_LABELS,
+} from './data';
 export type {
   RecurringAutopayDetail,
   RecurringAutopayMethod,
   RecurringDateRow,
   RecurringDateVisitPlan,
   RecurringDateVisitTime,
-  RecurringDayCell,
   RecurringDaysMode,
   RecurringDurationOption,
   RecurringPickedDay,
@@ -34,4 +37,7 @@ export type {
   RecurringTimeOfDay,
   RecurringVisitCharge,
   RecurringVisitDraft,
+  RecurringWindow,
+  RecurringWindowDay,
+  RecurringWindowRow,
 } from './types';

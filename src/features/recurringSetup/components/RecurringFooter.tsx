@@ -15,8 +15,11 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
  *   `ruled`   — `4:713` / `4:1267` / `4:1929` / `4:2000` (Steps 2–5): a 1pt `#EEEDE8` rule edge to
  *               edge, 11 below it, 8 between content and CTA.
  *   `stacked` — `4:2034` (Step 6): no rule; 14 above, 10 between the CTA and `secondary`.
+ *   `pill`    — the redesigned file (`cCQlzTeiObQkpVBzwI8mZi`, e.g. `144:2481`): a 72pt white Footer,
+ *               px 16 / py 12, holding the file's Button — a 48pt `#FFD600` pill with a Livvic Bold
+ *               16/24 black label, and its own soft disabled state. No rule, no lift.
  */
-export type RecurringFooterLayout = 'plain' | 'ruled' | 'stacked';
+export type RecurringFooterLayout = 'plain' | 'ruled' | 'stacked' | 'pill';
 
 export interface RecurringFooterProps {
   readonly label: string;
@@ -42,16 +45,29 @@ export function RecurringFooter({
   return (
     <View style={LAYOUT_STYLE[layout]}>
       {children}
-      <Button
-        label={label}
-        onPress={onPress}
-        disabled={disabled}
-        flat
-        labelVariant="titleLargeBlack"
-        labelColor="textInk"
-        style={styles.cta}
-        testID={testID}
-      />
+      {layout === 'pill' ? (
+        <Button
+          label={label}
+          onPress={onPress}
+          disabled={disabled}
+          size="pillLg"
+          flat
+          disabledTone="soft"
+          labelColor="textPrimary"
+          testID={testID}
+        />
+      ) : (
+        <Button
+          label={label}
+          onPress={onPress}
+          disabled={disabled}
+          flat
+          labelVariant="titleLargeBlack"
+          labelColor="textInk"
+          style={styles.cta}
+          testID={testID}
+        />
+      )}
       {secondary}
     </View>
   );
@@ -87,6 +103,15 @@ const styles = StyleSheet.create({
     paddingTop: lightTheme.space.s6,
     paddingHorizontal: GUTTER - SCREEN_GUTTER,
   },
+  /**
+   * `144:2481` — py 12 around the button. `Screen` already gives 8 on top and the safe area below
+   * (the frame's 34pt home indicator), so this adds 4 above and the full 12 below.
+   */
+  pill: {
+    gap: lightTheme.space.sm,
+    paddingTop: lightTheme.space.xs,
+    paddingBottom: lightTheme.space.md,
+  },
   /** `4:426` — a flat 52pt bar at a 16pt radius. */
   cta: { height: 52, paddingVertical: 0, borderRadius: lightTheme.radius.md },
 });
@@ -95,4 +120,5 @@ const LAYOUT_STYLE: Record<RecurringFooterLayout, ViewStyle> = {
   plain: styles.plain,
   ruled: styles.ruled,
   stacked: styles.stacked,
+  pill: styles.pill,
 };

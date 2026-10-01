@@ -9,17 +9,30 @@
  * so every screen here renders from local fixture data until one does.
  */
 
-/** One cell in the Step 1 "Pick your days" calendar. */
-export interface RecurringDayCell {
-  /** ISO calendar date (`yyyy-mm-dd`), stable enough to key a Set of selections. */
+/** One bookable date on Step 1 ("Pick your days"). */
+export interface RecurringWindowDay {
+  /** Local calendar date (`yyyy-mm-dd`), stable enough to key a Set of selections. */
   readonly id: string;
   readonly dayOfMonth: number;
-  /** Screen-reader label, e.g. "Tuesday, September 29". */
+  /** 0 = Monday … 6 = Sunday: the column the date sits in. */
+  readonly weekday: number;
+  /** 0 = January … 11 = December. */
+  readonly month: number;
+  /** Screen-reader label, e.g. "Monday, September 28". */
   readonly label: string;
-  /** Outside the bookable window (past, one-time-Schedule-owned, or beyond the 21-day horizon). */
-  readonly disabled: boolean;
-  /** Inside the window but with no cook coverage — greyed out and non-selectable. */
-  readonly unavailable: boolean;
+}
+
+/** One calendar row: seven Monday-first slots (null outside the window) and its month label. */
+export interface RecurringWindowRow {
+  readonly monthLabel: string;
+  readonly days: readonly (RecurringWindowDay | null)[];
+}
+
+/** The 21-day Recurring window, laid out for Step 1. */
+export interface RecurringWindow {
+  readonly rows: readonly RecurringWindowRow[];
+  /** Every bookable date in order: the earliest picked is the start, the latest the end. */
+  readonly orderedIds: readonly string[];
 }
 
 /** A duration choice on Step 2 — mirrors `PriceTile`'s own fields plus the minutes to schedule with. */

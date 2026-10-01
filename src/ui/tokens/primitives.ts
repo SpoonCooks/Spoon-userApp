@@ -219,6 +219,17 @@ export const palette = {
   dangerSurfaceStrong: 'rgba(255,4,4,0.3)',
 
   // ---------------------------------------------------------------------------
+  // Spoon — User (`cCQlzTeiObQkpVBzwI8mZi`), the redesigned recurring setup. Values are the
+  // file's own variables, not measurements.
+  // ---------------------------------------------------------------------------
+  /** `color/surface/disabled` — the disabled pill CTA. `#00000006`, i.e. black at ~2 %. */
+  black02: '#00000006',
+  /** `color/text/disabled` — the disabled pill CTA's label. `#00000040`, i.e. black at 25 %. */
+  black25: '#00000040',
+  /** `155:1585` / `158:1586` — the inline "Max 14 days reached" error and its dot. */
+  red600: '#E53935',
+
+  // ---------------------------------------------------------------------------
   // Recurring setup — Figma `ZIJf639gTWHXshaa2YOeCT` ("Version 1"), frames `4:282` … `4:2005`.
   // A warm stone ramp plus a near-black ink, used across all six steps.
   // ---------------------------------------------------------------------------

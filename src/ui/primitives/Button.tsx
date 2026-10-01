@@ -52,11 +52,13 @@ export type ButtonVariant =
  *                      Below 44pt, so `hitSlop` restores the target without redrawing it.
  *  - `barSm` `143:364` — the Extension fallback's "Book NOW": 32pt at a 15pt radius with a Livvic
  *                      **Bold** 16/24 label, where `bar` is Black.
+ *  - `pillLg` `90:180` (Spoon — User) — the redesigned file's Button: at least 48 tall, px 16 /
+ *                      py 12, fully rounded, Livvic Bold 16/24.
  *  - `form` `53:110` / `275:4485` — the address CTA: a FIXED 34pt bar, px 12 / py 6, 30pt radius,
  *                      Livvic Black 16/24 at −0.4. Below 44pt, so `hitSlop` restores the target.
  *                      The finalized file draws NO glow under it; the screens no longer add one.
  */
-export type ButtonSize = 'md' | 'lg' | 'bar' | 'barSm' | 'form' | 'pill' | 'pillSm';
+export type ButtonSize = 'md' | 'lg' | 'bar' | 'barSm' | 'form' | 'pill' | 'pillSm' | 'pillLg';
 
 export interface ButtonProps {
   readonly label: string;
@@ -84,6 +86,15 @@ export interface ButtonProps {
    * The recurring-setup CTA (`4:545`) sets `#1A1A1A` on the `#FFD600` bar where `primary` is black.
    */
   readonly labelColor?: ColorToken;
+  /**
+   * Which disabled treatment the bar takes.
+   *
+   *   `drained` — `275:4690`: `#EDEDED` behind a black-50 % label, lift kept. Every screen so far.
+   *   `soft`    — Spoon — User's `color/surface/disabled` (`#00000006`) behind
+   *               `color/text/disabled` (`#00000040`), the redesigned file's disabled Button
+   *               (`144:2482`, "Pick 5 more days").
+   */
+  readonly disabledTone?: 'drained' | 'soft';
   /** Trailing slot inside the bar — `37:3912`, the inset black `Pay →` pill on Scheduled. */
   readonly trailing?: ReactNode;
   /** Overrides the visible label for screen readers when the label alone is ambiguous. */
@@ -150,6 +161,7 @@ export function Button({
   flat = false,
   labelVariant,
   labelColor: labelColorOverride,
+  disabledTone = 'drained',
   accessibilityLabel,
   accessibilityHint,
   testID,
@@ -161,7 +173,9 @@ export function Button({
    * label. NOT the slate `textDisabled`, which belongs to list rows and icons.
    */
   const labelColor: ColorToken = inactive
-    ? 'textCtaDisabled'
+    ? disabledTone === 'soft'
+      ? 'textDisabledSoft'
+      : 'textCtaDisabled'
     : (labelColorOverride ?? LABEL_COLOR[variant]);
 
   return (
@@ -183,7 +197,7 @@ export function Button({
         SURFACE[variant],
         flat ? styles.flat : null,
         fullWidth ? styles.fullWidth : null,
-        inactive ? styles.inactive : null,
+        inactive ? (disabledTone === 'soft' ? styles.inactiveSoft : styles.inactive) : null,
         pressed && !inactive ? styles.pressed : null,
         style,
       ]}
@@ -231,6 +245,7 @@ const LABEL_VARIANT: Record<ButtonSize, TypographyToken> = {
   form: 'headingCtaTight',
   pill: 'titleLead',
   pillSm: 'title',
+  pillLg: 'headingBold',
 };
 
 const styles = StyleSheet.create({
@@ -279,6 +294,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: lightTheme.space.md,
     paddingVertical: lightTheme.space.s6,
   },
+  /** `90:180` (Spoon — User) — min 48 tall, px 16 / py 12, fully rounded. */
+  pillLg: {
+    minHeight: 48,
+    borderRadius: lightTheme.radius.pill,
+    paddingHorizontal: lightTheme.space.lg,
+    paddingVertical: lightTheme.space.md,
+  },
   /** `143:364` — the Extension fallback's 32pt "Book NOW" pill. */
   barSm: {
     height: 32,
@@ -308,6 +330,13 @@ const styles = StyleSheet.create({
    * the fill and the ink change, which is what makes the disabled state read as the SAME control.
    */
   inactive: { backgroundColor: lightTheme.colors.surfaceCtaDisabled, borderColor: 'transparent' },
+  /** `144:2482` — the redesigned file's disabled pill: a near-white wash, no lift. */
+  inactiveSoft: {
+    backgroundColor: lightTheme.colors.surfaceDisabledSoft,
+    borderColor: 'transparent',
+    ...lightTheme.elevation.none,
+    shadowColor: 'transparent',
+  },
   inactiveTrailing: { opacity: 0.4 },
   pressed: { opacity: 0.85 },
   content: {
@@ -327,4 +356,5 @@ const SHAPE: Record<ButtonSize, ViewStyle> = {
   form: styles.form,
   pill: styles.pill,
   pillSm: styles.pillSm,
+  pillLg: styles.pillLg,
 };

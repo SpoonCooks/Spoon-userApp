@@ -194,6 +194,20 @@ export const lightColors = {
   accentPrimary: palette.yellow400,
   accentSecondary: palette.lime300,
 
+  /**
+   * Spoon — User (`cCQlzTeiObQkpVBzwI8mZi`): `color/brand/primary` and `color/brand/primary-tint`.
+   * On Step 1 (`149:1525`) the first and last picked days take the brand fill and the days
+   * between take the tint.
+   */
+  surfaceBrand: palette.yellow500,
+  surfaceBrandTint: palette.yellow400,
+  /** `color/surface/disabled` + `color/text/disabled` — the redesigned file's disabled pill CTA. */
+  surfaceDisabledSoft: palette.black02,
+  textDisabledSoft: palette.black25,
+  /** `155:1585` — inline validation copy, and the dot (`158:1586`) beside it. */
+  textError: palette.red600,
+  surfaceError: palette.red600,
+
   danger: palette.danger,
   dangerSurface: palette.dangerSurface,
   dangerSurfaceStrong: palette.dangerSurfaceStrong,
@@ -984,6 +998,27 @@ export const typography = {
   /** Recurring setup, Step 1 — the "Sep 29 – Oct 19" range: Livvic Regular 14/20. */
   bodyLarge: {
     fontSize: fontSize.lg,
+    lineHeight: lineHeight.lg,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Body Strong`: Livvic SemiBold 14/20 (the Step 1 weekday and month labels). */
+  bodyLargeStrong: {
+    fontSize: fontSize.lg,
+    lineHeight: lineHeight.lg,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Title`: Livvic Bold 20/28, the `Nav header 2` title (`44:66`). */
+  titleNav: {
+    fontSize: fontSize.xxl20,
+    lineHeight: lineHeight.xxl,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `155:1585` — Livvic Regular 12 on a 20pt line: inline validation under a field or grid. */
+  captionError: {
+    fontSize: fontSize.md,
     lineHeight: lineHeight.lg,
     fontFamily: fontFamily.regular,
     letterSpacing: letterSpacing.none,

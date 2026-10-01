@@ -23,6 +23,9 @@ import { RouteScaffold } from '@ui';
  * Grows as each step is built; nothing here is wired to the real flow or to the previous step's
  * selection.
  */
+/** `144:2404` opens on Sep 28 = today + 3. */
+const FIGMA_TODAY = new Date(2026, 8, 25);
+
 export default function RecurringSetupPreviewRoute() {
   const router = useRouter();
   const { step, visits } = useLocalSearchParams<{ step?: string; visits?: string }>();
@@ -52,6 +55,8 @@ export default function RecurringSetupPreviewRoute() {
     case '6':
       return <RecurringPlanConfirmedScreen />;
     default:
-      return <RecurringDaysScreen onBack={goBack} />;
+      // Pinned to the date the Figma frames are drawn for (window Sep 28 – Oct 18), so the
+      // preview can be compared against `144:2404` side by side. The real route uses today.
+      return <RecurringDaysScreen onBack={goBack} today={FIGMA_TODAY} />;
   }
 }

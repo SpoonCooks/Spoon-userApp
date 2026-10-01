@@ -1,8 +1,9 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { ViewStyle } from 'react-native';
 import type { ReactNode } from 'react';
 
 import { DirectionalDisc } from '@ui/primitives/DirectionalDisc';
+import { Icon } from '@ui/primitives/Icon';
 import { Text } from '@ui/primitives/Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
@@ -22,7 +23,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
  * This is NOT the booking-lifecycle header (`39:5324`), which carries an address pair and the Help
  * pill instead of a single title, nor the sheet header (`1:735`).
  */
-export type ScreenHeaderDensity = 'default' | 'band' | 'step';
+export type ScreenHeaderDensity = 'default' | 'band' | 'step' | 'nav';
 
 export interface ScreenHeaderProps {
   readonly title: string;
@@ -57,6 +58,9 @@ export interface ScreenHeaderProps {
    *               36pt disc, a 12pt gap and a Livvic Black 22/28 `#1A1A1A` title, in its OWN 20pt
    *               gutter, 8 below the safe area and 6 above the content (the frame's pt 52 less
    *               its 44pt status bar). Drawn full-bleed — no wrapper supplies the gutter.
+   *   `nav`     — `Nav header 2` (`44:62`) in the redesigned file (`cCQlzTeiObQkpVBzwI8mZi`): NO
+   *               disc — a bare 24pt chevron (`43:63`) centred in a 44pt back button, a 4pt gap,
+   *               pl 8 / pr 16 / py 8, and a Livvic Bold 20/28 black title. 60 tall.
    */
   readonly density?: ScreenHeaderDensity;
   readonly trailing?: ReactNode;
@@ -72,6 +76,7 @@ export function ScreenHeader({
   testID = 'screen-header',
 }: ScreenHeaderProps) {
   const step = density === 'step';
+  const nav = density === 'nav';
   return (
     <View
       style={[styles.header, DENSITY_STYLE[density], divider ? styles.divider : null]}
@@ -79,7 +84,19 @@ export function ScreenHeader({
     >
       {/* `54:289` — the exported 32pt disc, mirrored to face back (36pt on `step`). Absent by
           design on a first-run `53:31`; see `onBack`. */}
-      {onBack === undefined ? null : (
+      {onBack === undefined ? null : nav ? (
+        // `43:63` is Feather's `chevron-left` exactly: M15 6 L9 12 L15 18, a 2pt round stroke in a
+        // 24 box — which is the glyph `Icon`'s `back` already draws at 24.
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          style={styles.navBack}
+          testID={`${testID}-back`}
+        >
+          <Icon name="back" size={NAV_CHEVRON} color="textPrimary" />
+        </Pressable>
+      ) : (
         <DirectionalDisc
           direction="back"
           label="Back"
@@ -89,7 +106,7 @@ export function ScreenHeader({
         />
       )}
       <Text
-        variant={step ? 'headingStep' : 'headingScreen'}
+        variant={step ? 'headingStep' : nav ? 'titleNav' : 'headingScreen'}
         color={step ? 'textInk' : 'textPrimary'}
         accessibilityRole="header"
         numberOfLines={1}
@@ -104,6 +121,8 @@ export function ScreenHeader({
 
 /** `4:300` — the recurring-setup back disc. */
 const STEP_DISC = 36;
+/** `43:63` — the bare chevron inside `Nav header 2`'s 44pt back button (`44:63`). */
+const NAV_CHEVRON = 24;
 
 const styles = StyleSheet.create({
   /** Shared by every density: a white row, 12pt gap. */
@@ -129,6 +148,20 @@ const styles = StyleSheet.create({
     paddingTop: lightTheme.space.sm,
     paddingBottom: lightTheme.space.s6,
   },
+  /** `44:62` — pl 8 / pr 16 / py 8 around the 44pt button; a 4pt gap, not the shared 12. */
+  nav: {
+    gap: lightTheme.space.xs,
+    paddingLeft: lightTheme.space.sm,
+    paddingRight: lightTheme.space.lg,
+    paddingVertical: lightTheme.space.sm,
+  },
+  /** `44:63` — the 44pt back button, already a full touch target. */
+  navBack: {
+    width: lightTheme.layout.minTouchTarget,
+    height: lightTheme.layout.minTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   divider: {
     borderBottomWidth: lightTheme.stroke.hairline,
     borderBottomColor: lightTheme.colors.borderField,
@@ -140,4 +173,5 @@ const DENSITY_STYLE: Record<ScreenHeaderDensity, ViewStyle> = {
   default: styles.default,
   band: styles.band,
   step: styles.step,
+  nav: styles.nav,
 };
