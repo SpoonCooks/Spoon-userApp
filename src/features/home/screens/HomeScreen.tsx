@@ -91,26 +91,39 @@ export interface HomeViewProps extends HomeActions {
 
 export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps) {
   const { top } = useSafeAreaInsets();
+  /** The banner's drawn height — the room the scroll content leaves for it at the top. */
+  const [bannerHeight, setBannerHeight] = useState(0);
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right']} testID="home-screen">
       <QueryBoundary state={state} {...(onRetry === undefined ? {} : { onRetry })}>
         {(home) => (
-          <>
+          <View style={styles.flex}>
             {/*
+              The banner floats OVER the scroll view rather than sitting above it, so content
+              scrolls up under its rounded bottom corners instead of the page's white showing
+              there; the scroll content starts `bannerHeight` down, so it opens where it did. It
+              stays FIRST in the tree so screen readers still reach it first; `zIndex` draws it on
+              top.
+
               `topInset` extends the banner's OWN padding/background/shadow up through the status
               bar area, rather than a separate sibling box sitting above it — two adjacent boxes
               left a visible seam where the banner's shadow bled across the shared edge. A single
               box has no seam, and its shadow's top edge is simply clipped by the screen edge.
             */}
-            <HomeTopBanner
-              header={home.header}
-              topInset={top}
-              onPressAddress={actions.onPressAddress}
-              onPressProfile={actions.onPressProfile}
-            />
+            <View
+              style={styles.banner}
+              onLayout={(event) => setBannerHeight(event.nativeEvent.layout.height)}
+            >
+              <HomeTopBanner
+                header={home.header}
+                topInset={top}
+                onPressAddress={actions.onPressAddress}
+                onPressProfile={actions.onPressProfile}
+              />
+            </View>
 
             <ScrollView
-              contentContainerStyle={styles.scroll}
+              contentContainerStyle={[styles.scroll, { paddingTop: bannerHeight }]}
               showsVerticalScrollIndicator={false}
               testID="home-scroll"
             >
@@ -151,7 +164,7 @@ export function HomeView({ state, onRetry, focused, ...actions }: HomeViewProps)
                 </View>
               </View>
             </ScrollView>
-          </>
+          </View>
         )}
       </QueryBoundary>
     </SafeAreaView>
@@ -179,6 +192,9 @@ export function HomeScreen(actions: HomeActions) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: lightTheme.colors.surface },
+  flex: { flex: 1 },
+  /** Pinned to the top, over the scroll view. */
+  banner: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 },
   scroll: { paddingBottom: HOME_DESIGN.body.paddingBottom },
   /**
    * The carousel is FULL-BLEED (`1:479` spans the viewport, not the 16pt column), so the gutter
