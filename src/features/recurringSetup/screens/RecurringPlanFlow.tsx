@@ -1,10 +1,12 @@
 import { useState } from 'react';
 
+import { visitCaption } from '../data';
 import type { RecurringPlanDraft, RecurringVisitChoice } from '../types';
 import { RecurringDaysScreen } from './RecurringDaysScreen';
 import type { RecurringPlanDays } from './RecurringDaysScreen';
 import { RecurringScheduleScreen } from './RecurringScheduleScreen';
 import { RecurringSummaryScreen } from './RecurringSummaryScreen';
+import { RecurringVisitDaysScreen } from './RecurringVisitDaysScreen';
 
 /**
  * The redesigned recurring flow, end to end on device: pick days (and plans) → schedule each
@@ -15,8 +17,11 @@ import { RecurringSummaryScreen } from './RecurringSummaryScreen';
  *  - Days → Schedule: every plan without a visit is scheduled in plan order ("P1 → P2 → … Pn").
  *  - Schedule → Summary once no plan is left unscheduled.
  *  - Summary "+" plan: back to the calendar with a blank plan added and active.
- *  - Summary "+" visit: Schedule for that plan's next visit, then back to the Summary.
- *  - Summary pencil: back to the calendar on that plan. Visits survive a change of days.
+ *  - Summary "+" visit (`332:6093` …): pick which of the plan's days it runs on, then Schedule
+ *    it ("Add this visit"), then back to the Summary on the new visit.
+ *  - Summary pencil: on a 1st visit, back to the calendar on that plan; on a later visit, back to
+ *    that visit's days. Visits survive a change of plan days, keeping the days the plan still has
+ *    (a later visit left with none is dropped).
  *  - Summary bin: removes the visit shown, or the plan when it is the plan's only visit.
  */
 export interface RecurringPlanFlowProps {
@@ -34,6 +39,14 @@ type Stage =
       readonly visitIndex: number;
       /** `sequence` walks every unscheduled plan; `summary` returns straight to the Summary. */
       readonly returnTo: 'sequence' | 'summary';
+      /** A later visit's own days, picked on the visit-days screen. */
+      readonly dayIds?: readonly string[] | undefined;
+    }
+  | {
+      readonly kind: 'visitDays';
+      readonly planId: string;
+      readonly visitIndex: number;
+      readonly dayIds?: readonly string[] | undefined;
     }
   | { readonly kind: 'summary'; readonly planIndex: number; readonly visitIndex: number };
 
@@ -42,6 +55,22 @@ function nextPlanId(plans: readonly RecurringPlanDraft[]): string {
   let serial = plans.length + 1;
   while (taken.has(`plan-${serial}`)) serial += 1;
   return `plan-${serial}`;
+}
+
+/**
+ * A plan's visits after its days change: the 1st keeps running on every day; a later visit keeps
+ * the days the plan still has, and is dropped if none are left.
+ */
+function keepVisitsOn(
+  dayIds: readonly string[],
+  visits: readonly RecurringVisitChoice[],
+): readonly RecurringVisitChoice[] {
+  const kept = new Set(dayIds);
+  return visits.flatMap((visit, index) => {
+    if (index === 0 || visit.dayIds === undefined) return [visit];
+    const left = visit.dayIds.filter((id) => kept.has(id));
+    return left.length === 0 ? [] : [{ ...visit, dayIds: left }];
+  });
 }
 
 export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFlowProps) {
@@ -84,7 +113,10 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
           const next = picked.map((entry) => ({
             id: entry.id,
             dayIds: entry.dayIds,
-            visits: plans.find((plan) => plan.id === entry.id)?.visits ?? [],
+            visits: keepVisitsOn(
+              entry.dayIds,
+              plans.find((plan) => plan.id === entry.id)?.visits ?? [],
+            ),
           }));
           setPlans(next);
           const focus = next.findIndex((plan) => plan.id === stage.activeId);
@@ -94,37 +126,88 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
     );
   }
 
+  if (stage.kind === 'visitDays') {
+    const index = plans.findIndex((plan) => plan.id === stage.planId);
+    const plan = plans[index];
+    if (plan === undefined) return null;
+    const editing = plan.visits[stage.visitIndex];
+    return (
+      <RecurringVisitDaysScreen
+        key={`${plan.id}-days-${stage.visitIndex}`}
+        planNumber={index + 1}
+        planDayIds={plan.dayIds}
+        bookedVisits={plan.visits.slice(0, stage.visitIndex).map(visitCaption)}
+        initialDayIds={stage.dayIds ?? editing?.dayIds}
+        onBack={() =>
+          setStage({
+            kind: 'summary',
+            planIndex: index,
+            visitIndex: Math.min(stage.visitIndex, plan.visits.length - 1),
+          })
+        }
+        onContinue={(dayIds) =>
+          setStage({
+            kind: 'schedule',
+            planId: plan.id,
+            visitIndex: stage.visitIndex,
+            returnTo: 'summary',
+            dayIds,
+          })
+        }
+      />
+    );
+  }
+
   if (stage.kind === 'schedule') {
     const index = plans.findIndex((plan) => plan.id === stage.planId);
     const plan = plans[index];
     if (plan === undefined) return null;
+    const laterVisit = stage.visitIndex > 0;
+    const existing = plan.visits[stage.visitIndex];
     const laterPending = plans.findIndex(
       (entry, entryIndex) => entryIndex > index && entry.visits.length === 0,
     );
-    const ctaLabel =
-      stage.returnTo === 'sequence' && laterPending !== -1
+    const ctaLabel = laterVisit
+      ? existing === undefined
+        ? 'Add this visit'
+        : 'Save & Continue'
+      : stage.returnTo === 'sequence' && laterPending !== -1
         ? `Save & Schedule Plan ${laterPending + 1}`
         : 'Save & Continue';
+    const dayIds = laterVisit ? (stage.dayIds ?? existing?.dayIds ?? plan.dayIds) : plan.dayIds;
     return (
       <RecurringScheduleScreen
         key={`${plan.id}-${stage.visitIndex}`}
         planNumber={index + 1}
         visitNumber={stage.visitIndex + 1}
-        dayIds={plan.dayIds}
-        initial={plan.visits[stage.visitIndex]}
+        dayIds={dayIds}
+        initial={existing}
         ctaLabel={ctaLabel}
-        onBack={() =>
-          stage.returnTo === 'summary'
-            ? setStage({
-                kind: 'summary',
-                planIndex: index,
-                visitIndex: Math.max(0, Math.min(stage.visitIndex, plan.visits.length - 1)),
-              })
-            : goToDays(plans, plan.id)
-        }
+        {...(laterVisit
+          ? {
+              addingVisit: {
+                planDayIds: plan.dayIds,
+                visitsBefore: plan.visits.slice(0, stage.visitIndex),
+                otherVisits: plan.visits.filter((_, visitIndex) => visitIndex !== stage.visitIndex),
+              },
+            }
+          : {})}
+        onBack={() => {
+          if (laterVisit) {
+            setStage({ kind: 'visitDays', planId: plan.id, visitIndex: stage.visitIndex, dayIds });
+          } else if (stage.returnTo === 'summary') {
+            setStage({
+              kind: 'summary',
+              planIndex: index,
+              visitIndex: Math.max(0, Math.min(stage.visitIndex, plan.visits.length - 1)),
+            });
+          } else {
+            goToDays(plans, plan.id);
+          }
+        }}
         onSave={(choice: RecurringVisitChoice) => {
           const visits = [...plan.visits];
-          visits[stage.visitIndex] = choice;
+          visits[stage.visitIndex] = laterVisit ? { ...choice, dayIds } : choice;
           const next = plans.map((entry) => (entry.id === plan.id ? { ...entry, visits } : entry));
           setPlans(next);
           if (stage.returnTo === 'summary') {
@@ -150,14 +233,14 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
       onAddVisit={(planIndex) => {
         const plan = plans[planIndex];
         if (plan === undefined) return;
-        setStage({
-          kind: 'schedule',
-          planId: plan.id,
-          visitIndex: plan.visits.length,
-          returnTo: 'summary',
-        });
+        setStage({ kind: 'visitDays', planId: plan.id, visitIndex: plan.visits.length });
       }}
-      onEditDays={(planIndex) => goToDays(plans, plans[planIndex]?.id)}
+      onEditDays={(planIndex, visitIndex) => {
+        const plan = plans[planIndex];
+        if (plan === undefined) return;
+        if (visitIndex === 0) goToDays(plans, plan.id);
+        else setStage({ kind: 'visitDays', planId: plan.id, visitIndex });
+      }}
       onDelete={(planIndex, visitIndex) => {
         const plan = plans[planIndex];
         if (plan === undefined) return;

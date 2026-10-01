@@ -10,6 +10,8 @@ export { RecurringScheduleScreen } from './screens/RecurringScheduleScreen';
 export type { RecurringScheduleScreenProps } from './screens/RecurringScheduleScreen';
 export { RecurringSummaryScreen } from './screens/RecurringSummaryScreen';
 export type { RecurringSummaryScreenProps } from './screens/RecurringSummaryScreen';
+export { RecurringVisitDaysScreen } from './screens/RecurringVisitDaysScreen';
+export type { RecurringVisitDaysScreenProps } from './screens/RecurringVisitDaysScreen';
 export { RecurringPlanFlow } from './screens/RecurringPlanFlow';
 export type { RecurringPlanFlowProps } from './screens/RecurringPlanFlow';
 export { RecurringTimeScreen } from './screens/RecurringTimeScreen';

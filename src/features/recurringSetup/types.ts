@@ -168,6 +168,11 @@ export interface RecurringVisitChoice {
   readonly durationId: string;
   /** Start, in minutes after midnight (Asia/Kolkata wall clock). */
   readonly startMinutes: number;
+  /**
+   * The plan days this visit runs on, earliest first. Absent on a plan's 1st visit, which always
+   * runs on every plan day; a later visit (`332:6093`) picks a subset of them.
+   */
+  readonly dayIds?: readonly string[] | undefined;
 }
 
 /** A plan as the recurring flow carries it: its days and the visits booked on them. */
@@ -175,5 +180,6 @@ export interface RecurringPlanDraft {
   readonly id: string;
   /** Local dates, earliest first. */
   readonly dayIds: readonly string[];
+  /** The 1st visit runs on every plan day; later ones on their own `dayIds`. */
   readonly visits: readonly RecurringVisitChoice[];
 }

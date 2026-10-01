@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen, ScreenHeader, Text } from '@ui';
@@ -7,14 +7,20 @@ import { innerShadows } from '@ui/tokens/primitives';
 
 import { TIME_OF_DAY_ICONS } from '../art';
 import { PlanBanner } from '../components/PlanBanner';
+import { PlanVisitsHeader } from '../components/PlanVisitsHeader';
 import { RecurringFooter } from '../components/RecurringFooter';
 import { SelectedDays } from '../components/SelectedDays';
 import {
   DURATION_OPTIONS,
   TIME_OF_DAY_BANDS,
+  busyWindowsFor,
+  clashes,
+  durationMinutes,
   formatStartTime,
   ordinal,
+  planSubtitle,
   startTimesFor,
+  visitCaption,
 } from '../data';
 import type { RecurringTimeOfDay, RecurringVisitChoice } from '../types';
 
@@ -32,6 +38,11 @@ import type { RecurringTimeOfDay, RecurringVisitChoice } from '../types';
  * last. (The note under `340:7539` words them "Move to Plan (i+1)" / "Continue"; the frames win.)
  *
  * Start times are every 30 minutes across the band and all available until availability is read.
+ *
+ * Adding a further visit to a plan (`addingVisit`) — `332:5681` / `332:5921` / `332:5718`: the
+ * Plan card and its visits replace the banner, the first section is titled "Time", and anything
+ * that would overlap the plan's other visits on these days is greyed out — a 1 hr 9 AM 1st visit
+ * takes 9 to 10 AM away from the 2nd. A duration with no start time left in the band greys too.
  */
 export interface RecurringScheduleScreenProps {
   /** 1-based. */
@@ -45,6 +56,16 @@ export interface RecurringScheduleScreenProps {
   readonly ctaLabel: string;
   readonly onBack: () => void;
   readonly onSave: (choice: RecurringVisitChoice) => void;
+  /** Set when this schedules a further visit on a plan. */
+  readonly addingVisit?:
+    | {
+        readonly planDayIds: readonly string[];
+        /** The visits numbered before this one — the header's greyed cards. */
+        readonly visitsBefore: readonly RecurringVisitChoice[];
+        /** Every other visit on the plan, whose times this one must not overlap. */
+        readonly otherVisits: readonly RecurringVisitChoice[];
+      }
+    | undefined;
   readonly testID?: string;
 }
 
@@ -56,6 +77,7 @@ export function RecurringScheduleScreen({
   ctaLabel,
   onBack,
   onSave,
+  addingVisit,
   testID = 'recurring-schedule-screen',
 }: RecurringScheduleScreenProps) {
   const [timeOfDay, setTimeOfDay] = useState<RecurringTimeOfDay | null>(initial?.timeOfDay ?? null);
@@ -63,9 +85,27 @@ export function RecurringScheduleScreen({
   const [startMinutes, setStartMinutes] = useState<number | null>(initial?.startMinutes ?? null);
   const complete = timeOfDay !== null && durationId !== null && startMinutes !== null;
 
+  const busy = useMemo(
+    () =>
+      addingVisit === undefined
+        ? []
+        : busyWindowsFor(addingVisit.planDayIds, addingVisit.otherVisits, dayIds),
+    [addingVisit, dayIds],
+  );
+  /** A duration is open while some start in the band still fits around the other visits. */
+  const durationOpen = (band: RecurringTimeOfDay, id: string) =>
+    startTimesFor(band).some((start) => !clashes(start, durationMinutes(id), busy));
+
   const pickTimeOfDay = (next: RecurringTimeOfDay) => {
     if (next !== timeOfDay) setStartMinutes(null);
+    if (durationId !== null && !durationOpen(next, durationId)) setDurationId(null);
     setTimeOfDay(next);
+  };
+  const pickDuration = (next: string) => {
+    if (startMinutes !== null && clashes(startMinutes, durationMinutes(next), busy)) {
+      setStartMinutes(null);
+    }
+    setDurationId(next);
   };
 
   return (
@@ -93,15 +133,24 @@ export function RecurringScheduleScreen({
         />
       }
     >
-      <PlanBanner
-        planNumber={planNumber}
-        subtitle={`${dayIds.length} day${dayIds.length === 1 ? '' : 's'} · ${ordinal(visitNumber)} Visit`}
-        testID={`${testID}-banner`}
-      />
+      {addingVisit === undefined ? (
+        <PlanBanner
+          planNumber={planNumber}
+          subtitle={`${dayIds.length} day${dayIds.length === 1 ? '' : 's'} · ${ordinal(visitNumber)} Visit`}
+          testID={`${testID}-banner`}
+        />
+      ) : (
+        <PlanVisitsHeader
+          planNumber={planNumber}
+          subtitle={planSubtitle(addingVisit.planDayIds.length, addingVisit.visitsBefore.length)}
+          bookedVisits={addingVisit.visitsBefore.map(visitCaption)}
+          testID={`${testID}-plan`}
+        />
+      )}
 
       <SelectedDays dayIds={dayIds} testID={`${testID}-days`} />
 
-      <Section title="Time of the day">
+      <Section title={addingVisit === undefined ? 'Time of the day' : 'Time'}>
         <View style={styles.row}>
           {TIME_OF_DAY_BANDS.map((band) => (
             <TimePill
@@ -125,7 +174,8 @@ export function RecurringScheduleScreen({
                 price={option.price}
                 strikePrice={option.strikePrice}
                 selected={option.id === durationId}
-                onPress={() => setDurationId(option.id)}
+                disabled={!durationOpen(timeOfDay, option.id)}
+                onPress={() => pickDuration(option.id)}
               />
             ))}
           </Grid>
@@ -140,6 +190,7 @@ export function RecurringScheduleScreen({
                 key={minutes}
                 label={formatStartTime(minutes)}
                 selected={minutes === startMinutes}
+                disabled={clashes(minutes, durationMinutes(durationId), busy)}
                 onPress={() => setStartMinutes(minutes)}
               />
             ))}
@@ -200,6 +251,8 @@ function Grid({
 
 interface ChoiceProps {
   readonly selected: boolean;
+  /** `332:5780` / `332:5810` — taken by another visit: `color/surface/disabled`, not pressable. */
+  readonly disabled?: boolean;
   readonly onPress: () => void;
 }
 
@@ -242,6 +295,7 @@ function DurationTile({
   price,
   strikePrice,
   selected,
+  disabled = false,
   onPress,
 }: ChoiceProps & {
   readonly label: string;
@@ -252,9 +306,10 @@ function DurationTile({
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      disabled={disabled}
+      accessibilityState={{ selected, disabled }}
       accessibilityLabel={`${label}, ${price}, was ${strikePrice}`}
-      style={[styles.duration, selected ? styles.choiceSelected : styles.choiceIdle]}
+      style={[styles.duration, choiceTone(selected, disabled)]}
     >
       <Text variant="headingBold" color="textPrimary">
         {label}
@@ -272,20 +327,31 @@ function DurationTile({
 }
 
 /** `288:585` — the Slot chip: p 8 at an 8pt radius, a SemiBold 14/20 time. */
-function SlotChip({ label, selected, onPress }: ChoiceProps & { readonly label: string }) {
+function SlotChip({
+  label,
+  selected,
+  disabled = false,
+  onPress,
+}: ChoiceProps & { readonly label: string }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      disabled={disabled}
+      accessibilityState={{ selected, disabled }}
       accessibilityLabel={label}
-      style={[styles.slot, selected ? styles.choiceSelected : styles.choiceIdle]}
+      style={[styles.slot, choiceTone(selected, disabled)]}
     >
       <Text variant="bodyLargeStrong" color="textPrimary">
         {label}
       </Text>
     </Pressable>
   );
+}
+
+function choiceTone(selected: boolean, disabled: boolean) {
+  if (disabled) return styles.choiceDisabled;
+  return selected ? styles.choiceSelected : styles.choiceIdle;
 }
 
 /** `288:550` — three 115.33 tiles across 370: 12 apart, both ways. */
@@ -314,6 +380,7 @@ const styles = StyleSheet.create({
   pillIcon: { width: 14, height: 14 },
   choiceIdle: { backgroundColor: lightTheme.colors.surfaceAccent },
   choiceSelected: { backgroundColor: lightTheme.colors.surfaceBrandTint },
+  choiceDisabled: { backgroundColor: lightTheme.colors.surfaceDisabledSoft },
   duration: {
     height: 60,
     padding: lightTheme.space.sm,

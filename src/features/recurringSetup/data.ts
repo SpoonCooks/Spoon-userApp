@@ -10,6 +10,7 @@ import type {
   RecurringReviewSummary,
   RecurringTimeOfDay,
   RecurringVisitCharge,
+  RecurringVisitChoice,
   RecurringVisitDraft,
   RecurringWindow,
   RecurringWindowDay,
@@ -520,4 +521,59 @@ export function selectedDayLabel(id: string): { readonly weekday: string; readon
   const [year, month, day] = id.split('-').map(Number) as [number, number, number];
   const date = new Date(year, month - 1, day);
   return { weekday: SELECTED_DAY_WEEKDAYS[(date.getDay() + 6) % 7] ?? '', day };
+}
+
+/** The days a visit runs on: its own pick, or every plan day for a plan's 1st visit. */
+export function visitDays(
+  planDayIds: readonly string[],
+  visit: Pick<RecurringVisitChoice, 'dayIds'>,
+): readonly string[] {
+  return visit.dayIds ?? planDayIds;
+}
+
+/** "1 hr · 9:00 AM" — a scheduled visit's tab caption (`408:1731`). */
+export function visitCaption(visit: RecurringVisitChoice): string {
+  return `${durationLabel(visit.durationId)} · ${formatStartTime(visit.startMinutes)}`;
+}
+
+/** A booked stretch of the day, in minutes after midnight: `[from, to)`. */
+export interface RecurringBusyWindow {
+  readonly fromMinutes: number;
+  readonly toMinutes: number;
+}
+
+/**
+ * When the plan's other visits already have the cook on any of `dayIds` (`332:5718`'s note: a
+ * 1 hr 9 AM 1st visit greys the 2nd visit out from 9 to 10 AM).
+ */
+export function busyWindowsFor(
+  planDayIds: readonly string[],
+  visits: readonly RecurringVisitChoice[],
+  dayIds: readonly string[],
+): readonly RecurringBusyWindow[] {
+  const wanted = new Set(dayIds);
+  return visits
+    .filter((visit) => visitDays(planDayIds, visit).some((id) => wanted.has(id)))
+    .map((visit) => ({
+      fromMinutes: visit.startMinutes,
+      toMinutes: visit.startMinutes + durationMinutes(visit.durationId),
+    }));
+}
+
+/** Whether a visit starting at `startMinutes` for `minutes` would overlap a busy window. */
+export function clashes(
+  startMinutes: number,
+  minutes: number,
+  busy: readonly RecurringBusyWindow[],
+): boolean {
+  const end = startMinutes + minutes;
+  return busy.some((window) => startMinutes < window.toMinutes && end > window.fromMinutes);
+}
+
+/**
+ * `444:10267` — "4 days · 1st Visit": the plan's days and the latest visit it already has. The
+ * frames show "1st Visit" while the 2nd is being added.
+ */
+export function planSubtitle(dayCount: number, bookedCount: number): string {
+  return `${dayCount} day${dayCount === 1 ? '' : 's'} · ${ordinal(Math.max(bookedCount, 1))} Visit`;
 }

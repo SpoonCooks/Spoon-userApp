@@ -580,6 +580,16 @@ export const innerShadows = {
       color: 'rgba(0,0,0,0.08)',
     },
   ],
+  /** `444:10250` — the visit flow's Plan card: `0 -2 4 rgba(255,230,102,0.8)`, inset. */
+  planCard: [
+    {
+      offsetX: 0,
+      offsetY: -2,
+      blurRadius: 4,
+      color: 'rgba(255,230,102,0.8)',
+      inset: true,
+    },
+  ],
   /** `444:10424` — the "+" button: `0 -2 4 rgba(255,222,51,0.8)`, inset. */
   planAdd: [
     {

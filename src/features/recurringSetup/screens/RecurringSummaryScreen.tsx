@@ -14,7 +14,7 @@ import {
 } from '../art';
 import { RecurringFooter } from '../components/RecurringFooter';
 import { SelectedDays } from '../components/SelectedDays';
-import { TIME_OF_DAY_BANDS, durationMinutes, formatStartTime, ordinal } from '../data';
+import { TIME_OF_DAY_BANDS, durationMinutes, formatStartTime, ordinal, visitDays } from '../data';
 import type { RecurringPlanDraft } from '../types';
 
 /**
@@ -29,8 +29,8 @@ import type { RecurringPlanDraft } from '../types';
  *  - A plan's first booking is its "1st Visit"; the visit "+" adds another visit on the same days.
  *  - The plan "+" goes back to the day flow with a blank calendar for the next plan, exactly like
  *    the "+" on the calendar.
- *  - The pencil edits the plan's days; the bin removes the visit shown, or the plan if it is that
- *    plan's only visit.
+ *  - The pencil edits the days of the visit shown — the plan's own days on its 1st visit; the bin
+ *    removes the visit shown, or the plan if it is that plan's only visit.
  *
  * The frame's header (`542:1341`, `Nav header 3`) has no back chevron — the title sits on the
  * gutter — so `onBack` is reached by Android's hardware back only.
@@ -42,7 +42,8 @@ export interface RecurringSummaryScreenProps {
   readonly onSelect: (planIndex: number, visitIndex: number) => void;
   readonly onAddPlan: () => void;
   readonly onAddVisit: (planIndex: number) => void;
-  readonly onEditDays: (planIndex: number) => void;
+  /** The pencil: the plan's days on a 1st visit, the visit's own days on a later one. */
+  readonly onEditDays: (planIndex: number, visitIndex: number) => void;
   readonly onDelete: (planIndex: number, visitIndex: number) => void;
   readonly onBook: () => void;
   /** Android hardware back; the header draws no chevron. */
@@ -120,8 +121,8 @@ export function RecurringSummaryScreen({
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {plan === undefined ? null : (
           <SelectedDays
-            dayIds={plan.dayIds}
-            onEdit={() => onEditDays(planIndex)}
+            dayIds={visit === undefined ? plan.dayIds : visitDays(plan.dayIds, visit)}
+            onEdit={() => onEditDays(planIndex, visitIndex)}
             testID={`${testID}-days`}
           />
         )}

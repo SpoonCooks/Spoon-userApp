@@ -373,6 +373,31 @@ export const gradients = {
     locations: [0, 0.6],
     angleDeg: 180,
   },
+  /**
+   * `444:10250` — the visit flow's Plan card: `#FFF7CC` → `#FFE666` (7.4 % → 81.5 %) at 174.75°
+   * under `planCardGloss`.
+   */
+  planCard: {
+    colors: [palette.yellow200, palette.yellow400],
+    locations: [0.074074, 0.81481],
+    angleDeg: 174.74972727026696,
+  },
+  /** `444:10250` — the Plan card's gloss: `#FFF7CC` at 80 % fading out by 50 %. */
+  planCardGloss: {
+    colors: [withAlpha(palette.yellow200, 0.8), withAlpha(palette.yellow200, 0)],
+    locations: [0, 0.5],
+    angleDeg: 180,
+  },
+  /** `444:10264` — the Plan card's ghost numeral: `#FFE666` → `#FFD600`, straight down its line. */
+  planCardGhost: {
+    colors: [palette.yellow400, palette.yellow500],
+    angleDeg: 180,
+  },
+  /**
+   * `444:10270` — the visit being scheduled: the selected Plan tile's sweep and gloss
+   * (`planTileActive` / `planTileGloss`) at this card's own 169.37°.
+   */
+  visitTabActiveAngleDeg: 169.37065492527108,
   planAddGloss: {
     colors: [withAlpha(palette.yellow200, 0.7), withAlpha(palette.yellow200, 0)],
     locations: [0, 0.45],
@@ -1063,6 +1088,13 @@ export const typography = {
   headingSection: {
     fontSize: fontSize.xxl,
     lineHeight: 26,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Emphasis`: Livvic SemiBold 16/24 (the Plan card's "Plan 1"). */
+  emphasis: {
+    fontSize: fontSize.xl,
+    lineHeight: lineHeight.xl,
     fontFamily: fontFamily.semibold,
     letterSpacing: letterSpacing.none,
   },
