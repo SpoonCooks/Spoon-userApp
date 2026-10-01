@@ -58,6 +58,34 @@ describe('LoginScreen — 250:2383', () => {
   });
 
   /**
+   * After sign-out (or a fresh install on iOS, where Keychain survives deletion — see
+   * `core/auth/lastPhoneStore`), the host resolves the last-used number asynchronously and
+   * passes it down once known. `initialPhone` stands in for that resolved read.
+   */
+  it('prefills the field from initialPhone, stripping a leading country code the same way autofill does', () => {
+    render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} initialPhone="+919876543210" />);
+
+    expect(screen.getByTestId('login-screen-phone').props.value).toBe('9876543210');
+  });
+
+  it('never overwrites a number the customer already started typing before initialPhone resolves', () => {
+    const { rerender } = render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} />);
+
+    fireEvent.changeText(screen.getByTestId('login-screen-phone'), '1112223334');
+    rerender(
+      <LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} initialPhone="+919876543210" />,
+    );
+
+    expect(screen.getByTestId('login-screen-phone').props.value).toBe('1112223334');
+  });
+
+  it('leaves the field empty when the resolved read found nothing stored', () => {
+    render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} initialPhone="" />);
+
+    expect(screen.getByTestId('login-screen-phone').props.value).toBe('');
+  });
+
+  /**
    * Reported live on device: focusing the phone field left a stray sliver of the hero photograph
    * at the top of the screen instead of either the whole scene or none of it.
    *

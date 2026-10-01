@@ -50,7 +50,21 @@ export interface LoginScreenProps {
   readonly onRequestOtp: (phone: string) => void;
   readonly onOpenTerms?: () => void;
   readonly onOpenPrivacy?: () => void;
+  /**
+   * The number last signed in on this device, if the host found one (`core/auth/lastPhoneStore`)
+   * — undefined while that read is still in flight, so this never has to gate the screen behind
+   * a second loading surface (task §13/§25: the boot splash is the only one). Accepted in
+   * whatever shape it arrives (E.164 or bare digits) and run through the same digit
+   * normalisation as typed, pasted or autofilled text; applied once, and only while the field is
+   * still empty, so it can never overwrite something the customer already typed.
+   */
+  readonly initialPhone?: string;
   readonly testID?: string;
+}
+
+/** Strips everything but digits and keeps the LAST `maxLength` of them — see `onChangeText`. */
+function normalizePhoneDigits(raw: string, maxLength: number): string {
+  return raw.replace(/\D/g, '').slice(-maxLength);
 }
 
 /**
@@ -106,12 +120,34 @@ export function LoginScreen({
   onRequestOtp,
   onOpenTerms,
   onOpenPrivacy,
+  initialPhone,
   testID = 'login-screen',
 }: LoginScreenProps) {
   const [phone, setPhone] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const focusedRef = useRef(false);
   const ready = phone.length === login.phoneMaxLength && login.submitting !== true;
+
+  /**
+   * Applies the remembered number exactly once, the render `initialPhone` first resolves to a
+   * value — including a resolved "nothing stored", which arrives as `''` and simply never
+   * passes the length check below. Adjusted during render rather than in an effect (React's own
+   * guidance for "sync state from a prop that just changed"): `appliedInitialPhone` tracks the
+   * last `initialPhone` this already ran for, so the body below fires at most once per value and
+   * React folds the resulting state update into this same render instead of a second pass. Only
+   * applied while `phone` is still empty, so a customer who starts typing before the host's read
+   * resolves keeps what they typed.
+   */
+  const [appliedInitialPhone, setAppliedInitialPhone] = useState<string | undefined>(undefined);
+  if (initialPhone !== undefined && initialPhone !== appliedInitialPhone) {
+    setAppliedInitialPhone(initialPhone);
+    if (phone === '') {
+      const normalized = normalizePhoneDigits(initialPhone, login.phoneMaxLength);
+      if (normalized.length === login.phoneMaxLength) {
+        setPhone(normalized);
+      }
+    }
+  }
 
   /**
    * SCREEN ADAPTATION (task §8). Three things the superseded layout got wrong, and the rule each
@@ -274,12 +310,14 @@ export function LoginScreen({
                        * carries the `+91` this field's `dial` chip already shows
                        * separately. A native `maxLength` truncates before this handler
                        * ever sees the text, so it would cut "+91 98765 43210" down to
-                       * "+91 987654" and strip that into the wrong ten digits. Stripping
-                       * first and keeping the last `phoneMaxLength` digits takes the
-                       * country code off the front instead, however it arrived.
+                       * "+91 987654" and strip that into the wrong ten digits.
+                       * `normalizePhoneDigits` keeping the LAST `phoneMaxLength` digits
+                       * takes the country code off the front instead, however the text
+                       * arrived — typed, pasted, autofilled, or (see `initialPhone` above)
+                       * remembered from the last sign-in.
                        */
                       onChangeText={(next) =>
-                        setPhone(next.replace(/\D/g, '').slice(-login.phoneMaxLength))
+                        setPhone(normalizePhoneDigits(next, login.phoneMaxLength))
                       }
                       placeholder={login.phonePlaceholder}
                       placeholderTextColor={lightTheme.colors.textPlaceholder}
