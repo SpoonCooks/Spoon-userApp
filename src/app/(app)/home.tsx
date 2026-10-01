@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   InstantSheet,
@@ -69,6 +69,21 @@ export default function HomeRoute() {
   useEffect(() => {
     if (openParam === 'instant') router.setParams({ open: undefined });
   }, [openParam, router]);
+
+  /**
+   * The sheet closes when Home stops being the screen on top.
+   *
+   * It is a modal, and a modal draws over every screen — while Home stays mounted underneath
+   * whatever is pushed onto it. The sheet's own Schedule button closes it before navigating, but
+   * a link from outside the app does not go through that button: tapping the Schedule app
+   * shortcut, or a push notification, with the sheet open left the sheet drawn over the screen
+   * the link opened.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      return () => setInstantOpen(false);
+    }, []),
+  );
 
   /**
    * `336:4235` — the rating chips ON the "Share your rating!" banner.
