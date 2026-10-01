@@ -5,6 +5,7 @@ import type {
   RecurringDateVisitPlan,
   RecurringDurationOption,
   RecurringPickedDay,
+  RecurringPlanDraft,
   RecurringPlanConfirmation,
   RecurringReviewDateRow,
   RecurringReviewSummary,
@@ -576,4 +577,54 @@ export function clashes(
  */
 export function planSubtitle(dayCount: number, bookedCount: number): string {
   return `${dayCount} day${dayCount === 1 ? '' : 's'} · ${ordinal(Math.max(bookedCount, 1))} Visit`;
+}
+
+const SHORT_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+const SHORT_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** "Wed, 7 Oct" — the Edit date heading (`512:1233`). */
+export function editDateLabel(id: string): string {
+  const [year, month, day] = id.split('-').map(Number) as [number, number, number];
+  const date = new Date(year, month - 1, day);
+  const weekday = SHORT_WEEKDAYS[(date.getDay() + 6) % 7] ?? '';
+  return `${weekday}, ${day} ${SHORT_MONTHS[month - 1] ?? ''}`;
+}
+
+/**
+ * A plan with one date taken off one of its visits — what editing (`494:676`) or deleting
+ * (`586:4315`) a date does to the plan it came from.
+ *
+ * The visit keeps its other days; a visit left with none is dropped. The date stays on the plan
+ * while another visit still runs on it. Returns null when the plan has no visit left.
+ */
+export function withoutVisitDay(
+  plan: RecurringPlanDraft,
+  visitIndex: number,
+  dayId: string,
+): RecurringPlanDraft | null {
+  const visits = plan.visits.flatMap((visit, index) => {
+    if (index !== visitIndex) return [visit];
+    const left = visitDays(plan.dayIds, visit).filter((id) => id !== dayId);
+    return left.length === 0 ? [] : [{ ...visit, dayIds: left }];
+  });
+  if (visits.length === 0) return null;
+  const stillBooked = visits.some((visit) => visitDays(plan.dayIds, visit).includes(dayId));
+  return {
+    ...plan,
+    dayIds: stillBooked ? plan.dayIds : plan.dayIds.filter((id) => id !== dayId),
+    visits,
+  };
 }

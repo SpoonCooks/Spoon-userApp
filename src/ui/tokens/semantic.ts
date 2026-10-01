@@ -211,6 +211,8 @@ export const lightColors = {
   textSubdued: palette.black60,
   /** `444:10421` / `444:10424` — the `#FFF7CC` edge on Plan tiles and the "+" button. */
   borderPlanTile: palette.yellow200,
+  /** Spoon — User `color/border/strong` — the outlined "Delete date" button (`586:4386`). */
+  borderInk: palette.black,
 
   danger: palette.danger,
   dangerSurface: palette.dangerSurface,
@@ -1089,6 +1091,13 @@ export const typography = {
     fontSize: fontSize.xxl,
     lineHeight: 26,
     fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Display`: Livvic Bold 24/32 (the Edit date "Wed, 7 Oct"). */
+  display: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
   /** Spoon — User `Spoon/Emphasis`: Livvic SemiBold 16/24 (the Plan card's "Plan 1"). */

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -29,8 +30,10 @@ import type { RecurringPlanDraft } from '../types';
  *  - A plan's first booking is its "1st Visit"; the visit "+" adds another visit on the same days.
  *  - The plan "+" goes back to the day flow with a blank calendar for the next plan, exactly like
  *    the "+" on the calendar.
- *  - The pencil edits the days of the visit shown — the plan's own days on its 1st visit; the bin
- *    removes the visit shown, or the plan if it is that plan's only visit.
+ *  - The pencil (`494:1039`) puts the dates into edit mode: it turns gold, the heading asks which
+ *    date to edit, and tapping one opens Edit date for it. Tapping the pencil again, or moving to
+ *    another plan or visit, leaves edit mode.
+ *  - The bin removes the visit shown, or the plan if it is that plan's only visit.
  *
  * The frame's header (`542:1341`, `Nav header 3`) has no back chevron — the title sits on the
  * gutter — so `onBack` is reached by Android's hardware back only.
@@ -42,8 +45,8 @@ export interface RecurringSummaryScreenProps {
   readonly onSelect: (planIndex: number, visitIndex: number) => void;
   readonly onAddPlan: () => void;
   readonly onAddVisit: (planIndex: number) => void;
-  /** The pencil: the plan's days on a 1st visit, the visit's own days on a later one. */
-  readonly onEditDays: (planIndex: number, visitIndex: number) => void;
+  /** Edit mode's date tap: edit that one date of the visit shown. */
+  readonly onEditDate: (planIndex: number, visitIndex: number, dayId: string) => void;
   readonly onDelete: (planIndex: number, visitIndex: number) => void;
   readonly onBook: () => void;
   /** Android hardware back; the header draws no chevron. */
@@ -58,7 +61,7 @@ export function RecurringSummaryScreen({
   onSelect,
   onAddPlan,
   onAddVisit,
-  onEditDays,
+  onEditDate,
   onDelete,
   onBook,
   onBack,
@@ -68,6 +71,10 @@ export function RecurringSummaryScreen({
   const visit = plan?.visits[visitIndex];
   const minutes = visit === undefined ? 0 : durationMinutes(visit.durationId);
   const band = TIME_OF_DAY_BANDS.find((entry) => entry.id === visit?.timeOfDay);
+  // Edit mode belongs to the plan and visit it was turned on for, so switching tabs leaves it.
+  const shown = `${planIndex}:${visitIndex}`;
+  const [editingFor, setEditingFor] = useState<string | null>(null);
+  const editing = editingFor === shown;
   useAndroidBackHandler(() => {
     onBack();
     return true;
@@ -122,7 +129,15 @@ export function RecurringSummaryScreen({
         {plan === undefined ? null : (
           <SelectedDays
             dayIds={visit === undefined ? plan.dayIds : visitDays(plan.dayIds, visit)}
-            onEdit={() => onEditDays(planIndex, visitIndex)}
+            onEdit={() => setEditingFor(editing ? null : shown)}
+            onPickDay={
+              editing
+                ? (dayId: string) => {
+                    setEditingFor(null);
+                    onEditDate(planIndex, visitIndex, dayId);
+                  }
+                : undefined
+            }
             testID={`${testID}-days`}
           />
         )}

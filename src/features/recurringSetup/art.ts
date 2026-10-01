@@ -56,3 +56,20 @@ export const START_TIME_PHOTOS: Readonly<Record<RecurringTimeOfDay, ImageSourceP
   afternoon: require('../../../assets/figma/recurring/start-afternoon.png') as ImageSourcePropType,
   evening: require('../../../assets/figma/recurring/start-evening.png') as ImageSourcePropType,
 };
+
+/**
+ * `512:1235` — the Edit date header's 16pt chip icons. Morning is the file's own `Icon/sunrise`;
+ * the file draws no Afternoon or Evening chip, so those reuse the time-of-day pictograms drawn
+ * at 16. All are tinted on screen, so their source ink doesn't matter.
+ */
+export const CHIP_TIME_OF_DAY_ICONS: Readonly<Record<RecurringTimeOfDay, ImageSourcePropType>> = {
+  morning: require('../../../assets/figma/recurring/chip-morning.png') as ImageSourcePropType,
+  afternoon: require('../../../assets/figma/recurring/chip-afternoon.png') as ImageSourcePropType,
+  evening: require('../../../assets/figma/recurring/chip-evening.png') as ImageSourcePropType,
+};
+/** `512:1247` — `Icon/clock`, 16pt. */
+export const CHIP_CLOCK_ICON =
+  require('../../../assets/figma/recurring/chip-clock.png') as ImageSourcePropType;
+/** `558:170` — `Cook/ Visit`, 24pt, the delete dialog's badge. */
+export const COOK_VISIT_ICON =
+  require('../../../assets/figma/recurring/cook-visit.png') as ImageSourcePropType;

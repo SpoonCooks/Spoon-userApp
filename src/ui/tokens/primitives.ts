@@ -580,6 +580,15 @@ export const innerShadows = {
       color: 'rgba(0,0,0,0.08)',
     },
   ],
+  /** `Elevation/3` — `0 0 24 #00000024`, the recurring dialogs (`586:4373`). */
+  elevation3: [
+    {
+      offsetX: 0,
+      offsetY: 0,
+      blurRadius: 24,
+      color: 'rgba(0,0,0,0.14)',
+    },
+  ],
   /** `444:10250` — the visit flow's Plan card: `0 -2 4 rgba(255,230,102,0.8)`, inset. */
   planCard: [
     {
