@@ -371,6 +371,39 @@ describe('Payment Failed — retry against the same hold, or leave once the serv
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
+  /** Same "book again?" routing `[id].tsx` gives — see that file's identical test. */
+  it.each([
+    ['cancel-book-again-yes', '/scheduled'],
+    ['cancel-book-again-no', '/home'],
+  ])('routes %s to %s from the confirmed step', async (testId, destination) => {
+    mockSearchParams = { id: 'bk-1' };
+    let status = 'created';
+    renderWithRuntime(<PaymentFailedRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({ booking: bookingWith({ status }) }),
+          'POST /v1/bookings/bk-1/cancel': () => {
+            status = 'cancelled';
+            return {};
+          },
+        }),
+      }),
+    });
+
+    fireEvent.press(await screen.findByTestId('payment-failed-cancel'));
+    fireEvent.press(await screen.findByTestId('cancel-continue-policy'));
+    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
+    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
+    fireEvent.press(await screen.findByTestId('cancel-confirm'));
+    await screen.findByTestId('cancel-step-confirmed');
+
+    fireEvent.press(screen.getByTestId(testId));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith(destination);
+  });
+
   /**
    * A read that keeps failing is not a reason to hold the customer on an error screen forever —
    * the same call `confirming.tsx` makes for the identical situation. Without this, a booking
@@ -455,6 +488,42 @@ describe('Cancel booking — `useCancelFlow`, shared by the booking host and Pay
 
     expect(await screen.findByTestId('cancel-step-confirmed')).toBeTruthy();
     expect(cancelCalls).toEqual([{ reasonCode: 'URGENT_CHANGE' }]);
+  });
+
+  /**
+   * The confirmed step's "book again?" prompt: "Yes" hands the customer Schedule to complete a
+   * new booking themselves (never one this flow creates on their behalf), "No" is Home. Neither
+   * used to distinguish the two — both replaced to `/home` — which is the regression this guards.
+   */
+  it.each([
+    ['cancel-book-again-yes', '/scheduled'],
+    ['cancel-book-again-no', '/home'],
+  ])('routes %s to %s from the confirmed step', async (testId, destination) => {
+    mockSearchParams = { id: 'bk-1' };
+
+    renderWithRuntime(<BookingRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          ...CANCELLATION_STUBS,
+          'GET /v1/bookings/bk-1': () => ({
+            booking: bookingWith({ status: 'assigned', slotType: 'scheduled' }),
+          }),
+          'POST /v1/bookings/bk-1/cancel': () => ({}),
+        }),
+      }),
+    });
+
+    fireEvent.press(await screen.findByTestId('confirmation-cancel'));
+    fireEvent.press(await screen.findByTestId('cancel-continue-policy'));
+    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
+    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
+    fireEvent.press(await screen.findByTestId('cancel-confirm'));
+    await screen.findByTestId('cancel-step-confirmed');
+
+    fireEvent.press(screen.getByTestId(testId));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith(destination);
   });
 
   /**

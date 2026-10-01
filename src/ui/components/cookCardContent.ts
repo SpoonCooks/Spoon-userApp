@@ -54,7 +54,7 @@ function dishes(
  * so every published V0 profile carries it.
  */
 export const COOK_CARD_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/rekha-sample.jpg') as number,
+  require('../../../assets/figma/cook/rekha-sample.webp') as number,
 ).uri;
 
 /**
@@ -63,7 +63,7 @@ export const COOK_CARD_PHOTO = Image.resolveAssetSource(
  * baked-in background there would paint a second, wrong ground inside the box.
  */
 export const COOK_CARD_CUTOUT_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/rekha-cutout.png') as number,
+  require('../../../assets/figma/cook/rekha-cutout.webp') as number,
 ).uri;
 
 /**
@@ -73,13 +73,13 @@ export const COOK_CARD_CUTOUT_PHOTO = Image.resolveAssetSource(
  * remains the shared export for all cooks until transparent per-cook cut-outs exist.
  */
 const REKHA_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/rekha-photo.jpg') as number,
+  require('../../../assets/figma/cook/rekha-photo.webp') as number,
 ).uri;
 const SANCHITA_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/sanchita-photo.jpg') as number,
+  require('../../../assets/figma/cook/sanchita-photo.webp') as number,
 ).uri;
 const BARSHA_PHOTO = Image.resolveAssetSource(
-  require('../../../assets/figma/cook/barsha-photo.jpg') as number,
+  require('../../../assets/figma/cook/barsha-photo.webp') as number,
 ).uri;
 
 export interface CookCardContent {

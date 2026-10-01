@@ -66,15 +66,15 @@ import type { BookingSummaryViewModel } from '../types';
  */
 
 /** `250:2945` — the 32 × 66 to-do mark, shared with the En route note. */
-const NOTE_TODO = require('../../../../assets/figma/booking/note-todo.png') as ImageSourcePropType;
+const NOTE_TODO = require('../../../../assets/figma/booking/note-todo.webp') as ImageSourcePropType;
 
 /** `292:236` — the 35 × 35 "Product" glyph on the details row, exported from the node. */
 export const DETAILS_GLYPH =
-  require('../../../../assets/figma/booking/view-booking-details.png') as ImageSourcePropType;
+  require('../../../../assets/figma/booking/view-booking-details.webp') as ImageSourcePropType;
 
 /** `383:755` — the 35 x 35 "Cooking Book" mark on the share-recipe row, exported from the node. */
 const SHARE_RECIPE_GLYPH =
-  require('../../../../assets/figma/booking/share-recipe.png') as ImageSourcePropType;
+  require('../../../../assets/figma/booking/share-recipe.webp') as ImageSourcePropType;
 
 export interface ConfirmationBodyProps {
   readonly summary: BookingSummaryViewModel;

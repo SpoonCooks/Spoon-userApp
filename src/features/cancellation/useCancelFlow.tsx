@@ -20,15 +20,18 @@ import { useCancellationData } from './data';
  * changed error path) to land in one and not the other.
  *
  * What stays with the CALLER, because it differs per host: where "Reschedule instead" and Help
- * go, and what happens once the customer has answered the sheet's own "book again?" prompt —
- * home for a live booking (`[id].tsx`), the real lifecycle host for a hold that never got paid
- * (Payment Failed).
+ * go, and where each answer to the sheet's own "book again?" prompt lands.
  */
 export interface CancelFlowOptions {
   readonly onReschedule?: () => void;
   readonly onHelp?: () => void;
-  /** Called once the confirmed step's prompt is answered, either way — see the class comment. */
-  readonly onCancelled: () => void;
+  /**
+   * The confirmed step's prompt, answered. `true` — "Yes, book again" — and `false` — "No" —
+   * are the caller's to route separately; neither answer here creates a booking on its own, so
+   * routing "Yes" to Schedule only ever hands the customer the normal booking flow to complete
+   * themselves.
+   */
+  readonly onCancelled: (bookAgain: boolean) => void;
 }
 
 export interface CancelFlow {
@@ -118,12 +121,9 @@ export function useCancelFlow(bookingId: string | null, options: CancelFlowOptio
                   // customer can retry against the same idempotency scope.
                 });
             }}
-            onBookAgain={() => {
-              // PRODUCT_DESIGN_CONFLICT (§37): a cancellation flow must not create a booking, so
-              // both answers to "book again?" do the same thing — recorded, not obeyed. Neither
-              // caller today distinguishes the two either.
+            onBookAgain={(again) => {
               setIsOpen(false);
-              options.onCancelled();
+              options.onCancelled(again);
             }}
           />
         )}

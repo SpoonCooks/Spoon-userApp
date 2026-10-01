@@ -10,7 +10,7 @@ import { ServiceLinkRow } from './ServiceLinkRow';
 import type { CompletionViewModel } from '../types';
 
 /** `308:3130` — the 35 × 35 "Receive Cash" mark on the tip row. */
-const TIP_GLYPH = require('../../../../assets/figma/booking/tip-cook.png') as ImageSourcePropType;
+const TIP_GLYPH = require('../../../../assets/figma/booking/tip-cook.webp') as ImageSourcePropType;
 
 /**
  * Completion — Figma `299:1424` ("Page 14a"), with `319:3191` ("Page 14b") as its SUBMITTED
@@ -340,25 +340,36 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.md,
     paddingVertical: lightTheme.space.s6,
   },
-  /** `143:247` — a 65 × 70 `#FFF7CC` panel at a 16pt radius. Smaller than the 85 × 90 cook card. */
+  /**
+   * `143:247` — a 65 × 70 `#FFF7CC` panel at a 16pt radius. Smaller than the 85 × 90 cook card.
+   *
+   * Outlined 1pt in `#FFD230`, the same `borderNoteStrong` ring `BookingCard`'s own photo uses —
+   * requested directly against that card as the reference, so the two read as the same kind of
+   * portrait rather than one bare and one framed.
+   */
   cookPhoto: {
     width: 65,
     height: 70,
     borderRadius: lightTheme.radius.md,
+    borderWidth: lightTheme.stroke.thin,
+    borderColor: lightTheme.colors.borderNoteStrong,
     overflow: 'hidden',
     backgroundColor: lightTheme.colors.surfaceAccent,
     ...lightTheme.elevation.softer,
   },
   /**
-   * `143:248` — the same offset crop the cook card and the Home card use: the portrait is drawn
-   * wider and higher than its box so the frame lands on the face.
+   * The portrait fills the 65 × 70 box and is centre-cropped by `resizeMode="cover"`.
+   *
+   * `143:248` drew an offset crop sized for the one bundled placeholder the frame was built
+   * around, the same as `CookCard` and the Home card originally did — over-zooming and cropping
+   * through the face on a real cook photo. `cover` at 100 % is the honest generalisation.
    */
   cookPhotoImage: {
     position: 'absolute',
-    left: '-6.15%',
-    top: '-7.857%',
-    width: '118.46%',
-    height: '169.29%',
+    left: 0,
+    top: 0,
+    width: '100%',
+    height: '100%',
   },
   /** `143:249` — a 70pt column, 8pt between the two lines, 6pt padding, centred. */
   cookText: {

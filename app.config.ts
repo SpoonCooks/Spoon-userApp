@@ -427,8 +427,49 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-splash-screen',
       {
         backgroundColor: SPLASH_BACKGROUND,
+        // The real "spoon" wordmark (cropped from `icon.png`'s own black foreground layer, the
+        // same artwork `android-icon-foreground.png` already uses), not the unbranded chevron
+        // this pointed at before -- that placeholder was never swapped for real branding, and its
+        // plain abstract shape on a blank field read as a generic template splash rather than
+        // Spoon's own. `imageWidth` raised from 76 to fit the wordmark's text legibly; the old
+        // width was tuned for the chevron's simpler, more compact silhouette.
+        //
+        // This is Android's splash too (and iOS's fallback for anything that can't take the `ios`
+        // override below): Android 12+'s OS-level Splash Screen API is icon-on-solid-colour ONLY
+        // -- no custom full-bleed image is possible there, the same platform ceiling the adaptive
+        // icon comment above already documents. `SPLASH_BACKGROUND` stays a flat colour rather
+        // than one end of the gradient chosen ad hoc in a build file, matching that reasoning.
         image: './assets/images/splash-icon.png',
-        imageWidth: 76,
+        imageWidth: 180,
+
+        /**
+         * iOS has no such ceiling -- `SplashScreen.storyboard` can hold any image full-bleed --
+         * so it gets the actual designed splash: Figma `1:4272`'s yellow-to-lime ramp (the same
+         * pair `android-icon-background.png` already renders) with the wordmark centred on it,
+         * flattened into one image because the native launch screen cannot compose a gradient and
+         * a logo as two live layers. `enableFullScreenImage_legacy` is the flag name, not its
+         * status -- it is still the plugin's only supported route to an edge-to-edge image
+         * (`withIosSplashScreenStoryboardImage.js`: without it, the image is pinned to a small
+         * `imageWidth`-square frame instead of the screen's own bounds).
+         */
+        ios: {
+          image: './assets/images/splash-background-ios.png',
+          resizeMode: 'cover',
+          enableFullScreenImage_legacy: true,
+          /**
+           * The gradient's own top stop (`palette.yellow500`, `#FFD600`), not `SPLASH_BACKGROUND`.
+           *
+           * `enableFullScreenImage_legacy` pins the image with autolayout constraints rather than
+           * an immediate frame (`withIosSplashScreenStoryboardImage.js`'s base rect is a stale
+           * 414x736 reference size, stretched to the real screen only once those constraints
+           * resolve), and the view's own background paints before that first layout pass
+           * completes. On a cold launch that gap is a real flash of whatever this colour is --
+           * previously the pale cream `SPLASH_BACKGROUND`, jarringly different from the yellow
+           * gradient and read as a separate blank screen ahead of the real one. Matching it to the
+           * gradient's own top colour makes that same gap visually disappear instead.
+           */
+          backgroundColor: '#FFD600', // palette.yellow500 -- a literal here, like SPLASH_BACKGROUND above; primitives.ts imports react-native and cannot load in this Node config context
+        },
       },
     ],
 

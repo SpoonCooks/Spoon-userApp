@@ -35,7 +35,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
  *
  * Only the alpha channel differs. Every drawn pixel of the circle and the chevron is Figma's own.
  */
-const DISC = require('../../../assets/figma/icons/disc.png') as ImageSourcePropType;
+const DISC = require('../../../assets/figma/icons/disc.webp') as ImageSourcePropType;
 
 export type DiscDirection = 'back' | 'forward' | 'down';
 
