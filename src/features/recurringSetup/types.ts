@@ -160,3 +160,20 @@ export interface RecurringPlanConfirmation {
   /** e.g. "1:15 PM". */
   readonly firstVisitTimeLabel: string;
 }
+
+/** One visit's choices on the Schedule screen (Spoon — User `288:516`). */
+export interface RecurringVisitChoice {
+  readonly timeOfDay: RecurringTimeOfDay;
+  /** A `DURATION_OPTIONS` id. */
+  readonly durationId: string;
+  /** Start, in minutes after midnight (Asia/Kolkata wall clock). */
+  readonly startMinutes: number;
+}
+
+/** A plan as the recurring flow carries it: its days and the visits booked on them. */
+export interface RecurringPlanDraft {
+  readonly id: string;
+  /** Local dates, earliest first. */
+  readonly dayIds: readonly string[];
+  readonly visits: readonly RecurringVisitChoice[];
+}

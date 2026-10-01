@@ -28,8 +28,8 @@ import type { RecurringWindowDay } from '../types';
  * (Plan 2):
  *
  *  - Everything picked on the first calendar is Plan 1, and each plan's tile counts its days.
- *  - Once the newest plan has a day, a "+" appears; it starts the next plan on a blank calendar.
- *    There is no cap on plans.
+ *  - The "+" is always shown (owner direction, overriding the frame's "appears after one tap"):
+ *    it starts the next plan on a blank calendar. There is no cap on plans.
  *  - Days already in another plan are greyed out and cannot be picked.
  *  - The CTA unlocks once all plans together have 5 days, and until then reads "Pick N more days".
  *
@@ -50,8 +50,9 @@ interface PlanDraft {
   readonly days: ReadonlySet<string>;
 }
 
-/** A plan as Step 1 hands it on: its label and its dates, earliest first. */
+/** A plan as Step 1 hands it on: its id, label and dates, earliest first. */
 export interface RecurringPlanDays {
+  readonly id: string;
   readonly label: string;
   readonly dayIds: readonly string[];
 }
@@ -62,6 +63,15 @@ export interface RecurringDaysScreenProps {
   readonly onContinue?: (plans: readonly RecurringPlanDays[]) => void;
   /** The day the window is counted from. Defaults to now; the dev preview pins Figma's date. */
   readonly today?: Date;
+  /**
+   * Plans already made, when the flow returns here from the Summary — to edit a plan's days, or
+   * (with a trailing blank plan) to add one. Omitted, the screen opens on a blank Plan 1.
+   */
+  readonly initialPlans?: readonly { readonly id: string; readonly dayIds: readonly string[] }[];
+  /** Which of `initialPlans` opens active. Defaults to the last. */
+  readonly initialActiveId?: string;
+  /** Plans already scheduled: the CTA names the first plan NOT in this set. */
+  readonly scheduledPlanIds?: ReadonlySet<string>;
   readonly testID?: string;
 }
 
@@ -73,6 +83,9 @@ export function RecurringDaysScreen({
   onBack,
   onContinue,
   today,
+  initialPlans,
+  initialActiveId,
+  scheduledPlanIds,
   testID = 'recurring-days-screen',
 }: RecurringDaysScreenProps) {
   const todayKey = today?.getTime();
@@ -80,10 +93,14 @@ export function RecurringDaysScreen({
     () => buildRecurringWindow(todayKey === undefined ? new Date() : new Date(todayKey)),
     [todayKey],
   );
-  const [plans, setPlans] = useState<readonly PlanDraft[]>(() => [
-    { id: 'plan-1', days: new Set() },
-  ]);
-  const [activeId, setActiveId] = useState('plan-1');
+  const [plans, setPlans] = useState<readonly PlanDraft[]>(() =>
+    initialPlans === undefined || initialPlans.length === 0
+      ? [{ id: 'plan-1', days: new Set() }]
+      : initialPlans.map((plan) => ({ id: plan.id, days: new Set(plan.dayIds) })),
+  );
+  const [activeId, setActiveId] = useState(
+    () => initialActiveId ?? initialPlans?.at(-1)?.id ?? 'plan-1',
+  );
   const [capError, setCapError] = useState(false);
   const capTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -98,11 +115,14 @@ export function RecurringDaysScreen({
     return ids;
   }, [plans, activeId]);
   const total = plans.reduce((sum, plan) => sum + plan.days.size, 0);
+  const firstToSchedule = Math.max(
+    0,
+    plans.findIndex((plan) => plan.days.size > 0 && scheduledPlanIds?.has(plan.id) !== true),
+  );
   const complete = total >= MIN_DAYS;
   const picked = calendar.orderedIds.filter((id) => activeDays.has(id));
   const startId = picked[0];
   const endId = picked.at(-1);
-  const newest = plans.at(-1);
 
   const showCapError = useCallback(() => {
     setCapError(true);
@@ -163,7 +183,11 @@ export function RecurringDaysScreen({
   };
 
   const addPlan = () => {
-    const id = `plan-${plansRef.current.length + 1}`;
+    // Ids never repeat, even after a plan is deleted on the Summary and the numbering closes up.
+    const taken = new Set(plansRef.current.map((plan) => plan.id));
+    let serial = plansRef.current.length + 1;
+    while (taken.has(`plan-${serial}`)) serial += 1;
+    const id = `plan-${serial}`;
     commit([...plansRef.current, { id, days: new Set() }]);
     select(id);
   };
@@ -173,6 +197,7 @@ export function RecurringDaysScreen({
     onContinue?.(
       plans
         .map((plan, index) => ({
+          id: plan.id,
           label: planLabel(index),
           dayIds: calendar.orderedIds.filter((id) => plan.days.has(id)),
         }))
@@ -198,7 +223,7 @@ export function RecurringDaysScreen({
           layout="pill"
           label={
             complete
-              ? `Schedule ${planLabel(0)}`
+              ? `Schedule ${planLabel(firstToSchedule)}`
               : `Pick ${MIN_DAYS - total} more day${MIN_DAYS - total === 1 ? '' : 's'}`
           }
           onPress={continueWith}
@@ -216,7 +241,7 @@ export function RecurringDaysScreen({
           }))}
           activeId={activeId}
           onSelect={select}
-          onAdd={newest !== undefined && newest.days.size > 0 ? addPlan : undefined}
+          onAdd={addPlan}
           testID={`${testID}-plans`}
         />
 
@@ -299,23 +324,27 @@ function DayGrid({ rows, selected, locked, startId, endId, onApply }: DayGridPro
   // its `Animated.Value` — so the gesture can track a sweep without reading a ref during render.
   const [tracker] = useState(() => new SweepTracker());
 
-  const visit = (x: number, y: number) => {
-    const hit = tracker.hit(x, y, rows);
-    if (hit === null) return;
-    const mode = onApply(hit.id, hit.intent);
-    if (hit.intent === 'toggle' && mode !== null) tracker.start(mode);
-  };
-
-  // `minDistance(0)`: a tap is a pan that never moves, so taps and sweeps share one path.
-  const sweep = Gesture.Pan()
-    .minDistance(0)
-    .runOnJS(true)
-    .onBegin((event) => {
-      tracker.reset();
-      visit(event.x, event.y);
-    })
-    .onUpdate((event) => visit(event.x, event.y))
-    .onFinalize(() => tracker.reset());
+  // Built once per grid, not per render: a sweep's first day re-renders the screen, and handing
+  // the detector a new gesture mid-sweep can reset the one in progress. Everything it reads —
+  // the tracker, the rows and `onApply` — is stable across renders.
+  const sweep = useMemo(() => {
+    const visit = (x: number, y: number) => {
+      const hit = tracker.hit(x, y, rows);
+      if (hit === null) return;
+      const mode = onApply(hit.id, hit.intent);
+      if (hit.intent === 'toggle' && mode !== null) tracker.start(mode);
+    };
+    // `minDistance(0)`: a tap is a pan that never moves, so taps and sweeps share one path.
+    return Gesture.Pan()
+      .minDistance(0)
+      .runOnJS(true)
+      .onBegin((event) => {
+        tracker.reset();
+        visit(event.x, event.y);
+      })
+      .onUpdate((event) => visit(event.x, event.y))
+      .onFinalize(() => tracker.reset());
+  }, [tracker, rows, onApply]);
 
   return (
     <GestureDetector gesture={sweep}>

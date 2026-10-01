@@ -226,6 +226,8 @@ export const palette = {
   black02: '#00000006',
   /** `color/text/disabled` — the disabled pill CTA's label. `#00000040`, i.e. black at 25 %. */
   black25: '#00000040',
+  /** `color/text/secondary` — struck prices and unselected tab labels. Black at 60 %. */
+  black60: 'rgba(0,0,0,0.6)',
   /** `155:1585` / `158:1586` — the inline "Max 14 days reached" error and its dot. */
   red600: '#E53935',
 
@@ -557,6 +559,25 @@ export const innerShadows = {
       blurRadius: 3,
       color: '#FFEF99',
       inset: true,
+    },
+  ],
+  /** `364:520` — the Plan banner's lift: `0 8 20 -6 rgba(140,102,0,0.18)`. */
+  planBanner: [
+    {
+      offsetX: 0,
+      offsetY: 8,
+      blurRadius: 20,
+      spreadDistance: -6,
+      color: 'rgba(140,102,0,0.18)',
+    },
+  ],
+  /** `Elevation/1` — `0 0 3 #00000014`, the selected time-of-day pill (`288:523`). */
+  elevation1: [
+    {
+      offsetX: 0,
+      offsetY: 0,
+      blurRadius: 3,
+      color: 'rgba(0,0,0,0.08)',
     },
   ],
   /** `444:10424` — the "+" button: `0 -2 4 rgba(255,222,51,0.8)`, inset. */

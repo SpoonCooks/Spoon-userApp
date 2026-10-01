@@ -207,6 +207,8 @@ export const lightColors = {
   /** `155:1585` — inline validation copy, and the dot (`158:1586`) beside it. */
   textError: palette.red600,
   surfaceError: palette.red600,
+  /** Spoon — User `color/text/secondary`: struck prices, unselected tab labels. */
+  textSubdued: palette.black60,
   /** `444:10421` / `444:10424` — the `#FFF7CC` edge on Plan tiles and the "+" button. */
   borderPlanTile: palette.yellow200,
 
@@ -358,6 +360,18 @@ export const gradients = {
     colors: [palette.yellow400, palette.yellow33],
     locations: [0.074074, 0.81481],
     angleDeg: 138.81407483429035,
+  },
+  /** `364:520` — the Schedule Plan banner: `#FFDE33` → `#FFD600` (0 → 71.4 %) at 169.89°. */
+  planBanner: {
+    colors: [palette.yellow33, palette.yellow500],
+    locations: [0, 0.71429],
+    angleDeg: 169.88604760821104,
+  },
+  /** `358:8192` — the Summary's active Plan tab: `#FFDE33` → `#FFD600` by 60 %, straight down. */
+  planTabActive: {
+    colors: [palette.yellow33, palette.yellow500],
+    locations: [0, 0.6],
+    angleDeg: 180,
   },
   planAddGloss: {
     colors: [withAlpha(palette.yellow200, 0.7), withAlpha(palette.yellow200, 0)],
@@ -1042,6 +1056,20 @@ export const typography = {
   bodyLargeStrong: {
     fontSize: fontSize.lg,
     lineHeight: lineHeight.lg,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Heading`: Livvic SemiBold 18/26 ("Plan 1", "Selected days"). */
+  headingSection: {
+    fontSize: fontSize.xxl,
+    lineHeight: 26,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Micro Strong`: Livvic SemiBold 10/14 (the "Selected days" weekdays). */
+  microSemibold: {
+    fontSize: fontSize.xs,
+    lineHeight: 14,
     fontFamily: fontFamily.semibold,
     letterSpacing: letterSpacing.none,
   },

@@ -79,7 +79,12 @@ export function ScreenHeader({
   const nav = density === 'nav';
   return (
     <View
-      style={[styles.header, DENSITY_STYLE[density], divider ? styles.divider : null]}
+      style={[
+        styles.header,
+        DENSITY_STYLE[density],
+        nav && onBack === undefined ? styles.navNoBack : null,
+        divider ? styles.divider : null,
+      ]}
       testID={testID}
     >
       {/* `54:289` — the exported 32pt disc, mirrored to face back (36pt on `step`). Absent by
@@ -155,6 +160,8 @@ const styles = StyleSheet.create({
     paddingRight: lightTheme.space.lg,
     paddingVertical: lightTheme.space.sm,
   },
+  /** `542:1341` (`Nav header 3`) — no back button, so the title takes the 16pt gutter. */
+  navNoBack: { paddingLeft: lightTheme.space.lg },
   /** `44:63` — the 44pt back button, already a full touch target. */
   navBack: {
     width: lightTheme.layout.minTouchTarget,

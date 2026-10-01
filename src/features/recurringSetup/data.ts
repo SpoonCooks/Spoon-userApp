@@ -456,3 +456,68 @@ export function buildDemoPlanConfirmation(): RecurringPlanConfirmation {
     firstVisitTimeLabel: '1:15 PM',
   };
 }
+
+/**
+ * Schedule (`288:516`) — the three time-of-day bands, read off the start-time artwork's captions
+ * (`586:3820`): "5 AM - 11:45 AM", "12 PM to 4:45 PM", "5 PM onwards". The evening band has no
+ * stated end; it runs to 9:45 PM here, an assumption until availability says otherwise.
+ */
+export const TIME_OF_DAY_BANDS: readonly {
+  readonly id: RecurringTimeOfDay;
+  readonly label: string;
+  readonly fromMinutes: number;
+  readonly toMinutes: number;
+}[] = [
+  { id: 'morning', label: 'Morning', fromMinutes: 5 * 60, toMinutes: 11 * 60 + 45 },
+  { id: 'afternoon', label: 'Afternoon', fromMinutes: 12 * 60, toMinutes: 16 * 60 + 45 },
+  { id: 'evening', label: 'Evening', fromMinutes: 17 * 60, toMinutes: 21 * 60 + 45 },
+];
+
+/** Start times are offered every 30 minutes until availability is read from the backend. */
+const START_STEP_MINUTES = 30;
+
+/** The start times a band offers, earliest first. */
+export function startTimesFor(timeOfDay: RecurringTimeOfDay): readonly number[] {
+  const band = TIME_OF_DAY_BANDS.find((entry) => entry.id === timeOfDay);
+  if (band === undefined) return [];
+  const starts: number[] = [];
+  for (let minutes = band.fromMinutes; minutes <= band.toMinutes; minutes += START_STEP_MINUTES) {
+    starts.push(minutes);
+  }
+  return starts;
+}
+
+/** "9:00 AM" — the Slot chip's label (`288:585`). */
+export function formatStartTime(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const suffix = hours < 12 ? 'AM' : 'PM';
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${hour12}:${String(mins).padStart(2, '0')} ${suffix}`;
+}
+
+/** "1st", "2nd", "3rd", "4th", "11th", "21st" … */
+export function ordinal(value: number): string {
+  const tens = value % 100;
+  if (tens >= 11 && tens <= 13) return `${value}th`;
+  switch (value % 10) {
+    case 1:
+      return `${value}st`;
+    case 2:
+      return `${value}nd`;
+    case 3:
+      return `${value}rd`;
+    default:
+      return `${value}th`;
+  }
+}
+
+/** "Mon", "Tue", "Wed", "Thurs", "Fri", "Sat", "Sun" — the Selected days labels (`340:7096`). */
+const SELECTED_DAY_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thurs', 'Fri', 'Sat', 'Sun'] as const;
+
+/** A picked local date as the Selected days grid shows it. */
+export function selectedDayLabel(id: string): { readonly weekday: string; readonly day: number } {
+  const [year, month, day] = id.split('-').map(Number) as [number, number, number];
+  const date = new Date(year, month - 1, day);
+  return { weekday: SELECTED_DAY_WEEKDAYS[(date.getDay() + 6) % 7] ?? '', day };
+}

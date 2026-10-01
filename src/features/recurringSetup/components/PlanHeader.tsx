@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -7,6 +7,8 @@ import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import { innerShadows } from '@ui/tokens/primitives';
 import { gradientAxis } from '@ui/tokens/semantic';
+
+import { PLUS_ICON } from '../art';
 
 /**
  * Step 1's Plan header — Figma `cCQlzTeiObQkpVBzwI8mZi`: `476:5804` (Plan 1 alone, `340:6661`),
@@ -30,7 +32,7 @@ export interface PlanHeaderProps {
   readonly plans: readonly PlanHeaderPlan[];
   readonly activeId: string;
   readonly onSelect: (id: string) => void;
-  /** Omit to hide the "+" (the newest plan has no days yet). */
+  /** Omit to hide the "+". Step 1 always shows it: there is no cap on plans. */
   readonly onAdd?: (() => void) | undefined;
   readonly testID: string;
 }
@@ -173,18 +175,9 @@ function Gloss({
   );
 }
 
-/**
- * `352:141` — two 11pt strokes, 2.2 wide with round caps, crossing in a 16pt box. Drawn as two
- * rounded bars of the same geometry: the app renders no SVG, and Feather's `plus` is a different
- * shape (longer arms, a thinner stroke).
- */
+/** `352:141` — the file's own 16pt plus, rendered from its SVG. */
 function PlusGlyph() {
-  return (
-    <View style={styles.plus} accessibilityElementsHidden importantForAccessibility="no">
-      <View style={[styles.plusBar, styles.plusHorizontal]} />
-      <View style={[styles.plusBar, styles.plusVertical]} />
-    </View>
-  );
+  return <Image source={PLUS_ICON} style={styles.plus} accessibilityElementsHidden />;
 }
 
 /** `444:10420` — tiles and the "+" are 56 tall. */
@@ -194,8 +187,6 @@ const ADD_WIDTH = 32;
 const ADD_SLOP = { left: 6, right: 6 };
 /** Below this a tile's "Plan N" no longer fits, so the row scrolls instead of shrinking it. */
 const MIN_TILE_WIDTH = 120;
-const STROKE = 2.2;
-const ARM = 11 + STROKE;
 
 const styles = StyleSheet.create({
   /**
@@ -258,12 +249,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     boxShadow: innerShadows.planAdd,
   },
-  plus: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
-  plusBar: {
-    position: 'absolute',
-    borderRadius: STROKE / 2,
-    backgroundColor: lightTheme.colors.textPrimary,
-  },
-  plusHorizontal: { width: ARM, height: STROKE },
-  plusVertical: { width: STROKE, height: ARM },
+  plus: { width: 16, height: 16 },
 });

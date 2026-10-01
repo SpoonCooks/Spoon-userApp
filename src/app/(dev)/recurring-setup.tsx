@@ -1,8 +1,9 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   RecurringAutopayScreen,
   RecurringDaysScreen,
+  RecurringPlanFlow,
   RecurringPlanConfirmedScreen,
   RecurringReviewScreen,
   RecurringTimeScreen,
@@ -54,9 +55,23 @@ export default function RecurringSetupPreviewRoute() {
       return <RecurringAutopayScreen onBack={goBack} />;
     case '6':
       return <RecurringPlanConfirmedScreen />;
+    case '1':
+      return (
+        <>
+          <Stack.Screen options={{ gestureEnabled: false }} />
+          <RecurringDaysScreen onBack={goBack} today={FIGMA_TODAY} />
+        </>
+      );
     default:
-      // Pinned to the date the Figma frames are drawn for (window Sep 28 – Oct 18), so the
-      // preview can be compared against `144:2404` side by side. The real route uses today.
-      return <RecurringDaysScreen onBack={goBack} today={FIGMA_TODAY} />;
+      // The redesigned flow end to end: days and plans → Schedule per plan → Summary. Pinned to
+      // the date the Figma frames are drawn for (window Sep 28 – Oct 18), so it can be compared
+      // against them side by side. The real route uses today. Swipe-back is off: a sweep across
+      // the calendar from its Monday column would otherwise start the stack's back gesture.
+      return (
+        <>
+          <Stack.Screen options={{ gestureEnabled: false }} />
+          <RecurringPlanFlow onExit={goBack} today={FIGMA_TODAY} />
+        </>
+      );
   }
 }

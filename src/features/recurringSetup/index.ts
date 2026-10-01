@@ -5,7 +5,13 @@
  * Screens are being built one step at a time; only the ones below exist so far.
  */
 export { RecurringDaysScreen } from './screens/RecurringDaysScreen';
-export type { RecurringDaysScreenProps } from './screens/RecurringDaysScreen';
+export type { RecurringDaysScreenProps, RecurringPlanDays } from './screens/RecurringDaysScreen';
+export { RecurringScheduleScreen } from './screens/RecurringScheduleScreen';
+export type { RecurringScheduleScreenProps } from './screens/RecurringScheduleScreen';
+export { RecurringSummaryScreen } from './screens/RecurringSummaryScreen';
+export type { RecurringSummaryScreenProps } from './screens/RecurringSummaryScreen';
+export { RecurringPlanFlow } from './screens/RecurringPlanFlow';
+export type { RecurringPlanFlowProps } from './screens/RecurringPlanFlow';
 export { RecurringTimeScreen } from './screens/RecurringTimeScreen';
 export type { RecurringTimeScreenProps } from './screens/RecurringTimeScreen';
 export { RecurringTimesByDateScreen } from './screens/RecurringTimesByDateScreen';
@@ -37,6 +43,8 @@ export type {
   RecurringTimeOfDay,
   RecurringVisitCharge,
   RecurringVisitDraft,
+  RecurringPlanDraft,
+  RecurringVisitChoice,
   RecurringWindow,
   RecurringWindowDay,
   RecurringWindowRow,

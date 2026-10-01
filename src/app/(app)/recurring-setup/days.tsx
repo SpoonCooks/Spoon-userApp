@@ -1,3 +1,5 @@
+import { Stack } from 'expo-router';
+
 import { RecurringDaysScreen } from '@features/recurringSetup';
 import { useSafeBack } from '@core/navigation';
 
@@ -12,5 +14,12 @@ import { useSafeBack } from '@core/navigation';
 export default function RecurringSetupDaysRoute() {
   const goBack = useSafeBack('/home');
 
-  return <RecurringDaysScreen onBack={goBack} />;
+  // Swipe-back is off: a sweep across the calendar from its Monday column would otherwise start
+  // the stack's back gesture. The screen has its own back button.
+  return (
+    <>
+      <Stack.Screen options={{ gestureEnabled: false }} />
+      <RecurringDaysScreen onBack={goBack} />
+    </>
+  );
 }
