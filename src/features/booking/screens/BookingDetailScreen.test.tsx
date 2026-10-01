@@ -296,7 +296,11 @@ describe('Booking host — en route on time and late (3:1381 / 99:1413)', () => 
 describe('Booking host — arrived (3:1658)', () => {
   it('shows the Start OTP and the Start Service label, drawn unconditionally', () => {
     render(
-      <BookingDetailView state={ready(DEMO_BOOKING_ARRIVED)} onRetry={onRetry} onBack={jest.fn()} />,
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_ARRIVED)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
     );
 
     expect(screen.getByTestId('arrived-handover-otp')).toBeTruthy();
@@ -311,7 +315,11 @@ describe('Booking host — arrived (3:1658)', () => {
    */
   it('is a label, not a control — no button role, nothing to press', () => {
     render(
-      <BookingDetailView state={ready(DEMO_BOOKING_ARRIVED)} onRetry={onRetry} onBack={jest.fn()} />,
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_ARRIVED)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
     );
 
     const cta = screen.getByTestId('arrived-handover-cta');
@@ -321,7 +329,11 @@ describe('Booking host — arrived (3:1658)', () => {
 
   it('draws the OTP panel in the lime `start` tone, not the In-service yellow', () => {
     render(
-      <BookingDetailView state={ready(DEMO_BOOKING_ARRIVED)} onRetry={onRetry} onBack={jest.fn()} />,
+      <BookingDetailView
+        state={ready(DEMO_BOOKING_ARRIVED)}
+        onRetry={onRetry}
+        onBack={jest.fn()}
+      />,
     );
 
     // `21:1105` — the panel is `lime300` at 30%; `101:1905` is `yellow300` at 30%.

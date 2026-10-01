@@ -72,9 +72,7 @@ describe('LoginScreen — 250:2383', () => {
     const { rerender } = render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} />);
 
     fireEvent.changeText(screen.getByTestId('login-screen-phone'), '1112223334');
-    rerender(
-      <LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} initialPhone="+919876543210" />,
-    );
+    rerender(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} initialPhone="+919876543210" />);
 
     expect(screen.getByTestId('login-screen-phone').props.value).toBe('1112223334');
   });
