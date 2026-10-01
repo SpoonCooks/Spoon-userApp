@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   InstantSheet,
@@ -39,17 +39,51 @@ const DEV_INSTANT = {
 
 export default function HomeRoute() {
   const router = useRouter();
-  const { instant: instantParam } = useLocalSearchParams<{
+  const { instant: instantParam, open: openParam } = useLocalSearchParams<{
     instant?: keyof typeof DEV_INSTANT;
+    open?: string;
   }>();
   const devInstant = __DEV__ && instantParam !== undefined && instantParam in DEV_INSTANT;
-  const [instantOpen, setInstantOpen] = useState(devInstant);
+  const [instantOpen, setInstantOpen] = useState(devInstant || openParam === 'instant');
   const [durationId, setDurationId] = useState<string | null>(null);
   // The chosen duration is what availability and the quote are ABOUT, so it is an input to the
   // read, not something applied to its result.
   const instant = useInstantData({ durationId });
   const submission = useBookingSubmission({ slotType: 'instant', durationId });
   const addressGate = useAddressGate();
+
+  /**
+   * `?open=instant` — the Instant APP SHORTCUT (Spotlight / launcher search, see
+   * `plugins/withAppShortcuts.js`). Unlike `?instant=` above, this is live in release builds: it
+   * opens the same sheet the Home tile does, and nothing more.
+   *
+   * Read on every CHANGE of the param, not only in the `useState` initialiser, because a shortcut
+   * tapped while Home is already mounted only changes the params — the screen does not remount.
+   * The param is then cleared, so closing the sheet stays closed and the next tap is a change again.
+   */
+  const [seenOpenParam, setSeenOpenParam] = useState(openParam);
+  if (openParam !== seenOpenParam) {
+    setSeenOpenParam(openParam);
+    if (openParam === 'instant') setInstantOpen(true);
+  }
+  useEffect(() => {
+    if (openParam === 'instant') router.setParams({ open: undefined });
+  }, [openParam, router]);
+
+  /**
+   * The sheet closes when Home stops being the screen on top.
+   *
+   * It is a modal, and a modal draws over every screen — while Home stays mounted underneath
+   * whatever is pushed onto it. The sheet's own Schedule button closes it before navigating, but
+   * a link from outside the app does not go through that button: tapping the Schedule app
+   * shortcut, or a push notification, with the sheet open left the sheet drawn over the screen
+   * the link opened.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      return () => setInstantOpen(false);
+    }, []),
+  );
 
   /**
    * `336:4235` — the rating chips ON the "Share your rating!" banner.
