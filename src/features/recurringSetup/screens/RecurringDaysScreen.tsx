@@ -5,6 +5,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
+import { PlanHeader } from '../components/PlanHeader';
 import { RecurringFooter } from '../components/RecurringFooter';
 import { WEEKDAY_LABELS, buildRecurringWindow } from '../data';
 import type { RecurringWindowDay } from '../types';
@@ -12,16 +13,28 @@ import type { RecurringWindowDay } from '../types';
 /**
  * Recurring setup — Step 1 "Pick your days".
  *
- * Source: Figma `cCQlzTeiObQkpVBzwI8mZi` (Spoon — User), "Date selections flows": `144:2404`
- * (unselected), `135:1681` (under 5), `147:1510` (vertical drag), `132:1568` (horizontal drag),
- * `149:1525` (random taps) and `154:1583` (max cap error). The rules are the frames' own notes:
+ * Source: Figma `cCQlzTeiObQkpVBzwI8mZi` (Spoon — User).
+ *
+ * "Date selections flows": `144:2404` (unselected), `135:1681` (under 5), `147:1510` (vertical
+ * drag), `132:1568` (horizontal drag), `149:1525` (random taps), `154:1583` (max cap error):
  *
  *  - Only the 21 bookable dates (today + 3 onward) are shown; the week is not padded out.
- *  - 5 to 14 days. Under 5 the CTA is disabled and reads "Pick N more days", updating per tap.
  *  - Days are picked by tapping, or by dragging across them vertically or horizontally.
- *  - The earliest picked day is the start and the latest the end; both take the brand fill, the
- *    days between take the tint. Rechecked on every change.
+ *  - In a plan, the earliest picked day is the start and the latest the end; both take the brand
+ *    fill, the days between take the tint. Rechecked on every change.
  *  - A 15th pick is refused and "Max 14 days reached…" shows for a moment.
+ *
+ * "Date selection / Plan creation": `340:6661` (Plan 1), `334:6406` (add plans), `340:6550`
+ * (Plan 2):
+ *
+ *  - Everything picked on the first calendar is Plan 1, and each plan's tile counts its days.
+ *  - Once the newest plan has a day, a "+" appears; it starts the next plan on a blank calendar.
+ *    There is no cap on plans.
+ *  - Days already in another plan are greyed out and cannot be picked.
+ *  - The CTA unlocks once all plans together have 5 days, and until then reads "Pick N more days".
+ *
+ * Defaults the frames leave open: the 14-day cap counts every plan together (it is the window's
+ * cap, not a plan's), and tapping a tile returns to that plan's calendar.
  *
  * Still local: no availability is read yet, so no date is struck out, and `onContinue` is left to
  * the caller.
@@ -32,13 +45,28 @@ const MAX_DAYS = 14;
 /** How long the max-cap error stays up — the frame says only "temporarily". */
 const CAP_ERROR_MS = 3000;
 
+interface PlanDraft {
+  readonly id: string;
+  readonly days: ReadonlySet<string>;
+}
+
+/** A plan as Step 1 hands it on: its label and its dates, earliest first. */
+export interface RecurringPlanDays {
+  readonly label: string;
+  readonly dayIds: readonly string[];
+}
+
 export interface RecurringDaysScreenProps {
   readonly onBack: () => void;
-  /** Left unwired by the route for now. */
-  readonly onContinue?: (selectedDayIds: readonly string[]) => void;
+  /** Left unwired by the route for now. Receives every plan that has at least one day. */
+  readonly onContinue?: (plans: readonly RecurringPlanDays[]) => void;
   /** The day the window is counted from. Defaults to now; the dev preview pins Figma's date. */
   readonly today?: Date;
   readonly testID?: string;
+}
+
+function planLabel(index: number): string {
+  return `Plan ${index + 1}`;
 }
 
 export function RecurringDaysScreen({
@@ -52,15 +80,29 @@ export function RecurringDaysScreen({
     () => buildRecurringWindow(todayKey === undefined ? new Date() : new Date(todayKey)),
     [todayKey],
   );
-  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [plans, setPlans] = useState<readonly PlanDraft[]>(() => [
+    { id: 'plan-1', days: new Set() },
+  ]);
+  const [activeId, setActiveId] = useState('plan-1');
   const [capError, setCapError] = useState(false);
   const capTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const count = selected.size;
-  const complete = count >= MIN_DAYS;
-  const picked = calendar.orderedIds.filter((id) => selected.has(id));
+  const active = plans.find((plan) => plan.id === activeId) ?? plans[0];
+  const activeDays = active?.days ?? EMPTY;
+  const locked = useMemo(() => {
+    const ids = new Set<string>();
+    for (const plan of plans) {
+      if (plan.id === activeId) continue;
+      for (const id of plan.days) ids.add(id);
+    }
+    return ids;
+  }, [plans, activeId]);
+  const total = plans.reduce((sum, plan) => sum + plan.days.size, 0);
+  const complete = total >= MIN_DAYS;
+  const picked = calendar.orderedIds.filter((id) => activeDays.has(id));
   const startId = picked[0];
   const endId = picked.at(-1);
+  const newest = plans.at(-1);
 
   const showCapError = useCallback(() => {
     setCapError(true);
@@ -76,36 +118,67 @@ export function RecurringDaysScreen({
   );
 
   /**
-   * Adds or removes one day. A drag applies several in one burst, so the next set is computed from
-   * a ref kept in step with every change rather than from a state updater, which React runs later.
+   * Adds or removes one day in the active plan. A drag applies several in one burst, so the next
+   * state is computed from refs kept in step with every change rather than from a state updater,
+   * which React runs later. Returns null for a day another plan holds.
    */
-  const selectedRef = useRef(selected);
+  const plansRef = useRef(plans);
+  const activeRef = useRef(activeId);
+  const commit = useCallback((next: readonly PlanDraft[]) => {
+    plansRef.current = next;
+    setPlans(next);
+  }, []);
+
   const apply = useCallback(
     (id: string, intent: SweepIntent): 'add' | 'remove' | null => {
-      const current = selectedRef.current;
-      const mode = intent === 'toggle' ? (current.has(id) ? 'remove' : 'add') : intent;
+      const all = plansRef.current;
+      const current = all.find((plan) => plan.id === activeRef.current);
+      if (current === undefined) return null;
+      if (all.some((plan) => plan !== current && plan.days.has(id))) return null;
+      const mode = intent === 'toggle' ? (current.days.has(id) ? 'remove' : 'add') : intent;
       if (mode === 'remove') {
-        if (!current.has(id)) return mode;
-        const next = new Set(current);
-        next.delete(id);
-        selectedRef.current = next;
-        setSelected(next);
+        if (!current.days.has(id)) return mode;
+        const days = new Set(current.days);
+        days.delete(id);
+        commit(all.map((plan) => (plan === current ? { ...plan, days } : plan)));
         setCapError(false);
         return mode;
       }
-      if (current.has(id)) return mode;
-      if (current.size >= MAX_DAYS) {
+      if (current.days.has(id)) return mode;
+      if (all.reduce((sum, plan) => sum + plan.days.size, 0) >= MAX_DAYS) {
         showCapError();
         return mode;
       }
-      const next = new Set(current);
-      next.add(id);
-      selectedRef.current = next;
-      setSelected(next);
+      const days = new Set(current.days);
+      days.add(id);
+      commit(all.map((plan) => (plan === current ? { ...plan, days } : plan)));
       return mode;
     },
-    [showCapError],
+    [commit, showCapError],
   );
+
+  const select = (id: string) => {
+    activeRef.current = id;
+    setActiveId(id);
+  };
+
+  const addPlan = () => {
+    const id = `plan-${plansRef.current.length + 1}`;
+    commit([...plansRef.current, { id, days: new Set() }]);
+    select(id);
+  };
+
+  const continueWith = () => {
+    if (!complete) return;
+    onContinue?.(
+      plans
+        .map((plan, index) => ({
+          label: planLabel(index),
+          dayIds: calendar.orderedIds.filter((id) => plan.days.has(id)),
+        }))
+        .filter((plan) => plan.dayIds.length > 0),
+    );
+  };
 
   return (
     <Screen
@@ -125,16 +198,28 @@ export function RecurringDaysScreen({
           layout="pill"
           label={
             complete
-              ? 'Continue'
-              : `Pick ${MIN_DAYS - count} more day${MIN_DAYS - count === 1 ? '' : 's'}`
+              ? `Schedule ${planLabel(0)}`
+              : `Pick ${MIN_DAYS - total} more day${MIN_DAYS - total === 1 ? '' : 's'}`
           }
-          onPress={() => complete && onContinue?.(picked)}
+          onPress={continueWith}
           disabled={!complete}
           testID={`${testID}-continue`}
         />
       }
     >
       <View style={styles.content}>
+        <PlanHeader
+          plans={plans.map((plan, index) => ({
+            id: plan.id,
+            label: planLabel(index),
+            dayCount: plan.days.size,
+          }))}
+          activeId={activeId}
+          onSelect={select}
+          onAdd={newest !== undefined && newest.days.size > 0 ? addPlan : undefined}
+          testID={`${testID}-plans`}
+        />
+
         <View style={styles.calendar}>
           <View style={styles.row}>
             {WEEKDAY_LABELS.map((label) => (
@@ -153,7 +238,8 @@ export function RecurringDaysScreen({
 
           <DayGrid
             rows={calendar.rows}
-            selected={selected}
+            selected={activeDays}
+            locked={locked}
             startId={startId}
             endId={endId}
             onApply={apply}
@@ -181,9 +267,14 @@ export function RecurringDaysScreen({
   );
 }
 
+const EMPTY: ReadonlySet<string> = new Set();
+
 interface DayGridProps {
   readonly rows: ReturnType<typeof buildRecurringWindow>['rows'];
+  /** The active plan's days. */
   readonly selected: ReadonlySet<string>;
+  /** Days another plan holds: greyed out and not pickable. */
+  readonly locked: ReadonlySet<string>;
   readonly startId: string | undefined;
   readonly endId: string | undefined;
   /**
@@ -203,7 +294,7 @@ type SweepIntent = 'add' | 'remove' | 'toggle';
  * picked one a remove sweep, and every further day the finger enters gets the same treatment once.
  * A tap is the same gesture with no movement.
  */
-function DayGrid({ rows, selected, startId, endId, onApply }: DayGridProps) {
+function DayGrid({ rows, selected, locked, startId, endId, onApply }: DayGridProps) {
   // Lazily created and stable for the component's life — the same pattern `BottomSheet` uses for
   // its `Animated.Value` — so the gesture can track a sweep without reading a ref during render.
   const [tracker] = useState(() => new SweepTracker());
@@ -242,6 +333,7 @@ function DayGrid({ rows, selected, startId, endId, onApply }: DayGridProps) {
                   key={day.id}
                   day={day}
                   selected={selected.has(day.id)}
+                  locked={locked.has(day.id)}
                   edge={day.id === startId || day.id === endId}
                   onToggle={() => onApply(day.id, 'toggle')}
                 />
@@ -308,26 +400,43 @@ class SweepTracker {
 interface DayCellProps {
   readonly day: RecurringWindowDay;
   readonly selected: boolean;
+  /** Held by another plan (`340:6559`): a faint disc under faint ink. */
+  readonly locked: boolean;
   /** The earliest or latest picked day: brand fill rather than tint. */
   readonly edge: boolean;
   /** Screen-reader activation; touch goes through the grid's responder. */
   readonly onToggle: () => void;
 }
 
-function DayCell({ day, selected, edge, onToggle }: DayCellProps) {
+function DayCell({ day, selected, locked, edge, onToggle }: DayCellProps) {
   return (
     <View
       style={styles.column}
       accessible
       accessibilityRole="button"
       accessibilityLabel={day.label}
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled: locked }}
       accessibilityActions={[{ name: 'activate' }]}
       onAccessibilityAction={onToggle}
       testID={`recurring-day-${day.id}`}
     >
-      <View style={[styles.disc, selected ? (edge ? styles.discEdge : styles.discPicked) : null]}>
-        <Text variant="bodyLarge" color="textPrimary" align="center">
+      <View
+        style={[
+          styles.disc,
+          locked
+            ? styles.discLocked
+            : selected
+              ? edge
+                ? styles.discEdge
+                : styles.discPicked
+              : null,
+        ]}
+      >
+        <Text
+          variant="bodyLarge"
+          color={locked ? 'textDisabledSoft' : 'textPrimary'}
+          align="center"
+        >
           {day.dayOfMonth}
         </Text>
       </View>
@@ -345,7 +454,7 @@ const DISC = 32;
 const DISC_TOP = 4;
 
 const styles = StyleSheet.create({
-  /** `144:2407` — p 16 all round, 24 between the calendar and the error. */
+  /** `340:6553` — p 16 all round, 24 between the plan header, the calendar and the error. */
   content: { flex: 1, padding: lightTheme.space.lg, gap: lightTheme.space.xl },
   /** `144:2414` — the weekday row and the date rows share one 5pt-gapped grid. */
   calendar: { gap: CELL_GAP },
@@ -366,6 +475,7 @@ const styles = StyleSheet.create({
   },
   discPicked: { backgroundColor: lightTheme.colors.surfaceBrandTint },
   discEdge: { backgroundColor: lightTheme.colors.surfaceBrand },
+  discLocked: { backgroundColor: lightTheme.colors.surfaceDisabledSoft },
   /** `158:1588` — a 16pt dot and the copy, 6 apart, centred. */
   error: {
     flexDirection: 'row',

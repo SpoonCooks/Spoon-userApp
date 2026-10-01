@@ -539,6 +539,36 @@ export const innerShadows = {
       inset: true,
     },
   ],
+  /** Spoon — User `444:10422` — the selected Plan tile: `0 -2 4 rgba(255,214,0,0.9)`, inset. */
+  planTileActive: [
+    {
+      offsetX: 0,
+      offsetY: -2,
+      blurRadius: 4,
+      color: 'rgba(255,214,0,0.9)',
+      inset: true,
+    },
+  ],
+  /** `444:10421` — an unselected Plan tile: `0 -1.5 3 #FFEF99`, inset. */
+  planTileIdle: [
+    {
+      offsetX: 0,
+      offsetY: -1.5,
+      blurRadius: 3,
+      color: '#FFEF99',
+      inset: true,
+    },
+  ],
+  /** `444:10424` — the "+" button: `0 -2 4 rgba(255,222,51,0.8)`, inset. */
+  planAdd: [
+    {
+      offsetX: 0,
+      offsetY: -2,
+      blurRadius: 4,
+      color: 'rgba(255,222,51,0.8)',
+      inset: true,
+    },
+  ],
 } as const;
 
 /**

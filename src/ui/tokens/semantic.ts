@@ -207,6 +207,8 @@ export const lightColors = {
   /** `155:1585` — inline validation copy, and the dot (`158:1586`) beside it. */
   textError: palette.red600,
   surfaceError: palette.red600,
+  /** `444:10421` / `444:10424` — the `#FFF7CC` edge on Plan tiles and the "+" button. */
+  borderPlanTile: palette.yellow200,
 
   danger: palette.danger,
   dangerSurface: palette.dangerSurface,
@@ -327,6 +329,40 @@ export const gradients = {
     colors: [withAlpha(palette.yellow500, 0.1), palette.black40],
     locations: [0.044863, 0.99057],
     angleDeg: 179.70251199528715,
+  },
+  /**
+   * Spoon — User, Step 1's Plan header (`444:10420`). The selected Plan tile is two layers: a
+   * `#FFDE33` → `#FFD600` sweep (7.4 % → 81.5 %) under a gloss of `#FFF7CC` at 60 % fading out by
+   * 45 %. Figma reports the sweep's angle per tile width — 175.60° full width (`476:5805`),
+   * 175.00° beside the "+" (`444:10434`), 169.73° with two tiles (`444:10422`) — so the tile picks
+   * one of `angles` by layout rather than one angle being stretched across every width.
+   */
+  planTileActive: {
+    colors: [palette.yellow33, palette.yellow500],
+    locations: [0.074074, 0.81481],
+    angleDeg: 169.72779139697923,
+  },
+  planTileActiveAngles: { alone: 175.6012946450045, besideAdd: 174.99935540244158 },
+  planTileGloss: {
+    colors: [withAlpha(palette.yellow200, 0.6), withAlpha(palette.yellow200, 0)],
+    locations: [0, 0.45],
+    angleDeg: 180,
+  },
+  /** `444:10421` — an unselected Plan tile: `#FFF7CC` → `#FFEF99`, straight down. */
+  planTileIdle: {
+    colors: [palette.yellow200, palette.yellow300],
+    angleDeg: 180,
+  },
+  /** `444:10424` — the "+" button: `#FFE666` → `#FFDE33` at 138.81°, under a 70 % gloss. */
+  planAdd: {
+    colors: [palette.yellow400, palette.yellow33],
+    locations: [0.074074, 0.81481],
+    angleDeg: 138.81407483429035,
+  },
+  planAddGloss: {
+    colors: [withAlpha(palette.yellow200, 0.7), withAlpha(palette.yellow200, 0)],
+    locations: [0, 0.45],
+    angleDeg: 180,
   },
 } as const;
 
