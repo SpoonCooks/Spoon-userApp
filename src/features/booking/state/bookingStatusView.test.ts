@@ -40,10 +40,20 @@ describe('booking status view', () => {
       );
     });
 
-    it('shows the ordinary cancelled screen when the customer cancelled it', () => {
+    it('shows the customer-cancelled screen when the customer cancelled it', () => {
       expect(viewForBooking({ status: 'cancelled', cancelledBy: 'customer' }).view).toBe(
-        'cancelled',
+        'customerCancelled',
       );
+    });
+
+    it('treats an absent cancelledBy as customer-caused, not as the system apology', () => {
+      // Same convention `homeBannerView.ts` uses: anything that is not literally 'system' is
+      // customer-caused. A booking the server cancelled without saying who must not draw the
+      // apology screen on the strength of a missing field.
+      expect(viewForBooking({ status: 'cancelled', cancelledBy: null }).view).toBe(
+        'customerCancelled',
+      );
+      expect(viewForBooking({ status: 'cancelled' }).view).toBe('customerCancelled');
     });
 
     it('shows the reassigned screen for a live booking whose assignment changed', () => {

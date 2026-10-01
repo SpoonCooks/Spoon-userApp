@@ -174,6 +174,29 @@ export interface AutoCancelledViewModel {
   readonly rebookDeclineLabel: string;
 }
 
+/**
+ * `606:4895` "Page 8d- User cancelled" — a TERMINAL, server-reported state, the customer's own
+ * counterpart to `AutoCancelledViewModel`.
+ *
+ * No apology: the hero's title says the customer cancelled it, and nothing here apologises for a
+ * decision they made. No rebook prompt either — the design draws none, unlike `201:278`'s PRODUCT
+ * PENDING "Give us another chance". Every figure is pre-formatted and supplied; `refundAmount` is
+ * not derived from the rows, for the same reason `AutoCancelledViewModel`'s is not (task §10).
+ */
+export interface CustomerCancelledViewModel {
+  readonly title: string;
+  readonly rows: readonly DetailRow[];
+  /** `606:4946` — "Booking details", the heading above the rows. */
+  readonly detailsTitle: string;
+  readonly refundTitle: string;
+  readonly refundBody: string;
+  readonly refundAmountLabel: string;
+  /** Server-supplied. Never `paid − fee`. */
+  readonly refundAmount: string;
+  readonly refundDestination: string;
+  readonly refundTimeframe: string;
+}
+
 export interface ArrivedViewModel extends TrackingViewModel {
   readonly startCtaLabel: string;
   readonly otpTitle: string;
@@ -364,6 +387,7 @@ export interface BookingDetailViewModel {
   readonly tracking?: TrackingViewModel;
   readonly reassigned?: ReassignedViewModel;
   readonly autoCancelled?: AutoCancelledViewModel;
+  readonly customerCancelled?: CustomerCancelledViewModel;
   readonly arrived?: ArrivedViewModel;
   readonly inService?: InServiceViewModel;
   readonly completion?: CompletionViewModel;

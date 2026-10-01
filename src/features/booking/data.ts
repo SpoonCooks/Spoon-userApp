@@ -51,6 +51,7 @@ import {
   DEMO_BOOKING_COMPLETION,
   DEMO_BOOKING_CONFIRMATION,
   DEMO_BOOKING_CONFIRM_REASSIGN,
+  DEMO_BOOKING_CUSTOMER_CANCELLED,
   DEMO_BOOKING_FEEDBACK_SUBMITTED,
   DEMO_BOOKING_EN_ROUTE,
   DEMO_BOOKING_EN_ROUTE_LATE,
@@ -168,15 +169,16 @@ function lifecycleCopyFor(input: {
     case 'autoCancelled':
       return DEMO_BOOKING_AUTO_CANCELLED;
 
+    // 8d `606:4895` — the customer's own cancellation. No apology: `viewForBooking` sends anything
+    // that is not a SYSTEM cancellation here instead of to `201:278`'s apology copy.
+    case 'customerCancelled':
+      return DEMO_BOOKING_CUSTOMER_CANCELLED;
+
     /**
-     * A CUSTOMER cancellation and an unrecognised status.
-     *
-     * `201:278` is the apology Spoon owes for cancelling, and showing it for a cancellation the
-     * customer chose would apologise for their own decision — the same reasoning `homeBannerView`
-     * applies when it draws no banner for one. No other cancelled surface is designed, so the host
-     * renders its safe fallback; only the shared header copy is taken from here.
-     *
-     * Recorded as a UI gap in `docs/USER_APP_BACKEND_CONNECTIVITY_CLOSURE.md`, not papered over.
+     * `cancelled` is an intermediate value `resolveBookingView` produces before `viewForBooking`
+     * reads `cancelledBy` and upgrades it to one of the two screens above — it should not reach
+     * this function in practice. An unrecognised status is genuinely unknown. Both fall back to
+     * the shared header copy, which is all the safe fallback (`unknownView`) needs.
      */
     case 'cancelled':
     case 'unknown':
@@ -197,6 +199,7 @@ const DEMO_VIEWS: Readonly<Record<string, BookingDetailViewModel>> = {
   reassigned: DEMO_BOOKING_REASSIGNED,
   reassignedLate: DEMO_BOOKING_REASSIGNED_LATE,
   autoCancelled: DEMO_BOOKING_AUTO_CANCELLED,
+  customerCancelled: DEMO_BOOKING_CUSTOMER_CANCELLED,
 };
 
 function isDevBookingId(bookingId: string): boolean {
@@ -1233,23 +1236,21 @@ export function useBookingDetailData(bookingId: string): ScreenQuery<BookingDeta
   const tracking = useTracking(isDev || !trackable ? null : bookingId);
 
   /**
-   * The refund behind `201:278`.
+   * The refund behind `201:278` AND `606:4895` — both cancelled surfaces name an amount.
    *
-   * Fetched ONLY for a Spoon-side cancellation, which is the one surface that names an amount.
-   * Every other lifecycle state passes `null` and makes no request.
+   * Fetched ONLY for a cancelled booking, whoever cancelled it. Every other lifecycle state
+   * passes `null` and makes no request.
    */
-  const autoCancelled =
-    remote.state.status === 'ready' &&
-    remote.state.data.status === 'cancelled' &&
-    remote.state.data.cancellation?.cancelledBy === 'system';
+  const cancelled =
+    remote.state.status === 'ready' && remote.state.data.status === 'cancelled';
   /*
-   * `bookingId === ''` guarded explicitly, not just `!autoCancelled`: the route host
+   * `bookingId === ''` guarded explicitly, not just `!cancelled`: the route host
    * (`app/(app)/booking/[id].tsx`) falls back to `''`, not `null`, while Expo Router's `id`
    * param is momentarily unresolved -- the same reason it guards `useCallCook`/`useCancelFlow`
    * the same way. `useBookingRefunds`'s own `enabled` check only tests `!== null`, so an empty
    * string reached it uncaught and became `GET /v1/bookings//refunds`, a guaranteed 400.
    */
-  const refunds = useBookingRefunds(isDev || !autoCancelled || bookingId === '' ? null : bookingId);
+  const refunds = useBookingRefunds(isDev || !cancelled || bookingId === '' ? null : bookingId);
 
   const devSample = useMemo(() => {
     if (!isDev) return null;

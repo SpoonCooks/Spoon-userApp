@@ -593,6 +593,20 @@ export function bookingDetailFrom(input: {
             refundAmount: refundAmount ?? '—',
           },
         }),
+    /**
+     * `606:4895` — the terminal customer-cancelled surface. Same rule as `autoCancelled`
+     * immediately above: the rows are this booking's, and an unpublished refund shows the em
+     * dash rather than the frame's transcribed ₹135.
+     */
+    ...(base.customerCancelled === undefined
+      ? {}
+      : {
+          customerCancelled: {
+            ...base.customerCancelled,
+            rows: bookingRowsFrom(dto),
+            refundAmount: refundAmount ?? '—',
+          },
+        }),
     // The same ruling for Call Cook. Pressing it fetches a cook's personal number from a
     // separate endpoint that enforces this identical eligibility, so offering the control on
     // any other basis would only produce a failed call — and, worse, would imply the customer
