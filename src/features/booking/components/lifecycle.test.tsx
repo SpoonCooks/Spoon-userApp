@@ -10,6 +10,7 @@ import { lightColors } from '@ui';
 import {
   DEMO_BOOKING_ARRIVED,
   DEMO_BOOKING_AUTO_CANCELLED,
+  DEMO_BOOKING_CUSTOMER_CANCELLED,
   DEMO_BOOKING_EN_ROUTE,
   DEMO_BOOKING_REASSIGNED,
   DEMO_BOOKING_REASSIGNED_LATE,
@@ -146,5 +147,37 @@ describe('Auto cancelled — `201:278`', () => {
     );
     fireEvent.press(screen.getByTestId('auto-cancelled-accept'));
     expect(onRebook).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Customer cancelled — `606:4895`', () => {
+  it('renders the hero, the refund notice and the booking details table — no apology, no rebook', () => {
+    show(ready(DEMO_BOOKING_CUSTOMER_CANCELLED));
+
+    expect(screen.getByTestId('customer-cancelled-hero')).toBeTruthy();
+    expect(screen.getByTestId('customer-cancelled-refund')).toBeTruthy();
+    expect(screen.getByTestId('customer-cancelled-details')).toBeTruthy();
+    expect(screen.getByText('You cancelled this booking')).toBeTruthy();
+
+    // `606:4895` draws neither block, unlike `201:278` — a customer who chose to cancel is not
+    // owed an apology, and the frame offers no "book again?" prompt.
+    expect(screen.queryByTestId('auto-cancelled-apology')).toBeNull();
+    expect(screen.queryByTestId('auto-cancelled-rebook')).toBeNull();
+    expect(screen.queryByText('We sincerely apologize for cancelling this booking')).toBeNull();
+  });
+
+  it('renders the SUPPLIED refund amount and never derives it', () => {
+    show(ready(DEMO_BOOKING_CUSTOMER_CANCELLED));
+
+    expect(screen.getByText('Refund Amount')).toBeTruthy();
+    expect(screen.getByText('₹135')).toBeTruthy();
+  });
+
+  it('shows the booking-details heading above the Date/Start time/Duration/End Time table', () => {
+    show(ready(DEMO_BOOKING_CUSTOMER_CANCELLED));
+
+    expect(screen.getByText('Booking details')).toBeTruthy();
+    expect(screen.getByTestId('customer-cancelled-rows')).toBeTruthy();
+    expect(screen.getByText('End Time')).toBeTruthy();
   });
 });

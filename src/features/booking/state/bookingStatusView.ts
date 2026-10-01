@@ -34,10 +34,16 @@ import type { StatusResolution, StatusViewRegistry } from '@core/render';
 /**
  * Client-side view identifiers — screens we know exist from the design, not backend values.
  *
- * `reassigned` (`201:100` / `209:747`) and `autoCancelled` (`201:278`) are listed because the
- * designs exist and are implemented. What CAUSES either transition is backend/business logic and
- * is deliberately absent: no timer, no matching rule and no penalty logic lives in this client
+ * `reassigned` (`201:100` / `209:747`), `autoCancelled` (`201:278`) and `customerCancelled`
+ * (`606:4895`, "Page 8d- User cancelled") are listed because the designs exist and are
+ * implemented. What CAUSES any of these transitions is backend/business logic and is
+ * deliberately absent: no timer, no matching rule and no penalty logic lives in this client
  * (task §7).
+ *
+ * `cancelled` remains as the INTERMEDIATE value `resolveBookingView` produces from the status
+ * table alone, before `viewForBooking` below reads `cancelledBy` and upgrades it to one of the
+ * two real screens. It is not expected to reach the host unresolved — see `unknownView`'s
+ * fallback for what happens if it somehow does.
  */
 export type BookingView =
   | 'confirmation'
@@ -47,6 +53,7 @@ export type BookingView =
   | 'inService'
   | 'completion'
   | 'autoCancelled'
+  | 'customerCancelled'
   | 'cancelled'
   | 'unknown';
 
@@ -121,8 +128,11 @@ export function isFinishedBooking(status: string | null | undefined): boolean {
  * Three of the designed screens are not reachable from a status alone, so this reads the fields
  * that actually distinguish them:
  *
- *  - `autoCancelled` (`201:278`) is a `cancelled` booking the SYSTEM cancelled. `cancelledBy` is
- *    the server's word for who did it; the client does not infer it from a missing reason.
+ *  - `autoCancelled` (`201:278`) is a `cancelled` booking the SYSTEM cancelled, and
+ *    `customerCancelled` (`606:4895`) is every other one. `cancelledBy` is the server's word for
+ *    who did it; the client does not infer it from a missing reason, and treats anything that is
+ *    not literally `'system'` — including an absent value — as customer-caused, the same
+ *    convention `homeBannerView.ts` already uses for its own cancelled-banner check.
  *  - `reassigned` (`201:100` / `209:747`, pages 8c/8d) is an EN ROUTE booking whose assignment
  *    changed. The payload carries that as `reassignment.occurred`; absent it, the booking renders
  *    its ordinary lifecycle screen.
@@ -152,8 +162,11 @@ export function viewForBooking(input: {
 }): StatusResolution<BookingView> {
   const base = resolveBookingView(input.status, input.onUnknown);
 
-  if (base.view === 'cancelled' && input.cancelledBy === 'system') {
-    return { ...base, view: 'autoCancelled' };
+  if (base.view === 'cancelled') {
+    return {
+      ...base,
+      view: input.cancelledBy === 'system' ? 'autoCancelled' : 'customerCancelled',
+    };
   }
   if (input.reassigned === true && base.view === 'enRoute') {
     return { ...base, view: 'reassigned' };
