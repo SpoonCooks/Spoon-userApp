@@ -103,7 +103,6 @@ export function RecurringEditDateScreen({
       }
       footer={
         <RecurringFooter
-          layout="pill"
           label="Save changes"
           disabled={choice === null}
           onPress={() => {

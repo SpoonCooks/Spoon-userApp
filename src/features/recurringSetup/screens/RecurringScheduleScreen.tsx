@@ -90,7 +90,6 @@ export function RecurringScheduleScreen({
       }
       footer={
         <RecurringFooter
-          layout="pill"
           label={ctaLabel}
           disabled={choice === null}
           onPress={() => {

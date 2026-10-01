@@ -230,14 +230,7 @@ export function RecurringSummaryScreen({
           />
         </View>
       }
-      footer={
-        <RecurringFooter
-          layout="pill"
-          label="Book Now"
-          onPress={onBook}
-          testID={`${testID}-book`}
-        />
-      }
+      footer={<RecurringFooter label="Book Now" onPress={onBook} testID={`${testID}-book`} />}
     >
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {undo === undefined ? null : (

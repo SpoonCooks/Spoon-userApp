@@ -64,7 +64,6 @@ export function RecurringVisitDaysScreen({
       }
       footer={
         <RecurringFooter
-          layout="pill"
           label="Continue"
           disabled={selected.size === 0}
           onPress={() => onContinue(planDayIds.filter((id) => selected.has(id)))}

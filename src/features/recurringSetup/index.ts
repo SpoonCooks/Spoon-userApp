@@ -1,8 +1,6 @@
 /**
- * Feature: recurring setup — a 6-step flow (Pick days → Time & duration → Times by date → Review
- * plan → Autopay → Plan confirmed). See `types.ts` for the design source and status.
- *
- * Screens are being built one step at a time; only the ones below exist so far.
+ * Feature: recurring setup — pick days and plans → Schedule each plan's visits → Summary (add,
+ * edit and delete visits, dates and plans). `RecurringPlanFlow` runs it end to end.
  */
 export { RecurringDaysScreen } from './screens/RecurringDaysScreen';
 export type { RecurringDaysScreenProps, RecurringPlanDays } from './screens/RecurringDaysScreen';
@@ -16,16 +14,6 @@ export { RecurringEditDateScreen } from './screens/RecurringEditDateScreen';
 export type { RecurringEditDateScreenProps } from './screens/RecurringEditDateScreen';
 export { RecurringPlanFlow } from './screens/RecurringPlanFlow';
 export type { RecurringPlanFlowProps } from './screens/RecurringPlanFlow';
-export { RecurringTimeScreen } from './screens/RecurringTimeScreen';
-export type { RecurringTimeScreenProps } from './screens/RecurringTimeScreen';
-export { RecurringTimesByDateScreen } from './screens/RecurringTimesByDateScreen';
-export type { RecurringTimesByDateScreenProps } from './screens/RecurringTimesByDateScreen';
-export { RecurringReviewScreen } from './screens/RecurringReviewScreen';
-export type { RecurringReviewScreenProps } from './screens/RecurringReviewScreen';
-export { RecurringAutopayScreen } from './screens/RecurringAutopayScreen';
-export type { RecurringAutopayScreenProps } from './screens/RecurringAutopayScreen';
-export { RecurringPlanConfirmedScreen } from './screens/RecurringPlanConfirmedScreen';
-export type { RecurringPlanConfirmedScreenProps } from './screens/RecurringPlanConfirmedScreen';
 export {
   buildRecurringWindow,
   RECURRING_WINDOW_LENGTH_DAYS,
@@ -33,20 +21,8 @@ export {
   WEEKDAY_LABELS,
 } from './data';
 export type {
-  RecurringAutopayDetail,
-  RecurringAutopayMethod,
-  RecurringDateRow,
-  RecurringDateVisitPlan,
-  RecurringDateVisitTime,
-  RecurringDaysMode,
   RecurringDurationOption,
-  RecurringPickedDay,
-  RecurringPlanConfirmation,
-  RecurringReviewDateRow,
-  RecurringReviewSummary,
   RecurringTimeOfDay,
-  RecurringVisitCharge,
-  RecurringVisitDraft,
   RecurringPlanDraft,
   RecurringVisitChoice,
   RecurringWindow,

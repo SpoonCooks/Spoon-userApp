@@ -220,7 +220,6 @@ export function RecurringDaysScreen({
       }
       footer={
         <RecurringFooter
-          layout="pill"
           label={
             complete
               ? `Schedule ${planLabel(firstToSchedule)}`
@@ -247,18 +246,20 @@ export function RecurringDaysScreen({
 
         <View style={styles.calendar}>
           <View style={styles.row}>
-            {WEEKDAY_LABELS.map((label) => (
-              <Text
-                key={label}
-                variant="bodyLargeStrong"
-                color="textPrimary"
-                align="center"
-                style={[styles.column, styles.weekday]}
-              >
-                {label}
-              </Text>
-            ))}
-            <View style={styles.column} />
+            <View style={styles.days}>
+              {WEEKDAY_LABELS.map((label) => (
+                <Text
+                  key={label}
+                  variant="bodyLargeStrong"
+                  color="textPrimary"
+                  align="center"
+                  style={[styles.column, styles.weekday]}
+                >
+                  {label}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.monthColumn} />
           </View>
 
           <DayGrid
@@ -354,25 +355,27 @@ function DayGrid({ rows, selected, locked, startId, endId, onApply }: DayGridPro
       >
         {rows.map((row, rowIndex) => (
           <View key={`row-${rowIndex}`} style={styles.row}>
-            {row.days.map((day, column) =>
-              day === null ? (
-                <View key={`empty-${rowIndex}-${column}`} style={styles.column} />
-              ) : (
-                <DayCell
-                  key={day.id}
-                  day={day}
-                  selected={selected.has(day.id)}
-                  locked={locked.has(day.id)}
-                  edge={day.id === startId || day.id === endId}
-                  onToggle={() => onApply(day.id, 'toggle')}
-                />
-              ),
-            )}
+            <View style={styles.days}>
+              {row.days.map((day, column) =>
+                day === null ? (
+                  <View key={`empty-${rowIndex}-${column}`} style={styles.column} />
+                ) : (
+                  <DayCell
+                    key={day.id}
+                    day={day}
+                    selected={selected.has(day.id)}
+                    locked={locked.has(day.id)}
+                    edge={day.id === startId || day.id === endId}
+                    onToggle={() => onApply(day.id, 'toggle')}
+                  />
+                ),
+              )}
+            </View>
             <Text
               variant="bodyLargeStrong"
               color="textPrimary"
               align="center"
-              style={[styles.column, styles.month]}
+              style={[styles.monthColumn, styles.month]}
             >
               {row.monthLabel}
             </Text>
@@ -411,9 +414,12 @@ class SweepTracker {
     rows: DayGridProps['rows'],
   ): { readonly id: string; readonly intent: SweepIntent } | null {
     if (this.width === 0) return null;
-    const column = Math.floor(x / ((this.width + CELL_GAP) / COLUMNS));
+    // Seven date columns `CELL_GAP` apart, then the month column flush after them: every column
+    // is (width − the six gaps) / 8 wide, so a date column and its gap step by that plus `CELL_GAP`.
+    const pitch = (this.width - (DAY_COLUMNS - 1) * CELL_GAP) / (DAY_COLUMNS + 1) + CELL_GAP;
+    const column = Math.floor(x / pitch);
     const row = Math.floor(y / (ROW_HEIGHT + CELL_GAP));
-    if (column < 0 || column > 6 || row < 0) return null;
+    if (column < 0 || column >= DAY_COLUMNS || row < 0) return null;
     const day = rows[row]?.days[column] ?? null;
     if (day === null) return null;
     if (this.session === null) {
@@ -473,11 +479,21 @@ function DayCell({ day, selected, locked, edge, onToggle }: DayCellProps) {
   );
 }
 
-/** `144:2414` — eight equal columns (seven days and the month), 5 apart both ways. */
-const COLUMNS = 8;
+/**
+ * The `Calendar` component (`587:4463`, 365 × 235): seven date columns 5 apart, then the month
+ * column flush against Sunday — eight columns of equal width, with no gap before the month.
+ */
+const DAY_COLUMNS = 7;
 const CELL_GAP = 5;
-/** `144:2414` — each date row is 39 tall; the weekday row 20. */
+/** `587:4381` — each date row is 39 tall, 5 apart; the weekday row above is 20, with no gap. */
 const ROW_HEIGHT = 39;
+/**
+ * `587:4381` — the grid always holds five rows (215): a 21-day window split at a month change can
+ * need five, and keeping the room means nothing below the calendar moves when it does.
+ */
+const MAX_ROWS = 5;
+/** `587:4463` — 365 wide in the 370 content box. */
+const CALENDAR_INSET_RIGHT = 5;
 /** `149:1807` — the 32pt selection disc, 4 below the row top so the number sits 10 down. */
 const DISC = 32;
 const DISC_TOP = 4;
@@ -485,13 +501,25 @@ const DISC_TOP = 4;
 const styles = StyleSheet.create({
   /** `340:6553` — p 16 all round, 24 between the plan header, the calendar and the error. */
   content: { flex: 1, padding: lightTheme.space.lg, gap: lightTheme.space.xl },
-  /** `144:2414` — the weekday row and the date rows share one 5pt-gapped grid. */
-  calendar: { gap: CELL_GAP },
-  grid: { gap: CELL_GAP },
-  row: { flexDirection: 'row', gap: CELL_GAP },
+  /** `587:4463` — the weekday row, then the date rows straight under it. */
+  calendar: { marginRight: CALENDAR_INSET_RIGHT },
+  grid: { gap: CELL_GAP, minHeight: MAX_ROWS * ROW_HEIGHT + (MAX_ROWS - 1) * CELL_GAP },
+  row: { flexDirection: 'row' },
+  /**
+   * The seven date columns and their six gaps. Grown 7 : 1 against the month column from a basis
+   * of the gaps, so every column — the month's included — lands on the same width.
+   */
+  days: {
+    flexDirection: 'row',
+    gap: CELL_GAP,
+    flexGrow: DAY_COLUMNS,
+    flexBasis: (DAY_COLUMNS - 1) * CELL_GAP,
+  },
+  /** `587:4438` — the month column, flush against Sunday. */
+  monthColumn: { flexGrow: 1, flexBasis: 0, alignItems: 'center' },
   column: { flex: 1, alignItems: 'center' },
   weekday: { height: 20 },
-  /** `144:2474` — the month sits on the dates' text line: 10 down a 39 row. */
+  /** `587:4439` — the month sits on the dates' text line: 10 down a 39 row. */
   month: { height: ROW_HEIGHT, paddingTop: 10 },
   disc: {
     width: DISC,
