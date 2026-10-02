@@ -200,6 +200,27 @@ export const lightColors = {
   /** The Delete Account confirmation prompt's rose block — `rose600` at 30%, per the inspector. */
   surfaceCritical: palette.rose600Surface,
 
+  // Meal Library (`1:519`).
+  /** `1:531` titles, the selected meal tab and rail item, the add-dish glyph. */
+  textWarmInk: palette.warmGrey10,
+  /** `1:671` — the dish name under each card. */
+  textWarmDish: palette.warmGrey15,
+  /** `1:543` / `1:572` — idle meal tabs and idle rail labels. */
+  textWarmMuted: palette.warmGrey32,
+  /** `1:651` — the Veg / Non-Veg toggle labels. */
+  textWarmQuiet: palette.warmGrey45,
+  /** `1:522` — the sticky header's glass. */
+  surfaceHeaderGlass: palette.cream95,
+  /** `1:557` — the ingredient rail. */
+  surfaceRail: palette.warmGrey96,
+  /** `1:649` — the Veg / Non-Veg toggle track. */
+  surfaceToggleTrack: palette.white80,
+  /** `1:659` — the cook-time badge on a dish photo, and its `#FFE666` edge. */
+  surfaceTimeBadge: palette.yellow200Glass,
+  borderTimeBadge: palette.yellow400,
+  /** `1:665` — the add-dish button's edge. */
+  borderAddButton: palette.yellow47,
+
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */
   scrimSheet: palette.black65,
@@ -962,6 +983,55 @@ export const typography = {
     fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.tight,
   },
+  /** `1:531` "Meal Library" — Livvic Black 16/**16** at −0.4; `heading` is the same face at 24. */
+  headingLibrary: {
+    fontSize: fontSize.xl,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.tight,
+  },
+  /** `1:543` meal tabs ("Breakfast", "Lunch") — Livvic Bold 12/**12**. */
+  mealTab: {
+    fontSize: fontSize.md,
+    lineHeight: fontSize.md,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1:572` an idle ingredient in the rail — Livvic SemiBold 11/13.75 at −0.275. */
+  railLabel: {
+    fontSize: fontSize.sm,
+    lineHeight: 13.75,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: -0.275,
+  },
+  /** `1:565` the selected ingredient — the same line in Livvic **Black**. */
+  railLabelActive: {
+    fontSize: fontSize.sm,
+    lineHeight: 13.75,
+    fontFamily: fontFamily.black,
+    letterSpacing: -0.275,
+  },
+  /**
+   * `1:569` — an ingredient drawn as an emoji at 30pt. The frame sets it in Inter; the platform's
+   * emoji face renders it either way, so no family is named.
+   *
+   * The frame's line height is also 30, but an emoji glyph is TALLER than its point size: a 30pt
+   * line box gives the text a frame shorter than the glyph, and iOS clips the glyph to that frame,
+   * which shaved the top and bottom off every rail emoji. The line box is the rail's full 36pt art
+   * slot instead, which holds the whole glyph and keeps it centred.
+   */
+  railEmoji: {
+    fontSize: 30,
+    lineHeight: 36,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1:671` dish names — Livvic Medium 11/15.13. */
+  dishName: {
+    fontSize: fontSize.sm,
+    lineHeight: 15.13,
+    fontFamily: fontFamily.medium,
+    letterSpacing: letterSpacing.none,
+  },
 } as const satisfies Record<string, TextTokenStyle>;
 
 export type TypographyToken = keyof typeof typography;
@@ -996,6 +1066,10 @@ export const elevation = {
   glow: elevations.glow,
   sheet: elevations.raised,
   cta: elevations.cta,
+  /** `0 1 0 rgba(0,0,0,0.05)` — Meal Library's Book Now pill, diet toggle and dish cards. */
+  ledge: elevations.ledge,
+  /** `1:666` — the add-dish button. */
+  addButton: elevations.addButton,
 } as const satisfies Record<string, Elevation>;
 
 export type ElevationRole = keyof typeof elevation;

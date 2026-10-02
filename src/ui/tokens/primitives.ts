@@ -137,6 +137,29 @@ export const palette = {
   /** `color/yellow/59` — the recipe input border (`3:780`). */
   yellow59: '#FFD230',
 
+  // ---------------------------------------------------------------------------
+  // Meal Library — Figma `cCQlzTeiObQkpVBzwI8mZi` ("Spoon- V0"), frame `1:519`. A warm-grey ink
+  // ramp the rest of the file does not use, plus the frame's translucent glass fills.
+  // ---------------------------------------------------------------------------
+  /** `color/grey/10` — titles, the selected tab and rail item, the add glyph. */
+  warmGrey10: '#1C1917',
+  /** `color/grey/15-2` — the dish names under each card. */
+  warmGrey15: '#292524',
+  /** `color/grey/32-2` — idle meal tabs and idle rail labels. */
+  warmGrey32: '#57534E',
+  /** `color/grey/45-2` — the Veg / Non-Veg toggle labels. */
+  warmGrey45: '#78716C',
+  /** `color/grey/96-7` — the ingredient rail's ground. */
+  warmGrey96: '#FAF8EE',
+  /** `color/yellow/47` — the edge of the add-dish button. */
+  yellow47: '#F0C800',
+  /** `color/grey/98-95%` — the sticky header, `cream` at 95% over the scrolling content. */
+  cream95: 'rgba(255,253,245,0.95)',
+  /** `color/yellow/90-95%` — the cook-time badge over a dish photo. */
+  yellow200Glass: 'rgba(255,247,204,0.95)',
+  /** `color/white/-80%` — the Veg / Non-Veg toggle track. */
+  white80: 'rgba(255,255,255,0.8)',
+
   /** `6:784` — the Profile logout surface: `color/grey/97-2`, a rose-tinted white. */
   roseLogout: '#FFF1F2',
   /** `color/rose/39` — `6:789` the Log Out label. Distinct from `rose600` `#EC003F`. */
@@ -452,6 +475,13 @@ export const elevations = {
   subtle: elevation(0, 1, 1, 0.15, 2),
   /** `1:821` the primary CTA bar — a 3pt blur, tighter than the 4pt used by surfaces. */
   cta: elevation(0, 0, 3, 0.15, 3),
+  /** `1:537` / `1:649` / `1:655` — Meal Library's hard 1pt drop: `0 1 0 rgba(0,0,0,0.05)`. */
+  ledge: elevation(0, 1, 0, 0.05, 1),
+  /**
+   * `1:666` — the add-dish button: `0 4 6 -1 rgba(0,0,0,0.1)`. Figma layers a second, smaller
+   * shadow under it; React Native draws one per view, so the larger is kept (as `glow` does).
+   */
+  addButton: elevation(0, 4, 6, 0.1, 3),
 } as const;
 
 export type ElevationToken = keyof typeof elevations;
