@@ -67,11 +67,15 @@ export const COOK_CARD_CUTOUT_PHOTO = Image.resolveAssetSource(
 ).uri;
 
 /**
- * Per-cook photographs for the onboarded partners, extracted from the Figma exports
- * (`cookRekha.svg` / `cookSanchita.svg` / `cookBarsha.svg`) and bundled at 512px.
- * Jyoti has no individual photograph yet and keeps the shared card export. The cut-out
- * remains the shared export for all cooks until transparent per-cook cut-outs exist.
+ * Per-cook photographs for the onboarded partners. Jyoti, Rekha and Sanchita are the
+ * TRANSPARENT portraits hosted in the `spoon-cook-photos` S3 bucket, bundled pixel-identical
+ * as lossless WebP so the yellow photo panel shows through behind the cook when the server
+ * sends no hosted photo. Barsha has no transparent portrait yet and keeps the 512px Figma
+ * export (`cookBarsha.svg`), whose black background is baked into the image.
  */
+const JYOTI_PHOTO = Image.resolveAssetSource(
+  require('../../../assets/figma/cook/jyoti-photo.webp') as number,
+).uri;
 const REKHA_PHOTO = Image.resolveAssetSource(
   require('../../../assets/figma/cook/rekha-photo.webp') as number,
 ).uri;
@@ -95,7 +99,7 @@ export interface CookCardContent {
 
 /** `289:7392` / `289:7891` — Cook Jyoti, mixed and veg. */
 const JYOTI: CookCardContent = {
-  photoUrl: COOK_CARD_PHOTO,
+  photoUrl: JYOTI_PHOTO,
   cutoutPhotoUrl: COOK_CARD_CUTOUT_PHOTO,
   specialties: dishes(
     ['Chicken curry', 'poultryLeg'],
