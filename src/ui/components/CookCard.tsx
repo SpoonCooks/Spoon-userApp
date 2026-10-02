@@ -257,6 +257,10 @@ const styles = StyleSheet.create({
     width: 85,
     height: 90,
     borderRadius: lightTheme.radius.md,
+    // The same golden outline as `BookingCard`'s avatar, the Home banner and the completion card,
+    // so the transparent portrait keeps an edge against its `#FFF7CC` panel.
+    borderWidth: lightTheme.stroke.thin,
+    borderColor: lightTheme.colors.borderNoteStrong,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',

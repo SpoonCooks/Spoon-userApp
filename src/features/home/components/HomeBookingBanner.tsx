@@ -254,11 +254,17 @@ const styles = StyleSheet.create({
     paddingVertical: DESIGN.cookPaddingVertical,
     marginRight: DESIGN.bodyGap,
   },
-  /** `337:4363` — 67 × 70 on `#FFF7CC`, clipped at r16 under a 2pt lift. */
+  /**
+   * `337:4363` — 67 × 70 on `#FFF7CC`, clipped at r16 under a 2pt lift, outlined in the same
+   * golden `borderNoteStrong` as `BookingCard`'s avatar and the completion card's portrait, so
+   * every cook photo in the app reads as the same kind of portrait.
+   */
   photo: {
     width: DESIGN.photo.width,
     height: DESIGN.photo.height,
     borderRadius: DESIGN.photo.radius,
+    borderWidth: lightTheme.stroke.thin,
+    borderColor: lightTheme.colors.borderNoteStrong,
     overflow: 'hidden',
     backgroundColor: lightTheme.colors.surfaceAccent,
     shadowColor: lightTheme.colors.textPrimary,
