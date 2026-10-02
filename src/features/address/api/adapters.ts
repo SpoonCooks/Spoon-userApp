@@ -24,13 +24,34 @@ export function addressLineOf(dto: AddressDto): string {
     .join(', ');
 }
 
-export function savedAddressFrom(dto: AddressDto): SavedAddressViewModel {
+/**
+ * The address the app is actually using — the one every booking read is made against.
+ *
+ * The server's default when there is one, otherwise the first row of the list, which
+ * `GET /v1/me/addresses` orders by `created_at` (the oldest saved address).
+ *
+ * An account often HAS no default: the add flow never sends `isDefault`, so nothing is marked until
+ * the customer taps a row, and `DELETE` clears the flag without promoting another (the backend
+ * declines to invent a reassignment order). Bookings carried on regardless by falling back to
+ * `list[0]` — but Saved addresses highlighted only `isDefault`, so the address in use showed no
+ * selection at all, and deleting the selected one left the list with nothing marked. Every screen
+ * now asks this one function, so the highlighted row and the booked address cannot disagree.
+ */
+export function currentAddressOf<T extends Pick<AddressDto, 'isDefault'>>(
+  list: readonly T[],
+): T | null {
+  return list.find((address) => address.isDefault) ?? list[0] ?? null;
+}
+
+export function savedAddressFrom(
+  dto: AddressDto,
+  selected: boolean = dto.isDefault,
+): SavedAddressViewModel {
   return {
     id: dto.id,
     label: dto.label,
     line: addressLineOf(dto),
-    // The server's default flag is the selection. The client does not pick one.
-    ...(dto.isDefault ? { selected: true } : {}),
+    ...(selected ? { selected: true } : {}),
   };
 }
 
@@ -38,7 +59,12 @@ export function addressListFrom(input: {
   readonly base: AddressListViewModel;
   readonly addresses: readonly AddressDto[];
 }): AddressListViewModel {
-  return { ...input.base, addresses: input.addresses.map(savedAddressFrom) };
+  // The selection is the address in use, not only a stored default — see `currentAddressOf`.
+  const currentId = currentAddressOf(input.addresses)?.id ?? null;
+  return {
+    ...input.base,
+    addresses: input.addresses.map((dto) => savedAddressFrom(dto, dto.id === currentId)),
+  };
 }
 
 /**

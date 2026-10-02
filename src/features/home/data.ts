@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useActiveBookings, useBookingDetails, useTrackings } from '@features/booking';
-import { addressLineOf, useAddresses } from '@features/address';
+import { addressLineOf, currentAddressOf, useAddresses } from '@features/address';
 import { useCatalogue } from '@features/catalogue';
 import { useInstantAvailability } from '@features/availability';
 import { ready } from '@core/data';
@@ -159,8 +159,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
    */
   const defaultAddressId =
     addresses.state.status === 'ready'
-      ? ((addresses.state.data.find((address) => address.isDefault) ?? addresses.state.data[0])
-          ?.id ?? null)
+      ? (currentAddressOf(addresses.state.data)?.id ?? null)
       : null;
 
   const probeDurationMinutes =
@@ -175,8 +174,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
   const state = useMemo(() => {
     if (addresses.state.status !== 'ready') return addresses.state;
 
-    const defaultAddress =
-      addresses.state.data.find((address) => address.isDefault) ?? addresses.state.data[0] ?? null;
+    const defaultAddress = currentAddressOf(addresses.state.data);
 
     /**
      * One banner per booking, each built from what the SERVER said for THAT booking — never from

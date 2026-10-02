@@ -10,7 +10,7 @@ import { getUserMessage, normalizeError } from '@core/errors';
 import { getLogger } from '@core/logging';
 import { assertNever } from '@core/render';
 import { useRuntime } from '@core/runtimeContext';
-import { useAddresses } from '@features/address';
+import { currentAddressOf, useAddresses } from '@features/address';
 import { availabilityKeys, useInstantAvailability } from '@features/availability';
 import type { InstantAvailabilityDto } from '@features/availability';
 import { useCatalogue } from '@features/catalogue';
@@ -241,8 +241,7 @@ function useDefaultAddressId(): string | null {
 
   return useMemo(() => {
     if (addresses.state.status !== 'ready') return null;
-    const list = addresses.state.data;
-    return (list.find((address) => address.isDefault) ?? list[0])?.id ?? null;
+    return currentAddressOf(addresses.state.data)?.id ?? null;
   }, [addresses.state]);
 }
 
