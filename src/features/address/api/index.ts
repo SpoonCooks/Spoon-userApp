@@ -4,6 +4,7 @@ export {
   addressLineOf,
   addressListFrom,
   addressWriteInputFrom,
+  currentAddressOf,
   isServiceable,
   savedAddressFrom,
   serviceabilityMessageFor,
