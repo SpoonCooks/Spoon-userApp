@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@ui';
@@ -6,8 +6,9 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 import { innerShadows } from '@ui/tokens/primitives';
 
 import { TIME_OF_DAY_ICONS } from '../art';
+import { useRecurringStartTimes } from '../api';
+import { useRecurringPlanning } from '../planning';
 import {
-  DURATION_OPTIONS,
   TIME_OF_DAY_BANDS,
   clashes,
   durationMinutes,
@@ -24,21 +25,45 @@ import type { RecurringTimeOfDay, RecurringVisitChoice } from '../types';
  * Changing the time of day clears the start time, whose options depend on it. Anything that
  * would overlap `busy` is greyed out, and a duration with no free start left in the band greys
  * too. Rendered as three siblings so they take the screen's own 24pt spacing.
+ *
+ * Durations and prices come from the catalogue, and once a duration is picked the start times are
+ * asked of `POST /v1/recurring/start-times` for this visit's days: a start is offered only when a
+ * pool Cook can take it on EVERY one of them (`coverage: 'all'`). The design draws no "some days"
+ * state, so a partly free start is greyed like a taken one. Until the backend answers, every start
+ * in the band is offered, as before — the save re-checks each visit either way.
  */
 export interface VisitChoicesProps {
   readonly initial?: RecurringVisitChoice | undefined;
   /** The cook's other visits on these days. */
   readonly busy: readonly RecurringBusyWindow[];
+  /** The days this visit runs on — what its start times are asked about. */
+  readonly dayIds: readonly string[];
   /** "Time of the day", or "Time" on a further visit (`332:5722`). */
   readonly timeLabel: string;
   /** The complete choice, or null while one is still missing. */
   readonly onChange: (choice: RecurringVisitChoice | null) => void;
 }
 
-export function VisitChoices({ initial, busy, timeLabel, onChange }: VisitChoicesProps) {
+export function VisitChoices({ initial, busy, dayIds, timeLabel, onChange }: VisitChoicesProps) {
+  const planning = useRecurringPlanning();
   const [timeOfDay, setTimeOfDay] = useState<RecurringTimeOfDay | null>(initial?.timeOfDay ?? null);
   const [durationId, setDurationId] = useState<string | null>(initial?.durationId ?? null);
   const [startMinutes, setStartMinutes] = useState<number | null>(initial?.startMinutes ?? null);
+
+  const startTimes = useRecurringStartTimes({
+    addressId: planning.addressId,
+    dates: dayIds,
+    durationMinutes: durationId === null ? null : durationMinutes(durationId),
+  });
+  /** Starts a pool Cook can take on every day of this visit; `null` until the backend answers. */
+  const offered = useMemo(() => {
+    if (startTimes.state.status !== 'ready') return null;
+    return new Set(
+      startTimes.state.data.startTimes
+        .filter((slot) => slot.coverage === 'all')
+        .map((slot) => minutesOf(slot.startTime)),
+    );
+  }, [startTimes.state]);
 
   const commit = (
     nextTime: RecurringTimeOfDay | null,
@@ -93,7 +118,7 @@ export function VisitChoices({ initial, busy, timeLabel, onChange }: VisitChoice
       {timeOfDay === null ? null : (
         <Section title="Duration">
           <Grid columns={3} gap={DURATION_GAP}>
-            {DURATION_OPTIONS.map((option) => (
+            {planning.durations.map((option) => (
               <DurationTile
                 key={option.id}
                 label={option.label}
@@ -116,7 +141,10 @@ export function VisitChoices({ initial, busy, timeLabel, onChange }: VisitChoice
                 key={minutes}
                 label={formatStartTime(minutes)}
                 selected={minutes === startMinutes}
-                disabled={clashes(minutes, durationMinutes(durationId), busy)}
+                disabled={
+                  clashes(minutes, durationMinutes(durationId), busy) ||
+                  (offered !== null && !offered.has(minutes))
+                }
                 onPress={() => commit(timeOfDay, durationId, minutes)}
               />
             ))}
@@ -125,6 +153,12 @@ export function VisitChoices({ initial, busy, timeLabel, onChange }: VisitChoice
       )}
     </>
   );
+}
+
+/** `"08:30"` → 510, the flow's own minutes-after-midnight. */
+function minutesOf(time: string): number {
+  const [hours = 0, minutes = 0] = time.split(':').map(Number);
+  return hours * 60 + minutes;
 }
 
 /** `288:520` / `288:550` / `288:583` — a Body 14/20 label, 8 above its options. */
@@ -226,7 +260,7 @@ function DurationTile({
 }: ChoiceProps & {
   readonly label: string;
   readonly price: string;
-  readonly strikePrice: string;
+  readonly strikePrice?: string | undefined;
 }) {
   return (
     <Pressable
@@ -234,16 +268,20 @@ function DurationTile({
       accessibilityRole="radio"
       disabled={disabled}
       accessibilityState={{ selected, disabled }}
-      accessibilityLabel={`${label}, ${price}, was ${strikePrice}`}
+      accessibilityLabel={
+        strikePrice === undefined ? `${label}, ${price}` : `${label}, ${price}, was ${strikePrice}`
+      }
       style={[styles.duration, choiceTone(selected, disabled)]}
     >
       <Text variant="headingBold" color="textPrimary">
         {label}
       </Text>
       <View style={styles.priceRow}>
-        <Text variant="bodyStrong" color="textSubdued" style={styles.strike}>
-          {strikePrice}
-        </Text>
+        {strikePrice === undefined ? null : (
+          <Text variant="bodyStrong" color="textSubdued" style={styles.strike}>
+            {strikePrice}
+          </Text>
+        )}
         <Text variant="bodyStrong" color="textPrimary">
           {price}
         </Text>

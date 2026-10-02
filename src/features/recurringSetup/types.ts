@@ -40,8 +40,8 @@ export interface RecurringDurationOption {
   readonly minutes: number;
   /** e.g. "₹189" — pre-formatted, as `PriceTile` requires. */
   readonly price: string;
-  /** e.g. "₹450" — the struck original. */
-  readonly strikePrice: string;
+  /** e.g. "₹450" — the struck original. Absent when the catalogue price is not discounted. */
+  readonly strikePrice?: string | undefined;
 }
 
 export type RecurringTimeOfDay = 'morning' | 'afternoon' | 'evening';
@@ -49,7 +49,7 @@ export type RecurringTimeOfDay = 'morning' | 'afternoon' | 'evening';
 /** One visit's choices on the Schedule screen (Spoon — User `288:516`). */
 export interface RecurringVisitChoice {
   readonly timeOfDay: RecurringTimeOfDay;
-  /** A `DURATION_OPTIONS` id. */
+  /** A duration id, `d` plus its minutes (`durationIdFor`). */
   readonly durationId: string;
   /** Start, in minutes after midnight (Asia/Kolkata wall clock). */
   readonly startMinutes: number;

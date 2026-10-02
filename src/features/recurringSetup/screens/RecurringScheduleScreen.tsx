@@ -24,7 +24,8 @@ import type { RecurringVisitChoice } from '../types';
  * CTA copy is the frames': "Save & Schedule Plan N+1" while plans remain, "Save & Continue" on the
  * last. (The note under `340:7539` words them "Move to Plan (i+1)" / "Continue"; the frames win.)
  *
- * Start times are every 30 minutes across the band and all available until availability is read.
+ * Start times are every 30 minutes across the band; once the backend answers for these days, the
+ * ones no pool Cook can take on all of them are greyed (`VisitChoices`).
  *
  * Adding a further visit to a plan (`addingVisit`) — `332:5681` / `332:5921` / `332:5718`: the
  * Plan card and its visits replace the banner, the first section is titled "Time", and anything
@@ -119,6 +120,7 @@ export function RecurringScheduleScreen({
       <VisitChoices
         initial={initial}
         busy={busy}
+        dayIds={dayIds}
         timeLabel={addingVisit === undefined ? 'Time of the day' : 'Time'}
         onChange={setChoice}
       />

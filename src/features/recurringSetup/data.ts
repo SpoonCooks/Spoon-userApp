@@ -97,25 +97,48 @@ export function buildRecurringWindow(today: Date): RecurringWindow {
 }
 
 /**
- * Schedule's durations (`288:550`). Prices are struck/discounted pairs from the design; there is no
- * pricing endpoint yet for these to be a read of.
+ * A duration's id names its minutes (`d90`), so a duration the catalogue adds later still reads
+ * back everywhere the flow shows one — the Summary, Edit date, the visit line — without a lookup
+ * table that would have to know about it first.
  */
-export const DURATION_OPTIONS: readonly RecurringDurationOption[] = [
-  { id: 'd30', label: '30 mins', minutes: 30, price: '₹69', strikePrice: '₹150' },
-  { id: 'd45', label: '45 mins', minutes: 45, price: '₹99', strikePrice: '₹225' },
-  { id: 'd60', label: '1 hr', minutes: 60, price: '₹129', strikePrice: '₹300' },
-  { id: 'd90', label: '1.5 hr', minutes: 90, price: '₹189', strikePrice: '₹450' },
-  { id: 'd120', label: '2 hr', minutes: 120, price: '₹259', strikePrice: '₹600' },
-  { id: 'd150', label: '2.5 hr', minutes: 150, price: '₹319', strikePrice: '₹750' },
-] as const;
+export function durationIdFor(minutes: number): string {
+  return `d${minutes}`;
+}
 
 export function durationMinutes(durationId: string | null): number {
-  return DURATION_OPTIONS.find((option) => option.id === durationId)?.minutes ?? 0;
+  const minutes = durationId === null ? NaN : Number(durationId.slice(1));
+  return Number.isInteger(minutes) && minutes > 0 ? minutes : 0;
+}
+
+/** Schedule's own wording (`288:550`): "30 mins", "1 hr", "1.5 hr", "2.5 hr". */
+export function durationLabelForMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes} mins`;
+  const hours = minutes / 60;
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} hr`;
 }
 
 export function durationLabel(durationId: string | null): string {
-  return DURATION_OPTIONS.find((option) => option.id === durationId)?.label ?? '';
+  const minutes = durationMinutes(durationId);
+  return minutes === 0 ? '' : durationLabelForMinutes(minutes);
 }
+
+/**
+ * Schedule's durations (`288:550`) as the design draws them, used until the catalogue answers —
+ * the dev preview, and anywhere the planning reads are not available. Live prices come from
+ * `GET /v1/catalogue` (see `planning.tsx`).
+ */
+export const DURATION_OPTIONS: readonly RecurringDurationOption[] = [
+  { minutes: 30, price: '₹69', strikePrice: '₹150' },
+  { minutes: 45, price: '₹99', strikePrice: '₹225' },
+  { minutes: 60, price: '₹129', strikePrice: '₹300' },
+  { minutes: 90, price: '₹189', strikePrice: '₹450' },
+  { minutes: 120, price: '₹259', strikePrice: '₹600' },
+  { minutes: 150, price: '₹319', strikePrice: '₹750' },
+].map((option) => ({
+  ...option,
+  id: durationIdFor(option.minutes),
+  label: durationLabelForMinutes(option.minutes),
+}));
 
 /**
  * Schedule (`288:516`) — the three time-of-day bands, read off the start-time artwork's captions

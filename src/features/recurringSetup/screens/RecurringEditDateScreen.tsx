@@ -112,7 +112,7 @@ export function RecurringEditDateScreen({
         />
       }
     >
-      <VisitChoices busy={busy} timeLabel="Time of the day" onChange={setChoice} />
+      <VisitChoices busy={busy} dayIds={[dayId]} timeLabel="Time of the day" onChange={setChoice} />
       <DeleteDateDialog
         visible={confirmingDelete}
         planNumber={planNumber}

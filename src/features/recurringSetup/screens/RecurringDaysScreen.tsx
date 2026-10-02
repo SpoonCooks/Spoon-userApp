@@ -7,7 +7,8 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { PlanHeader } from '../components/PlanHeader';
 import { RecurringFooter } from '../components/RecurringFooter';
-import { WEEKDAY_LABELS, buildRecurringWindow } from '../data';
+import { RECURRING_WINDOW_OFFSET_DAYS, WEEKDAY_LABELS, buildRecurringWindow } from '../data';
+import { useRecurringPlanning } from '../planning';
 import type { RecurringWindowDay } from '../types';
 
 /**
@@ -38,12 +39,10 @@ import type { RecurringWindowDay } from '../types';
  * Defaults the frames leave open: the 14-day cap counts every plan together (it is the window's
  * cap, not a plan's), and tapping a tile returns to that plan's calendar.
  *
- * Still local: no availability is read yet, so no date is struck out, and `onContinue` is left to
- * the caller.
+ * The window, the 5-day minimum and the 14-day cap come from `GET /v1/recurring/eligibility` once
+ * it answers, and days the calendar says no pool Cook can take are greyed and refused like a day
+ * another plan holds (`useRecurringPlanning`). Until then the same values are counted locally.
  */
-
-const MIN_DAYS = 5;
-const MAX_DAYS = 14;
 /** How long the max-cap error stays up — the frame says only "temporarily". */
 const CAP_ERROR_MS = 3000;
 
@@ -77,6 +76,19 @@ export interface RecurringDaysScreenProps {
   readonly testID?: string;
 }
 
+/**
+ * The day the window is counted from. The backend's window start wins when it has answered —
+ * `buildRecurringWindow` opens the window `RECURRING_WINDOW_OFFSET_DAYS` after this — so the grid
+ * is the server's 21 days even if the device clock disagrees with Asia/Kolkata's date.
+ */
+function windowOrigin(windowStartId: string | null, todayKey: number | undefined): Date {
+  if (windowStartId !== null) {
+    const [year = 0, month = 1, day = 1] = windowStartId.split('-').map(Number);
+    return new Date(year, month - 1, day - RECURRING_WINDOW_OFFSET_DAYS);
+  }
+  return todayKey === undefined ? new Date() : new Date(todayKey);
+}
+
 function planLabel(index: number): string {
   return `Plan ${index + 1}`;
 }
@@ -90,10 +102,12 @@ export function RecurringDaysScreen({
   scheduledPlanIds,
   testID = 'recurring-days-screen',
 }: RecurringDaysScreenProps) {
+  const planning = useRecurringPlanning();
+  const { minDays, maxDays, unavailableDayIds, windowStartId } = planning;
   const todayKey = today?.getTime();
   const calendar = useMemo(
-    () => buildRecurringWindow(todayKey === undefined ? new Date() : new Date(todayKey)),
-    [todayKey],
+    () => buildRecurringWindow(windowOrigin(windowStartId, todayKey)),
+    [windowStartId, todayKey],
   );
   const [plans, setPlans] = useState<readonly PlanDraft[]>(() =>
     initialPlans === undefined || initialPlans.length === 0
@@ -109,19 +123,19 @@ export function RecurringDaysScreen({
   const active = plans.find((plan) => plan.id === activeId) ?? plans[0];
   const activeDays = active?.days ?? EMPTY;
   const locked = useMemo(() => {
-    const ids = new Set<string>();
+    const ids = new Set<string>(unavailableDayIds);
     for (const plan of plans) {
       if (plan.id === activeId) continue;
       for (const id of plan.days) ids.add(id);
     }
     return ids;
-  }, [plans, activeId]);
+  }, [plans, activeId, unavailableDayIds]);
   const total = plans.reduce((sum, plan) => sum + plan.days.size, 0);
   const firstToSchedule = Math.max(
     0,
     plans.findIndex((plan) => plan.days.size > 0 && scheduledPlanIds?.has(plan.id) !== true),
   );
-  const complete = total >= MIN_DAYS;
+  const complete = total >= minDays;
   const picked = calendar.orderedIds.filter((id) => activeDays.has(id));
   const startId = picked[0];
   const endId = picked.at(-1);
@@ -146,6 +160,11 @@ export function RecurringDaysScreen({
    */
   const plansRef = useRef(plans);
   const activeRef = useRef(activeId);
+  // Kept in a ref like the plans, so `apply` stays stable for the grid's gesture.
+  const limitsRef = useRef({ maxDays, unavailableDayIds });
+  useEffect(() => {
+    limitsRef.current = { maxDays, unavailableDayIds };
+  }, [maxDays, unavailableDayIds]);
   const commit = useCallback((next: readonly PlanDraft[]) => {
     plansRef.current = next;
     setPlans(next);
@@ -157,6 +176,7 @@ export function RecurringDaysScreen({
       const current = all.find((plan) => plan.id === activeRef.current);
       if (current === undefined) return null;
       if (all.some((plan) => plan !== current && plan.days.has(id))) return null;
+      if (limitsRef.current.unavailableDayIds.has(id) && !current.days.has(id)) return null;
       const mode = intent === 'toggle' ? (current.days.has(id) ? 'remove' : 'add') : intent;
       if (mode === 'remove') {
         if (!current.days.has(id)) return mode;
@@ -167,7 +187,7 @@ export function RecurringDaysScreen({
         return mode;
       }
       if (current.days.has(id)) return mode;
-      if (all.reduce((sum, plan) => sum + plan.days.size, 0) >= MAX_DAYS) {
+      if (all.reduce((sum, plan) => sum + plan.days.size, 0) >= limitsRef.current.maxDays) {
         showCapError();
         return mode;
       }
@@ -228,7 +248,7 @@ export function RecurringDaysScreen({
           label={
             complete
               ? `Schedule ${planLabel(firstToSchedule)}`
-              : `Pick ${MIN_DAYS - total} more day${MIN_DAYS - total === 1 ? '' : 's'}`
+              : `Pick ${minDays - total} more day${minDays - total === 1 ? '' : 's'}`
           }
           onPress={continueWith}
           disabled={!complete}
@@ -290,7 +310,7 @@ export function RecurringDaysScreen({
               </Text>
             </View>
             <Text variant="captionError" color="textError">
-              Max {MAX_DAYS} days reached, deselect a day to pick another
+              Max {maxDays} days reached, deselect a day to pick another
             </Text>
           </View>
         ) : null}
