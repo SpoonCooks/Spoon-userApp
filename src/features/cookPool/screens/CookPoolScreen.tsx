@@ -11,8 +11,9 @@ import { emptyPlaces } from '../pool';
 import type { CookPoolMember, CookPoolSummary } from '../types';
 
 /**
- * Your Cook Pool — Figma `cCQlzTeiObQkpVBzwI8mZi` (Spoon — User): `844:5842` (new user),
- * `719:1507` (with cooks) and `848:7605` (after a change).
+ * Your Cook Pool — Figma `cCQlzTeiObQkpVBzwI8mZi` (Spoon — User): `901:17325` (new user) and
+ * `901:17537` / `901:17606` (with cooks). Laid out to fit one screen; it scrolls only once the
+ * pool grows a second row.
  *
  * Reached from Home and from the recurring landing; back returns to whichever it came from. The
  * pool grid shows the household's cooks in the backend's order, then empty places up to the
@@ -53,7 +54,11 @@ export function CookPoolScreen({
         />
         <QueryBoundary state={state} onRetry={refetch}>
           {(pool) => (
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+              alwaysBounceVertical={false}
+            >
               <Image source={LANDING_HERO} style={styles.hero} resizeMode="contain" />
               {/* `844:5853` — 8 apart. */}
               <View style={styles.description}>
@@ -61,9 +66,8 @@ export function CookPoolScreen({
                   Your favorite cooks, no surprises!
                 </Text>
                 <Text variant="bodyLarge" color="textPrimary">
-                  Found a cook you love? Add them to your Cook Pool. Next time you book, we&apos;ll
-                  try your preferred cooks first, so you can relax while amazing, homely food gets
-                  cooked.
+                  Found a cook you love? Add them to your Cook Pool and relax while familiar cooks
+                  prepare your favorite meals.
                 </Text>
               </View>
               <PoolSection
@@ -82,9 +86,10 @@ export function CookPoolScreen({
 }
 
 /**
- * `844:5856` — "Your Cook Pool" over a 4-column grid, 12 apart both ways. Each place is an 83pt
- * circle with its caption 12 below: a cook's photo, contained, on `#FFF7CC`
- * (`719:1524`), or a dashed "Add" place.
+ * "Your Cook Pool" over a 4-column grid, rows and columns 12 apart. Each place is a circle as wide
+ * as its column with its caption under it: a cook standing on `#FFF7CC` (`719:1524`), or a dashed
+ * "Add" place. The two frames space it differently and each is followed: a new household's
+ * (`844:5856`) puts 8 under the title and under each circle, a pool with cooks (`719:1521`) 12.
  */
 function PoolSection({
   pool,
@@ -104,13 +109,14 @@ function PoolSection({
     ...pool.members,
     ...Array.from({ length: emptyPlaces(pool.members.length, pool.minimumSize) }, () => null),
   ];
+  const gap = pool.members.length === 0 ? styles.gapTight : styles.gapLoose;
   const rows: (CookPoolMember | null)[][] = [];
   for (let index = 0; index < places.length; index += COLUMNS) {
     rows.push(places.slice(index, index + COLUMNS));
   }
 
   return (
-    <View style={styles.section}>
+    <View style={gap}>
       <Text variant="headingSection" color="textPrimary">
         Your Cook Pool
       </Text>
@@ -126,7 +132,7 @@ function PoolSection({
                   onPress={onAddCooks}
                   accessibilityRole="button"
                   accessibilityLabel="Add cooks to your Cook Pool"
-                  style={styles.cell}
+                  style={[styles.cell, gap]}
                   testID={`${testID}-add`}
                 >
                   <View style={[styles.circle, styles.placeholder]}>
@@ -143,7 +149,7 @@ function PoolSection({
                   onPress={() => onOpenCook(place.cookId)}
                   accessibilityRole="button"
                   accessibilityLabel={`${place.name}'s profile`}
-                  style={styles.cell}
+                  style={[styles.cell, gap]}
                   testID={`${testID}-${place.cookId}`}
                 >
                   <View style={[styles.circle, styles.avatar]}>
@@ -164,14 +170,14 @@ function PoolSection({
   );
 }
 
-/** `844:5866` — the three steps: the flow art, then a 3-column caption under each icon. */
+/** `844:5866` — the three steps, 8 apart: the flow art, then each step's title over its line. */
 function HowItWorks() {
   const { width } = useWindowDimensions();
   // `844:5869` — the art is 370×94.92 drawn into an 83-tall box, overhanging it 1.76 % above.
   const artWidth = width - lightTheme.space.lg * 2;
   const scale = artWidth / FLOW_WIDTH;
   return (
-    <View style={styles.section}>
+    <View style={styles.gapTight}>
       <Text variant="headingSection" color="textPrimary">
         How it works?
       </Text>
@@ -190,11 +196,8 @@ function HowItWorks() {
         />
       </View>
       <View style={styles.steps}>
-        {STEPS.map((step, index) => (
+        {STEPS.map((step) => (
           <View key={step.title} style={styles.step}>
-            <Text variant="caption" color="textSubdued" style={styles.stepNumber}>
-              STEP {index + 1}
-            </Text>
             <Text variant="bodyLargeStrong" color="textPrimary" align="center">
               {step.title}
             </Text>
@@ -227,16 +230,21 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: lightTheme.colors.surface },
   glows: { position: 'absolute', top: 0, left: 0 },
   safe: { flex: 1 },
-  /** `844:5850` — p 16, 24 between blocks. */
-  content: { padding: lightTheme.space.lg, gap: lightTheme.space.xl },
+  /** `844:5850` — px 16, pb 16, nothing above the hero; 24 between blocks. */
+  content: {
+    paddingHorizontal: lightTheme.space.lg,
+    paddingBottom: lightTheme.space.lg,
+    gap: lightTheme.space.xl,
+  },
   /** `844:5852` — 370×235. */
   hero: { width: '100%', height: undefined, aspectRatio: 370 / 235 },
   description: { gap: lightTheme.space.sm },
-  section: { gap: lightTheme.space.md },
+  gapTight: { gap: lightTheme.space.sm },
+  gapLoose: { gap: lightTheme.space.md },
   grid: { gap: lightTheme.space.md },
   gridRow: { flexDirection: 'row', gap: lightTheme.space.md },
-  /** A circle as wide as its column, the caption 12 under it (`844:5863`). */
-  cell: { flex: 1, gap: lightTheme.space.md },
+  /** A circle as wide as its column, its caption under it. */
+  cell: { flex: 1 },
   circle: {
     width: '100%',
     aspectRatio: 1,
@@ -265,6 +273,4 @@ const styles = StyleSheet.create({
   /** `844:5878` — three equal columns, 8 apart; 8 between each column's lines. */
   steps: { flexDirection: 'row', gap: lightTheme.space.sm },
   step: { flex: 1, alignItems: 'center', gap: lightTheme.space.sm },
-  /** `844:5880` — Regular 10/14. */
-  stepNumber: { lineHeight: 14 },
 });
