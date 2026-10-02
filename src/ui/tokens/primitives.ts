@@ -271,6 +271,24 @@ export const palette = {
   grey666: '#666666',
   /** Quiet labels — the weekday letters. */
   grey777: '#777777',
+
+  // ---------------------------------------------------------------------------
+  // Cook Pool — Spoon — User (`cCQlzTeiObQkpVBzwI8mZi`), `755:2333` … `848:7809`.
+  // ---------------------------------------------------------------------------
+  /** `848:7809` — a dish card's name. */
+  grey333: '#333333',
+  /** `755:2362` — a menu section's title on the deck card. */
+  navy142: '#142C44',
+  /** `848:7809` — a dish card's idle heart. */
+  grey217: '#D9D9D9',
+  /** `848:6318` — black at 6 %: the skip tab and a card dragged toward it. */
+  black06: 'rgba(0,0,0,0.06)',
+  /** `848:6318` — black at 14 %: the skip tab, widened. */
+  black14: 'rgba(0,0,0,0.14)',
+  /** `848:6318` — black at 35 %: the edge of a card dragged toward skip. */
+  black35: 'rgba(0,0,0,0.35)',
+  /** `848:6611` — `#FFD600` at 12 %: a card dragged toward add. */
+  yellow500Wash: 'rgba(255,214,0,0.12)',
 } as const;
 
 /**

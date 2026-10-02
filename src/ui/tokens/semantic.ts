@@ -251,6 +251,16 @@ export const lightColors = {
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */
   scrimSheet: palette.black65,
+
+  // Cook Pool (`755:2333` … `848:7809`).
+  textDish: palette.grey333,
+  textMenuSection: palette.navy142,
+  iconIdle: palette.grey217,
+  surfaceSkipTab: palette.black06,
+  surfaceSkipTabActive: palette.black14,
+  surfaceSkipWash: palette.black06,
+  borderSkip: palette.black35,
+  surfaceAddWash: palette.yellow500Wash,
 } as const;
 
 /** TODO(designer): no dark theme exists in Figma. Mirrors light until one does. */

@@ -70,8 +70,9 @@ export const COOK_CARD_CUTOUT_PHOTO = Image.resolveAssetSource(
  * Per-cook photographs for the onboarded partners. Jyoti, Rekha and Sanchita are the
  * TRANSPARENT portraits hosted in the `spoon-cook-photos` S3 bucket, bundled pixel-identical
  * as lossless WebP so the yellow photo panel shows through behind the cook when the server
- * sends no hosted photo. Barsha has no transparent portrait yet and keeps the 512px Figma
- * export (`cookBarsha.svg`), whose black background is baked into the image.
+ * sends no hosted photo. Barsha has none in S3: hers is the 512px Figma export with its black
+ * background lifted out on the Mac (Vision's subject mask), cropped to the cut-out. Replace it
+ * with the S3 portrait once one exists.
  */
 const JYOTI_PHOTO = Image.resolveAssetSource(
   require('../../../assets/figma/cook/jyoti-photo.webp') as number,

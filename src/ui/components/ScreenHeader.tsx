@@ -64,6 +64,11 @@ export interface ScreenHeaderProps {
    */
   readonly density?: ScreenHeaderDensity;
   readonly trailing?: ReactNode;
+  /**
+   * Drops the white fill, for a screen whose background art runs up behind the header — the Cook
+   * Pool landing's glows (`844:5843`).
+   */
+  readonly transparent?: boolean;
   readonly testID?: string;
 }
 
@@ -73,6 +78,7 @@ export function ScreenHeader({
   divider = false,
   density = 'default',
   trailing,
+  transparent = false,
   testID = 'screen-header',
 }: ScreenHeaderProps) {
   const step = density === 'step';
@@ -84,6 +90,7 @@ export function ScreenHeader({
         DENSITY_STYLE[density],
         nav && onBack === undefined ? styles.navNoBack : null,
         divider ? styles.divider : null,
+        transparent ? styles.transparent : null,
       ]}
       testID={testID}
     >
@@ -174,6 +181,7 @@ const styles = StyleSheet.create({
     borderBottomColor: lightTheme.colors.borderField,
   },
   title: { flexShrink: 1 },
+  transparent: { backgroundColor: 'transparent' },
 });
 
 const DENSITY_STYLE: Record<ScreenHeaderDensity, ViewStyle> = {
