@@ -423,6 +423,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      */
     './plugins/withAndroidSingleFcmReceiver',
 
+    /**
+     * Instant / Schedule / Recurring as OS-level shortcuts: Spotlight's buttons beside the app on
+     * iOS, launcher search and the icon's long-press menu on Android. See the plugin.
+     */
+    './plugins/withAppShortcuts',
+
     [
       'expo-splash-screen',
       {

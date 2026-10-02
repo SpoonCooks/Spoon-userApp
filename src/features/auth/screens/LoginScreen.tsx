@@ -298,7 +298,7 @@ export function LoginScreen({
                   {/* `250:2415` — a 43pt bar at a **15pt** radius, outlined 1pt in `#FFD600`. */}
                   <View style={styles.field}>
                     <View style={styles.dial}>
-                      <Text variant="fieldValue" color="textPrimary">
+                      <Text variant="fieldValue" color="textPrimary" style={styles.dialCode}>
                         {login.dialCode}
                       </Text>
                     </View>
@@ -401,6 +401,12 @@ export function LoginScreen({
   );
 }
 
+/**
+ * The `+91` cell's padding either side of the code. It used to sit 12 (the field's) + 16 from the
+ * edge and 16 from the rule; splitting that 44 evenly centres the code without moving the rule.
+ */
+const DIAL_PADDING = (12 + 16 + 16) / 2;
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: lightTheme.colors.surface },
   fill: { flex: 1 },
@@ -469,25 +475,49 @@ const styles = StyleSheet.create({
     height: 43,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: lightTheme.space.md,
+    paddingRight: lightTheme.space.md,
     borderRadius: lightTheme.radius.r15,
     borderWidth: lightTheme.stroke.thin,
     borderColor: lightTheme.colors.surfaceCta,
     backgroundColor: lightTheme.colors.surface,
   },
-  /** `250:2416` — the dial cell is closed by a 1.778pt `#FFE666` rule. */
+  /**
+   * `250:2416` — the dial cell is closed by a 1.778pt `#FFE666` rule. `+91` is centred between
+   * the field's edge and the rule (it used to sit 29pt from the edge and 19pt from the rule); the
+   * cell keeps its width, so the rule and the number stay where they were.
+   */
   dial: {
-    paddingHorizontal: lightTheme.space.lg,
+    // The "1" the code ends on carries more empty side-bearing than the "+" it starts with; a
+    // point from the right padding into the left lands the INK in the middle of the cell.
+    paddingLeft: DIAL_PADDING + 1,
+    paddingRight: DIAL_PADDING - 1,
     borderRightWidth: lightTheme.stroke.base,
     borderRightColor: lightTheme.colors.surfaceAccentBold,
   },
+  /**
+   * iOS sets a `Text` two-thirds of a point lower than a `TextInput` in the same font and box, so
+   * left alone the `+91` sat that much under the number beside it (measured on device). Lifting
+   * it by exactly that puts both on one line, centred on the bar.
+   */
+  dialCode: { transform: [{ translateY: -2 / 3 }] },
+  /**
+   * The number shares the `+91`'s type but NOT its line height. A single-line iOS `TextInput`
+   * given a `lineHeight` sets its text low in the box, so the digits sat under the `+91` beside
+   * them. Without one the input centres the glyphs in its own height; it fills the bar, so they
+   * centre on the bar, as the `+91` does. Android pads the font's ascent unless told not to.
+   */
   input: {
     flex: 1,
     minWidth: 0,
+    alignSelf: 'stretch',
     paddingHorizontal: lightTheme.space.lg,
     paddingVertical: 0,
     color: lightTheme.colors.textPrimary,
-    ...lightTheme.typography.fieldValue,
+    fontSize: lightTheme.typography.fieldValue.fontSize,
+    fontFamily: lightTheme.typography.fieldValue.fontFamily,
+    letterSpacing: lightTheme.typography.fieldValue.letterSpacing,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   /**
    * `250:2421` — a fixed 34pt bar at a 16pt radius, carrying a `0 0 2 rgba(0,0,0,0.15)` drop

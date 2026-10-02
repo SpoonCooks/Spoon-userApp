@@ -217,6 +217,78 @@ export const palette = {
   dangerSurface: 'rgba(255,4,4,0.07)',
   /** The Account screen's Delete Account row — `#FF0404` at 30%, read off the Figma inspector. */
   dangerSurfaceStrong: 'rgba(255,4,4,0.3)',
+
+  // ---------------------------------------------------------------------------
+  // Spoon — User (`cCQlzTeiObQkpVBzwI8mZi`), the redesigned recurring setup. Values are the
+  // file's own variables, not measurements.
+  // ---------------------------------------------------------------------------
+  /** `color/surface/disabled` — the disabled pill CTA. `#00000006`, i.e. black at ~2 %. */
+  black02: '#00000006',
+  /** `color/text/disabled` — the disabled pill CTA's label. `#00000040`, i.e. black at 25 %. */
+  black25: '#00000040',
+  /** `color/text/secondary` — struck prices and unselected tab labels. Black at 60 %. */
+  black60: 'rgba(0,0,0,0.6)',
+  /** `155:1585` / `158:1586` — the inline "Max 14 days reached" error and its dot. */
+  red600: '#E53935',
+
+  // ---------------------------------------------------------------------------
+  // Recurring setup — Figma `ZIJf639gTWHXshaa2YOeCT` ("Version 1"), frames `4:282` … `4:2005`.
+  // A warm stone ramp plus a near-black ink, used across all six steps.
+  // ---------------------------------------------------------------------------
+  /** Selected cells and tabs, the valid counter, primary copy. */
+  ink: '#1A1A1A',
+  /** Idle cells, pills and toggles. */
+  stone100: '#EEEDE8',
+  /** Hint and summary boxes. */
+  stone50: '#F2F1EC',
+  /** Card and footer edges. */
+  stone200: '#E4E2DA',
+  /** Unavailable ink ("full" slots, the no-cooks day). */
+  stone400: '#B5B3AA',
+  /** Days outside the window. */
+  stone350: '#C9C7BF',
+  /** `4:2014` — Step 6's confirmation disc. */
+  stone230: '#E0DED6',
+  /** `4:2024` — Step 6's first-visit tile. */
+  stone150: '#E6E5DF',
+  /** `4:1924` — the "Keep my plan going" card's edge. */
+  stone250: '#CFCDC4',
+  /** `4:666` — the dashed edge of a start time free on only some days. */
+  stone300: '#BDBBB2',
+  /** `4:574` — the dashed "+ Add visit" tab edge; `4:1045` a clashing start time's ink. */
+  stone500: '#9A988F',
+  /** `4:671` — "9/11 days", a start time free on only some days. */
+  amber31: '#A06A00',
+  /** `4:1156` — a date whose usual time is booked out: its fill, edge and ink. */
+  cream50: '#FFF8DB',
+  amber44: '#E0A800',
+  amber27: '#8A5A00',
+  /** `4:1950` — Step 5's intro ("Approve once. …"). */
+  grey444: '#444444',
+  /** Secondary copy — the range, "Pick 5 to 14 days". */
+  grey555: '#555555',
+  /** Captions — "Pick 2 more days to continue". */
+  grey666: '#666666',
+  /** Quiet labels — the weekday letters. */
+  grey777: '#777777',
+
+  // ---------------------------------------------------------------------------
+  // Cook Pool — Spoon — User (`cCQlzTeiObQkpVBzwI8mZi`), `755:2333` … `848:7809`.
+  // ---------------------------------------------------------------------------
+  /** `848:7809` — a dish card's name. */
+  grey333: '#333333',
+  /** `755:2362` — a menu section's title on the deck card. */
+  navy142: '#142C44',
+  /** `848:7809` — a dish card's idle heart. */
+  grey217: '#D9D9D9',
+  /** `848:6318` — black at 6 %: the skip tab and a card dragged toward it. */
+  black06: 'rgba(0,0,0,0.06)',
+  /** `848:6318` — black at 14 %: the skip tab, widened. */
+  black14: 'rgba(0,0,0,0.14)',
+  /** `848:6318` — black at 35 %: the edge of a card dragged toward skip. */
+  black35: 'rgba(0,0,0,0.35)',
+  /** `848:6611` — `#FFD600` at 12 %: a card dragged toward add. */
+  yellow500Wash: 'rgba(255,214,0,0.12)',
 } as const;
 
 /**
@@ -484,6 +556,74 @@ export const innerShadows = {
       offsetY: 0,
       blurRadius: 4,
       color: 'rgba(0,0,0,0.15)',
+      inset: true,
+    },
+  ],
+  /** Spoon — User `444:10422` — the selected Plan tile: `0 -2 4 rgba(255,214,0,0.9)`, inset. */
+  planTileActive: [
+    {
+      offsetX: 0,
+      offsetY: -2,
+      blurRadius: 4,
+      color: 'rgba(255,214,0,0.9)',
+      inset: true,
+    },
+  ],
+  /** `444:10421` — an unselected Plan tile: `0 -1.5 3 #FFEF99`, inset. */
+  planTileIdle: [
+    {
+      offsetX: 0,
+      offsetY: -1.5,
+      blurRadius: 3,
+      color: '#FFEF99',
+      inset: true,
+    },
+  ],
+  /** `364:520` — the Plan banner's lift: `0 8 20 -6 rgba(140,102,0,0.18)`. */
+  planBanner: [
+    {
+      offsetX: 0,
+      offsetY: 8,
+      blurRadius: 20,
+      spreadDistance: -6,
+      color: 'rgba(140,102,0,0.18)',
+    },
+  ],
+  /** `Elevation/1` — `0 0 3 #00000014`, the selected time-of-day pill (`288:523`). */
+  elevation1: [
+    {
+      offsetX: 0,
+      offsetY: 0,
+      blurRadius: 3,
+      color: 'rgba(0,0,0,0.08)',
+    },
+  ],
+  /** `Elevation/3` — `0 0 24 #00000024`, the recurring dialogs (`586:4373`). */
+  elevation3: [
+    {
+      offsetX: 0,
+      offsetY: 0,
+      blurRadius: 24,
+      color: 'rgba(0,0,0,0.14)',
+    },
+  ],
+  /** `444:10250` — the visit flow's Plan card: `0 -2 4 rgba(255,230,102,0.8)`, inset. */
+  planCard: [
+    {
+      offsetX: 0,
+      offsetY: -2,
+      blurRadius: 4,
+      color: 'rgba(255,230,102,0.8)',
+      inset: true,
+    },
+  ],
+  /** `444:10424` — the "+" button: `0 -2 4 rgba(255,222,51,0.8)`, inset. */
+  planAdd: [
+    {
+      offsetX: 0,
+      offsetY: -2,
+      blurRadius: 4,
+      color: 'rgba(255,222,51,0.8)',
       inset: true,
     },
   ],
