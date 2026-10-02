@@ -26,13 +26,24 @@ import type { HomeViewModel } from './types';
 import type { BookingSummaryDto } from '@features/booking';
 
 /**
- * The bundled transparent cut-out for a cook, by the SERVER's stable `profileCode`.
+ * The photo pair the Home banner draws for a booking's cook: a hosted photo wins, and the cook's
+ * bundled photograph (by the SERVER's stable `profileCode`) is the primary when none is hosted and
+ * the failure fallback when one is.
  *
- * Read twice per banner — once as the primary when no photo is hosted, once as the failure
- * fallback when one is — so it is named rather than repeated, and the two can never diverge.
+ * The bundled tier is the SAME `photoUrl` the booking screen's `CookCard` resolves, so the two
+ * surfaces draw the same person. Home used to read `cutoutPhotoUrl`, which is one shared picture
+ * of Rekha for every cook: with no hosted photo, Home drew Rekha over a Sanchita booking while
+ * the confirmation one tap inside drew Sanchita.
  */
-function bundledCutoutFor(cook: { readonly profileCode?: string | null } | null | undefined) {
-  return cookCardContentFor(cook?.profileCode)?.cutoutPhotoUrl ?? null;
+export function homeCookPhotoFor(
+  cook:
+    { readonly photoUrl?: string | null; readonly profileCode?: string | null } | null | undefined,
+): { readonly cookPhotoUrl: string | null; readonly cookPhotoFallbackUrl: string | null } {
+  const bundled = cookCardContentFor(cook?.profileCode)?.photoUrl ?? null;
+  const hosted = cook?.photoUrl ?? null;
+  return hosted === null
+    ? { cookPhotoUrl: bundled, cookPhotoFallbackUrl: null }
+    : { cookPhotoUrl: hosted, cookPhotoFallbackUrl: bundled };
 }
 
 /**
@@ -201,18 +212,9 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
                   bookingId: summary.id,
                   status: detailData.status,
                   cookName: detailData.cook?.name ?? null,
-                  // The banner draws the TRANSPARENT cut-out over its `#FFF7CC` panel (`337:4364`).
-                  // A hosted photo wins; otherwise the cook's stable profileCode resolves the
-                  // bundled cut-out, and a cook with neither renders the banner without a photo.
-                  //
-                  // The bundled cut-out also rides along as the FAILURE fallback whenever the
-                  // hosted photo won, so a URL that 404s degrades to the tier it skipped rather
-                  // than to an empty panel. Both come from the same `cookCardContentFor` read.
-                  cookPhotoUrl: detailData.cook?.photoUrl ?? bundledCutoutFor(detailData.cook),
-                  cookPhotoFallbackUrl:
-                    detailData.cook?.photoUrl === null || detailData.cook?.photoUrl === undefined
-                      ? null
-                      : bundledCutoutFor(detailData.cook),
+                  // A hosted photo wins, else the cook's bundled photograph; a cook with neither
+                  // renders the banner without a photo. See `homeCookPhotoFor`.
+                  ...homeCookPhotoFor(detailData.cook),
                   dateLabel: formatDateLabel(detailData.scheduledStart, serverNow),
                   timeLabel: formatTimeLabel(detailData.scheduledStart, detailData.durationMinutes),
                   etaMinutes: minutesUntil(trackingData?.eta.estimatedArrivalAt, serverNow),

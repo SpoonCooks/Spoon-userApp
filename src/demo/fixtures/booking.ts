@@ -472,6 +472,35 @@ export const DEMO_BOOKING_AUTO_CANCELLED: BookingDetailViewModel = {
   },
 };
 
+/**
+ * `606:4895` "Page 8d- User cancelled" — the customer's own cancellation. A terminal state.
+ *
+ * No apology and no rebook prompt: the frame draws neither, unlike `201:278`. `refundAmount` is a
+ * SUPPLIED value for the same reason `DEMO_BOOKING_AUTO_CANCELLED`'s is — the client never
+ * computes a refund (task §10, FRONTEND_FOUNDATION_PLAN.md §20).
+ */
+export const DEMO_BOOKING_CUSTOMER_CANCELLED: BookingDetailViewModel = {
+  ...HEADER,
+  view: 'customerCancelled',
+  customerCancelled: {
+    title: 'You cancelled this booking',
+    rows: [
+      { label: 'Date', value: 'Today, Aug 5' },
+      { label: 'Start time', value: '5:30 PM' },
+      { label: 'Duration', value: '1 hr' },
+      { label: 'End Time', value: '8:00 PM' },
+    ],
+    detailsTitle: 'Booking details',
+    refundTitle: 'Amount shall be refunded to original source',
+    refundBody:
+      'The amount paid against this booking shall be refunded back to your source. And we promise to not let you down again!',
+    refundAmountLabel: 'Refund Amount',
+    refundAmount: '₹135',
+    refundDestination: 'Refund to original payment source',
+    refundTimeframe: 'Takes 5-7 business days',
+  },
+};
+
 /** `3:1658` Arrived. */
 export const DEMO_BOOKING_ARRIVED: BookingDetailViewModel = {
   ...HEADER,

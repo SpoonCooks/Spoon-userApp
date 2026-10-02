@@ -9,6 +9,7 @@ import { AutoCancelledBody } from '../components/AutoCancelledBody';
 import { BookingDetailsSheet } from '../components/BookingDetailsSheet';
 import { BookingHeader } from '../components/BookingHeader';
 import { CompletionBody } from '../components/CompletionBody';
+import { CustomerCancelledBody } from '../components/CustomerCancelledBody';
 import { ConfirmationBody } from '../components/ConfirmationBody';
 import { ExtensionSheet } from '../components/ExtensionSheet';
 import { InServiceBody } from '../components/InServiceBody';
@@ -454,6 +455,15 @@ export function BookingDetailView({
               ? {}
               : { onDeclineRebook: actions.onDeclineRebook })}
           />
+        );
+
+      // `606:4895` — a terminal, server-reported state. Nothing here can reach it on its own,
+      // and nothing here apologises for a cancellation the customer made themselves.
+      case 'customerCancelled':
+        return booking.customerCancelled === undefined ? (
+          unknownView(booking.view)
+        ) : (
+          <CustomerCancelledBody cancelled={booking.customerCancelled} />
         );
 
       case 'cancelled':

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react-native';
+import { screen, within } from '@testing-library/react-native';
 
 import {
   DEFAULT_API_STUBS,
@@ -634,11 +634,11 @@ describe('booking lifecycle from real DTOs', () => {
   });
 
   /**
-   * A CUSTOMER cancellation has no designed surface, and `201:278` is not it — that frame
-   * apologises for a cancellation Spoon made. The safe fallback is the correct answer here, and
-   * it is recorded as a UI gap rather than solved by showing the wrong apology.
+   * A CUSTOMER cancellation — `606:4895`, not `201:278`. That frame apologises for a
+   * cancellation Spoon made; this one does not apologise for a decision the customer made
+   * themselves, and names the refund the same way `201:278` does, from the SAME endpoint.
    */
-  it('falls back safely for a customer cancellation rather than apologising for it', async () => {
+  it('renders 8d Customer cancelled with the backend refund amount, no apology', async () => {
     renderBooking({
       [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
         booking: bookingDto({
@@ -651,11 +651,53 @@ describe('booking lifecycle from real DTOs', () => {
           },
         }),
       }),
+      [`GET /v1/bookings/${BOOKING_ID}/refunds`]: () => ({
+        refunds: [
+          {
+            refundId: '44444444-4444-4444-8444-444444444444',
+            bookingId: BOOKING_ID,
+            reason: 'customer_cancelled',
+            amountPaise: 13545,
+            currency: 'INR',
+            state: 'provider_pending',
+            requestedAt: '2026-08-20T05:00:05.000Z',
+            completedAt: null,
+          },
+        ],
+      }),
     });
     await settle();
 
-    expect(screen.getByTestId('booking-unknown-view')).toBeTruthy();
+    expect(screen.getByTestId('customer-cancelled-body')).toBeTruthy();
+    expect(screen.getByText('₹135.45')).toBeTruthy();
     expect(screen.queryByText('We sincerely apologize for cancelling this booking')).toBeNull();
+  });
+
+  /**
+   * An unpublished refund shows the em dash, exactly as `201:278` does — never a figure nobody
+   * has stated, and never a frame-transcribed sample.
+   */
+  it('shows an em dash when the customer-cancellation refund has not been published yet', async () => {
+    renderBooking({
+      [`GET /v1/bookings/${BOOKING_ID}`]: () => ({
+        booking: bookingDto({
+          status: 'cancelled',
+          cancellation: {
+            cancelledAt: '2026-08-20T05:00:00.000Z',
+            cancelledBy: 'customer',
+            reasonCode: 'URGENT_CHANGE',
+            reasonDetail: null,
+          },
+        }),
+      }),
+      [`GET /v1/bookings/${BOOKING_ID}/refunds`]: () => ({ refunds: [] }),
+    });
+    await settle();
+
+    expect(screen.getByTestId('customer-cancelled-body')).toBeTruthy();
+    // Scoped to the refund card specifically: a cancelled-before-start booking's End Time row
+    // also shows "—", for its own, unrelated reason.
+    expect(within(screen.getByTestId('customer-cancelled-refund')).getByText('—')).toBeTruthy();
   });
 
   /**
