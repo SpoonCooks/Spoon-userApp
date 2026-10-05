@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { HomeRedesignScreen, joinWaitlist } from '@features/homeRedesign';
 import type { BookingMode, HomeModel } from '@features/homeRedesign';
 import { formatPaise } from '@core/format';
+import { getLogger } from '@core/logging';
 import { RouteScaffold } from '@ui';
 import {
   DEMO_HOME_FIRST_TIME,
@@ -13,7 +14,10 @@ import {
   DEMO_HOME_NOT_LIVE_JOINED,
   DEMO_HOME_RETURNING,
   DEMO_HOME_RETURNING_PLAN,
+  DEMO_HOME_PRICING_ERROR,
+  DEMO_HOME_PRICING_LOADING,
   DEMO_HOME_RETURNING_SMALL_POOL,
+  DEMO_HOME_SOME_UNAVAILABLE,
 } from '@/demo/fixtures/homeRedesign';
 
 const FIXTURES: Record<string, HomeModel> = {
@@ -24,6 +28,9 @@ const FIXTURES: Record<string, HomeModel> = {
   noInstant: DEMO_HOME_NO_INSTANT,
   notLive: DEMO_HOME_NOT_LIVE,
   notLiveJoined: DEMO_HOME_NOT_LIVE_JOINED,
+  unavailable: DEMO_HOME_SOME_UNAVAILABLE,
+  pricingLoading: DEMO_HOME_PRICING_LOADING,
+  pricingError: DEMO_HOME_PRICING_ERROR,
 };
 
 /** Destinations that do not exist yet say so instead of doing nothing. */
@@ -39,9 +46,11 @@ const pending = (destination: string, detail?: string) =>
  *
  *   first (default)  `941:4884`     returning  `1255:2973`     notLive  `1302:3539`
  *   plan             returning with a live recurring plan
- *   smallPool        returning with one pooled cook (Recurring locked)
- *   noInstant        instant unavailable (Now disabled)
+ *   smallPool        returning with one pooled cook ("Check Recurring")
+ *   noInstant        instant unavailable (opens on Later; Now books nothing)
  *   notLiveJoined    already on the waitlist
+ *   unavailable      Now can't fit 2 / 2.5 hrs; Later has no 30-min slots
+ *   pricingLoading   six skeleton tiles      pricingError   retry, CTA off
  *
  * `?tab=recurring` opens the Recurring tab (`1290:1280`, with `state=returning`).
  * `?returning=1` and `?notLive=1` are kept as shorthands.
@@ -78,14 +87,12 @@ export default function HomeRedesignDevRoute() {
       onPressProfile={() => router.push('/profile')}
       onBookNow={(r) =>
         pending(
-          'Confirm step',
-          `${r.duration.label} · ${formatPaise(r.duration.pricePaise)} · ${r.dishes} dishes · ${r.people} people · ${r.complexity}`,
+          'Razorpay checkout',
+          `${r.duration.label} · ${formatPaise(r.duration.payablePaise)} incl. GST · ${r.dishes} dishes · ${r.people} people · ${r.complexity}`,
         )
       }
       onPickSlot={() => router.push('/scheduled')}
-      onPressPaymentDetails={(d) =>
-        pending('Tax dialog', `${d.label} · ${formatPaise(d.pricePaise)}`)
-      }
+      onDurationSelected={(event) => getLogger('home-redesign').info('duration_selected', event)}
       onPressRecurring={(target) =>
         pending(
           {

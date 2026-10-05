@@ -35,7 +35,12 @@ export function RecurringPool({
       <Pressable
         accessibilityRole="button"
         onPress={onPressChip}
-        style={[styles.pill, styles.recurring, SHADOW_PILL]}
+        style={[
+          styles.pill,
+          styles.recurring,
+          chip.tone === 'outline' ? styles.recurringOutline : null,
+          SHADOW_PILL,
+        ]}
       >
         <Image source={ART.restart} style={styles.pillIcon} />
         <Text style={styles.pillLabel}>{chip.label}</Text>
@@ -98,7 +103,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
   },
-  recurring: { left: 200, top: 23, backgroundColor: C.lime },
+  /**
+   * `1257:1016` sits at x 200, 186 wide — i.e. 16 from the right edge. Anchored right so a longer
+   * label ("Check Recurring", "Recurring · Live") grows leftwards instead of off-screen.
+   */
+  recurring: { right: 16, top: 23, backgroundColor: C.lime },
+  /** `1290:1183` — 'Check Recurring': white with a 1pt `#FFD600` hairline. */
+  recurringOutline: { backgroundColor: C.base, borderWidth: 1, borderColor: C.brand },
   pool: { left: 14, top: 222, backgroundColor: C.brand },
   pillIcon: { width: 24, height: 24 },
   pillLabel: { fontFamily: F.bold, fontSize: 16, lineHeight: 24, color: C.text },

@@ -12,8 +12,11 @@ const TABS: readonly { id: BookingMode; label: string }[] = [
 export interface BookingToggleProps {
   readonly value: BookingMode;
   readonly onChange: (mode: BookingMode) => void;
-  /** "Now" is off when instant is unavailable; "Recurring" is locked until the pool qualifies. */
-  readonly disabled?: Partial<Record<BookingMode, boolean>>;
+  /**
+   * `1303:1423` — on Now while instant is unavailable the fill turns grey to signal it; the tab
+   * stays tappable and shows the same SKUs with a Schedule CTA.
+   */
+  readonly muted?: boolean;
 }
 
 /** Figma draws children from the frame's outer edge; React Native from inside the 1pt border. */
@@ -21,39 +24,37 @@ const BORDER = 1;
 const CELL = 88;
 
 /**
- * `1290:2328` / `1290:2363` — 274 × 48 pill. Labels sit in 88pt cells from x 4, y 11; the active
- * 88 × 40 fill sits at x 4 + 88·i, y 3.
+ * `1297:1415` "Toggle/ booking" — 274 × 48 pill with a state per tab (Now / Later / Recurring).
+ * Labels sit in 88pt cells from x 4, y 11; the active 88 × 40 fill sits at x 4 + 88·i (4, 92,
+ * 180), y 3.
+ *
+ * Per the component's dev note, no tab is ever unclickable or deactivated — what a mode can do is
+ * decided by the content below it — and the group is a radio group for accessibility. Switching
+ * keeps the chosen duration (the draft owns it, not this control).
  */
-export function BookingToggle({ value, onChange, disabled = {} }: BookingToggleProps) {
+export function BookingToggle({ value, onChange, muted = false }: BookingToggleProps) {
   const index = Math.max(
     0,
     TABS.findIndex((tab) => tab.id === value),
   );
   return (
-    <View style={styles.track} accessibilityRole="tablist">
-      <View style={[styles.pill, { left: 4 - BORDER + index * CELL }]} />
+    <View style={styles.track} accessibilityRole="radiogroup" accessibilityLabel="Booking type">
+      <View
+        style={[styles.pill, muted ? styles.pillMuted : null, { left: 4 - BORDER + index * CELL }]}
+      />
       <View style={styles.cells}>
         {TABS.map((tab) => {
           const active = tab.id === value;
-          const off = disabled[tab.id] === true;
           return (
             <Pressable
               key={tab.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active, disabled: off }}
-              disabled={off}
+              accessibilityRole="radio"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ checked: active }}
               onPress={() => onChange(tab.id)}
               style={styles.cell}
             >
-              <Text
-                style={[
-                  styles.label,
-                  active ? styles.labelActive : null,
-                  off ? styles.labelDisabled : null,
-                ]}
-              >
-                {tab.label}
-              </Text>
+              <Text style={[styles.label, active ? styles.labelActive : null]}>{tab.label}</Text>
             </Pressable>
           );
         })}
@@ -79,6 +80,7 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     backgroundColor: C.brand,
   },
+  pillMuted: { backgroundColor: C.textDisabled },
   cells: { position: 'absolute', left: 4 - BORDER, top: 0, bottom: 0, flexDirection: 'row' },
   cell: { width: CELL, paddingTop: 11 - BORDER, alignItems: 'center' },
   label: {
@@ -90,5 +92,4 @@ const styles = StyleSheet.create({
     color: C.textSecondary,
   },
   labelActive: { fontFamily: F.bold, color: C.text },
-  labelDisabled: { color: C.textDisabled },
 });

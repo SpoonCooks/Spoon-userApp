@@ -5,10 +5,11 @@ export type BookingMode = 'now' | 'later' | 'recurring';
 /**
  * Everything the customer has chosen on Home but not yet booked.
  *
- * `focusedDurationId` is the tile the carousel is centred on; `selectedDurationId` is the tile the
- * customer actually chose. They start apart: "1 hr" opens focused but NOT selected, so the CTA
- * stays disabled until a tap. Once something is selected, snapping the carousel moves the
- * selection with it, so the big tile is always the chosen one.
+ * `focusedDurationId` is the tile the carousel is centred on (scroll position);
+ * `selectedDurationId` is the booking choice. They are independent: "1 hr" opens focused but NOT
+ * selected, so the CTA stays disabled until a tap, and scrolling away from a selected tile keeps
+ * the selection (the CTA then names it). A tap selects and centres; tapping the selected tile
+ * does not deselect.
  *
  * Switching mode never touches the duration, so leaving Recurring restores what was chosen.
  */
@@ -28,6 +29,7 @@ export type DraftAction =
   | { type: 'setMode'; mode: BookingMode }
   | { type: 'focusDuration'; id: string }
   | { type: 'selectDuration'; id: string }
+  | { type: 'clearSelection' }
   | { type: 'setComplexity'; complexity: DishComplexity }
   | { type: 'setDishes'; value: number }
   | { type: 'setPeople'; value: number };
@@ -39,7 +41,7 @@ export function initialDraft(input: {
 }): BookingDraft {
   const wanted = input.mode ?? 'now';
   return {
-    // "Now" is disabled when instant is unavailable, so a draft never starts on it.
+    // Without instant, "Now" cannot book, so the draft opens on "Later" instead.
     mode: wanted === 'now' && !input.instantAvailable ? 'later' : wanted,
     focusedDurationId: input.focusedDurationId,
     selectedDurationId: null,
@@ -58,13 +60,11 @@ export function draftReducer(draft: BookingDraft, action: DraftAction): BookingD
       return draft.mode === action.mode ? draft : { ...draft, mode: action.mode };
     case 'focusDuration':
       if (draft.focusedDurationId === action.id) return draft;
-      return {
-        ...draft,
-        focusedDurationId: action.id,
-        selectedDurationId: draft.selectedDurationId === null ? null : action.id,
-      };
+      return { ...draft, focusedDurationId: action.id };
     case 'selectDuration':
       return { ...draft, focusedDurationId: action.id, selectedDurationId: action.id };
+    case 'clearSelection':
+      return draft.selectedDurationId === null ? draft : { ...draft, selectedDurationId: null };
     case 'setComplexity':
       return { ...draft, complexity: action.complexity };
     case 'setDishes':
@@ -74,8 +74,23 @@ export function draftReducer(draft: BookingDraft, action: DraftAction): BookingD
   }
 }
 
-/** The booking CTA: live only with a tapped duration, and — for Now — an available instant. */
-export function canBook(draft: BookingDraft, instantAvailable: boolean): boolean {
-  if (draft.mode === 'recurring' || draft.selectedDurationId === null) return false;
-  return draft.mode === 'later' || instantAvailable;
+/**
+ * Which CTA the Book section shows (`1222:23630` / `1222:24656` / `1303:1333`):
+ *
+ *   book      Now with instant available — lime "Book now · ₹payable" → Razorpay, with the
+ *             "Check payment details" link
+ *   schedule  Later, or Now while instant is unavailable (same SKUs) — yellow "Schedule" → slot
+ *             picker, duration carried over, no payment link
+ *   none      Recurring hands off to the recurring block instead
+ */
+export type CtaKind = 'book' | 'schedule' | 'none';
+
+export function ctaKind(mode: BookingMode, instantAvailable: boolean): CtaKind {
+  if (mode === 'recurring') return 'none';
+  return mode === 'now' && instantAvailable ? 'book' : 'schedule';
+}
+
+/** The CTA is live once a duration is tapped; "1 hr" opens focused but not selected. */
+export function canBook(draft: BookingDraft): boolean {
+  return draft.mode !== 'recurring' && draft.selectedDurationId !== null;
 }

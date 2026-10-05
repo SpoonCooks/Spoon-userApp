@@ -1,6 +1,6 @@
 import type { HomeModel } from '../types';
 
-/** Recurring unlocks once the customer has at least this many cooks in their pool. */
+/** Below this many pooled cooks the chip reads "Check Recurring" instead of "Book Recurring". */
 export const RECURRING_MIN_POOL = 2;
 
 /** Beads shown on Home. */
@@ -11,6 +11,8 @@ export type RecurringTarget = 'recurringFlow' | 'planTracker' | 'explainer';
 export interface RecurringChip {
   readonly label: string;
   readonly target: RecurringTarget;
+  /** `1290:1162` lime for a live plan or an eligible pool; `1290:1183` white + yellow hairline. */
+  readonly tone: 'lime' | 'outline';
 }
 
 type RecurringInput = Pick<HomeModel, 'cookPool' | 'activeRecurringPlan'>;
@@ -23,17 +25,12 @@ type RecurringInput = Pick<HomeModel, 'cookPool' | 'activeRecurringPlan'>;
  */
 export function recurringChipFor(model: RecurringInput): RecurringChip {
   if (model.activeRecurringPlan !== null) {
-    return { label: 'Recurring · Live', target: 'planTracker' };
+    return { label: 'Recurring · Live', target: 'planTracker', tone: 'lime' };
   }
   if (model.cookPool.length >= RECURRING_MIN_POOL) {
-    return { label: 'Book Recurring', target: 'recurringFlow' };
+    return { label: 'Book Recurring', target: 'recurringFlow', tone: 'lime' };
   }
-  return { label: 'Check Recurring', target: 'explainer' };
-}
-
-/** Whether the Recurring tab of the booking toggle can be chosen. */
-export function isRecurringUnlocked(model: RecurringInput): boolean {
-  return model.activeRecurringPlan !== null || model.cookPool.length >= RECURRING_MIN_POOL;
+  return { label: 'Check Recurring', target: 'explainer', tone: 'outline' };
 }
 
 /** Real cooks only, capped at six. A cook without a photo is never drawn as a placeholder face. */

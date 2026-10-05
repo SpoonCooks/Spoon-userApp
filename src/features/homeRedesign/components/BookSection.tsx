@@ -3,22 +3,27 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatPaise } from '@core/format';
 
 import { ART } from '../assets';
-import type { BookingMode } from '../state/bookingDraft';
+import type { BookingMode, CtaKind } from '../state/bookingDraft';
 import type { DurationOption } from '../types';
 import { C, F, SHADOW_PILL } from '../theme';
 import { BookingToggle } from './BookingToggle';
 import { DurationCarousel } from './DurationCarousel';
 
 export interface BookSectionProps {
+  /** The lowest instant ETA, or `null` when instant is unavailable — regardless of the tab. */
   readonly etaMins: number | null;
   readonly mode: BookingMode;
   readonly onChangeMode: (mode: BookingMode) => void;
-  readonly disabledModes: Partial<Record<BookingMode, boolean>>;
+  readonly cta: CtaKind;
   readonly durations: readonly DurationOption[];
   readonly focusedDurationId: string;
   readonly selectedDurationId: string | null;
   readonly onFocusDuration: (id: string) => void;
   readonly onSelectDuration: (id: string) => void;
+  readonly isAvailable: (duration: DurationOption) => boolean;
+  readonly pricingStatus: 'ready' | 'loading' | 'error';
+  readonly onPressUnavailable: (duration: DurationOption) => void;
+  readonly onRetryPricing: () => void;
   readonly canBook: boolean;
   readonly onPressBook: () => void;
   readonly onPressHelpMePick: () => void;
@@ -26,43 +31,74 @@ export interface BookSectionProps {
 }
 
 /**
- * `1047:6923` "Book section" — header, mode toggle and, on Now / Later, the duration strip and
- * CTA. On Recurring only the header and toggle remain; the recurring block takes the rest.
+ * `1047:6923` "Book section" and its states — `1222:23630` selected (Now), `1222:24656` schedule
+ * (Later), `1303:1333` instantNA.
  *
- * The CTA price is the selected tile's, else the focused tile's — so the disabled button still
- * reads "Book now · ₹69" over the untapped "1 hr", as drawn.
+ * The header caption is a function of instant availability only: "Arriving in x mins" while it
+ * is available, "Instant · Unavailable" with a grey bolt while it is not, whichever tab is on.
+ *
+ * CTA:
+ *   book      lime "Book now · ₹payable" (the server's price incl. GST) + "Check payment details";
+ *             before a tap it is the disabled grey button over the focused tile's price.
+ *   schedule  yellow "Schedule", no payment link; grey until a duration is tapped.
  */
 export function BookSection({
   etaMins,
   mode,
   onChangeMode,
-  disabledModes,
+  cta,
   durations,
   focusedDurationId,
   selectedDurationId,
   onFocusDuration,
   onSelectDuration,
+  isAvailable,
+  pricingStatus,
+  onPressUnavailable,
+  onRetryPricing,
   canBook,
   onPressBook,
   onPressHelpMePick,
   onPressPaymentDetails,
 }: BookSectionProps) {
-  const priced =
-    durations.find((d) => d.id === (selectedDurationId ?? focusedDurationId)) ?? durations[0];
+  const selected = durations.find((d) => d.id === selectedDurationId);
+  const focused = durations.find((d) => d.id === focusedDurationId) ?? durations[0];
+  const live = canBook && selected !== undefined && pricingStatus === 'ready';
+  // The design has no Selected variant for a side tile, so when the choice is scrolled off-centre
+  // the CTA names it (the tile dev note's proposal).
+  const named = selected !== undefined && selected.id !== focusedDurationId;
+
+  const label =
+    cta === 'schedule'
+      ? live && named
+        ? `Schedule  ·  ${selected.label}`
+        : 'Schedule'
+      : live
+        ? named
+          ? `Book now  ·  ${selected.label}  ·  ${formatPaise(selected.payablePaise)}`
+          : `Book now  ·  ${formatPaise(selected.payablePaise)}`
+        : focused === undefined
+          ? 'Book now'
+          : `Book now  ·  ${formatPaise(focused.pricePaise)}`;
+
   return (
     <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.titles}>
-          <Text style={styles.title}>Select duration to book</Text>
-          {etaMins === null ? null : (
-            <View style={styles.eta}>
-              <Image source={ART.flash} style={styles.flash} />
-              <Text style={styles.etaLabel}>Arriving in</Text>
-              <View style={styles.etaChip}>
-                <Text style={styles.etaValue}>{`${etaMins} mins`}</Text>
+          <Text style={styles.title}>Select a duration to book</Text>
+          <View style={styles.eta}>
+            <Image source={etaMins === null ? ART.flashOff : ART.flash} style={styles.flash} />
+            {etaMins === null ? (
+              <Text style={styles.etaLabel}>Instant · Unavailable</Text>
+            ) : (
+              <View style={styles.etaRow}>
+                <Text style={styles.etaLabel}>Arriving in</Text>
+                <View style={styles.etaChip}>
+                  <Text style={styles.etaValue}>{`${etaMins} mins`}</Text>
+                </View>
               </View>
-            </View>
-          )}
+            )}
+          </View>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -74,33 +110,49 @@ export function BookSection({
         </Pressable>
       </View>
 
-      <BookingToggle value={mode} onChange={onChangeMode} disabled={disabledModes} />
+      <BookingToggle
+        value={mode}
+        onChange={onChangeMode}
+        muted={mode === 'now' && etaMins === null}
+      />
 
-      {mode === 'recurring' ? null : (
+      {cta === 'none' ? null : (
         <>
           <DurationCarousel
             durations={durations}
             focusedId={focusedDurationId}
+            selectedId={selectedDurationId}
+            isAvailable={isAvailable}
+            status={pricingStatus}
             onFocus={onFocusDuration}
             onSelect={onSelectDuration}
+            onPressUnavailable={onPressUnavailable}
+            onRetry={onRetryPricing}
           />
           <View style={styles.cta}>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: !canBook }}
-              disabled={!canBook}
+              accessibilityState={{ disabled: !live }}
+              disabled={!live}
               onPress={onPressBook}
-              style={[styles.button, canBook ? styles.buttonEnabled : styles.buttonDisabled]}
+              style={[
+                styles.button,
+                !live
+                  ? styles.buttonDisabled
+                  : cta === 'book'
+                    ? styles.buttonBook
+                    : styles.buttonSchedule,
+              ]}
             >
-              <Text style={[styles.buttonLabel, canBook ? null : styles.buttonLabelDisabled]}>
-                {priced === undefined
-                  ? 'Book now'
-                  : `Book now  ·  ${formatPaise(priced.pricePaise)}`}
+              <Text style={[styles.buttonLabel, live ? null : styles.buttonLabelDisabled]}>
+                {label}
               </Text>
             </Pressable>
-            <Pressable accessibilityRole="link" onPress={onPressPaymentDetails}>
-              <Text style={styles.link}>Check payment details</Text>
-            </Pressable>
+            {cta === 'book' ? (
+              <Pressable accessibilityRole="link" onPress={onPressPaymentDetails}>
+                <Text style={styles.link}>Check payment details</Text>
+              </Pressable>
+            ) : null}
           </View>
         </>
       )}
@@ -120,11 +172,11 @@ const styles = StyleSheet.create({
   titles: { gap: 4 },
   title: { fontFamily: F.semibold, fontSize: 18, lineHeight: 26, color: C.text },
   eta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  etaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   flash: { width: 32, height: 32 },
   etaLabel: { fontFamily: F.semibold, fontSize: 14, lineHeight: 20, color: C.text },
   etaChip: {
     height: 24,
-    marginLeft: -4,
     paddingHorizontal: 4,
     backgroundColor: C.lime,
     alignItems: 'center',
@@ -154,7 +206,10 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
   },
   buttonDisabled: { backgroundColor: C.surfaceDisabled },
-  buttonEnabled: { backgroundColor: C.brand },
+  /** `1222:23640` — lime "Book now". */
+  buttonBook: { backgroundColor: C.lime },
+  /** `1222:24666` — yellow "Schedule". */
+  buttonSchedule: { backgroundColor: C.brand },
   buttonLabel: { fontFamily: F.bold, fontSize: 16, lineHeight: 24, color: C.text },
   buttonLabelDisabled: { color: C.textDisabled },
   link: {

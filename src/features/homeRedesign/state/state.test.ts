@@ -1,6 +1,7 @@
-import { canBook, draftReducer, initialDraft } from './bookingDraft';
+import { canBook, ctaKind, draftReducer, initialDraft } from './bookingDraft';
+import { isDurationAvailable, liquidHeight, nearestAvailableId, showsMrp } from './durations';
 import { recommendDuration } from './recommendDuration';
-import { isRecurringUnlocked, poolBeads, recurringChipFor } from './recurring';
+import { poolBeads, recurringChipFor } from './recurring';
 import { resolveHomeVariant } from './variant';
 import { joinWaitlist, waitlistProgress } from './waitlist';
 import type { DurationOption, PoolCook } from '../types';
@@ -11,6 +12,8 @@ const DURATIONS: DurationOption[] = [30, 45, 60, 90, 120, 150].map((minutes) => 
   label: `${minutes}`,
   pricePaise: 6900,
   mrpPaise: 15000,
+  payablePaise: 7500,
+  available: { now: true, later: true },
 }));
 const cook = (id: string, photo = true): PoolCook => ({ id, name: id, photo: photo ? 1 : null });
 
@@ -38,13 +41,13 @@ describe('booking draft', () => {
   it('opens focused on the default tile but with nothing selected, so the CTA is off', () => {
     expect(start.focusedDurationId).toBe('60');
     expect(start.selectedDurationId).toBeNull();
-    expect(canBook(start, true)).toBe(false);
+    expect(canBook(start)).toBe(false);
   });
 
   it('enables the CTA once a tile is tapped', () => {
     const next = draftReducer(start, { type: 'selectDuration', id: '90' });
     expect(next).toMatchObject({ focusedDurationId: '90', selectedDurationId: '90' });
-    expect(canBook(next, true)).toBe(true);
+    expect(canBook(next)).toBe(true);
   });
 
   it('only moves focus when scrolling before a tap', () => {
@@ -52,28 +55,44 @@ describe('booking draft', () => {
     expect(next).toMatchObject({ focusedDurationId: '45', selectedDurationId: null });
   });
 
-  it('moves the selection with the focus after a tap', () => {
+  it('keeps the selection when the carousel is scrolled away', () => {
     const tapped = draftReducer(start, { type: 'selectDuration', id: '90' });
-    expect(draftReducer(tapped, { type: 'focusDuration', id: '120' }).selectedDurationId).toBe(
-      '120',
+    expect(draftReducer(tapped, { type: 'focusDuration', id: '120' })).toMatchObject({
+      focusedDurationId: '120',
+      selectedDurationId: '90',
+    });
+  });
+
+  it('does not deselect when the selected tile is tapped again', () => {
+    const tapped = draftReducer(start, { type: 'selectDuration', id: '90' });
+    expect(draftReducer(tapped, { type: 'selectDuration', id: '90' }).selectedDurationId).toBe(
+      '90',
     );
+  });
+
+  it('clears a selection that became unavailable', () => {
+    const tapped = draftReducer(start, { type: 'selectDuration', id: '90' });
+    expect(draftReducer(tapped, { type: 'clearSelection' }).selectedDurationId).toBeNull();
   });
 
   it('keeps the duration when leaving recurring and going back to now', () => {
     const tapped = draftReducer(start, { type: 'selectDuration', id: '90' });
     const recurring = draftReducer(tapped, { type: 'setMode', mode: 'recurring' });
-    expect(canBook(recurring, true)).toBe(false);
+    expect(canBook(recurring)).toBe(false);
     const back = draftReducer(recurring, { type: 'setMode', mode: 'now' });
     expect(back.selectedDurationId).toBe('90');
-    expect(canBook(back, true)).toBe(true);
+    expect(canBook(back)).toBe(true);
   });
 
-  it('starts on Later and blocks Now bookings when instant is unavailable', () => {
-    const draft = initialDraft({ focusedDurationId: '60', instantAvailable: false });
-    expect(draft.mode).toBe('later');
-    const tapped = draftReducer(draft, { type: 'selectDuration', id: '60' });
-    expect(canBook(tapped, false)).toBe(true);
-    expect(canBook({ ...tapped, mode: 'now' }, false)).toBe(false);
+  it('starts on Later when instant is unavailable', () => {
+    expect(initialDraft({ focusedDurationId: '60', instantAvailable: false }).mode).toBe('later');
+  });
+
+  it('books on Now with instant, schedules otherwise, and hands Recurring off', () => {
+    expect(ctaKind('now', true)).toBe('book');
+    expect(ctaKind('now', false)).toBe('schedule');
+    expect(ctaKind('later', true)).toBe('schedule');
+    expect(ctaKind('recurring', true)).toBe('none');
   });
 
   it('clamps the counters', () => {
@@ -103,17 +122,20 @@ describe('recurring', () => {
     expect(recurringChipFor({ cookPool: [], activeRecurringPlan: { id: 'p' } })).toEqual({
       label: 'Recurring · Live',
       target: 'planTracker',
+      tone: 'lime',
     });
   });
   it('offers Book Recurring from two pooled cooks', () => {
     const model = { cookPool: [cook('a'), cook('b')], activeRecurringPlan: null };
     expect(recurringChipFor(model).target).toBe('recurringFlow');
-    expect(isRecurringUnlocked(model)).toBe(true);
   });
-  it('locks recurring and points at the explainer under two cooks', () => {
+  it('points at the explainer under two cooks', () => {
     const model = { cookPool: [cook('a')], activeRecurringPlan: null };
-    expect(recurringChipFor(model)).toEqual({ label: 'Check Recurring', target: 'explainer' });
-    expect(isRecurringUnlocked(model)).toBe(false);
+    expect(recurringChipFor(model)).toEqual({
+      label: 'Check Recurring',
+      target: 'explainer',
+      tone: 'outline',
+    });
   });
   it('draws only real cooks, at most six', () => {
     const pool = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id) => cook(id));
@@ -163,5 +185,37 @@ describe('waitlist', () => {
     );
     expect(requestPushPermission).not.toHaveBeenCalled();
     expect(register).not.toHaveBeenCalled();
+  });
+});
+
+describe('durations', () => {
+  const mixed = DURATIONS.map((d) =>
+    d.minutes === 60 ? { ...d, available: { now: false, later: true } } : d,
+  );
+
+  it('judges Now on instant availability and everything else on slots', () => {
+    const hour = mixed.find((d) => d.minutes === 60)!;
+    expect(isDurationAvailable(hour, 'book')).toBe(false);
+    expect(isDurationAvailable(hour, 'schedule')).toBe(true);
+  });
+
+  it('snaps focus to the nearest bookable tile, shorter first on a tie', () => {
+    expect(nearestAvailableId(mixed, '60', 'book')).toBe('45');
+    expect(nearestAvailableId(mixed, '60', 'schedule')).toBe('60');
+  });
+
+  it("keeps liquid proportional to minutes, landing on the frames' heights", () => {
+    expect([30, 45, 60, 90, 120, 150].map((m) => liquidHeight(m, false))).toEqual([
+      22, 33, 43, 65, 87, 108,
+    ]);
+    expect([30, 45, 60, 90, 120, 150].map((m) => liquidHeight(m, true))).toEqual([
+      27, 40, 53, 80, 107, 133,
+    ]);
+  });
+
+  it('hides the MRP when missing or equal to the price', () => {
+    expect(showsMrp({ pricePaise: 6900, mrpPaise: 15000 })).toBe(true);
+    expect(showsMrp({ pricePaise: 6900, mrpPaise: 6900 })).toBe(false);
+    expect(showsMrp({ pricePaise: 6900, mrpPaise: null })).toBe(false);
   });
 });

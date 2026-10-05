@@ -17,7 +17,20 @@ export interface DurationOption {
   readonly label: string;
   readonly pricePaise: number;
   readonly mrpPaise: number | null;
+  /**
+   * What "Book now" charges for this duration — the price plus GST, as the SERVER totals it.
+   * The client never adds tax (see `@core/format/money`).
+   */
+  readonly payablePaise: number;
+  /** Server flag; one tile only. */
   readonly mostBooked?: boolean;
+  /**
+   * Bookable per mode: Now fails when no cook can arrive and stay that long, Later on slot
+   * capacity. An unavailable tile stays in the track but cannot be selected or snapped to.
+   */
+  readonly available: { readonly now: boolean; readonly later: boolean };
+  /** "Serves" — what fits in this duration. Announced to screen readers; not drawn yet. */
+  readonly serves?: { readonly dishes: number; readonly people: number };
 }
 
 export interface PoolCook {
@@ -48,6 +61,10 @@ export interface HomeModel {
   readonly user: { readonly hasCompletedBooking: boolean };
   readonly instant: { readonly available: boolean; readonly etaMins: number | null };
   readonly durations: readonly DurationOption[];
+  /** Per-duration pricing: six skeleton tiles while loading; retry (and no CTA) when it fails. */
+  readonly pricingStatus?: 'ready' | 'loading' | 'error';
+  /** The GST rate the tax dialog states, from config — never a literal in copy. */
+  readonly tax: { readonly gstPercent: number };
   /** The tile the carousel opens centred on ("1 hr"). Focused, never pre-selected. */
   readonly focusedDurationId: string;
   /** Returning users only; up to 6 beads. */

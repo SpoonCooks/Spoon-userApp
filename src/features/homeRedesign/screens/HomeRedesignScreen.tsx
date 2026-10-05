@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Image, LayoutAnimation, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,14 +18,18 @@ import type { NotifyState } from '../components/NotLiveCard';
 import { PromiseFooter } from '../components/Promise';
 import { RecurringPool } from '../components/RecurringPool';
 import { ShareCard } from '../components/ShareCard';
+import { Toast } from '../components/Toast';
+import type { ToastHandle } from '../components/Toast';
+import { TaxDetailsDialog } from '../components/TaxDetailsDialog';
 import { SHARE_MESSAGE } from '../content';
 import { useHomeRedesignData } from '../data';
 import { shareSpoon } from '../share';
-import { canBook, draftReducer, initialDraft } from '../state/bookingDraft';
+import { canBook, ctaKind, draftReducer, initialDraft } from '../state/bookingDraft';
 import type { BookingDraft, BookingMode } from '../state/bookingDraft';
+import { isDurationAvailable, nearestAvailableId } from '../state/durations';
 import { recommendDuration } from '../state/recommendDuration';
 import type { DialInputs } from '../state/recommendDuration';
-import { isRecurringUnlocked, poolBeads, recurringChipFor } from '../state/recurring';
+import { poolBeads, recurringChipFor } from '../state/recurring';
 import type { RecurringTarget } from '../state/recurring';
 import { resolveHomeVariant } from '../state/variant';
 import { C } from '../theme';
@@ -47,12 +51,13 @@ export interface HomeRedesignActions {
   readonly onPressAddress: () => void;
   /** Avatar → profile. */
   readonly onPressProfile: () => void;
-  /** "Book now" on Now → the confirm step. */
+  /** Lime "Book now" (Now, instant available) → Razorpay for the payable total. */
   readonly onBookNow: (request: BookingRequest) => void;
-  /** "Book now" on Later → the slot picker. */
+  /**
+   * Yellow "Schedule" (Later, or Now while instant is unavailable) → the slot picker, with the
+   * duration pre-selected so only slots and payment remain.
+   */
   readonly onPickSlot: (request: BookingRequest) => void;
-  /** "Check payment details" → the tax dialog for the priced tile. */
-  readonly onPressPaymentDetails: (duration: DurationOption) => void;
   /** The recurring chip: recurring flow, plan tracker or explainer. */
   readonly onPressRecurring: (target: RecurringTarget) => void;
   readonly onPressCookPool: () => void;
@@ -63,6 +68,14 @@ export interface HomeRedesignActions {
    * the tap (see `joinWaitlist`). Rejects only if the register fails.
    */
   readonly onJoinWaitlist: (pincode: string) => Promise<void>;
+  /** Analytics `duration_selected`, raised on every new selection. */
+  readonly onDurationSelected?: (event: {
+    durationMin: number;
+    pricePaise: number;
+    source: 'tile' | 'dial';
+  }) => void;
+  /** Re-read availability (Home focus is handled by the screen; this is the Now/Later switch). */
+  readonly onRefreshAvailability?: () => void;
   /** Defaults to `shareSpoon`: WhatsApp first, the system share sheet otherwise. */
   readonly onShare?: () => void;
 }
@@ -103,23 +116,48 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
       }),
   );
 
-  // A refreshed payload may drop the tile the draft points at; fall back to the server's focus.
+  // Every mode can be chosen (the toggle never deactivates a tab); the content below decides
+  // what each can do — Now without instant simply leaves the CTA off.
+  const mode = draft.mode;
+  const cta = ctaKind(mode, model.instant.available);
+  const [taxOpen, setTaxOpen] = useState(false);
+  const toast = useRef<ToastHandle>(null);
+  const available = (d: DurationOption) => isDurationAvailable(d, cta);
+
+  // Focus never rests on an unbookable tile; a refreshed payload that drops it falls back too.
   const durationIds = model.durations.map((d) => d.id);
-  const focusedId = durationIds.includes(draft.focusedDurationId)
+  const wantedFocus = durationIds.includes(draft.focusedDurationId)
     ? draft.focusedDurationId
     : model.focusedDurationId;
+  const focusedId = nearestAvailableId(model.durations, wantedFocus, cta);
+  // A selection that became unavailable (refresh, or a Now/Later switch) is cleared below.
+  const selectedOption = model.durations.find((d) => d.id === draft.selectedDurationId);
   const selectedId =
-    draft.selectedDurationId !== null && durationIds.includes(draft.selectedDurationId)
-      ? draft.selectedDurationId
-      : null;
+    selectedOption !== undefined && available(selectedOption) ? selectedOption.id : null;
+  const bookable = canBook({ ...draft, selectedDurationId: selectedId });
 
-  const recurringUnlocked = variant === 'returning' && isRecurringUnlocked(model);
-  const mode: BookingMode = draft.mode === 'recurring' && !recurringUnlocked ? 'now' : draft.mode;
-  const disabledModes = { now: !model.instant.available, recurring: !recurringUnlocked };
-  const bookable = canBook(
-    { ...draft, mode, selectedDurationId: selectedId },
-    model.instant.available,
-  );
+  const lostSelection = draft.selectedDurationId !== null && selectedId === null;
+  useEffect(() => {
+    if (!lostSelection) return;
+    const lost = model.durations.find((d) => d.id === draft.selectedDurationId);
+    toast.current?.show(
+      `${lost?.label ?? 'That duration'} is no longer available. Pick another duration.`,
+    );
+    dispatch({ type: 'clearSelection' });
+  }, [lostSelection, draft.selectedDurationId, model.durations]);
+
+  const selectDuration = (id: string, source: 'tile' | 'dial') => {
+    const option = model.durations.find((d) => d.id === id);
+    if (option === undefined || !available(option)) return;
+    if (id !== draft.selectedDurationId) {
+      actions.onDurationSelected?.({
+        durationMin: option.minutes,
+        pricePaise: option.pricePaise,
+        source,
+      });
+    }
+    dispatch({ type: 'selectDuration', id });
+  };
 
   const inputs: DialInputs = {
     complexity: draft.complexity,
@@ -133,6 +171,7 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
     // Recurring removes the strip and CTA; animate the content moving up (and back).
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     dispatch({ type: 'setMode', mode: next });
+    actions.onRefreshAvailability?.();
   };
 
   /** The dial's result selects the tile, so changing an input picks the new recommendation. */
@@ -142,8 +181,11 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
     }
     if (next.dishes !== draft.dishes) dispatch({ type: 'setDishes', value: next.dishes });
     if (next.people !== draft.people) dispatch({ type: 'setPeople', value: next.people });
-    const pick = recommendDuration(next, model.durations);
-    if (pick !== null) dispatch({ type: 'selectDuration', id: pick.id });
+    const pick = recommendDuration(
+      next,
+      model.durations.filter((d) => available(d)),
+    );
+    if (pick !== null) selectDuration(pick.id, 'dial');
   };
 
   const request = (): BookingRequest | null => {
@@ -155,8 +197,8 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
   const book = () => {
     const chosen = request();
     if (chosen === null) return;
-    if (mode === 'later') actions.onPickSlot(chosen);
-    else actions.onBookNow(chosen);
+    if (cta === 'book') actions.onBookNow(chosen);
+    else if (cta === 'schedule') actions.onPickSlot(chosen);
   };
 
   // Waitlist button: disabled "You're on the list" on load when the server says joined.
@@ -174,7 +216,9 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
   };
 
   const share = actions.onShare ?? (() => void shareSpoon(SHARE_MESSAGE));
-  const showPool = variant === 'returning';
+  // Returning users see the pool under the CTA; anyone on Recurring sees it in place of the strip.
+  // With fewer than two pooled cooks its chip reads "Check Recurring" and opens the explainer.
+  const showPool = variant === 'returning' || mode === 'recurring';
 
   return (
     <View style={styles.screen} testID="home-redesign-screen">
@@ -215,21 +259,26 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
               etaMins={model.instant.available ? model.instant.etaMins : null}
               mode={mode}
               onChangeMode={changeMode}
-              disabledModes={disabledModes}
               durations={model.durations}
               focusedDurationId={focusedId}
               selectedDurationId={selectedId}
               onFocusDuration={(id) => dispatch({ type: 'focusDuration', id })}
-              onSelectDuration={(id) => dispatch({ type: 'selectDuration', id })}
+              onSelectDuration={(id) => selectDuration(id, 'tile')}
+              isAvailable={available}
+              pricingStatus={model.pricingStatus ?? 'ready'}
+              onPressUnavailable={(d) =>
+                toast.current?.show(
+                  `${d.label} isn’t available ${cta === 'book' ? 'right now' : 'to schedule'}.`,
+                )
+              }
+              onRetryPricing={() => actions.onRefreshAvailability?.()}
               canBook={bookable}
               onPressBook={book}
               onPressHelpMePick={() =>
                 scroll.current?.scrollTo({ y: bodyY.current + dialY.current - top, animated: true })
               }
-              onPressPaymentDetails={() => {
-                const priced = model.durations.find((d) => d.id === (selectedId ?? focusedId));
-                if (priced !== undefined) actions.onPressPaymentDetails(priced);
-              }}
+              onPressPaymentDetails={() => setTaxOpen(true)}
+              cta={cta}
             />
           )}
 
@@ -266,6 +315,12 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
           <PromiseFooter />
         </View>
       </ScrollView>
+      <Toast ref={toast} />
+      <TaxDetailsDialog
+        visible={taxOpen}
+        onClose={() => setTaxOpen(false)}
+        gstPercent={model.tax.gstPercent}
+      />
     </View>
   );
 }
@@ -292,6 +347,7 @@ export function HomeRedesignScreen({ sample, initialMode, ...actions }: HomeRede
           <HomeRedesignView
             model={model}
             {...(initialMode === undefined ? {} : { initialMode })}
+            onRefreshAvailability={refetch}
             {...actions}
           />
         )}
