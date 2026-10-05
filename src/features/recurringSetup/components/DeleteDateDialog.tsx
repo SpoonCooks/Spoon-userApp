@@ -1,18 +1,21 @@
+import { StyleSheet, View } from 'react-native';
+
+import { lightTheme } from '@ui/theme/ThemeProvider';
+
 import { COOK_VISIT_ICON } from '../art';
 import { visitTags } from '../data';
 import type { RecurringVisitChoice } from '../types';
-import { DialogDays, DialogTags, RecurringDialog } from './RecurringDialog';
+import { DialogDayDisc, DialogTags, RecurringDialog } from './RecurringDialog';
 
 /**
- * "Delete this date from Plan N?" — Figma `586:4373` (on `586:4315`).
+ * "Caution! Delete this date?" — Figma `586:4373` (on `586:4315`).
  *
- * The cook badge, the question, the date as the Selected days grid draws it, the visit booked on
- * it as tags, then "Keep date" and the outlined "Delete date".
+ * The cook badge, the question, a red "Deleted dates can't be restored", then the date as a disc
+ * ("Fri 2") beside the visit booked on it as tags, then "Keep date" and the outlined "Delete
+ * date". The plan is not named: the screen behind it already says which one.
  */
 export interface DeleteDateDialogProps {
   readonly visible: boolean;
-  /** 1-based. */
-  readonly planNumber: number;
   readonly dayId: string;
   /** The visit booked on the date. */
   readonly visit: RecurringVisitChoice;
@@ -23,7 +26,6 @@ export interface DeleteDateDialogProps {
 
 export function DeleteDateDialog({
   visible,
-  planNumber,
   dayId,
   visit,
   onKeep,
@@ -34,15 +36,23 @@ export function DeleteDateDialog({
     <RecurringDialog
       visible={visible}
       icon={COOK_VISIT_ICON}
-      title={`Delete this date from Plan ${planNumber}?`}
+      title="Caution! Delete this date?"
+      note="Deleted dates can’t be restored"
       keepLabel="Keep date"
       confirmLabel="Delete date"
       onKeep={onKeep}
       onConfirm={onDelete}
       testID={testID}
     >
-      <DialogDays dayIds={[dayId]} heading={false} />
-      <DialogTags tags={visitTags(visit)} />
+      {/* `1073:3206` — the disc and the tags on one line, 12 apart. */}
+      <View style={styles.row}>
+        <DialogDayDisc dayId={dayId} />
+        <DialogTags tags={visitTags(visit)} gap={lightTheme.space.xs} />
+      </View>
     </RecurringDialog>
   );
 }
+
+const styles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.md },
+});

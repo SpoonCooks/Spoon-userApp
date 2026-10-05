@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAndroidBackHandler } from '@core/navigation';
-import { Screen, ScreenHeader, Text } from '@ui';
+import { Screen, ScreenHeader, Text, useBottomGutter } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import {
@@ -17,10 +17,11 @@ import {
   TIME_OF_DAY_PHOTOS,
   TRASH_ICON,
 } from '../art';
+import { HelpFab } from '../components/HelpFab';
 import { ManagePlansSheet } from '../components/ManagePlansSheet';
 import { DialogDays, DialogRows, DialogTags, RecurringDialog } from '../components/RecurringDialog';
 import { RecurringFooter } from '../components/RecurringFooter';
-import { SelectedDays } from '../components/SelectedDays';
+import { SummaryCalendar, summaryWindow } from '../components/SummaryCalendar';
 import { UndoBanner } from '../components/UndoBanner';
 import {
   TIME_OF_DAY_BANDS,
@@ -32,29 +33,38 @@ import {
   visitDetail,
   visitTags,
 } from '../data';
+import { useRecurringPlanning } from '../planning';
 import type { RecurringPlanDraft } from '../types';
 
 /**
- * Recurring setup — Summary. Figma `316:4728` (Spoon — User).
+ * Recurring setup — Summary. Figma `1079:3207` (view), `494:1039` (edit), `568:2909` (after a
+ * delete) and `542:1442` (the bin's sheet) — Spoon — User.
  *
  * Every plan and visit in one place. A two-layer switcher: Plan tabs on top (the active one taller,
  * its concave feet merging it into the gold panel below), then that plan's visits as pills. Under
- * it the visit's days and three photo tiles — time of day, duration, start time — each picked by
- * the value chosen, captioned with it.
+ * it the plan's dates as a month calendar (`SummaryCalendar`), then the visit's three photo tiles —
+ * time of day, duration, start time — each picked by the value chosen and captioned with it ABOVE
+ * the photo. The content scrolls beneath the pinned "Book Now".
  *
- * Per the frame's note:
+ * Per the frames' notes:
  *  - A plan's first booking is its "1st Visit"; the visit "+" adds another visit on the same days.
  *  - The plan "+" goes back to the day flow with a blank calendar for the next plan, exactly like
  *    the "+" on the calendar.
- *  - The pencil (`494:1039`) puts the dates into edit mode: it turns gold, the heading asks which
- *    date to edit, and tapping one opens Edit date for it. Tapping the pencil again, or moving to
- *    another plan or visit, leaves edit mode.
+ *  - The pencil (`494:1039`, note `513:1288`) puts the dates into edit mode: it sits on a gold
+ *    disc, the header gains a back chevron, the footer goes and the plan's dates jiggle as buttons.
+ *    Tapping one opens Edit date for it; only one date is edited at a time. The chevron, the
+ *    pencil again or moving to another plan or visit leaves edit mode.
  *  - The bin (`542:1442`) opens "Manage your plans": delete the visit shown, delete its plan, or
  *    start over — each confirmed in a dialog. After a delete the Summary shows an undo banner
  *    (`568:2909`).
  *
- * The frame's header (`542:1341`, `Nav header 3`) has no back chevron — the title sits on the
- * gutter — so `onBack` is reached by Android's hardware back only.
+ * `568:2909` and `542:1442` are older than the view frame (they still draw the "Selected days"
+ * strip, photos above their captions and no calendar): they decide the banner's and the sheet's
+ * look, `1079:3207` / `494:1039` the body.
+ *
+ * The view frame's header (`1079:3209`, `Nav header 3`) has no back chevron — the title sits on
+ * the gutter — so `onBack` is reached by Android's hardware back only; the edit frame's header
+ * (`Nav header 2`) has the chevron and no bin.
  */
 export interface RecurringSummaryScreenProps {
   readonly plans: readonly RecurringPlanDraft[];
@@ -80,8 +90,14 @@ export interface RecurringSummaryScreenProps {
       }
     | undefined;
   readonly onBook: () => void;
-  /** Android hardware back; the header draws no chevron. */
+  /** Android hardware back; the view header draws no chevron. */
   readonly onBack: () => void;
+  /** The day the window is counted from. Defaults to now; the dev preview pins Figma's date. */
+  readonly today?: Date;
+  /** Opens with the dates already in edit mode (`494:1039`): the dev preview's way to see it. */
+  readonly initialEditing?: boolean;
+  /** Opens with the bin's sheet showing (`542:1442`): the dev preview's way to see it. */
+  readonly initialManaging?: 'sheet' | 'visit' | 'plan' | 'startOver';
   readonly testID?: string;
 }
 
@@ -99,6 +115,9 @@ export function RecurringSummaryScreen({
   undo,
   onBook,
   onBack,
+  today,
+  initialEditing = false,
+  initialManaging,
   testID = 'recurring-summary-screen',
 }: RecurringSummaryScreenProps) {
   const plan = plans[planIndex];
@@ -107,10 +126,26 @@ export function RecurringSummaryScreen({
   const band = TIME_OF_DAY_BANDS.find((entry) => entry.id === visit?.timeOfDay);
   // Edit mode belongs to the plan and visit it was turned on for, so switching tabs leaves it.
   const shown = `${planIndex}:${visitIndex}`;
-  const [editingFor, setEditingFor] = useState<string | null>(null);
+  const [editingFor, setEditingFor] = useState<string | null>(initialEditing ? shown : null);
   const editing = editingFor === shown;
   /** The bin's sheet (`542:1442`), or the confirm dialog one of its rows opened. */
-  const [managing, setManaging] = useState<'sheet' | 'visit' | 'plan' | 'startOver' | null>(null);
+  const [managing, setManaging] = useState<'sheet' | 'visit' | 'plan' | 'startOver' | null>(
+    initialManaging ?? null,
+  );
+  const { windowStartId } = useRecurringPlanning();
+  const todayKey = today?.getTime();
+  /** One window for every plan (`1079:3220`), so the calendar does not move between tabs. */
+  const range = useMemo(
+    () =>
+      summaryWindow(
+        plans.flatMap((entry) => entry.dayIds),
+        windowStartId,
+        todayKey === undefined ? undefined : new Date(todayKey),
+      ),
+    [plans, windowStartId, todayKey],
+  );
+  /** `494:1039` — with no footer the content ends at the home indicator, whose gutter is 34. */
+  const homeGutter = useBottomGutter(HOME_INDICATOR);
   const visitCount = plans.reduce((total, entry) => total + entry.visits.length, 0);
   const planCount = plans.length;
   const hasOtherVisit = (plan?.visits.length ?? 0) > 1;
@@ -192,9 +227,22 @@ export function RecurringSummaryScreen({
     return null;
   };
   useAndroidBackHandler(() => {
-    onBack();
+    if (editing) setEditingFor(null);
+    else onBack();
     return true;
   });
+
+  const trash = (
+    <Pressable
+      onPress={() => setManaging('sheet')}
+      accessibilityRole="button"
+      accessibilityLabel="Manage your plans"
+      style={styles.trash}
+      testID={`${testID}-delete`}
+    >
+      <Image source={TRASH_ICON} style={styles.icon24} />
+    </Pressable>
+  );
 
   return (
     <Screen
@@ -203,22 +251,22 @@ export function RecurringSummaryScreen({
       testID={testID}
       header={
         <View>
-          <ScreenHeader
-            density="nav"
-            title="Summary"
-            trailing={
-              <Pressable
-                onPress={() => setManaging('sheet')}
-                accessibilityRole="button"
-                accessibilityLabel="Manage your plans"
-                style={styles.trash}
-                testID={`${testID}-delete`}
-              >
-                <Image source={TRASH_ICON} style={styles.icon24} />
-              </Pressable>
-            }
-            testID={`${testID}-header`}
-          />
+          {editing ? (
+            // `494:1039` — `Nav header 2`: the chevron leaves edit mode; there is no bin.
+            <ScreenHeader
+              density="nav"
+              title="Summary"
+              onBack={() => setEditingFor(null)}
+              testID={`${testID}-header`}
+            />
+          ) : (
+            <ScreenHeader
+              density="nav"
+              title="Summary"
+              trailing={trash}
+              testID={`${testID}-header`}
+            />
+          )}
           <PlanSwitcher
             plans={plans}
             planIndex={planIndex}
@@ -230,80 +278,97 @@ export function RecurringSummaryScreen({
           />
         </View>
       }
-      footer={<RecurringFooter label="Book Now" onPress={onBook} testID={`${testID}-book`} />}
+      footer={
+        editing ? undefined : (
+          <RecurringFooter label="Book Now" onPress={onBook} testID={`${testID}-book`} />
+        )
+      }
     >
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {undo === undefined ? null : (
-          <UndoBanner
-            message={undo.message}
-            onUndo={undo.onUndo}
-            onDismiss={undo.onDismiss}
-            testID={`${testID}-undo`}
-          />
-        )}
-        {plan === undefined ? null : (
-          <SelectedDays
-            dayIds={visit === undefined ? plan.dayIds : visitDays(plan.dayIds, visit)}
-            onEdit={() => setEditingFor(editing ? null : shown)}
-            onPickDay={
-              editing
-                ? (dayId: string) => {
-                    setEditingFor(null);
-                    onEditDate(planIndex, visitIndex, dayId);
-                  }
-                : undefined
-            }
-            testID={`${testID}-days`}
-          />
-        )}
-        {visit === undefined ? null : (
-          <View style={styles.details}>
-            <View style={styles.tiles}>
-              <Image
-                source={TIME_OF_DAY_PHOTOS[visit.timeOfDay]}
-                style={styles.tile}
-                resizeMode="cover"
+      <View style={styles.region}>
+        <View style={[styles.region, editing ? { paddingBottom: homeGutter } : null]}>
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            {undo === undefined ? null : (
+              <UndoBanner
+                message={undo.message}
+                onUndo={undo.onUndo}
+                onDismiss={undo.onDismiss}
+                testID={`${testID}-undo`}
               />
-              {DURATION_PHOTOS[minutes] === undefined ? (
-                <View style={styles.tile} />
-              ) : (
-                <Image source={DURATION_PHOTOS[minutes]} style={styles.tile} resizeMode="cover" />
-              )}
-              <Image
-                source={START_TIME_PHOTOS[visit.timeOfDay]}
-                style={styles.tile}
-                resizeMode="cover"
+            )}
+            {plan === undefined ? null : (
+              <SummaryCalendar
+                range={range}
+                selectedIds={visit === undefined ? plan.dayIds : visitDays(plan.dayIds, visit)}
+                title={`Plan ${planIndex + 1} selected dates`}
+                onEdit={() => setEditingFor(editing ? null : shown)}
+                onPickDay={
+                  editing
+                    ? (dayId: string) => {
+                        setEditingFor(null);
+                        onEditDate(planIndex, visitIndex, dayId);
+                      }
+                    : undefined
+                }
+                testID={`${testID}-days`}
               />
-            </View>
-            <View style={styles.captions}>
-              <Text
-                variant="bodyLargeStrong"
-                color="textPrimary"
-                align="center"
-                style={styles.caption}
-              >
-                {band?.label ?? ''}
-              </Text>
-              <Text
-                variant="bodyLargeStrong"
-                color="textPrimary"
-                align="center"
-                style={styles.caption}
-              >
-                {minutes} minutes
-              </Text>
-              <Text
-                variant="bodyLargeStrong"
-                color="textPrimary"
-                align="center"
-                style={styles.caption}
-              >
-                {formatStartTime(visit.startMinutes)}
-              </Text>
-            </View>
-          </View>
-        )}
-      </ScrollView>
+            )}
+            {visit === undefined ? null : (
+              <View style={styles.details}>
+                <View style={styles.captions}>
+                  <Text
+                    variant="emphasis"
+                    color="textPrimary"
+                    align="center"
+                    style={styles.caption}
+                  >
+                    {band?.label ?? ''}
+                  </Text>
+                  <Text
+                    variant="emphasis"
+                    color="textPrimary"
+                    align="center"
+                    style={styles.caption}
+                  >
+                    {minutes} minutes
+                  </Text>
+                  <Text
+                    variant="emphasis"
+                    color="textPrimary"
+                    align="center"
+                    style={styles.caption}
+                  >
+                    {formatStartTime(visit.startMinutes)}
+                  </Text>
+                </View>
+                <View style={styles.tiles}>
+                  <Image
+                    source={TIME_OF_DAY_PHOTOS[visit.timeOfDay]}
+                    style={styles.tile}
+                    resizeMode="cover"
+                  />
+                  {DURATION_PHOTOS[minutes] === undefined ? (
+                    <View style={styles.tile} />
+                  ) : (
+                    <Image
+                      source={DURATION_PHOTOS[minutes]}
+                      style={styles.tile}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <Image
+                    source={START_TIME_PHOTOS[visit.timeOfDay]}
+                    style={styles.tile}
+                    resizeMode="cover"
+                  />
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+        {/* `1302:2638` floats 12 above the footer; `1302:2660` has no footer and floats 20 above
+            the home indicator. */}
+        <HelpFab {...(editing ? { bottom: homeGutter + HELP_ABOVE_HOME } : {})} />
+      </View>
       <ManagePlansSheet
         visible={managing === 'sheet'}
         visitLine={
@@ -469,6 +534,12 @@ function AddPlanTab({
 }
 
 const FOOT = 10;
+/** The least a Plan tab shrinks to once the row is full: its label and the 20pt padding. */
+const PLAN_TAB_MIN = 96;
+/** `43:79` — the home indicator's band, which the footer-less edit frame leaves clear. */
+const HOME_INDICATOR = 34;
+/** `1302:2660` — the help button's foot sits 54 up: 34 of indicator and 20 clear. */
+const HELP_ABOVE_HOME = 20;
 
 const styles = StyleSheet.create({
   /** `543:2419` — the bin's 44pt hit area sits 6 from the frame's right edge, past the gutter. */
@@ -486,14 +557,18 @@ const styles = StyleSheet.create({
   switcher: { backgroundColor: lightTheme.colors.surfaceAccent },
   /** `358:8190` — pt 16, px 12, 12 apart, tabs sitting on the panel. */
   planTabs: {
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: lightTheme.space.md,
     paddingTop: lightTheme.space.lg,
     paddingHorizontal: lightTheme.space.md,
   },
-  /** `358:8191` — an unselected tab: 44 tall, px 20, `#FFEF99`, top corners 16. */
+  /** `754:3535` — an unselected tab: 44 tall, px 20, `#FFEF99`, top corners 16, sharing the row. */
   planTab: {
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: PLAN_TAB_MIN,
     height: 44,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -503,6 +578,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: lightTheme.radius.md,
   },
   activeTab: {
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: PLAN_TAB_MIN,
     height: 52,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -590,11 +668,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: lightTheme.colors.surfaceBrandTint,
   },
-  /** `316:4731` — p 16, 24 between blocks. */
+  /** The content region: it ends at the footer's top edge, and the help button floats in it. */
+  region: { flex: 1 },
+  /** `1079:3211` — p 16, 24 between blocks. */
   content: { padding: lightTheme.space.lg, gap: lightTheme.space.xl },
-  /** `373:8742` — 8 between the tiles and their captions. */
+  /** `1079:3221` — 8 between the captions and their tiles. */
   details: { gap: lightTheme.space.sm },
-  /** `316:4762` — three tiles, 16 apart, 185 tall at an 8pt radius. */
+  /** `1079:3226` — three tiles, 16 apart, 185 tall at an 8pt radius. */
   tiles: { flexDirection: 'row', gap: lightTheme.space.lg },
   tile: {
     flex: 1,
@@ -602,6 +682,7 @@ const styles = StyleSheet.create({
     borderRadius: lightTheme.radius.xs,
     backgroundColor: lightTheme.colors.surfaceAccent,
   },
+  /** `1079:3222` — three columns 15.5 apart, above the tiles. */
   captions: { flexDirection: 'row', gap: 15.5 },
   caption: { flex: 1 },
 });

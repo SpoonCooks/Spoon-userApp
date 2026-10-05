@@ -86,6 +86,8 @@ export const palette = {
   yellow300: '#FFEF99',
   /** `130:43` promo side panels; matrix even rows. */
   yellow200: '#FFF7CC',
+  /** `1219:4397` — the middle stop of an unfocused duration card's liquid: `#FFE666` → this → `#FFEF99`. */
+  yellow250: '#FFF3B3',
   /**
    * `1:798` / `1:821` — the "Popular" badge and the primary CTA bar. This is a DIFFERENT yellow
    * to the Schedule tile's `#FFE666`; the file genuinely uses two.
@@ -230,6 +232,8 @@ export const palette = {
   black60: 'rgba(0,0,0,0.6)',
   /** `155:1585` / `158:1586` — the inline "Max 14 days reached" error and its dot. */
   red600: '#E53935',
+  /** `1073:3181` — "Deleted dates can't be restored": the file's literal `red`, `#FF0000`. */
+  red: '#FF0000',
 
   // ---------------------------------------------------------------------------
   // Recurring setup — Figma `ZIJf639gTWHXshaa2YOeCT` ("Version 1"), frames `4:282` … `4:2005`.
@@ -269,6 +273,8 @@ export const palette = {
   grey555: '#555555',
   /** Captions — "Pick 2 more days to continue". */
   grey666: '#666666',
+  /** `1351:4412` — the day-picker legend's caption ("Selected", "Start/ End date"). */
+  grey6B: '#6B6B6B',
   /** Quiet labels — the weekday letters. */
   grey777: '#777777',
 
@@ -289,6 +295,18 @@ export const palette = {
   black35: 'rgba(0,0,0,0.35)',
   /** `848:6611` — `#FFD600` at 12 %: a card dragged toward add. */
   yellow500Wash: 'rgba(255,214,0,0.12)',
+
+  // ---------------------------------------------------------------------------
+  // Recurring landing — Spoon — User (`cCQlzTeiObQkpVBzwI8mZi`), `970:5392` … `970:5546`.
+  // ---------------------------------------------------------------------------
+  /** `970:5451` — "See the whole flow in under 4 minutes.". */
+  stone600: '#6B6A60',
+  /** `970:5610` — the player's elapsed and total time. */
+  stone380: '#B9B8AE',
+  /** `970:5608` — the video's scene surface. */
+  yellow100: '#FFF9DC',
+  /** `970:5600` — the scrim over the page while the video plays: `#0A0A08` at 50 %. */
+  scrimPlayer: 'rgba(10,10,8,0.5)',
 } as const;
 
 /**
@@ -524,6 +542,8 @@ export const elevations = {
   subtle: elevation(0, 1, 1, 0.15, 2),
   /** `1:821` the primary CTA bar — a 3pt blur, tighter than the 4pt used by surfaces. */
   cta: elevation(0, 0, 3, 0.15, 3),
+  /** `983:6074` — Spoon — User `Elevation/2`: the Recurring landing's "Schedule Now" tag. */
+  tag: elevation(0, 0, 12, 0.1, 4),
 } as const;
 
 export type ElevationToken = keyof typeof elevations;
@@ -596,6 +616,15 @@ export const innerShadows = {
       offsetY: 0,
       blurRadius: 3,
       color: 'rgba(0,0,0,0.08)',
+    },
+  ],
+  /** `Elevation/2` — `0 0 12 #0000001A`, the focused duration card (`1219:4271`). */
+  elevation2: [
+    {
+      offsetX: 0,
+      offsetY: 0,
+      blurRadius: 12,
+      color: 'rgba(0,0,0,0.1)',
     },
   ],
   /** `Elevation/3` — `0 0 24 #00000024`, the recurring dialogs (`586:4373`). */

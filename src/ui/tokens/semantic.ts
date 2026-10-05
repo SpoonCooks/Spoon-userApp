@@ -204,13 +204,21 @@ export const lightColors = {
   /** `color/surface/disabled` + `color/text/disabled` — the redesigned file's disabled pill CTA. */
   surfaceDisabledSoft: palette.black02,
   textDisabledSoft: palette.black25,
+  /** `1351:4412` — the day-picker legend's caption. */
+  textLegend: palette.grey6B,
+  /** `1351:4411` — the legend's "Selected" dot, `#FFEF99` (lighter than the `#FFE666` day itself). */
+  surfaceLegendSelected: palette.yellow300,
   /** `155:1585` — inline validation copy, and the dot (`158:1586`) beside it. */
   textError: palette.red600,
   surfaceError: palette.red600,
+  /** `1073:3181` — the "Deleted dates can't be restored" note in the delete-date dialog. */
+  textWarning: palette.red,
   /** Spoon — User `color/text/secondary`: struck prices, unselected tab labels. */
   textSubdued: palette.black60,
   /** `444:10421` / `444:10424` — the `#FFF7CC` edge on Plan tiles and the "+" button. */
   borderPlanTile: palette.yellow200,
+  /** `1219:4271` — the focused duration card's 1pt edge: the file's `--disabled`, black at 25 %. */
+  borderDurationFocus: palette.black25,
   /** Spoon — User `color/border/strong` — the outlined "Delete date" button (`586:4386`). */
   borderInk: palette.black,
   /** Spoon — User `--disabled` (`#00000040`) as a fill: the undo banner's tick badge (`567:1031`). */
@@ -261,6 +269,16 @@ export const lightColors = {
   surfaceSkipWash: palette.black06,
   borderSkip: palette.black35,
   surfaceAddWash: palette.yellow500Wash,
+
+  // Recurring landing (`970:5392` … `970:5546`).
+  /** `970:5451` — the explainer's "See the whole flow…" line. */
+  textExplainer: palette.stone600,
+  /** `970:5610` — the player's time labels. */
+  textPlayerTime: palette.stone380,
+  /** `970:5608` — the video's scene surface. */
+  surfaceVideoScene: palette.yellow100,
+  /** `970:5600` — the wash over the landing while the video plays. */
+  scrimPlayer: palette.scrimPlayer,
 } as const;
 
 /** TODO(designer): no dark theme exists in Figma. Mirrors light until one does. */
@@ -364,6 +382,23 @@ export const gradients = {
     locations: [0, 0.45],
     angleDeg: 180,
   },
+  /** `1241:2362` — "Scroll fade": 40pt over the foot of scrolling content, clear → white. */
+  scrollFade: {
+    colors: [withAlpha(palette.white, 0), palette.white],
+    angleDeg: 180,
+  },
+  /** `1219:4397` — the liquid in an unfocused duration card: `#FFE666` → `#FFF3B3` (60 %) → `#FFEF99`. */
+  durationLevel: {
+    colors: [palette.yellow400, palette.yellow250, palette.yellow300],
+    locations: [0, 0.6, 1],
+    angleDeg: 180,
+  },
+  /** `1219:4274` — the liquid in the focused duration card: `#FFD600` → `#FFDE33` (60 %) → `#FFE666`. */
+  durationLevelFocused: {
+    colors: [palette.yellow500, palette.yellow33, palette.yellow400],
+    locations: [0, 0.6, 1],
+    angleDeg: 180,
+  },
   /** `444:10421` — an unselected Plan tile: `#FFF7CC` → `#FFEF99`, straight down. */
   planTileIdle: {
     colors: [palette.yellow200, palette.yellow300],
@@ -380,6 +415,15 @@ export const gradients = {
     colors: [palette.yellow33, palette.yellow500],
     locations: [0, 0.71429],
     angleDeg: 169.88604760821104,
+  },
+  /**
+   * `364:520` — the Schedule Plan banner's 1.5pt edge: `#FFF7CC` at the top, clear by 45 % of the
+   * way down (the stroke is a vertical gradient, not a flat colour).
+   */
+  planBannerRim: {
+    colors: [palette.yellow200, withAlpha(palette.yellow200, 0)],
+    locations: [0, 0.45],
+    angleDeg: 180,
   },
   /** `358:8192` — the Summary's active Plan tab: `#FFDE33` → `#FFD600` by 60 %, straight down. */
   planTabActive: {
@@ -412,12 +456,61 @@ export const gradients = {
    * (`planTileActive` / `planTileGloss`) at this card's own 169.37°.
    */
   visitTabActiveAngleDeg: 169.37065492527108,
+  /**
+   * `444:10299` — the 1.5pt edge of the visit being scheduled: a vertical stroke, `#FFF7CC` at the
+   * top through `#FFE666` (55 %) to `#FFD600` at the foot.
+   */
+  visitTabRim: {
+    colors: [palette.yellow200, palette.yellow400, palette.yellow500],
+    locations: [0, 0.55, 1],
+    angleDeg: 180,
+  },
   planAddGloss: {
     colors: [withAlpha(palette.yellow200, 0.7), withAlpha(palette.yellow200, 0)],
     locations: [0, 0.45],
     angleDeg: 180,
   },
+  /**
+   * Step 1's Plan header as the current frames draw it (`1366:2937` selected, `1366:2914`
+   * unselected, `1366:2938` "+"): RADIAL gradients, an ellipse centred on the box that reaches its
+   * four sides (`farthest-side`; the transform's radii are exactly half the width and height).
+   * `radialBackground` turns one into a style, since `expo-linear-gradient` is linear only. The
+   * selected tile's mid stops are the file's own eased ramp from `#FFE666` to `#FFD600`.
+   */
+  planHeaderActive: {
+    colors: [
+      palette.yellow300,
+      palette.yellow400,
+      '#FFE24D',
+      palette.yellow33,
+      '#FFDA1A',
+      '#FFD80D',
+      palette.yellow500,
+    ],
+    locations: [0, 0.71635, 0.78726, 0.85817, 0.92909, 0.96454, 1],
+  },
+  /** `1366:2914` — an unselected tile: white at the centre into `#FFF7CC` at the edge. */
+  planHeaderIdle: {
+    colors: [palette.white, palette.yellow200],
+    locations: [0, 1],
+  },
+  /** `1366:2938` — the "+": white into `#FFE666` through `#FFF3B3` and `#FFEC8C`. */
+  planHeaderAdd: {
+    colors: [palette.white, '#FFF3B3', '#FFEC8C', palette.yellow400],
+    locations: [0, 0.5, 0.75, 1],
+  },
 } as const;
+
+/** The CSS a radial gradient token resolves to: an ellipse reaching the box's four sides. */
+export function radialBackground(token: {
+  readonly colors: readonly string[];
+  readonly locations: readonly number[];
+}): string {
+  const stops = token.colors.map(
+    (color, index) => `${color} ${(token.locations[index] ?? 0) * 100}%`,
+  );
+  return `radial-gradient(ellipse farthest-side at 50% 50%, ${stops.join(', ')})`;
+}
 
 export type GradientToken = keyof typeof gradients;
 
@@ -1042,6 +1135,13 @@ export const typography = {
     fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.none,
   },
+  /** `1302:2618` — the "?" on Recurring's help button: Livvic Bold 22/28. */
+  helpGlyph: {
+    fontSize: fontSize.xxxl,
+    lineHeight: lineHeight.xxl,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
   /** Recurring setup — the screen title ("Pick your days"): Livvic Black 22/28. */
   headingStep: {
     fontSize: fontSize.xxxl,
@@ -1075,6 +1175,13 @@ export const typography = {
     fontSize: 17,
     lineHeight: 21,
     fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1219:4278` — Spoon `Display mid`, the focused duration card's label: Livvic Bold 26/32. */
+  displayMid: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
   /** Recurring setup, Step 6 — "Plan confirmed!": Livvic Black 26/32. */
@@ -1124,6 +1231,13 @@ export const typography = {
     fontSize: fontSize.xs,
     lineHeight: 14,
     fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Micro`: Livvic Regular 10/14, the day-picker legend (`1351:4412`). */
+  microRegular: {
+    fontSize: fontSize.xs,
+    lineHeight: 14,
+    fontFamily: fontFamily.regular,
     letterSpacing: letterSpacing.none,
   },
   /** Spoon — User `Spoon/Title`: Livvic Bold 20/28, the `Nav header 2` title (`44:66`). */
@@ -1289,6 +1403,8 @@ export const elevation = {
   glow: elevations.glow,
   sheet: elevations.raised,
   cta: elevations.cta,
+  /** `983:6074` — the Recurring landing's "Schedule Now" tag. */
+  tag: elevations.tag,
 } as const satisfies Record<string, Elevation>;
 
 export type ElevationRole = keyof typeof elevation;

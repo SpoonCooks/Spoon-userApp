@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 
 import {
   RecurringPlanFlow,
@@ -16,12 +16,15 @@ import { useSafeBack } from '@core/navigation';
  * days a pool Cook can take, catalogue durations and prices, and start times per visit
  * (`useRecurringPlanningSource`). Each falls back to the local rules until it has answered.
  *
+ * The "?" on every screen opens the Recurring landing page (`/recurring`, `1302:2617`).
+ *
  * Not linked from anywhere in the app yet, and "Book Now" (`onComplete`) is left unwired: saving a
  * plan needs the autopay step, which has no design yet, and the flow builds several plans where
  * the backend keeps one live plan per household. `/home` is a placeholder fallback for the same
  * reason: nothing has decided yet where this flow is entered from.
  */
 export default function RecurringSetupRoute() {
+  const router = useRouter();
   const goBack = useSafeBack('/home');
   const planning = useRecurringPlanningSource();
 
@@ -31,7 +34,7 @@ export default function RecurringSetupRoute() {
     <>
       <Stack.Screen options={{ gestureEnabled: false }} />
       <RecurringPlanningProvider value={planning}>
-        <RecurringPlanFlow onExit={goBack} />
+        <RecurringPlanFlow onExit={goBack} onOpenInfo={() => router.push('/recurring')} />
       </RecurringPlanningProvider>
     </>
   );

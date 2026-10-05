@@ -79,9 +79,12 @@ export const CALENDAR_REMOVE_ICON =
 /** `543:2325` — `Interface / Restart`, 24pt: the sheet's "Start over" row. */
 export const RESTART_ROW_ICON =
   require('../../../assets/figma/recurring/restart-sheet.png') as ImageSourcePropType;
-/** `542:1748` — the "Start over?" dialog's 24pt restart arrow. */
-export const RESTART_ICON =
-  require('../../../assets/figma/recurring/restart.png') as ImageSourcePropType;
+/**
+ * `919:4760` — the "Start over?" dialog's 24pt restart arrow. The dialog now draws the same
+ * `Interface / Restart` glyph as the sheet row (the filled-head circular arrow); the older
+ * `542:1748` artwork (`restart.png`, an angular arrow) is no longer used.
+ */
+export const RESTART_ICON = RESTART_ROW_ICON;
 /** `568:2994` — `Done_round`, 20pt white tick in the undo banner's badge. */
 export const DONE_ICON = require('../../../assets/figma/recurring/done.png') as ImageSourcePropType;
 /** `43:67` — `Icon/Close`, 24pt: the undo banner's dismiss. */

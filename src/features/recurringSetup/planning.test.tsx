@@ -139,6 +139,7 @@ describe('VisitChoices start times', () => {
   it('asks for this visit’s days and the picked duration', async () => {
     const { startTimesBodies } = renderChoices();
 
+    // The time of the day first (`229:1802`), then the Duration it opens (`288:401`).
     fireEvent.press(screen.getByRole('radio', { name: 'Morning' }));
     fireEvent.press(screen.getByRole('radio', { name: /^1 hr/ }));
 
@@ -150,6 +151,7 @@ describe('VisitChoices start times', () => {
   it('offers only starts a pool Cook can take on every day', async () => {
     renderChoices();
 
+    // The time of the day first (`229:1802`), then the Duration it opens (`288:401`).
     fireEvent.press(screen.getByRole('radio', { name: 'Morning' }));
     fireEvent.press(screen.getByRole('radio', { name: /^1 hr/ }));
 

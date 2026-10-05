@@ -6,6 +6,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { PlanVisitsHeader } from '../components/PlanVisitsHeader';
 import { RecurringFooter } from '../components/RecurringFooter';
+import { RecurringScrollBody } from '../components/RecurringScrollBody';
 import { VisitDaysPicker } from '../components/VisitDaysPicker';
 import { ordinal, planSubtitle } from '../data';
 
@@ -48,11 +49,8 @@ export function RecurringVisitDaysScreen({
 
   return (
     <Screen
-      scroll
       tone="plain"
       padded={false}
-      showsScrollIndicator={false}
-      contentStyle={styles.content}
       testID={testID}
       header={
         <ScreenHeader
@@ -71,27 +69,29 @@ export function RecurringVisitDaysScreen({
         />
       }
     >
-      <PlanVisitsHeader
-        planNumber={planNumber}
-        subtitle={planSubtitle(planDayIds.length, bookedVisits.length)}
-        bookedVisits={bookedVisits}
-        testID={`${testID}-plan`}
-      />
-      {/* `365:8602` — the heading, the ask, then the plan's days; 8 apart. */}
-      <View style={styles.section}>
-        <Text variant="headingSection" color="textPrimary">
-          Plan {planNumber}: Selected days
-        </Text>
-        <Text variant="body" color="textPrimary">
-          Select days on which {visitLabel} is needed
-        </Text>
-        <VisitDaysPicker
-          dayIds={planDayIds}
-          selected={selected}
-          onChange={setSelected}
-          testID={`${testID}-days`}
+      <RecurringScrollBody contentStyle={styles.content} testID={`${testID}-body`}>
+        <PlanVisitsHeader
+          planNumber={planNumber}
+          subtitle={planSubtitle(planDayIds.length, bookedVisits.length)}
+          bookedVisits={bookedVisits}
+          testID={`${testID}-plan`}
         />
-      </View>
+        {/* `365:8618` — the heading, the ask, then the plan's days; 12 apart. */}
+        <View style={styles.section}>
+          <Text variant="headingSection" color="textPrimary">
+            Plan {planNumber}: Selected days
+          </Text>
+          <Text variant="body" color="textPrimary">
+            Select days on which {visitLabel} is needed
+          </Text>
+          <VisitDaysPicker
+            dayIds={planDayIds}
+            selected={selected}
+            onChange={setSelected}
+            testID={`${testID}-days`}
+          />
+        </View>
+      </RecurringScrollBody>
     </Screen>
   );
 }
@@ -99,5 +99,5 @@ export function RecurringVisitDaysScreen({
 const styles = StyleSheet.create({
   /** `332:6096` — p 16, 24 between the header and the days. */
   content: { padding: lightTheme.space.lg, gap: lightTheme.space.xl },
-  section: { gap: lightTheme.space.sm },
+  section: { gap: lightTheme.space.md },
 });

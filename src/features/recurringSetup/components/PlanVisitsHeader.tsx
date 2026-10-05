@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
-import type { LayoutChangeEvent } from 'react-native';
+import type { LayoutChangeEvent, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Text } from '@ui';
@@ -122,12 +122,22 @@ function PlanCard({
   );
 }
 
-/** `444:10270` — the visit being added: the selected Plan tile's gold, edge and glow. */
+/**
+ * `444:10299` — the visit being added: the selected Plan tile's gold and glow, inside a 1.5pt edge
+ * that runs from `#FFF7CC` at the top to `#FFD600` at the foot. With no gradient border in React
+ * Native the edge is a ring: the rim gradient over the card, then the card's own fill again,
+ * inset by the stroke's width.
+ */
 function SchedulingVisit({ label }: { readonly label: string }) {
   const [box, setBox] = useState({ width: 0, height: 0 });
-  const sweep = lightTheme.gradients.planTileActive;
-  const gloss = lightTheme.gradients.planTileGloss;
-  const axis = gradientAxis(lightTheme.gradients.visitTabActiveAngleDeg, box.width, box.height);
+  const rim = lightTheme.gradients.visitTabRim;
+  const fill = (inset: boolean) => (
+    <TabFill
+      width={box.width - (inset ? EDGE * 2 : 0)}
+      height={box.height - (inset ? EDGE * 2 : 0)}
+      style={inset ? styles.visitInner : StyleSheet.absoluteFill}
+    />
+  );
   return (
     <View
       style={[styles.visit, styles.visitActive]}
@@ -138,6 +148,41 @@ function SchedulingVisit({ label }: { readonly label: string }) {
         );
       }}
     >
+      {fill(false)}
+      <LinearGradient
+        colors={rim.colors}
+        locations={rim.locations}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {fill(true)}
+      <Text variant="headingBold" color="textPrimary" align="center">
+        {label}
+      </Text>
+      <Text variant="bodyLarge" color="textPrimary" align="center">
+        Scheduling
+      </Text>
+      <View pointerEvents="none" style={[styles.overlay, styles.visitActiveGlow]} />
+    </View>
+  );
+}
+
+/** The visit tab's sweep and gloss over a `width` × `height` box. */
+function TabFill({
+  width,
+  height,
+  style,
+}: {
+  readonly width: number;
+  readonly height: number;
+  readonly style: StyleProp<ViewStyle>;
+}) {
+  const sweep = lightTheme.gradients.planTileActive;
+  const gloss = lightTheme.gradients.planTileGloss;
+  const axis = gradientAxis(lightTheme.gradients.visitTabActiveAngleDeg, width, height);
+  return (
+    <View style={style} pointerEvents="none">
       <LinearGradient
         colors={sweep.colors}
         locations={sweep.locations}
@@ -152,13 +197,6 @@ function SchedulingVisit({ label }: { readonly label: string }) {
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <Text variant="headingBold" color="textPrimary" align="center">
-        {label}
-      </Text>
-      <Text variant="bodyLarge" color="textPrimary" align="center">
-        Scheduling
-      </Text>
-      <View pointerEvents="none" style={[styles.overlay, styles.visitActiveEdge]} />
     </View>
   );
 }
@@ -175,6 +213,8 @@ const GHOST_SIZE = 100;
 const GHOST_LINE = 125.5;
 /** `444:10269` — two visits share the row; more scroll at this width instead of shrinking. */
 const MIN_VISIT_WIDTH = 160;
+/** `444:10299` — the visit being scheduled's edge. */
+const EDGE = 1.5;
 
 const styles = StyleSheet.create({
   /** `444:10249` — 12 between the Plan card and the visits. */
@@ -219,11 +259,17 @@ const styles = StyleSheet.create({
   },
   /** `Visit 1` — `color/surface/disabled` under 60 % ink. */
   visitBooked: { backgroundColor: lightTheme.colors.surfaceDisabledSoft },
-  visitActive: {},
-  /** `444:10270` — a 1.5pt `#FFF7CC` edge and `inset 0 -2 4 rgba(255,214,0,0.9)`. */
-  visitActiveEdge: {
-    borderWidth: 1.5,
-    borderColor: lightTheme.colors.borderPlanTile,
-    boxShadow: innerShadows.planTileActive,
+  /** `444:10299` — p 8 inside the 1.5pt edge. */
+  visitActive: { padding: lightTheme.space.sm + EDGE },
+  visitInner: {
+    position: 'absolute',
+    top: EDGE,
+    left: EDGE,
+    right: EDGE,
+    bottom: EDGE,
+    borderRadius: lightTheme.radius.md - EDGE,
+    overflow: 'hidden',
   },
+  /** `444:10299` — `inset 0 -2 4 rgba(255,214,0,0.9)`. */
+  visitActiveGlow: { boxShadow: innerShadows.planTileActive },
 });

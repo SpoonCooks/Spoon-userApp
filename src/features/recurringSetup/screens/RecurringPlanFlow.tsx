@@ -1,6 +1,8 @@
 import { useState } from 'react';
 
 import { busyWindowsFor, ordinal, visitCaption, withoutVisit, withoutVisitDay } from '../data';
+import { RecurringInfoProvider } from '../components/HelpFab';
+import type { EditDateDraft, EditDateField } from '../editDateDraft';
 import type { RecurringPlanDraft, RecurringVisitChoice } from '../types';
 import { RecurringDaysScreen } from './RecurringDaysScreen';
 import { RecurringEditDateScreen } from './RecurringEditDateScreen';
@@ -32,10 +34,30 @@ export interface RecurringPlanFlowProps {
   readonly onComplete?: (plans: readonly RecurringPlanDraft[]) => void;
   /** The day the window is counted from. Defaults to now; the dev preview pins Figma's date. */
   readonly today?: Date;
+  /**
+   * Where to open, with which plans — the dev preview's way to land on any screen of the flow
+   * directly (`spoon://recurring-setup?step=summary`). The real route never passes it.
+   */
+  readonly seed?: RecurringPlanFlowSeed;
+  /**
+   * What the help button on every screen opens — the Recurring landing page (`1302:2617`). Left
+   * out, the button is not drawn.
+   */
+  readonly onOpenInfo?: () => void;
 }
 
-type Stage =
-  | { readonly kind: 'days'; readonly activeId?: string | undefined }
+export interface RecurringPlanFlowSeed {
+  readonly plans: readonly RecurringPlanDraft[];
+  readonly stage: RecurringPlanFlowStage;
+}
+
+export type RecurringPlanFlowStage =
+  | {
+      readonly kind: 'days';
+      readonly activeId?: string | undefined;
+      /** The dev preview's way to open with the "Max 14 days reached" error already showing. */
+      readonly capError?: boolean | undefined;
+    }
   | {
       readonly kind: 'schedule';
       readonly planId: string;
@@ -44,12 +66,18 @@ type Stage =
       readonly returnTo: 'sequence' | 'summary';
       /** A later visit's own days, picked on the visit-days screen. */
       readonly dayIds?: readonly string[] | undefined;
+      /** The dev preview's way to open with part of the visit already chosen (`288:401` …). */
+      readonly draft?: Partial<RecurringVisitChoice> | undefined;
     }
   | {
       readonly kind: 'editDate';
       readonly planId: string;
       readonly visitIndex: number;
       readonly dayId: string;
+      /** Preview states for the dev route (`494:676`, `586:4315`): the editor, picks and dialog. */
+      readonly field?: EditDateField | undefined;
+      readonly draft?: Partial<EditDateDraft> | undefined;
+      readonly confirmingDelete?: boolean | undefined;
     }
   | {
       readonly kind: 'visitDays';
@@ -57,7 +85,17 @@ type Stage =
       readonly visitIndex: number;
       readonly dayIds?: readonly string[] | undefined;
     }
-  | { readonly kind: 'summary'; readonly planIndex: number; readonly visitIndex: number };
+  | {
+      readonly kind: 'summary';
+      readonly planIndex: number;
+      readonly visitIndex: number;
+      /** Preview states for the dev route: the dates in edit mode (`494:1039`)… */
+      readonly editing?: boolean | undefined;
+      /** …the bin's sheet (`542:1442`), or one of its confirm dialogs, open… */
+      readonly managing?: 'sheet' | 'visit' | 'plan' | 'startOver' | undefined;
+      /** …or the undo banner showing this message (`568:2909`). */
+      readonly undoMessage?: string | undefined;
+    };
 
 function nextPlanId(plans: readonly RecurringPlanDraft[]): string {
   const taken = new Set(plans.map((plan) => plan.id));
@@ -82,9 +120,19 @@ function keepVisitsOn(
   });
 }
 
-export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFlowProps) {
-  const [plans, setPlans] = useState<readonly RecurringPlanDraft[]>([]);
-  const [stage, setStage] = useState<Stage>({ kind: 'days' });
+type Stage = RecurringPlanFlowStage;
+
+export function RecurringPlanFlow(props: RecurringPlanFlowProps) {
+  return (
+    <RecurringInfoProvider onOpen={props.onOpenInfo}>
+      <RecurringPlanFlowScreens {...props} />
+    </RecurringInfoProvider>
+  );
+}
+
+function RecurringPlanFlowScreens({ onExit, onComplete, today, seed }: RecurringPlanFlowProps) {
+  const [plans, setPlans] = useState<readonly RecurringPlanDraft[]>(seed?.plans ?? []);
+  const [stage, setStage] = useState<Stage>(seed?.stage ?? { kind: 'days' });
   /** Remounts the calendar each time the flow returns to it, so it opens on the plans given. */
   const [daysVisit, setDaysVisit] = useState(0);
   /**
@@ -96,7 +144,16 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
     readonly plans: readonly RecurringPlanDraft[];
     readonly planIndex: number;
     readonly visitIndex: number;
-  } | null>(null);
+  } | null>(() =>
+    seed?.stage.kind === 'summary' && seed.stage.undoMessage !== undefined
+      ? {
+          message: seed.stage.undoMessage,
+          plans: seed.plans,
+          planIndex: seed.stage.planIndex,
+          visitIndex: seed.stage.visitIndex,
+        }
+      : null,
+  );
 
   const goToDays = (next: readonly RecurringPlanDraft[], activeId?: string) => {
     setUndo(null);
@@ -127,6 +184,7 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
         {...(today === undefined ? {} : { today })}
         initialPlans={plans.map((plan) => ({ id: plan.id, dayIds: plan.dayIds }))}
         {...(stage.activeId === undefined ? {} : { initialActiveId: stage.activeId })}
+        {...(stage.capError === true ? { initialCapError: true } : {})}
         scheduledPlanIds={new Set(plans.filter((plan) => plan.visits.length > 0).map((p) => p.id))}
         onContinue={(picked: readonly RecurringPlanDays[]) => {
           // Keep each plan's visits by id; plans emptied of days are dropped.
@@ -164,6 +222,9 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
         planNumber={index + 1}
         dayId={stage.dayId}
         visit={visit}
+        initialField={stage.field}
+        initialDraft={stage.draft}
+        initialConfirmingDelete={stage.confirmingDelete}
         busy={busyWindowsFor(
           plan.dayIds,
           plan.visits.filter((_, visitIndex) => visitIndex !== stage.visitIndex),
@@ -255,7 +316,7 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
         planNumber={index + 1}
         visitNumber={stage.visitIndex + 1}
         dayIds={dayIds}
-        initial={existing}
+        initial={existing ?? stage.draft}
         ctaLabel={ctaLabel}
         {...(laterVisit
           ? {
@@ -299,6 +360,9 @@ export function RecurringPlanFlow({ onExit, onComplete, today }: RecurringPlanFl
       plans={plans}
       planIndex={stage.planIndex}
       visitIndex={stage.visitIndex}
+      {...(today === undefined ? {} : { today })}
+      {...(stage.editing === true ? { initialEditing: true } : {})}
+      {...(stage.managing === undefined ? {} : { initialManaging: stage.managing })}
       onSelect={(planIndex, visitIndex) => setStage({ kind: 'summary', planIndex, visitIndex })}
       onAddPlan={() => {
         const id = nextPlanId(plans);

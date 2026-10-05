@@ -60,13 +60,18 @@ export function UndoBanner({
 }
 
 const styles = StyleSheet.create({
-  /** `567:1030` — 52 tall (more if the message wraps), p 8, 8 apart, a 24pt radius on `color/surface/disabled`. */
+  /**
+   * `567:1030` — 52 tall (more if the message wraps), px 8, 8 apart, a 24pt radius on
+   * `color/surface/disabled`. The frame fixes the height at 52 and lets the 44pt Undo and dismiss
+   * overflow its 8pt padding, so the vertical padding here is the 4 that fits them exactly.
+   */
   banner: {
     minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     gap: lightTheme.space.sm,
-    padding: lightTheme.space.sm,
+    paddingHorizontal: lightTheme.space.sm,
+    paddingVertical: lightTheme.space.xs,
     borderRadius: lightTheme.radius.lg,
     backgroundColor: lightTheme.colors.surfaceDisabledSoft,
   },

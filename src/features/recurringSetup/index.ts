@@ -13,7 +13,11 @@ export type { RecurringVisitDaysScreenProps } from './screens/RecurringVisitDays
 export { RecurringEditDateScreen } from './screens/RecurringEditDateScreen';
 export type { RecurringEditDateScreenProps } from './screens/RecurringEditDateScreen';
 export { RecurringPlanFlow } from './screens/RecurringPlanFlow';
-export type { RecurringPlanFlowProps } from './screens/RecurringPlanFlow';
+export type {
+  RecurringPlanFlowProps,
+  RecurringPlanFlowSeed,
+  RecurringPlanFlowStage,
+} from './screens/RecurringPlanFlow';
 export {
   buildRecurringWindow,
   RECURRING_WINDOW_LENGTH_DAYS,
@@ -29,6 +33,8 @@ export type {
   RecurringWindowDay,
   RecurringWindowRow,
 } from './types';
+export { HelpFab, RecurringInfoProvider } from './components/HelpFab';
+export type { HelpFabProps } from './components/HelpFab';
 export {
   LOCAL_PLANNING,
   RecurringPlanningProvider,

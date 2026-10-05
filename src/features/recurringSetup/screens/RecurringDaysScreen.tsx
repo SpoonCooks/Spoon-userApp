@@ -5,6 +5,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
+import { DaysLegend } from '../components/DaysLegend';
+import { HelpFab } from '../components/HelpFab';
 import { PlanHeader } from '../components/PlanHeader';
 import { RecurringFooter } from '../components/RecurringFooter';
 import { RECURRING_WINDOW_OFFSET_DAYS, WEEKDAY_LABELS, buildRecurringWindow } from '../data';
@@ -73,6 +75,8 @@ export interface RecurringDaysScreenProps {
   readonly initialActiveId?: string;
   /** Plans already scheduled: the CTA names the first plan NOT in this set. */
   readonly scheduledPlanIds?: ReadonlySet<string>;
+  /** Opens with the "Max 14 days reached" error already up — the dev preview's way to see it. */
+  readonly initialCapError?: boolean;
   readonly testID?: string;
 }
 
@@ -100,6 +104,7 @@ export function RecurringDaysScreen({
   initialPlans,
   initialActiveId,
   scheduledPlanIds,
+  initialCapError = false,
   testID = 'recurring-days-screen',
 }: RecurringDaysScreenProps) {
   const planning = useRecurringPlanning();
@@ -117,7 +122,7 @@ export function RecurringDaysScreen({
   const [activeId, setActiveId] = useState(
     () => initialActiveId ?? initialPlans?.at(-1)?.id ?? 'plan-1',
   );
-  const [capError, setCapError] = useState(false);
+  const [capError, setCapError] = useState(initialCapError);
   const capTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const active = plans.find((plan) => plan.id === activeId) ?? plans[0];
@@ -271,21 +276,14 @@ export function RecurringDaysScreen({
         />
 
         <View style={styles.calendar}>
-          <View style={styles.row}>
-            <View style={styles.days}>
-              {WEEKDAY_LABELS.map((label) => (
-                <Text
-                  key={label}
-                  variant="bodyLargeStrong"
-                  color="textPrimary"
-                  align="center"
-                  style={[styles.column, styles.weekday]}
-                >
+          <View style={styles.weekdays}>
+            {WEEKDAY_LABELS.map((label) => (
+              <View key={label} style={[styles.column, styles.weekday]}>
+                <Text variant="bodyLargeStrong" color="textPrimary" align="center">
                   {label}
                 </Text>
-              ))}
-            </View>
-            <View style={styles.monthColumn} />
+              </View>
+            ))}
           </View>
 
           <DayGrid
@@ -297,6 +295,8 @@ export function RecurringDaysScreen({
             onApply={apply}
           />
         </View>
+
+        <DaysLegend />
 
         {capError ? (
           <View
@@ -314,6 +314,8 @@ export function RecurringDaysScreen({
             </Text>
           </View>
         ) : null}
+
+        <HelpFab />
       </View>
     </Screen>
   );
@@ -397,12 +399,7 @@ function DayGrid({ rows, selected, locked, startId, endId, onApply }: DayGridPro
                 ),
               )}
             </View>
-            <Text
-              variant="bodyLargeStrong"
-              color="textPrimary"
-              align="center"
-              style={[styles.monthColumn, styles.month]}
-            >
+            <Text variant="bodyLargeStrong" color="textPrimary" align="center" style={styles.month}>
               {row.monthLabel}
             </Text>
           </View>
@@ -440,9 +437,10 @@ class SweepTracker {
     rows: DayGridProps['rows'],
   ): { readonly id: string; readonly intent: SweepIntent } | null {
     if (this.width === 0) return null;
-    // Seven date columns `CELL_GAP` apart, then the month column flush after them: every column
-    // is (width − the six gaps) / 8 wide, so a date column and its gap step by that plus `CELL_GAP`.
-    const pitch = (this.width - (DAY_COLUMNS - 1) * CELL_GAP) / (DAY_COLUMNS + 1) + CELL_GAP;
+    // Seven date columns `CELL_GAP` apart across the width the month column leaves free, so a
+    // date column and its gap step by one column's width plus `CELL_GAP`.
+    const pitch =
+      (this.width - DATES_INSET_RIGHT - (DAY_COLUMNS - 1) * CELL_GAP) / DAY_COLUMNS + CELL_GAP;
     const column = Math.floor(x / pitch);
     const row = Math.floor(y / (ROW_HEIGHT + CELL_GAP));
     if (column < 0 || column >= DAY_COLUMNS || row < 0) return null;
@@ -506,47 +504,53 @@ function DayCell({ day, selected, locked, edge, onToggle }: DayCellProps) {
 }
 
 /**
- * The `Calendar` component (`587:4463`, 365 × 235): seven date columns 5 apart, then the month
- * column flush against Sunday — eight columns of equal width, with no gap before the month.
+ * `Calendar/Variant2` (`1047:6167`, 370 × 255): a 40pt weekday row, then the date rows. The seven
+ * date columns share the width the month column leaves free — `1047:6170` stops 41.88 short of the
+ * right edge — and sit 5 apart; the month sits in its own 41.875pt column at `left: 323`
+ * (`1047:6213`), which is 5.125 short of the edge and tucks 5pt under the last date column.
  */
 const DAY_COLUMNS = 7;
 const CELL_GAP = 5;
-/** `587:4381` — each date row is 39 tall, 5 apart; the weekday row above is 20, with no gap. */
+const DATES_INSET_RIGHT = 41.875;
+const MONTH_WIDTH = 41.875;
+const MONTH_RIGHT = 5.125;
+/** `1047:6222` — the weekday row is a 20pt line with py 10 either side. */
+const WEEKDAY_HEIGHT = 40;
+/** `1047:6170` — each date row is 39 tall, 5 apart. */
 const ROW_HEIGHT = 39;
 /**
- * `587:4381` — the grid always holds five rows (215): a 21-day window split at a month change can
+ * `1047:6170` — the grid always holds five rows (215): a 21-day window split at a month change can
  * need five, and keeping the room means nothing below the calendar moves when it does.
  */
 const MAX_ROWS = 5;
-/** `587:4463` — 365 wide in the 370 content box. */
-const CALENDAR_INSET_RIGHT = 5;
-/** `149:1807` — the 32pt selection disc, 4 below the row top so the number sits 10 down. */
+/**
+ * `334:6411` — the 32pt selection disc, 4 below the row top so the number sits 10 down. (`340:6550`
+ * draws the same discs 8 lower; that frame's loose layers are the ones out of line, since
+ * `334:6406`, the older `149:1807` and the numeral's own 10pt padding all agree on 4.)
+ */
 const DISC = 32;
 const DISC_TOP = 4;
 
 const styles = StyleSheet.create({
-  /** `340:6553` — p 16 all round, 24 between the plan header, the calendar and the error. */
+  /** `340:6553` — p 16 all round, 24 between the plan header, the calendar, the legend and the error. */
   content: { flex: 1, padding: lightTheme.space.lg, gap: lightTheme.space.xl },
-  /** `587:4463` — the weekday row, then the date rows straight under it. */
-  calendar: { marginRight: CALENDAR_INSET_RIGHT },
+  /** `1047:6167` — the weekday row, then the date rows straight under it. */
+  calendar: {},
+  weekdays: { flexDirection: 'row', marginRight: DATES_INSET_RIGHT, gap: CELL_GAP },
   grid: { gap: CELL_GAP, minHeight: MAX_ROWS * ROW_HEIGHT + (MAX_ROWS - 1) * CELL_GAP },
   row: { flexDirection: 'row' },
-  /**
-   * The seven date columns and their six gaps. Grown 7 : 1 against the month column from a basis
-   * of the gaps, so every column — the month's included — lands on the same width.
-   */
-  days: {
-    flexDirection: 'row',
-    gap: CELL_GAP,
-    flexGrow: DAY_COLUMNS,
-    flexBasis: (DAY_COLUMNS - 1) * CELL_GAP,
-  },
-  /** `587:4438` — the month column, flush against Sunday. */
-  monthColumn: { flexGrow: 1, flexBasis: 0, alignItems: 'center' },
+  /** `1047:6170` — the seven date columns and their six gaps, short of the month column. */
+  days: { flex: 1, flexDirection: 'row', gap: CELL_GAP, marginRight: DATES_INSET_RIGHT },
   column: { flex: 1, alignItems: 'center' },
-  weekday: { height: 20 },
-  /** `587:4439` — the month sits on the dates' text line: 10 down a 39 row. */
-  month: { height: ROW_HEIGHT, paddingTop: 10 },
+  weekday: { height: WEEKDAY_HEIGHT, justifyContent: 'center' },
+  /** `1047:6213` — the month sits on the dates' text line: 10 down a 39 row. */
+  month: {
+    position: 'absolute',
+    right: MONTH_RIGHT,
+    width: MONTH_WIDTH,
+    height: ROW_HEIGHT,
+    paddingTop: 10,
+  },
   disc: {
     width: DISC,
     height: DISC,

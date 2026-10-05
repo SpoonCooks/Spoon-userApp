@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
@@ -17,23 +18,32 @@ import {
 } from '../data';
 import type { RecurringBusyWindow } from '../data';
 import type { RecurringTimeOfDay, RecurringVisitChoice } from '../types';
+import { DurationCarousel } from './DurationCarousel';
 
 /**
- * The three choices that schedule a visit, opening one after another: time of the day, then
- * duration, then start time — Schedule (`288:516`, `332:5718`) and Edit date (`494:676`).
+ * The three choices that schedule a visit, opening one after another: duration, then time of the
+ * day, then start time — Schedule (`340:7110` → `340:7455` → `288:516`), Visit addition
+ * (`332:5921` → `332:5718`) and Edit date (`494:676`).
  *
- * Changing the time of day clears the start time, whose options depend on it. Anything that
- * would overlap `busy` is greyed out, and a duration with no free start left in the band greys
- * too. Rendered as three siblings so they take the screen's own 24pt spacing.
+ * The frames stack them Duration, Time, Start time (`288:401`, `288:516`, `340:7455`, `332:5921`,
+ * `332:5718`; only the older `340:7539` has Time first) and `340:7110` opens on Duration alone.
+ * Duration is the carousel (`DurationCarousel`): the card it rests on is the choice, and the next
+ * section opens once it has one. A time of day chosen later keeps the duration; a changed one
+ * keeps the time of day, and either clears a start time that no longer fits.
  *
- * Durations and prices come from the catalogue, and once a duration is picked the start times are
- * asked of `POST /v1/recurring/start-times` for this visit's days: a start is offered only when a
- * pool Cook can take it on EVERY one of them (`coverage: 'all'`). The design draws no "some days"
- * state, so a partly free start is greyed like a taken one. Until the backend answers, every start
- * in the band is offered, as before — the save re-checks each visit either way.
+ * Anything that would overlap `busy` is greyed out, a duration with no free start left in the
+ * band greys too, and so does a time of day with none left for the chosen duration. Rendered as
+ * siblings so they take the screen's own spacing.
+ *
+ * Durations and prices come from the catalogue, and once a time of day is picked the start times
+ * are asked of `POST /v1/recurring/start-times` for this visit's days: a start is offered only
+ * when a pool Cook can take it on EVERY one of them (`coverage: 'all'`). The design draws no "some
+ * days" state, so a partly free start is greyed like a taken one. Until the backend answers, every
+ * start in the band is offered, as before — the save re-checks each visit either way.
  */
 export interface VisitChoicesProps {
-  readonly initial?: RecurringVisitChoice | undefined;
+  /** A choice already saved, or the part of one already made (the dev preview's states). */
+  readonly initial?: Partial<RecurringVisitChoice> | undefined;
   /** The cook's other visits on these days. */
   readonly busy: readonly RecurringBusyWindow[];
   /** The days this visit runs on — what its start times are asked about. */
@@ -42,9 +52,21 @@ export interface VisitChoicesProps {
   readonly timeLabel: string;
   /** The complete choice, or null while one is still missing. */
   readonly onChange: (choice: RecurringVisitChoice | null) => void;
+  /**
+   * Whether the Start time grid is showing. The frames tighten the screen's spacing from 24 to 16
+   * once it is (`288:516` against `288:401`), so the screen needs to know.
+   */
+  readonly onStartTimesShown?: ((shown: boolean) => void) | undefined;
 }
 
-export function VisitChoices({ initial, busy, dayIds, timeLabel, onChange }: VisitChoicesProps) {
+export function VisitChoices({
+  initial,
+  busy,
+  dayIds,
+  timeLabel,
+  onChange,
+  onStartTimesShown,
+}: VisitChoicesProps) {
   const planning = useRecurringPlanning();
   const [timeOfDay, setTimeOfDay] = useState<RecurringTimeOfDay | null>(initial?.timeOfDay ?? null);
   const [durationId, setDurationId] = useState<string | null>(initial?.durationId ?? null);
@@ -80,16 +102,15 @@ export function VisitChoices({ initial, busy, dayIds, timeLabel, onChange }: Vis
     );
   };
 
-  /** A duration is open while some start in the band still fits around the other visits. */
-  const durationOpen = (band: RecurringTimeOfDay, id: string) =>
-    startTimesFor(band).some((start) => !clashes(start, durationMinutes(id), busy));
+  /** Whether some start in `band` still fits `minutes` around the other visits. */
+  const bandFits = (band: RecurringTimeOfDay, minutes: number) =>
+    startTimesFor(band).some((start) => !clashes(start, minutes, busy));
+  /** A duration is open while some start still fits it — in the chosen band, or in any. */
+  const durationOpen = (id: string) =>
+    timeOfDay === null
+      ? TIME_OF_DAY_BANDS.some((band) => bandFits(band.id, durationMinutes(id)))
+      : bandFits(timeOfDay, durationMinutes(id));
 
-  const pickTimeOfDay = (next: RecurringTimeOfDay) =>
-    commit(
-      next,
-      durationId !== null && durationOpen(next, durationId) ? durationId : null,
-      next === timeOfDay ? startMinutes : null,
-    );
   const pickDuration = (next: string) =>
     commit(
       timeOfDay,
@@ -98,9 +119,36 @@ export function VisitChoices({ initial, busy, dayIds, timeLabel, onChange }: Vis
         ? startMinutes
         : null,
     );
+  const pickTimeOfDay = (next: RecurringTimeOfDay) =>
+    commit(next, durationId, next === timeOfDay ? startMinutes : null);
+
+  const startShown = timeOfDay !== null && durationId !== null;
+  useEffect(() => {
+    onStartTimesShown?.(startShown);
+  }, [onStartTimesShown, startShown]);
 
   return (
     <>
+      {/*
+       * The steps open in the order of the frames' names — Time, Duration, Slot (`229:1802`,
+       * `288:401`, `288:516`) — but the Duration carousel is drawn ABOVE the time pills: choosing a
+       * time of the day opens it over them and the pills move down, as `288:401` shows against
+       * `229:1802`.
+       */}
+      {timeOfDay === null ? null : (
+        <Section title="Duration" style={styles.durationSection}>
+          <DurationCarousel
+            options={planning.durations.map((option) => ({
+              ...option,
+              disabled: !durationOpen(option.id),
+            }))}
+            selectedId={durationId}
+            onSelect={pickDuration}
+            bleed={lightTheme.space.lg}
+          />
+        </Section>
+      )}
+
       <Section title={timeLabel}>
         <View style={styles.row}>
           {TIME_OF_DAY_BANDS.map((band) => (
@@ -109,29 +157,12 @@ export function VisitChoices({ initial, busy, dayIds, timeLabel, onChange }: Vis
               id={band.id}
               label={band.label}
               selected={band.id === timeOfDay}
+              disabled={durationId !== null && !bandFits(band.id, durationMinutes(durationId))}
               onPress={() => pickTimeOfDay(band.id)}
             />
           ))}
         </View>
       </Section>
-
-      {timeOfDay === null ? null : (
-        <Section title="Duration">
-          <Grid columns={3} gap={DURATION_GAP}>
-            {planning.durations.map((option) => (
-              <DurationTile
-                key={option.id}
-                label={option.label}
-                price={option.price}
-                strikePrice={option.strikePrice}
-                selected={option.id === durationId}
-                disabled={!durationOpen(timeOfDay, option.id)}
-                onPress={() => pickDuration(option.id)}
-              />
-            ))}
-          </Grid>
-        </Section>
-      )}
 
       {timeOfDay === null || durationId === null ? null : (
         <Section title="Start time">
@@ -164,13 +195,15 @@ function minutesOf(time: string): number {
 /** `288:520` / `288:550` / `288:583` — a Body 14/20 label, 8 above its options. */
 function Section({
   title,
+  style,
   children,
 }: {
   readonly title: string;
+  readonly style?: StyleProp<ViewStyle>;
   readonly children: React.ReactNode;
 }) {
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, style]}>
       <Text variant="bodyLarge" color="textPrimary">
         {title}
       </Text>
@@ -225,19 +258,21 @@ function TimePill({
   id,
   label,
   selected,
+  disabled = false,
   onPress,
 }: ChoiceProps & { readonly id: RecurringTimeOfDay; readonly label: string }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      disabled={disabled}
+      accessibilityState={{ selected, disabled }}
       accessibilityLabel={label}
       style={[
         styles.pill,
         id === 'afternoon' ? styles.pillNarrow : styles.pillWide,
-        selected ? styles.choiceSelected : styles.choiceIdle,
-        selected ? styles.pillLift : null,
+        choiceTone(selected, disabled),
+        selected && !disabled ? styles.pillLift : null,
       ]}
       testID={`recurring-time-${id}`}
     >
@@ -245,47 +280,6 @@ function TimePill({
       <Text variant="bodyLargeStrong" color="textPrimary">
         {label}
       </Text>
-    </Pressable>
-  );
-}
-
-/** `288:552` — 60 tall, p 8, the label over a struck price and the price, 8 apart. */
-function DurationTile({
-  label,
-  price,
-  strikePrice,
-  selected,
-  disabled = false,
-  onPress,
-}: ChoiceProps & {
-  readonly label: string;
-  readonly price: string;
-  readonly strikePrice?: string | undefined;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      disabled={disabled}
-      accessibilityState={{ selected, disabled }}
-      accessibilityLabel={
-        strikePrice === undefined ? `${label}, ${price}` : `${label}, ${price}, was ${strikePrice}`
-      }
-      style={[styles.duration, choiceTone(selected, disabled)]}
-    >
-      <Text variant="headingBold" color="textPrimary">
-        {label}
-      </Text>
-      <View style={styles.priceRow}>
-        {strikePrice === undefined ? null : (
-          <Text variant="bodyStrong" color="textSubdued" style={styles.strike}>
-            {strikePrice}
-          </Text>
-        )}
-        <Text variant="bodyStrong" color="textPrimary">
-          {price}
-        </Text>
-      </View>
     </Pressable>
   );
 }
@@ -318,13 +312,16 @@ function choiceTone(selected: boolean, disabled: boolean) {
   return selected ? styles.choiceSelected : styles.choiceIdle;
 }
 
-/** `288:550` — three 115.33 tiles across 370: 12 apart, both ways. */
-const DURATION_GAP = 12;
 /** `288:583` — four 86.5 chips across 370: 8 apart, both ways. */
 const SLOT_GAP = 8;
 
 const styles = StyleSheet.create({
   section: { gap: lightTheme.space.sm },
+  /**
+   * `1242:5390` — a fixed 240: the label, 8, and the carousel's 192 (strip, 12, dots), which the
+   * frame draws on top of the section rather than in it, leaving 20 clear below.
+   */
+  durationSection: { minHeight: 240 },
   row: { flexDirection: 'row', gap: 12 },
   cell: { flex: 1 },
   pill: {
@@ -343,16 +340,6 @@ const styles = StyleSheet.create({
   choiceIdle: { backgroundColor: lightTheme.colors.surfaceAccent },
   choiceSelected: { backgroundColor: lightTheme.colors.surfaceBrandTint },
   choiceDisabled: { backgroundColor: lightTheme.colors.surfaceDisabledSoft },
-  duration: {
-    height: 60,
-    padding: lightTheme.space.sm,
-    gap: lightTheme.space.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: lightTheme.radius.xs,
-  },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.sm },
-  strike: { textDecorationLine: 'line-through' },
   slot: {
     padding: lightTheme.space.sm,
     alignItems: 'center',

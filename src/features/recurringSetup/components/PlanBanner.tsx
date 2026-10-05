@@ -25,6 +25,7 @@ export interface PlanBannerProps {
 
 export function PlanBanner({ planNumber, subtitle, testID }: PlanBannerProps) {
   const gradient = lightTheme.gradients.planBanner;
+  const rim = lightTheme.gradients.planBannerRim;
   const axis = gradientAxis(gradient.angleDeg, BANNER_WIDTH, BANNER_HEIGHT);
   return (
     <View style={styles.lift} testID={testID}>
@@ -35,6 +36,23 @@ export function PlanBanner({ planNumber, subtitle, testID }: PlanBannerProps) {
           start={axis.start}
           end={axis.end}
           style={StyleSheet.absoluteFill}
+        />
+        {/* `364:520` — the edge is a stroke that fades out down the card. With no gradient border
+            in React Native it is a ring: the rim gradient over the card, then the card's own fill
+            again, inset by the stroke's width. */}
+        <LinearGradient
+          colors={rim.colors}
+          locations={rim.locations}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={gradient.colors}
+          locations={gradient.locations}
+          start={axis.start}
+          end={axis.end}
+          style={styles.inner}
         />
         {/* `364:534` — Livvic Bold 140 in `#FFE666`, its left edge at x 237.5 and its line box
             33 above the card's top, so the numeral runs off the bottom edge. */}
@@ -61,21 +79,29 @@ export function PlanBanner({ planNumber, subtitle, testID }: PlanBannerProps) {
 const BANNER_WIDTH = 370;
 const BANNER_HEIGHT = 88;
 const RADIUS = 24;
+/** `364:520` — the stroke's width. */
+const EDGE = 1.5;
 
 const styles = StyleSheet.create({
-  /** The drop shadow lives on an unclipped wrapper: the card clips its children, and its shadow. */
-  lift: { borderRadius: RADIUS, boxShadow: innerShadows.planBanner },
-  /** `364:520` — p 8, 16 between the calendar and the text, a 1.5pt `#FFF7CC` edge. */
+  /** The lift (`Elevation/1`) lives on an unclipped wrapper: the card clips its children, and its shadow. */
+  lift: { borderRadius: RADIUS, boxShadow: innerShadows.elevation1 },
+  /** `364:520` — p 8, 16 between the calendar and the text, a 1.5pt edge (`inner` is inside it). */
   card: {
     height: BANNER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     gap: lightTheme.space.lg,
-    padding: lightTheme.space.sm,
+    padding: lightTheme.space.sm + EDGE,
     borderRadius: RADIUS,
-    borderWidth: 1.5,
-    borderColor: lightTheme.colors.borderPlanTile,
     overflow: 'hidden',
+  },
+  inner: {
+    position: 'absolute',
+    top: EDGE,
+    left: EDGE,
+    right: EDGE,
+    bottom: EDGE,
+    borderRadius: RADIUS - EDGE,
   },
   /**
    * Line height is set to Livvic Bold's own "normal" — (ascender 1005 + descender 250) / 1000 em =
@@ -84,8 +110,8 @@ const styles = StyleSheet.create({
    */
   ghost: {
     position: 'absolute',
-    left: 237.5,
-    top: -33,
+    left: 237.5 + EDGE,
+    top: -33 + EDGE,
     fontFamily: lightTheme.typography.titleNav.fontFamily,
     fontSize: 140,
     lineHeight: 175.7,
