@@ -120,6 +120,14 @@ is deliberately permissive and the screen degrades to a sparse card. Non-blockin
 and the Profile "Help" tile still have nowhere to go (the long-standing product blocker B-10, now
 visible in the contract).
 
+**BE-5 — the redesigned Home has no read.** `src/features/homeRedesign` (Figma
+`cCQlzTeiObQkpVBzwI8mZi`) renders `HomeModel` from fixtures (`@/demo/fixtures/homeRedesign`)
+through `useDevFixture`, reachable only at the `__DEV__` route `(dev)/home-redesign`. Needed:
+serviceability for the address pincode, `user.hasCompletedBooking`, instant `{available, etaMins}`,
+per-duration pricing (paise), `user.cookPool[]`, `user.activeRecurringPlan`, live hubs, and the
+pincode waitlist `{countForPincode, launchThreshold, joined}` plus an idempotent `{userId, pincode}`
+register (push, SMS fallback). Listed in `ALLOWED_PENDING` (`src/__tests__/productionDataPath.test.ts`).
+
 ### BACKEND_DEPLOYMENT_GAP
 
 **DEP-4 — DEPLOYMENT DRIFT: Render is running older code than `D:\spoon-backend`. Blocking for
@@ -344,6 +352,10 @@ repo's own `rzp_test` sandbox key, with the publishable `keyId` on the response 
   needs changing, or the policy does.
 - **Meal brief has no store.** The catalogue publishes its BOUNDS (guest range, four-valued diet
   axis) but no endpoint persists a brief.
+- **Redesigned Home — open rules.** The dial's recommendation formula (`recommendDuration` is a
+  placeholder tuned to the frame), the share-sheet copy and store link, and the destinations not
+  built yet (confirm step, tax dialog, recurring flow, plan tracker, explainer, cook pool, cook
+  profile).
 
 ---
 

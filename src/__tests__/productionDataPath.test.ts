@@ -34,6 +34,10 @@ const ALLOWED_PENDING = new Set([
   // The meal brief: no endpoint persists a draft, and the catalogue publishes only its BOUNDS
   // (guest count, diet axis). PRODUCT_DECISION_PENDING on where a brief is stored.
   'src/features/mealBrief/data.ts',
+  // The redesigned Home (`cCQlzTeiObQkpVBzwI8mZi`): no endpoint serves serviceability, the cook
+  // pool, the recurring plan or the pincode waitlist yet. BACKEND_GAP BE-5. Its only screen is the
+  // `__DEV__`-only `(dev)/home-redesign` route.
+  'src/features/homeRedesign/data.ts',
 ]);
 
 describe('production data path', () => {
