@@ -1,16 +1,19 @@
 /**
  * Feature: homeRedesign — the new Home from Figma `cCQlzTeiObQkpVBzwI8mZi`.
  *
- * Frontend logic is wired from the frames' dev notes; data is a fixture until the endpoint
- * exists. The live Home (`@features/home`) is untouched.
+ * Wired to the live API (see `adapters.ts`) and routed at `/home`. Gaps with no endpoint yet are
+ * empty by design; `@features/home` (the old Home) is no longer routed.
  */
-export { HomeRedesignScreen, HomeRedesignView } from './screens/HomeRedesignScreen';
+export { HomeRedesignView } from './screens/HomeRedesignScreen';
 export type {
   BookingRequest,
   HomeRedesignActions,
-  HomeRedesignScreenProps,
   HomeRedesignViewProps,
 } from './screens/HomeRedesignScreen';
+export { useHomeRedesignData } from './data';
+export type { HomeRedesignData } from './data';
+export { useJoinWaitlist } from './api/waitlistApi';
+export { homeModelFrom } from './adapters';
 export { resolveHomeVariant } from './state/variant';
 export { joinWaitlist } from './state/waitlist';
 export type { JoinWaitlistDeps, WaitlistChannel } from './state/waitlist';

@@ -74,24 +74,27 @@ export function NotLiveCard({
             </Text>
           </View>
 
-          <View style={styles.meter}>
-            <View style={styles.waiting}>
-              <View style={styles.avatars}>
-                <Avatar letter="A" color="#FFD6DB" overlap />
-                <Avatar letter="R" color="#D4F5E3" overlap />
-                <Avatar letter="S" color="#D6EDFF" />
+          {/* Hidden until the backend publishes the pincode's demand count. */}
+          {waitlist.countForPincode === null ? null : (
+            <View style={styles.meter}>
+              <View style={styles.waiting}>
+                <View style={styles.avatars}>
+                  <Avatar letter="A" color="#FFD6DB" overlap />
+                  <Avatar letter="R" color="#D4F5E3" overlap />
+                  <Avatar letter="S" color="#D6EDFF" />
+                </View>
+                <Text style={styles.waitingText}>
+                  {`${waitlist.countForPincode} neighbours near you are waiting`}
+                </Text>
               </View>
-              <Text style={styles.waitingText}>
-                {`${waitlist.countForPincode} neighbours near you are waiting`}
+              <View style={styles.track}>
+                <View style={[styles.fill, { width: `${waitlistProgress(waitlist) * 100}%` }]} />
+              </View>
+              <Text style={styles.meterNote}>
+                {`Every share and notify brings Spoon closer to ${pincode}`}
               </Text>
             </View>
-            <View style={styles.track}>
-              <View style={[styles.fill, { width: `${waitlistProgress(waitlist) * 100}%` }]} />
-            </View>
-            <Text style={styles.meterNote}>
-              {`Every share and notify brings Spoon closer to ${pincode}`}
-            </Text>
-          </View>
+          )}
 
           <View style={styles.notify}>
             <Image source={ART.bell} style={styles.bell} />

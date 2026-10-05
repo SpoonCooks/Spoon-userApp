@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { Image, LayoutAnimation, ScrollView, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { QueryBoundary } from '@ui';
 
 import { ART } from '../assets';
 import { BookSection } from '../components/BookSection';
@@ -22,7 +19,6 @@ import { Toast } from '../components/Toast';
 import type { ToastHandle } from '../components/Toast';
 import { TaxDetailsDialog } from '../components/TaxDetailsDialog';
 import { SHARE_MESSAGE } from '../content';
-import { useHomeRedesignData } from '../data';
 import { shareSpoon } from '../share';
 import { canBook, ctaKind, draftReducer, initialDraft } from '../state/bookingDraft';
 import type { BookingDraft, BookingMode } from '../state/bookingDraft';
@@ -58,11 +54,15 @@ export interface HomeRedesignActions {
    * duration pre-selected so only slots and payment remain.
    */
   readonly onPickSlot: (request: BookingRequest) => void;
-  /** The recurring chip: recurring flow, plan tracker or explainer. */
-  readonly onPressRecurring: (target: RecurringTarget) => void;
-  readonly onPressCookPool: () => void;
+  /**
+   * The recurring chip: recurring flow, plan tracker or explainer. Returns `false` for a
+   * destination that does not exist yet, and the screen says "coming soon" instead of nothing.
+   */
+  readonly onPressRecurring: (target: RecurringTarget) => boolean;
+  /** Absent while the cook pool screen does not exist — the chip then says "coming soon". */
+  readonly onPressCookPool?: () => void;
   /** Bead → cook profile (proposed in the dev note). */
-  readonly onPressPoolCook: (cook: PoolCook) => void;
+  readonly onPressPoolCook?: (cook: PoolCook) => void;
   /**
    * "Notify me" — idempotent register for {user, pincode}, asking notification permission at
    * the tap (see `joinWaitlist`). Rejects only if the register fails.
@@ -83,6 +83,10 @@ export interface HomeRedesignActions {
 export interface HomeRedesignViewProps extends HomeRedesignActions {
   readonly model: HomeModel;
   readonly initialMode?: BookingMode;
+  /** A booking is being created / checkout is open — the CTA holds still. */
+  readonly bookingBusy?: boolean;
+  /** One-line messages from the route (a refused booking, say). A new `id` shows it again. */
+  readonly notice?: { readonly id: number; readonly message: string } | null;
 }
 
 /**
@@ -94,7 +98,13 @@ export interface HomeRedesignViewProps extends HomeRedesignActions {
  *              `1290:1280`  on Recurring the duration strip and CTA give way to that block
  *   inactive   `1302:3539`  not live — waitlist + referral, no booking path, read-only dial
  */
-export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesignViewProps) {
+export function HomeRedesignView({
+  model,
+  initialMode,
+  bookingBusy = false,
+  notice = null,
+  ...actions
+}: HomeRedesignViewProps) {
   const { top, bottom } = useSafeAreaInsets();
   const variant = resolveHomeVariant(model);
   const scroll = useRef<ScrollView>(null);
@@ -134,7 +144,15 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
   const selectedOption = model.durations.find((d) => d.id === draft.selectedDurationId);
   const selectedId =
     selectedOption !== undefined && available(selectedOption) ? selectedOption.id : null;
-  const bookable = canBook({ ...draft, selectedDurationId: selectedId });
+  const bookable = canBook({ ...draft, selectedDurationId: selectedId }) && !bookingBusy;
+
+  const noticeId = notice?.id;
+  const noticeMessage = notice?.message;
+  useEffect(() => {
+    if (noticeMessage !== undefined) toast.current?.show(noticeMessage);
+  }, [noticeId, noticeMessage]);
+
+  const comingSoon = () => toast.current?.show('Coming soon.');
 
   const lostSelection = draft.selectedDurationId !== null && selectedId === null;
   useEffect(() => {
@@ -286,9 +304,11 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
             <RecurringPool
               beads={poolBeads(model)}
               chip={recurringChipFor(model)}
-              onPressChip={() => actions.onPressRecurring(recurringChipFor(model).target)}
-              onPressCookPool={actions.onPressCookPool}
-              onPressCook={actions.onPressPoolCook}
+              onPressChip={() => {
+                if (!actions.onPressRecurring(recurringChipFor(model).target)) comingSoon();
+              }}
+              onPressCookPool={actions.onPressCookPool ?? comingSoon}
+              onPressCook={actions.onPressPoolCook ?? comingSoon}
             />
           ) : null}
 
@@ -321,37 +341,6 @@ export function HomeRedesignView({ model, initialMode, ...actions }: HomeRedesig
         onClose={() => setTaxOpen(false)}
         gstPercent={model.tax.gstPercent}
       />
-    </View>
-  );
-}
-
-export interface HomeRedesignScreenProps extends HomeRedesignActions {
-  /** The payload to serve until the endpoint exists (dev fixture). */
-  readonly sample: HomeModel;
-  readonly initialMode?: BookingMode;
-}
-
-/** Re-reads Home on every focus, which re-resolves the variant (address or history changes). */
-export function HomeRedesignScreen({ sample, initialMode, ...actions }: HomeRedesignScreenProps) {
-  const { state, refetch } = useHomeRedesignData(sample);
-  useFocusEffect(
-    useCallback(() => {
-      refetch();
-    }, [refetch]),
-  );
-
-  return (
-    <View style={styles.screen}>
-      <QueryBoundary state={state} onRetry={refetch}>
-        {(model) => (
-          <HomeRedesignView
-            model={model}
-            {...(initialMode === undefined ? {} : { initialMode })}
-            onRefreshAvailability={refetch}
-            {...actions}
-          />
-        )}
-      </QueryBoundary>
     </View>
   );
 }

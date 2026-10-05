@@ -2,8 +2,9 @@ import type { Waitlist } from '../types';
 
 /** Meter fill = count / threshold, capped at 100 %. A missing or zero threshold reads as empty. */
 export function waitlistProgress(waitlist: Pick<Waitlist, 'countForPincode' | 'launchThreshold'>) {
-  if (!(waitlist.launchThreshold > 0)) return 0;
-  return Math.min(1, Math.max(0, waitlist.countForPincode / waitlist.launchThreshold));
+  const { countForPincode: count, launchThreshold: threshold } = waitlist;
+  if (count === null || threshold === null || !(threshold > 0)) return 0;
+  return Math.min(1, Math.max(0, count / threshold));
 }
 
 export type WaitlistChannel = 'push' | 'sms';

@@ -50,8 +50,9 @@ export interface LiveHub {
 }
 
 export interface Waitlist {
-  readonly countForPincode: number;
-  readonly launchThreshold: number;
+  /** `null` until the backend publishes the pincode's demand — the meter is then hidden. */
+  readonly countForPincode: number | null;
+  readonly launchThreshold: number | null;
   readonly joined: boolean;
 }
 

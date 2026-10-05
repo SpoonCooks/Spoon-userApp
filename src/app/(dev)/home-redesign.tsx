@@ -2,7 +2,7 @@ import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 
-import { HomeRedesignScreen, joinWaitlist } from '@features/homeRedesign';
+import { HomeRedesignView, joinWaitlist } from '@features/homeRedesign';
 import type { BookingMode, HomeModel } from '@features/homeRedesign';
 import { formatPaise } from '@core/format';
 import { getLogger } from '@core/logging';
@@ -38,7 +38,10 @@ const pending = (destination: string, detail?: string) =>
   Alert.alert(`→ ${destination}`, detail ?? 'Not built yet in this preview.');
 
 /**
- * The redesigned Home — DEVELOPMENT ONLY. Reachable at `spoon://home-redesign`.
+ * The redesigned Home on FIXTURES — DEVELOPMENT ONLY. Reachable at `spoon://home-redesign`.
+ *
+ * `/home` renders the same view on live data; this route keeps every state reviewable without
+ * an account in that state (not live, a full pool, unavailable durations, pricing failures).
  *
  * No backend, so it lives outside the authenticated shell and refuses to render outside
  * `__DEV__`. `?state=` picks the payload; the variant is then RESOLVED from it, as on the real
@@ -78,10 +81,10 @@ export default function HomeRedesignDevRoute() {
       : undefined;
 
   return (
-    <HomeRedesignScreen
+    <HomeRedesignView
       // Remount on a new link so each case opens fresh rather than keeping the last one's state.
       key={`${key}-${mode ?? ''}`}
-      sample={sample}
+      model={sample}
       {...(mode === undefined ? {} : { initialMode: mode })}
       onPressAddress={() => router.push('/address?from=home')}
       onPressProfile={() => router.push('/profile')}
@@ -93,15 +96,16 @@ export default function HomeRedesignDevRoute() {
       }
       onPickSlot={() => router.push('/scheduled')}
       onDurationSelected={(event) => getLogger('home-redesign').info('duration_selected', event)}
-      onPressRecurring={(target) =>
+      onPressRecurring={(target) => {
         pending(
           {
             recurringFlow: 'Recurring flow',
             planTracker: 'Plan tracker',
             explainer: 'Recurring explainer',
           }[target],
-        )
-      }
+        );
+        return true;
+      }}
       onPressCookPool={() => pending('Cook pool screen')}
       onPressPoolCook={(cook) => pending('Cook profile', cook.name)}
       onJoinWaitlist={async (pincode) => {
