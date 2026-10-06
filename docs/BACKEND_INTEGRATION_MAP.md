@@ -134,8 +134,9 @@ eligibility (Home's chip, times of day, base/effective prices), the 21-day calen
 time of day with the Plan's other visits (`sameDayVisits`), the multi-Plan quote and save, UPI
 Autopay start/verify (re-approval included), visit and whole-booking cancellation with quotes and
 reasons, and visit prep checks. Gaps on the app side:
-- The Autopay step after "Book Now" has no Figma design, so `useBookRecurring` (save → mandate →
-  Razorpay recurring checkout → verify) is built and tested but not rendered.
+- The Autopay step after "Book Now" and the confirmation after it have no Figma frames; they are
+  built from the spec's Step 8 with the flow's own components (`RecurringAutopayScreen`,
+  `RecurringBookedScreen`) and run save → mandate → Razorpay recurring checkout → verify.
 - The Live booking / Manage plans / visit-details screens are not on this branch.
 - None of it has run against a live backend: the routes exist only on the unmerged V0 branch.
 
