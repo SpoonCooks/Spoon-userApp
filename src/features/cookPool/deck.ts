@@ -1,7 +1,9 @@
 /**
- * The deck's order: a loop. Every swipe — skip or add — sends the cook to the back, so once every
- * card has been seen the first comes round again, with no reload, and the deck never runs out.
- * A cook added stays in the loop; adding them again changes nothing in the pool.
+ * The deck's order: a loop of the candidates (`GET /v1/me/cooks/candidates` — cooks who have
+ * served the household and are not in its pool). A skip sends the cook to the back, so once every
+ * card has been seen the first comes round again, with no reload. An add takes the cook out of
+ * the loop: they are in the pool now, which is exactly what makes a cook stop being a candidate.
+ * The deck runs out only once every cook in it has been added.
  *
  * Undo skip brings back the last cook skipped, to the front, however many swipes ago that was.
  * A skipped cook later added is no longer theirs to undo.
@@ -38,11 +40,11 @@ export function skipCook(deck: DeckLoop, cookId: string): DeckLoop {
   };
 }
 
-/** Sends the cook to the back of the loop, out of Undo's reach. Not in it: unchanged. */
+/** Takes the cook out of the loop, and out of Undo's reach. Not in it: unchanged. */
 export function addCook(deck: DeckLoop, cookId: string): DeckLoop {
   if (!deck.ring.includes(cookId)) return deck;
   return {
-    ring: [...deck.ring.filter((id) => id !== cookId), cookId],
+    ring: deck.ring.filter((id) => id !== cookId),
     skipped: deck.skipped.filter((id) => id !== cookId),
     enteringId: null,
     turn: deck.turn + 1,

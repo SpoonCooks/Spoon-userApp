@@ -6,8 +6,8 @@ import type { CookMenuSection, CookPoolState, ServedCook } from '@features/cookP
  * DEMO FIXTURES — NOT PRODUCTION DATA.
  *
  * The Cook Pool as a household that has been served by four cooks and has not built its pool yet
- * (`844:5842`). No endpoint lists served cooks with their menus, so this stands in for one; see
- * `docs/COOK_POOL_BACKEND.md`.
+ * (`844:5842`) — the dev preview's local store (`createDemoCookPoolSource`), which runs with no
+ * session. The app reads the same screens from DEC-085's `/v1/me/cooks` routes.
  *
  * Every dish shows the one sample plate the frames draw (`755:2365`).
  */
@@ -117,5 +117,4 @@ export const DEMO_COOK_POOL: CookPoolState = {
   minimumSize: 2,
   servedCooks: [SANCHITA_COOK, REKHA_COOK, JYOTI_COOK, BARSHA_COOK],
   poolIds: [],
-  favouriteDishIds: [],
 };

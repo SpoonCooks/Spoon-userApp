@@ -1,14 +1,6 @@
 import { DEMO_COOK_POOL } from '@/demo/fixtures/cookPool';
 
-import {
-  addCook,
-  cookProfile,
-  deckCooks,
-  emptyPlaces,
-  poolSummary,
-  removeCook,
-  toggleFavouriteDish,
-} from './pool';
+import { addCook, cookProfile, deckCooks, emptyPlaces, poolSummary, removeCook } from './pool';
 
 const SANCHITA = 'demo-pool-sanchita';
 const REKHA = 'demo-pool-rekha';
@@ -32,13 +24,13 @@ describe('Cook Pool state', () => {
     expect(removeCook(removed, SANCHITA)).toBe(removed);
   });
 
-  it('deals every cook, pooled or not, so the deck never runs out', () => {
+  it('deals only the cooks not in the pool, as the candidates route does', () => {
     const pooled = addCook(DEMO_COOK_POOL, SANCHITA);
     const deck = deckCooks(pooled);
     expect(deck.map((cook) => cook.cookId)).toEqual(
-      DEMO_COOK_POOL.servedCooks.map((cook) => cook.cookId),
+      DEMO_COOK_POOL.servedCooks.map((cook) => cook.cookId).filter((cookId) => cookId !== SANCHITA),
     );
-    expect(deck.find((cook) => cook.cookId === SANCHITA)?.inPool).toBe(true);
+    expect(deck.every((cook) => !cook.inPool)).toBe(true);
   });
 
   it('keeps the backend order of cooks, lines and menu', () => {
@@ -65,12 +57,6 @@ describe('Cook Pool state', () => {
       expect.objectContaining({ cookId: SANCHITA, name: 'Sanchita' }),
     ]);
     expect(summary.minimumSize).toBe(2);
-  });
-
-  it('toggles a favourite dish', () => {
-    const on = toggleFavouriteDish(DEMO_COOK_POOL, 'dish-1');
-    expect(on.favouriteDishIds).toEqual(['dish-1']);
-    expect(toggleFavouriteDish(on, 'dish-1').favouriteDishIds).toEqual([]);
   });
 
   it('keeps empty places up to the minimum, and always one', () => {

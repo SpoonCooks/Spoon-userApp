@@ -7,11 +7,12 @@ import type {
 } from './types';
 
 /**
- * The Cook Pool's state while it has no backend, and the reads the screens take from it.
+ * The Cook Pool as a local store — the dev preview's source (`demoSource.ts`), which runs with no
+ * session — and the reads the screens take from it.
  *
- * Shaped after what the backend will hold: the cooks who have served the household, which of them
- * are in its pool, and the dishes it has favourited. Every read keeps the order the lists arrive
- * in; nothing here sorts.
+ * Shaped after what the backend holds (DEC-085): the cooks who have served the household and
+ * which of them are in its pool. Every read keeps the order the lists arrive in; nothing here
+ * sorts. Dish favourites are not here: they are local in the app too (`favourites.ts`).
  */
 
 /** A cook who has served the household, as the backend would send them. */
@@ -33,7 +34,6 @@ export interface CookPoolState {
   readonly servedCooks: readonly ServedCook[];
   /** The pool, newest first (`GET /v1/me/cooks`'s order). */
   readonly poolIds: readonly string[];
-  readonly favouriteDishIds: readonly string[];
 }
 
 /** Puts a cook in the pool, newest first. Already there: unchanged. */
@@ -49,13 +49,6 @@ export function removeCook(state: CookPoolState, cookId: string): CookPoolState 
   return { ...state, poolIds: state.poolIds.filter((id) => id !== cookId) };
 }
 
-export function toggleFavouriteDish(state: CookPoolState, dishId: string): CookPoolState {
-  const favourites = state.favouriteDishIds.includes(dishId)
-    ? state.favouriteDishIds.filter((id) => id !== dishId)
-    : [...state.favouriteDishIds, dishId];
-  return { ...state, favouriteDishIds: favourites };
-}
-
 /** The landing's pool grid. */
 export function poolSummary(state: CookPoolState): CookPoolSummary {
   const byId = new Map(state.servedCooks.map((cook) => [cook.cookId, cook]));
@@ -69,11 +62,13 @@ export function poolSummary(state: CookPoolState): CookPoolSummary {
 }
 
 /**
- * The deck: every cook who has served the household, in the pool or not — the deck is a loop and
- * never runs out (`deck.ts`). A cook already in the pool is dealt like any other.
+ * The deck: the cooks who have served the household and are not in its pool — what
+ * `GET /v1/me/cooks/candidates` serves.
  */
 export function deckCooks(state: CookPoolState): readonly CookProfile[] {
-  return state.servedCooks.map((cook) => toProfile(cook, state.poolIds.includes(cook.cookId)));
+  return state.servedCooks
+    .filter((cook) => !state.poolIds.includes(cook.cookId))
+    .map((cook) => toProfile(cook, false));
 }
 
 export function cookProfile(state: CookPoolState, cookId: string): CookProfile | undefined {

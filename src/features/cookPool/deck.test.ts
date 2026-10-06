@@ -16,17 +16,19 @@ describe('Cook Pool deck loop', () => {
     expect(deck.ring).toEqual(['b', 'c', 'a']);
   });
 
-  it('keeps an added cook in the loop, at the back', () => {
+  it('takes an added cook out of the loop — they are no longer a candidate', () => {
     let deck = addTop(startDeck(['a', 'b', 'c']));
-    expect(deck.ring).toEqual(['b', 'c', 'a']);
+    expect(deck.ring).toEqual(['b', 'c']);
     deck = skipTop(skipTop(deck));
-    expect(deck.ring).toEqual(['a', 'b', 'c']);
+    expect(deck.ring).toEqual(['b', 'c']);
   });
 
-  it('never runs out, even once every cook is added', () => {
+  it('runs out only once every cook is added', () => {
     let deck = startDeck(['a', 'b']);
+    deck = skipTop(deck);
+    expect(deck.ring).toEqual(['b', 'a']);
     deck = addTop(addTop(deck));
-    expect(deck.ring).toEqual(['a', 'b']);
+    expect(deck.ring).toEqual([]);
   });
 
   it('deals a lone cook again as a new turn', () => {
@@ -51,9 +53,9 @@ describe('Cook Pool deck loop', () => {
   it('undoes a skip across an add made since', () => {
     let deck = skipTop(startDeck(['a', 'b', 'c']));
     deck = addTop(deck);
-    expect(deck.ring).toEqual(['c', 'a', 'b']);
+    expect(deck.ring).toEqual(['c', 'a']);
     deck = undoSkip(deck);
-    expect(deck.ring).toEqual(['a', 'c', 'b']);
+    expect(deck.ring).toEqual(['a', 'c']);
   });
 
   it('undoes a skip made on an earlier lap', () => {
@@ -73,10 +75,10 @@ describe('Cook Pool deck loop', () => {
     let deck = startDeck(['a', 'b']);
     deck = skipTop(skipTop(deck));
     deck = addTop(deck);
-    expect(deck.ring).toEqual(['b', 'a']);
+    expect(deck.ring).toEqual(['b']);
     expect(deck.skipped).toEqual(['b']);
     deck = undoSkip(deck);
-    expect(deck.ring).toEqual(['b', 'a']);
+    expect(deck.ring).toEqual(['b']);
     expect(deck.skipped).toEqual([]);
   });
 
@@ -100,6 +102,6 @@ describe('Cook Pool deck loop', () => {
     deck = undoSkip(deck);
     expect(deck.ring).toEqual(['b', 'a', 'c']);
     deck = addCook(deck, 'a');
-    expect(deck.ring).toEqual(['b', 'c', 'a']);
+    expect(deck.ring).toEqual(['b', 'c']);
   });
 });
