@@ -32,7 +32,9 @@ import type {
  *
  * `DEMO_ADDRESS_LIST` supplies the screen's STATIC COPY only: the title, the add-CTA label, the
  * section heading and the empty-state text. The rows themselves are the customer's real saved
- * addresses, and the "selected" row is the server's `isDefault` — the client picks no default.
+ * addresses, and the "selected" row is the address bookings are made against — the server's
+ * `isDefault`, or the oldest row when there is none (`currentAddressOf`). Nothing is written back:
+ * the highlight shows what is in use, it does not store a default.
  *
  * The designed empty state is reached naturally: a real account with no addresses returns `[]`,
  * which renders `emptyTitle` / `emptyDescription` exactly as drawn.

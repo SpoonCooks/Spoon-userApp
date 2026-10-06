@@ -94,7 +94,7 @@ describe('routes render', () => {
   });
 
   it.each([
-    ['home', HomeRoute, 'home-screen'],
+    ['home', HomeRoute, 'home-redesign-screen'],
     ['scheduled', ScheduledRoute, 'schedule-screen'],
     ['reschedule/[id]', RescheduleRoute, 'schedule-screen'],
     ['meal-brief', MealBriefRoute, 'meal-brief-screen'],
@@ -153,28 +153,11 @@ describe('routes render', () => {
    *
    * The stub catalogue publishes 30, so both surfaces have to say 30.
    */
-  it('states the instant arrival promise from the catalogue, not from the fixture', async () => {
-    render(<HomeRoute />);
-    // `find*`, not `get*`: Home renders as soon as the ADDRESS read settles, and the catalogue —
-    // which carries the promise — lands a tick later.
-    expect(await screen.findByText('Spoon in 30 mins')).toBeTruthy();
-    expect(screen.getByText('Get a cook in 30 mins')).toBeTruthy();
-    expect(screen.getByTestId('home-tile-instant-emphasis').props.children).toBe(' 30 mins');
-    // The superseded hardcoded figure is gone from both.
-    expect(screen.queryByText(/18 mins/)).toBeNull();
-  });
-
   /**
-   * Home states the REAL estimate, not the promise, wherever the server has one.
-   *
-   * `projectedArrival.etaMinutes` is computed per request for the requested address -- route time
-   * to its gate, when the candidate cook comes free, and the preparation allowance. The two
-   * figures it supersedes are both a fixed 30 that the backend locks by policy, so for as long as
-   * Home read either of them it could not show a customer anything but "Spoon in 30 mins". The
-   * estimate was on the wire the whole time and stripped by a schema that never declared it.
-   *
-   * The stubs make them DISAGREE -- estimate 14, promise 30 -- which is the only way to see which
-   * one a surface is reading.
+   * The redesigned Home (`941:4884`) states the arrival in the Book section header — "Arriving in
+   * x mins" — and the minutes come from the SERVER: the per-address estimate when it has one,
+   * else the published promise. With no cook dispatchable the caption reads
+   * "Instant · Unavailable" (`1303:1333`) instead of a promise nobody can keep.
    */
   it('states the arrival estimate the server computed for this address', async () => {
     renderWithRuntime(<HomeRoute />, {
@@ -191,19 +174,10 @@ describe('routes render', () => {
       }),
     });
 
-    expect(await screen.findByText('Spoon in 14 mins')).toBeTruthy();
-    expect(screen.getByText('Get a cook in 14 mins')).toBeTruthy();
-    expect(screen.getByTestId('home-tile-instant-emphasis').props.children).toBe(' 14 mins');
-    // The locked 30 is published on both the catalogue and the availability read, and neither is
-    // what the customer is told any more.
-    expect(screen.queryByText('Spoon in 30 mins')).toBeNull();
-    expect(screen.queryByText('Get a cook in 30 mins')).toBeNull();
+    expect(await screen.findByText('14 mins')).toBeTruthy();
+    expect(screen.getByText('Arriving in')).toBeTruthy();
   });
 
-  /**
-   * No candidate means nothing to estimate from, and the operating promise is then the truest
-   * thing left to say -- so it is the fallback, not the answer.
-   */
   it('falls back to the published promise when the server estimated nothing', async () => {
     renderWithRuntime(<HomeRoute />, {
       runtime: createTestRuntime({
@@ -218,18 +192,10 @@ describe('routes render', () => {
       }),
     });
 
-    expect(await screen.findByText('Spoon in 30 mins')).toBeTruthy();
+    expect(await screen.findByText('Arriving in')).toBeTruthy();
+    expect(screen.getAllByText('30 mins').length).toBeGreaterThan(0);
   });
 
-  /**
-   * The promise is POLICY — "we aim to be with you inside 30 minutes" — published in the
-   * catalogue whatever the state of the network. Home used to state it unconditionally, so it
-   * read "Spoon in 30 mins" while `GET /v1/availability/instant` was answering
-   * `NO_PRESENT_COOK`: a promise nobody could keep, made on the operation's behalf.
-   *
-   * Both surfaces lose the minutes and keep the offer. Nothing is hidden and no flag is set —
-   * the day a cook is on shift, `available` turns true and every one of these comes back.
-   */
   it('drops the arrival promise while no cook can be dispatched', async () => {
     renderWithRuntime(<HomeRoute />, {
       runtime: createTestRuntime({
@@ -245,42 +211,14 @@ describe('routes render', () => {
       }),
     });
 
-    expect(await screen.findByText('Spoon')).toBeTruthy();
-    expect(screen.getByText('Get a cook')).toBeTruthy();
-    expect(screen.getByTestId('home-tile-instant-emphasis').props.children).toBe('');
-    // Not the fixture's transcribed figure either: falling through to `base` unchanged would
-    // have swapped one unkeepable promise for an older one.
-    expect(screen.queryByText(/Spoon in \d+ mins/)).toBeNull();
-    expect(screen.queryByText('Get a cook in')).toBeNull();
+    expect(await screen.findByText('Instant · Unavailable')).toBeTruthy();
+    expect(screen.queryByText('Arriving in')).toBeNull();
+    // Now cannot book, so the section opens on Later's Schedule CTA.
+    expect(screen.getByRole('button', { name: 'Schedule' })).toBeTruthy();
   });
 
-  /**
-   * The promise and a live ETA are different claims from different sources, and only the promise
-   * is gated. An active booking's "Arriving in 18 mins" is tracking's own number for a cook who
-   * has been assigned and routed — it is true whatever instant availability says, and a customer
-   * with a cook on the way must not be told the time is unknown because no NEW booking could be
-   * taken right now.
-   */
-  it('keeps a live tracking ETA while the promise is gone', async () => {
-    renderWithRuntime(<HomeRoute />, {
-      runtime: createTestRuntime({
-        api: createStubApi({
-          ...ROUTE_STUBS,
-          'GET /v1/availability/instant': () => ({
-            available: false,
-            arrivalTargetMinutes: 30,
-            reason: 'NO_PRESENT_COOK',
-            validUntil: '2026-08-18T09:00:30.000Z',
-          }),
-        }),
-      }),
-    });
-
-    expect(await screen.findByText('Spoon')).toBeTruthy();
-    // Not a specific figure: which banner a booking renders is the fixture's business. What is
-    // asserted is that a minutes reading SURVIVES on this screen while the promise does not.
-    expect(screen.getAllByText(/\d+ mins/).length).toBeGreaterThan(0);
-  });
+  // The old Home's "keeps a live tracking ETA" case went with its active-bookings carousel: the
+  // redesign has no such section, so no in-flight booking is drawn on Home any more.
 
   /** Both legal documents open IN the app, each under its own title. */
   it.each([

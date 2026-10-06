@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { useScheduledAvailability } from '@features/availability';
-import { useAddresses } from '@features/address';
+import { currentAddressOf, useAddresses } from '@features/address';
 import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
 import type { ScreenQuery } from '@core/data';
@@ -51,8 +51,7 @@ export function useScheduleData(
 
   const addressId = useMemo(() => {
     if (addresses.state.status !== 'ready') return null;
-    const list = addresses.state.data;
-    return (list.find((address) => address.isDefault) ?? list[0])?.id ?? null;
+    return currentAddressOf(addresses.state.data)?.id ?? null;
   }, [addresses.state]);
 
   // Default to today and the first published duration, so the grid is populated on arrival

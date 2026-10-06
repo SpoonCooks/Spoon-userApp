@@ -1,0 +1,353 @@
+import { useEffect, useReducer, useRef, useState } from 'react';
+import { Image, LayoutAnimation, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { ART } from '../assets';
+import { BookSection } from '../components/BookSection';
+import { CooksTrust } from '../components/CooksTrust';
+import { DaySorted } from '../components/DaySorted';
+import { DurationDial } from '../components/DurationDial';
+import { HeroBanner } from '../components/HeroBanner';
+import { HomeHeader } from '../components/HomeHeader';
+import { NotIncluded } from '../components/NotIncluded';
+import { NotLiveCard } from '../components/NotLiveCard';
+import type { NotifyState } from '../components/NotLiveCard';
+import { PromiseFooter } from '../components/Promise';
+import { RecurringPool } from '../components/RecurringPool';
+import { ShareCard } from '../components/ShareCard';
+import { Toast } from '../components/Toast';
+import type { ToastHandle } from '../components/Toast';
+import { TaxDetailsDialog } from '../components/TaxDetailsDialog';
+import { SHARE_MESSAGE } from '../content';
+import { shareSpoon } from '../share';
+import { canBook, ctaKind, draftReducer, initialDraft } from '../state/bookingDraft';
+import type { BookingDraft, BookingMode } from '../state/bookingDraft';
+import { isDurationAvailable, nearestAvailableId } from '../state/durations';
+import { recommendDuration } from '../state/recommendDuration';
+import type { DialInputs } from '../state/recommendDuration';
+import { poolBeads, recurringChipFor } from '../state/recurring';
+import type { RecurringTarget } from '../state/recurring';
+import { resolveHomeVariant } from '../state/variant';
+import { C } from '../theme';
+import type { DurationOption, HomeModel, PoolCook } from '../types';
+
+/** What the customer chose, handed to the booking flow. */
+export interface BookingRequest {
+  readonly duration: DurationOption;
+  readonly dishes: number;
+  readonly people: number;
+  readonly complexity: BookingDraft['complexity'];
+}
+
+/**
+ * Every place Home hands off to. The screen owns no navigation; the route decides where each goes.
+ */
+export interface HomeRedesignActions {
+  /** Building label → address picker. */
+  readonly onPressAddress: () => void;
+  /** Avatar → profile. */
+  readonly onPressProfile: () => void;
+  /** Lime "Book now" (Now, instant available) → Razorpay for the payable total. */
+  readonly onBookNow: (request: BookingRequest) => void;
+  /**
+   * Yellow "Schedule" (Later, or Now while instant is unavailable) → the slot picker, with the
+   * duration pre-selected so only slots and payment remain.
+   */
+  readonly onPickSlot: (request: BookingRequest) => void;
+  /**
+   * The recurring chip: recurring flow, plan tracker or explainer. Returns `false` for a
+   * destination that does not exist yet, and the screen says "coming soon" instead of nothing.
+   */
+  readonly onPressRecurring: (target: RecurringTarget) => boolean;
+  /** Absent while the cook pool screen does not exist — the chip then says "coming soon". */
+  readonly onPressCookPool?: () => void;
+  /** Bead → cook profile (proposed in the dev note). */
+  readonly onPressPoolCook?: (cook: PoolCook) => void;
+  /**
+   * "Notify me" — idempotent register for {user, pincode}, asking notification permission at
+   * the tap (see `joinWaitlist`). Rejects only if the register fails.
+   */
+  readonly onJoinWaitlist: (pincode: string) => Promise<void>;
+  /** Analytics `duration_selected`, raised on every new selection. */
+  readonly onDurationSelected?: (event: {
+    durationMin: number;
+    pricePaise: number;
+    source: 'tile' | 'dial';
+  }) => void;
+  /** Re-read availability (Home focus is handled by the screen; this is the Now/Later switch). */
+  readonly onRefreshAvailability?: () => void;
+  /** Defaults to `shareSpoon`: WhatsApp first, the system share sheet otherwise. */
+  readonly onShare?: () => void;
+}
+
+export interface HomeRedesignViewProps extends HomeRedesignActions {
+  readonly model: HomeModel;
+  readonly initialMode?: BookingMode;
+  /** A booking is being created / checkout is open — the CTA holds still. */
+  readonly bookingBusy?: boolean;
+  /** One-line messages from the route (a refused booking, say). A new `id` shows it again. */
+  readonly notice?: { readonly id: number; readonly message: string } | null;
+}
+
+/**
+ * The redesigned Home — Figma `cCQlzTeiObQkpVBzwI8mZi`, one screen with three variants resolved
+ * from the payload (`resolveHomeVariant`), never from a client guess:
+ *
+ *   default    `941:4884`   live pincode, no booking history
+ *   returning  `1255:2973`  default + the pool / recurring block under the CTA;
+ *              `1290:1280`  on Recurring the duration strip and CTA give way to that block
+ *   inactive   `1302:3539`  not live — waitlist + referral, no booking path, read-only dial
+ */
+export function HomeRedesignView({
+  model,
+  initialMode,
+  bookingBusy = false,
+  notice = null,
+  ...actions
+}: HomeRedesignViewProps) {
+  const { top, bottom } = useSafeAreaInsets();
+  const variant = resolveHomeVariant(model);
+  const scroll = useRef<ScrollView>(null);
+  const bodyY = useRef(0);
+  const dialY = useRef(0);
+
+  const [draft, dispatch] = useReducer(
+    draftReducer,
+    {
+      focusedDurationId: model.focusedDurationId,
+      instantAvailable: model.instant.available,
+      mode: initialMode,
+    },
+    (input) =>
+      initialDraft({
+        focusedDurationId: input.focusedDurationId,
+        instantAvailable: input.instantAvailable,
+        ...(input.mode === undefined ? {} : { mode: input.mode }),
+      }),
+  );
+
+  // Every mode can be chosen (the toggle never deactivates a tab); the content below decides
+  // what each can do — Now without instant simply leaves the CTA off.
+  const mode = draft.mode;
+  const cta = ctaKind(mode, model.instant.available);
+  const [taxOpen, setTaxOpen] = useState(false);
+  const toast = useRef<ToastHandle>(null);
+  const available = (d: DurationOption) => isDurationAvailable(d, cta);
+
+  // Focus never rests on an unbookable tile; a refreshed payload that drops it falls back too.
+  const durationIds = model.durations.map((d) => d.id);
+  const wantedFocus = durationIds.includes(draft.focusedDurationId)
+    ? draft.focusedDurationId
+    : model.focusedDurationId;
+  const focusedId = nearestAvailableId(model.durations, wantedFocus, cta);
+  // A selection that became unavailable (refresh, or a Now/Later switch) is cleared below.
+  const selectedOption = model.durations.find((d) => d.id === draft.selectedDurationId);
+  const selectedId =
+    selectedOption !== undefined && available(selectedOption) ? selectedOption.id : null;
+  const bookable = canBook({ ...draft, selectedDurationId: selectedId }) && !bookingBusy;
+
+  const noticeId = notice?.id;
+  const noticeMessage = notice?.message;
+  useEffect(() => {
+    if (noticeMessage !== undefined) toast.current?.show(noticeMessage);
+  }, [noticeId, noticeMessage]);
+
+  const comingSoon = () => toast.current?.show('Coming soon.');
+
+  const lostSelection = draft.selectedDurationId !== null && selectedId === null;
+  useEffect(() => {
+    if (!lostSelection) return;
+    const lost = model.durations.find((d) => d.id === draft.selectedDurationId);
+    toast.current?.show(
+      `${lost?.label ?? 'That duration'} is no longer available. Pick another duration.`,
+    );
+    dispatch({ type: 'clearSelection' });
+  }, [lostSelection, draft.selectedDurationId, model.durations]);
+
+  const selectDuration = (id: string, source: 'tile' | 'dial') => {
+    const option = model.durations.find((d) => d.id === id);
+    if (option === undefined || !available(option)) return;
+    if (id !== draft.selectedDurationId) {
+      actions.onDurationSelected?.({
+        durationMin: option.minutes,
+        pricePaise: option.pricePaise,
+        source,
+      });
+    }
+    dispatch({ type: 'selectDuration', id });
+  };
+
+  const inputs: DialInputs = {
+    complexity: draft.complexity,
+    dishes: draft.dishes,
+    people: draft.people,
+  };
+  const recommended = recommendDuration(inputs, model.durations);
+
+  const changeMode = (next: BookingMode) => {
+    if (next === mode) return;
+    // Recurring removes the strip and CTA; animate the content moving up (and back).
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    dispatch({ type: 'setMode', mode: next });
+    actions.onRefreshAvailability?.();
+  };
+
+  /** The dial's result selects the tile, so changing an input picks the new recommendation. */
+  const changeInputs = (next: DialInputs) => {
+    if (next.complexity !== draft.complexity) {
+      dispatch({ type: 'setComplexity', complexity: next.complexity });
+    }
+    if (next.dishes !== draft.dishes) dispatch({ type: 'setDishes', value: next.dishes });
+    if (next.people !== draft.people) dispatch({ type: 'setPeople', value: next.people });
+    const pick = recommendDuration(
+      next,
+      model.durations.filter((d) => available(d)),
+    );
+    if (pick !== null) selectDuration(pick.id, 'dial');
+  };
+
+  const request = (): BookingRequest | null => {
+    const duration = model.durations.find((d) => d.id === selectedId);
+    if (duration === undefined) return null;
+    return { duration, dishes: draft.dishes, people: draft.people, complexity: draft.complexity };
+  };
+
+  const book = () => {
+    const chosen = request();
+    if (chosen === null) return;
+    if (cta === 'book') actions.onBookNow(chosen);
+    else if (cta === 'schedule') actions.onPickSlot(chosen);
+  };
+
+  // Waitlist button: disabled "You're on the list" on load when the server says joined.
+  const joined = model.waitlist?.joined === true;
+  const [localNotify, setNotifyState] = useState<NotifyState>('idle');
+  const notifyState: NotifyState = joined ? 'joined' : localNotify;
+
+  const notify = () => {
+    if (notifyState !== 'idle') return;
+    setNotifyState('pending');
+    actions.onJoinWaitlist(model.address.pincode).then(
+      () => setNotifyState('joined'),
+      () => setNotifyState('idle'),
+    );
+  };
+
+  const share = actions.onShare ?? (() => void shareSpoon(SHARE_MESSAGE));
+  // Returning users see the pool under the CTA; anyone on Recurring sees it in place of the strip.
+  // With fewer than two pooled cooks its chip reads "Check Recurring" and opens the explainer.
+  const showPool = variant === 'returning' || mode === 'recurring';
+
+  return (
+    <View style={styles.screen} testID="home-redesign-screen">
+      <ScrollView
+        ref={scroll}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: top, paddingBottom: bottom }}
+      >
+        <Image source={ART.glows} style={styles.glows} resizeMode="stretch" />
+        <HomeHeader
+          addressLabel={model.address.label}
+          notLive={variant === 'inactive'}
+          onPressAddress={actions.onPressAddress}
+          onPressProfile={actions.onPressProfile}
+        />
+        <View
+          style={styles.body}
+          onLayout={(e) => {
+            bodyY.current = e.nativeEvent.layout.y;
+          }}
+        >
+          {/* Decorative. */}
+          <HeroBanner />
+
+          {variant === 'inactive' && model.waitlist !== null ? (
+            <NotLiveCard
+              pincode={model.address.pincode}
+              liveHubs={model.liveHubs}
+              waitlist={model.waitlist}
+              notifyState={notifyState}
+              onPressNotify={notify}
+              onPressShare={share}
+            />
+          ) : null}
+
+          {variant === 'inactive' ? null : (
+            <BookSection
+              etaMins={model.instant.available ? model.instant.etaMins : null}
+              mode={mode}
+              onChangeMode={changeMode}
+              durations={model.durations}
+              focusedDurationId={focusedId}
+              selectedDurationId={selectedId}
+              onFocusDuration={(id) => dispatch({ type: 'focusDuration', id })}
+              onSelectDuration={(id) => selectDuration(id, 'tile')}
+              isAvailable={available}
+              pricingStatus={model.pricingStatus ?? 'ready'}
+              onPressUnavailable={(d) =>
+                toast.current?.show(
+                  `${d.label} isn’t available ${cta === 'book' ? 'right now' : 'to schedule'}.`,
+                )
+              }
+              onRetryPricing={() => actions.onRefreshAvailability?.()}
+              canBook={bookable}
+              onPressBook={book}
+              onPressHelpMePick={() =>
+                scroll.current?.scrollTo({ y: bodyY.current + dialY.current - top, animated: true })
+              }
+              onPressPaymentDetails={() => setTaxOpen(true)}
+              cta={cta}
+            />
+          )}
+
+          {showPool ? (
+            <RecurringPool
+              beads={poolBeads(model)}
+              chip={recurringChipFor(model)}
+              onPressChip={() => {
+                if (!actions.onPressRecurring(recurringChipFor(model).target)) comingSoon();
+              }}
+              onPressCookPool={actions.onPressCookPool ?? comingSoon}
+              onPressCook={actions.onPressPoolCook ?? comingSoon}
+            />
+          ) : null}
+
+          <DaySorted />
+
+          <View
+            onLayout={(e) => {
+              // Relative to the body; Help me pick adds the body's offset and parks the dial's
+              // heading just under the status bar.
+              dialY.current = e.nativeEvent.layout.y;
+            }}
+          >
+            <DurationDial
+              durations={model.durations}
+              recommended={recommended}
+              inputs={inputs}
+              {...(variant === 'inactive' ? {} : { onChangeInputs: changeInputs })}
+            />
+          </View>
+
+          <CooksTrust />
+          <NotIncluded />
+          {variant === 'inactive' ? <ShareCard onPressShare={share} /> : null}
+          <PromiseFooter />
+        </View>
+      </ScrollView>
+      <Toast ref={toast} />
+      <TaxDetailsDialog
+        visible={taxOpen}
+        onClose={() => setTaxOpen(false)}
+        gstPercent={model.tax.gstPercent}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.base },
+  /** `941:4885` — soft yellow glows drawn behind the whole page; they scroll with it. */
+  glows: { position: 'absolute', top: 0, left: 0, right: 0, height: 3027 },
+  body: { gap: 24 },
+});

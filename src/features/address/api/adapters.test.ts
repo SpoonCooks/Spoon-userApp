@@ -1,4 +1,4 @@
-import { addressWriteInputFrom } from './adapters';
+import { addressListFrom, addressWriteInputFrom, currentAddressOf } from './adapters';
 import type { AddressDto } from './schemas';
 
 /**
@@ -93,5 +93,52 @@ describe('addressWriteInputFrom', () => {
     // `bodyOf` runs `toE164` on the way out and passes a number that already carries its country
     // code through untouched, so replaying the stored value is a no-op rather than a reformat.
     expect(addressWriteInputFrom(SAVED).receiverPhone).toBe('+919876543210');
+  });
+});
+
+/**
+ * `currentAddressOf` / `addressListFrom` — which row Saved addresses marks as selected.
+ *
+ * The marked row has to be the address bookings are actually made against. An account frequently
+ * has NO stored default (the add flow never sends one; delete clears it without promoting another),
+ * and bookings fall back to the oldest row — so the list must fall back the same way.
+ */
+describe('the selected address', () => {
+  const first: AddressDto = { ...SAVED, id: 'addr-1' };
+  const second: AddressDto = { ...SAVED, id: 'addr-2' };
+  const third: AddressDto = { ...SAVED, id: 'addr-3' };
+  const base = {
+    title: '',
+    addCtaLabel: '',
+    sectionTitle: '',
+    emptyTitle: '',
+    emptyDescription: '',
+    addresses: [],
+  };
+  const selectedIds = (addresses: readonly AddressDto[]) =>
+    addressListFrom({ base, addresses })
+      .addresses.filter((row) => row.selected === true)
+      .map((row) => row.id);
+
+  it('is the stored default when there is one', () => {
+    const list = [first, { ...second, isDefault: true }, third];
+    expect(currentAddressOf(list)?.id).toBe('addr-2');
+    expect(selectedIds(list)).toEqual(['addr-2']);
+  });
+
+  it('falls back to the oldest row when no default is stored', () => {
+    const list = [first, second, third];
+    expect(currentAddressOf(list)?.id).toBe('addr-1');
+    expect(selectedIds(list)).toEqual(['addr-1']);
+  });
+
+  it('moves to the next row once the selected one is deleted', () => {
+    // DELETE clears `isDefault` and archives the row; the refetched list simply lacks it.
+    expect(selectedIds([second, third])).toEqual(['addr-2']);
+  });
+
+  it('is nothing for an account with no addresses', () => {
+    expect(currentAddressOf([])).toBeNull();
+    expect(selectedIds([])).toEqual([]);
   });
 });

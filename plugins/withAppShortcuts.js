@@ -68,7 +68,9 @@ const SHORTCUTS = [
     id: 'instant',
     shortLabel: 'Instant',
     longLabel: 'Book an instant cook',
-    // Home's own Instant sheet; `open=instant` is read by `src/app/(app)/home.tsx`.
+    // Home, whose redesign leads with Instant's "Book now". `open=instant` is kept on the route so
+    // the shortcut can again open something more specific without a native rebuild; the
+    // redesigned Home does not read it yet.
     route: 'home?open=instant',
     intentName: 'OpenSpoonInstantIntent',
     iosPhrases: ['Book an instant cook in ${app}', '${app} instant'],
