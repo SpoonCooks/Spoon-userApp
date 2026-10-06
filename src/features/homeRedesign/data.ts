@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { LOADING, failed, ready, useApiQueries } from '@core/data';
 import type { DataState } from '@core/data';
@@ -91,12 +91,21 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
     options.waitlistJoined,
   ]);
 
+  // ONE identity for the life of Home. The route calls this from `useFocusEffect`, which re-runs
+  // whenever its callback changes; a `refetch` that changed with the reads (every failed fetch is
+  // a new error, so a new state) re-fired on every render and flooded the API until it rate
+  // limited us. The ref always holds the latest reads.
+  const reads = useRef({ addresses, catalogue, history, instantReads });
+  useEffect(() => {
+    reads.current = { addresses, catalogue, history, instantReads };
+  });
   const refetch = useCallback(() => {
-    addresses.refetch();
-    catalogue.refetch();
-    history.refetch();
-    for (const read of instantReads) read.refetch();
-  }, [addresses, catalogue, history, instantReads]);
+    const latest = reads.current;
+    latest.addresses.refetch();
+    latest.catalogue.refetch();
+    latest.history.refetch();
+    for (const read of latest.instantReads) read.refetch();
+  }, []);
 
   return {
     state,
