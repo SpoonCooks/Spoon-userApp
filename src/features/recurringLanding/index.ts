@@ -7,3 +7,4 @@
 export { RecurringLandingScreen } from './screens/RecurringLandingScreen';
 export type { RecurringLandingScreenProps } from './screens/RecurringLandingScreen';
 export type { ExplainerVideoSource } from './components/ExplainerPlayer';
+export { EXPLAINER_VIDEO_URL, useExplainerVideoSource } from './video';

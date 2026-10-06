@@ -128,6 +128,16 @@ profile (`719:1568`) render from a local store seeded by `src/demo/fixtures/cook
 their menus, none returns one cook's profile with a categorised menu and dish photos, and dish
 favourites do not exist. The full list of changes is in `docs/COOK_POOL_BACKEND.md`.
 
+**BE-RECURRING-VIDEO — the Recurring landing's explainer video has no source of truth yet
+(2026-10-05).** The player (`src/features/recurringLanding/components/ExplainerPlayer.tsx`) plays
+whatever `useExplainerVideoSource()` returns (`src/features/recurringLanding/video.ts`): today the
+constant `EXPLAINER_VIDEO_URL`, `null` until a URL is pasted there (an `https://` `.mp4` or HLS
+`.m3u8`; the 3:45 length is read from the video once it loads). If the backend should send it
+instead — so the video can change without an app release — expose the URL on a read the app
+already makes (or a small config read) and have `useExplainerVideoSource` return it; the player and
+the screens do not change. Playback uses `expo-video`, a native module: a build made before it was
+added plays a placeholder instead (`expoVideo.ts` checks for the module first).
+
 ### BACKEND_DEPLOYMENT_GAP
 
 **DEP-4 — DEPLOYMENT DRIFT: Render is running older code than `D:\spoon-backend`. Blocking for
