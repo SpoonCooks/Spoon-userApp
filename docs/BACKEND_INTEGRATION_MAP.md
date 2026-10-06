@@ -120,6 +120,14 @@ is deliberately permissive and the screen degrades to a sparse card. Non-blockin
 and the Profile "Help" tile still have nowhere to go (the long-standing product blocker B-10, now
 visible in the contract).
 
+**BE-COOKPOOL — the Cook Pool has no read model for its deck, profiles or favourites
+(2026-10-02).** The landing (`844:5842` / `719:1507`), the selection deck (`755:2333`) and the cook
+profile (`719:1568`) render from a local store seeded by `src/demo/fixtures/cookPool.ts`, through
+`src/features/cookPool/data.ts` (`useDevFixture`, listed in `ALLOWED_PENDING`). V0 already has
+`GET/POST/DELETE /v1/me/cooks`, but no endpoint lists the cooks who have served the household with
+their menus, none returns one cook's profile with a categorised menu and dish photos, and dish
+favourites do not exist. The full list of changes is in `docs/COOK_POOL_BACKEND.md`.
+
 **BE-5 — the redesigned Home is partly wired.** `/home` now renders `src/features/homeRedesign`
 on live data (`useHomeRedesignData`, `adapters.ts`): serviceability from the current address,
 `GET /v1/catalogue` durations (price, GST-inclusive total, `taxRateBps`),

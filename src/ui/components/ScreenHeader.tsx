@@ -1,7 +1,9 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import type { ReactNode } from 'react';
 
 import { DirectionalDisc } from '@ui/primitives/DirectionalDisc';
+import { Icon } from '@ui/primitives/Icon';
 import { Text } from '@ui/primitives/Text';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
@@ -21,7 +23,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
  * This is NOT the booking-lifecycle header (`39:5324`), which carries an address pair and the Help
  * pill instead of a single title, nor the sheet header (`1:735`).
  */
-export type ScreenHeaderDensity = 'default' | 'band';
+export type ScreenHeaderDensity = 'default' | 'band' | 'step' | 'nav';
 
 export interface ScreenHeaderProps {
   readonly title: string;
@@ -52,9 +54,21 @@ export interface ScreenHeaderProps {
    *   `band`    — 45: the `65:35` instance on `6:227` Past bookings is overridden to 45 tall,
    *               which opens the vertical padding to (45 − 32) / 2 = 6.5. Horizontal padding
    *               and gap are untouched.
+   *   `step`    — the recurring-setup header (Figma `ZIJf639gTWHXshaa2YOeCT`, e.g. `4:299`): a
+   *               36pt disc, a 12pt gap and a Livvic Black 22/28 `#1A1A1A` title, in its OWN 20pt
+   *               gutter, 8 below the safe area and 6 above the content (the frame's pt 52 less
+   *               its 44pt status bar). Drawn full-bleed — no wrapper supplies the gutter.
+   *   `nav`     — `Nav header 2` (`44:62`) in the redesigned file (`cCQlzTeiObQkpVBzwI8mZi`): NO
+   *               disc — a bare 24pt chevron (`43:63`) centred in a 44pt back button, a 4pt gap,
+   *               pl 8 / pr 16 / py 8, and a Livvic Bold 20/28 black title. 60 tall.
    */
   readonly density?: ScreenHeaderDensity;
   readonly trailing?: ReactNode;
+  /**
+   * Drops the white fill, for a screen whose background art runs up behind the header — the Cook
+   * Pool landing's glows (`844:5843`).
+   */
+  readonly transparent?: boolean;
   readonly testID?: string;
 }
 
@@ -64,25 +78,48 @@ export function ScreenHeader({
   divider = false,
   density = 'default',
   trailing,
+  transparent = false,
   testID = 'screen-header',
 }: ScreenHeaderProps) {
+  const step = density === 'step';
+  const nav = density === 'nav';
   return (
     <View
       style={[
         styles.header,
-        density === 'band' ? styles.band : null,
+        DENSITY_STYLE[density],
+        nav && onBack === undefined ? styles.navNoBack : null,
         divider ? styles.divider : null,
+        transparent ? styles.transparent : null,
       ]}
       testID={testID}
     >
-      {/* `54:289` — the exported 32pt disc, mirrored to face back. Absent by design on a
-          first-run `53:31`; see `onBack`. */}
-      {onBack === undefined ? null : (
-        <DirectionalDisc direction="back" label="Back" onPress={onBack} testID={`${testID}-back`} />
+      {/* `54:289` — the exported 32pt disc, mirrored to face back (36pt on `step`). Absent by
+          design on a first-run `53:31`; see `onBack`. */}
+      {onBack === undefined ? null : nav ? (
+        // `43:63` is Feather's `chevron-left` exactly: M15 6 L9 12 L15 18, a 2pt round stroke in a
+        // 24 box — which is the glyph `Icon`'s `back` already draws at 24.
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          style={styles.navBack}
+          testID={`${testID}-back`}
+        >
+          <Icon name="back" size={NAV_CHEVRON} color="textPrimary" />
+        </Pressable>
+      ) : (
+        <DirectionalDisc
+          direction="back"
+          label="Back"
+          onPress={onBack}
+          {...(step ? { size: STEP_DISC } : {})}
+          testID={`${testID}-back`}
+        />
       )}
       <Text
-        variant="headingScreen"
-        color="textPrimary"
+        variant={step ? 'headingStep' : nav ? 'titleNav' : 'headingScreen'}
+        color={step ? 'textInk' : 'textPrimary'}
         accessibilityRole="header"
         numberOfLines={1}
         style={styles.title}
@@ -94,27 +131,62 @@ export function ScreenHeader({
   );
 }
 
+/** `4:300` — the recurring-setup back disc. */
+const STEP_DISC = 36;
+/** `43:63` — the bare chevron inside `Nav header 2`'s 44pt back button (`44:63`). */
+const NAV_CHEVRON = 24;
+
 const styles = StyleSheet.create({
+  /** Shared by every density: a white row, 12pt gap. */
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: lightTheme.space.md,
+    backgroundColor: lightTheme.colors.surface,
+  },
   /**
-   * `63:783` — **38** tall, px 4, 12pt gap.
+   * `63:783` — **38** tall, px 4.
    *
    * The height is pinned rather than derived: the node's own `py-6` around a 32pt control would
    * measure 44, so honouring the padding would miss the drawn height by 6. Figma's autolayout
    * lets the control overflow its padding; RN does not, so the frame's height wins.
    */
-  header: {
-    height: 38,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: lightTheme.space.md,
-    paddingHorizontal: lightTheme.space.xs,
-    backgroundColor: lightTheme.colors.surface,
-  },
+  default: { height: 38, paddingHorizontal: lightTheme.space.xs },
   /** `65:35` as instanced on `6:227` — 45 tall. px and gap unchanged. */
-  band: { height: 45 },
+  band: { height: 45, paddingHorizontal: lightTheme.space.xs },
+  /** `4:299` — px 20, pt 8, pb 6 around the 36pt disc: 50 tall. */
+  step: {
+    paddingHorizontal: 20,
+    paddingTop: lightTheme.space.sm,
+    paddingBottom: lightTheme.space.s6,
+  },
+  /** `44:62` — pl 8 / pr 16 / py 8 around the 44pt button; a 4pt gap, not the shared 12. */
+  nav: {
+    gap: lightTheme.space.xs,
+    paddingLeft: lightTheme.space.sm,
+    paddingRight: lightTheme.space.lg,
+    paddingVertical: lightTheme.space.sm,
+  },
+  /** `542:1341` (`Nav header 3`) — no back button, so the title takes the 16pt gutter. */
+  navNoBack: { paddingLeft: lightTheme.space.lg },
+  /** `44:63` — the 44pt back button, already a full touch target. */
+  navBack: {
+    width: lightTheme.layout.minTouchTarget,
+    height: lightTheme.layout.minTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   divider: {
     borderBottomWidth: lightTheme.stroke.hairline,
     borderBottomColor: lightTheme.colors.borderField,
   },
   title: { flexShrink: 1 },
+  transparent: { backgroundColor: 'transparent' },
 });
+
+const DENSITY_STYLE: Record<ScreenHeaderDensity, ViewStyle> = {
+  default: styles.default,
+  band: styles.band,
+  step: styles.step,
+  nav: styles.nav,
+};

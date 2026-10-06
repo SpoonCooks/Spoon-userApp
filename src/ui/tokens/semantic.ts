@@ -134,7 +134,7 @@ export const lightColors = {
   textFree: palette.emerald,
   /**
    * `6:789` — the Profile logout label. v4 sets it to **`#FF0404`**, the same red the OTP error
-   * uses; the superseded file drew `#C70036` (`palette.rose39`, now unused).
+   * uses; the superseded file drew `#C70036` (`palette.rose39`, now `textRemove`).
    */
   textLogout: palette.danger,
   textDisabled: palette.slate400,
@@ -194,15 +194,91 @@ export const lightColors = {
   accentPrimary: palette.yellow400,
   accentSecondary: palette.lime300,
 
+  /**
+   * Spoon — User (`cCQlzTeiObQkpVBzwI8mZi`): `color/brand/primary` and `color/brand/primary-tint`.
+   * On Step 1 (`149:1525`) the first and last picked days take the brand fill and the days
+   * between take the tint.
+   */
+  surfaceBrand: palette.yellow500,
+  surfaceBrandTint: palette.yellow400,
+  /** `color/surface/disabled` + `color/text/disabled` — the redesigned file's disabled pill CTA. */
+  surfaceDisabledSoft: palette.black02,
+  textDisabledSoft: palette.black25,
+  /** `1351:4412` — the day-picker legend's caption. */
+  textLegend: palette.grey6B,
+  /** `1351:4411` — the legend's "Selected" dot, `#FFEF99` (lighter than the `#FFE666` day itself). */
+  surfaceLegendSelected: palette.yellow300,
+  /** `155:1585` — inline validation copy, and the dot (`158:1586`) beside it. */
+  textError: palette.red600,
+  surfaceError: palette.red600,
+  /** `1073:3181` — the "Deleted dates can't be restored" note in the delete-date dialog. */
+  textWarning: palette.red,
+  /** Spoon — User `color/text/secondary`: struck prices, unselected tab labels. */
+  textSubdued: palette.black60,
+  /** `444:10421` / `444:10424` — the `#FFF7CC` edge on Plan tiles and the "+" button. */
+  borderPlanTile: palette.yellow200,
+  /** `1219:4271` — the focused duration card's 1pt edge: the file's `--disabled`, black at 25 %. */
+  borderDurationFocus: palette.black25,
+  /** Spoon — User `color/border/strong` — the outlined "Delete date" button (`586:4386`). */
+  borderInk: palette.black,
+  /** Spoon — User `--disabled` (`#00000040`) as a fill: the undo banner's tick badge (`567:1031`). */
+  surfaceDisabledStrong: palette.black25,
+
   danger: palette.danger,
   dangerSurface: palette.dangerSurface,
   dangerSurfaceStrong: palette.dangerSurfaceStrong,
   /** The Delete Account confirmation prompt's rose block — `rose600` at 30%, per the inspector. */
   surfaceCritical: palette.rose600Surface,
 
+  /** Recurring setup (Figma `ZIJf639gTWHXshaa2YOeCT`) — see `palette.ink` / `palette.stone*`. */
+  surfaceInk: palette.ink,
+  surfaceStone: palette.stone100,
+  surfaceStoneSoft: palette.stone50,
+  borderStone: palette.stone200,
+  textInk: palette.ink,
+  textStoneDeep: palette.grey444,
+  textStone: palette.grey555,
+  textStoneCaption: palette.grey666,
+  textStoneQuiet: palette.grey777,
+  textStoneFaint: palette.stone350,
+  textStoneMuted: palette.stone400,
+  borderStoneDashed: palette.stone300,
+  borderStoneMid: palette.stone250,
+  surfaceStoneDisc: palette.stone230,
+  surfaceStoneTile: palette.stone150,
+  borderStoneStrong: palette.stone500,
+  textStoneClash: palette.stone500,
+  textPartial: palette.amber31,
+  /** `4:918` — "Remove Visit 2". */
+  textRemove: palette.rose39,
+  /** `4:1156` — Step 3's booked-out date card. */
+  surfaceClash: palette.cream50,
+  borderClash: palette.amber44,
+  textClash: palette.amber27,
+
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */
   scrimSheet: palette.black65,
+
+  // Cook Pool (`755:2333` … `848:7809`).
+  textDish: palette.grey333,
+  textMenuSection: palette.navy142,
+  iconIdle: palette.grey217,
+  surfaceSkipTab: palette.black06,
+  surfaceSkipTabActive: palette.black14,
+  surfaceSkipWash: palette.black06,
+  borderSkip: palette.black35,
+  surfaceAddWash: palette.yellow500Wash,
+
+  // Recurring landing (`970:5392` … `970:5546`).
+  /** `970:5451` — the explainer's "See the whole flow…" line. */
+  textExplainer: palette.stone600,
+  /** `970:5610` — the player's time labels. */
+  textPlayerTime: palette.stone380,
+  /** `970:5608` — the video's scene surface. */
+  surfaceVideoScene: palette.yellow100,
+  /** `970:5600` — the wash over the landing while the video plays. */
+  scrimPlayer: palette.scrimPlayer,
 } as const;
 
 /** TODO(designer): no dark theme exists in Figma. Mirrors light until one does. */
@@ -221,6 +297,9 @@ export const toneColors = {
   warning: { surface: palette.yellow400, text: lightColors.textOnAccent },
   info: { surface: palette.yellow200, text: lightColors.textPrimary },
   danger: { surface: lightColors.dangerSurface, text: lightColors.danger },
+  /** Recurring setup — the day counter under the minimum, and once valid. */
+  stone: { surface: palette.stone100, text: palette.grey555 },
+  ink: { surface: palette.ink, text: palette.yellow500 },
 } as const;
 
 export type Tone = keyof typeof toneColors;
@@ -285,7 +364,153 @@ export const gradients = {
     locations: [0.044863, 0.99057],
     angleDeg: 179.70251199528715,
   },
+  /**
+   * Spoon — User, Step 1's Plan header (`444:10420`). The selected Plan tile is two layers: a
+   * `#FFDE33` → `#FFD600` sweep (7.4 % → 81.5 %) under a gloss of `#FFF7CC` at 60 % fading out by
+   * 45 %. Figma reports the sweep's angle per tile width — 175.60° full width (`476:5805`),
+   * 175.00° beside the "+" (`444:10434`), 169.73° with two tiles (`444:10422`) — so the tile picks
+   * one of `angles` by layout rather than one angle being stretched across every width.
+   */
+  planTileActive: {
+    colors: [palette.yellow33, palette.yellow500],
+    locations: [0.074074, 0.81481],
+    angleDeg: 169.72779139697923,
+  },
+  planTileActiveAngles: { alone: 175.6012946450045, besideAdd: 174.99935540244158 },
+  planTileGloss: {
+    colors: [withAlpha(palette.yellow200, 0.6), withAlpha(palette.yellow200, 0)],
+    locations: [0, 0.45],
+    angleDeg: 180,
+  },
+  /** `1241:2362` — "Scroll fade": 40pt over the foot of scrolling content, clear → white. */
+  scrollFade: {
+    colors: [withAlpha(palette.white, 0), palette.white],
+    angleDeg: 180,
+  },
+  /** `1219:4397` — the liquid in an unfocused duration card: `#FFE666` → `#FFF3B3` (60 %) → `#FFEF99`. */
+  durationLevel: {
+    colors: [palette.yellow400, palette.yellow250, palette.yellow300],
+    locations: [0, 0.6, 1],
+    angleDeg: 180,
+  },
+  /** `1219:4274` — the liquid in the focused duration card: `#FFD600` → `#FFDE33` (60 %) → `#FFE666`. */
+  durationLevelFocused: {
+    colors: [palette.yellow500, palette.yellow33, palette.yellow400],
+    locations: [0, 0.6, 1],
+    angleDeg: 180,
+  },
+  /** `444:10421` — an unselected Plan tile: `#FFF7CC` → `#FFEF99`, straight down. */
+  planTileIdle: {
+    colors: [palette.yellow200, palette.yellow300],
+    angleDeg: 180,
+  },
+  /** `444:10424` — the "+" button: `#FFE666` → `#FFDE33` at 138.81°, under a 70 % gloss. */
+  planAdd: {
+    colors: [palette.yellow400, palette.yellow33],
+    locations: [0.074074, 0.81481],
+    angleDeg: 138.81407483429035,
+  },
+  /** `364:520` — the Schedule Plan banner: `#FFDE33` → `#FFD600` (0 → 71.4 %) at 169.89°. */
+  planBanner: {
+    colors: [palette.yellow33, palette.yellow500],
+    locations: [0, 0.71429],
+    angleDeg: 169.88604760821104,
+  },
+  /**
+   * `364:520` — the Schedule Plan banner's 1.5pt edge: `#FFF7CC` at the top, clear by 45 % of the
+   * way down (the stroke is a vertical gradient, not a flat colour).
+   */
+  planBannerRim: {
+    colors: [palette.yellow200, withAlpha(palette.yellow200, 0)],
+    locations: [0, 0.45],
+    angleDeg: 180,
+  },
+  /** `358:8192` — the Summary's active Plan tab: `#FFDE33` → `#FFD600` by 60 %, straight down. */
+  planTabActive: {
+    colors: [palette.yellow33, palette.yellow500],
+    locations: [0, 0.6],
+    angleDeg: 180,
+  },
+  /**
+   * `444:10250` — the visit flow's Plan card: `#FFF7CC` → `#FFE666` (7.4 % → 81.5 %) at 174.75°
+   * under `planCardGloss`.
+   */
+  planCard: {
+    colors: [palette.yellow200, palette.yellow400],
+    locations: [0.074074, 0.81481],
+    angleDeg: 174.74972727026696,
+  },
+  /** `444:10250` — the Plan card's gloss: `#FFF7CC` at 80 % fading out by 50 %. */
+  planCardGloss: {
+    colors: [withAlpha(palette.yellow200, 0.8), withAlpha(palette.yellow200, 0)],
+    locations: [0, 0.5],
+    angleDeg: 180,
+  },
+  /** `444:10264` — the Plan card's ghost numeral: `#FFE666` → `#FFD600`, straight down its line. */
+  planCardGhost: {
+    colors: [palette.yellow400, palette.yellow500],
+    angleDeg: 180,
+  },
+  /**
+   * `444:10270` — the visit being scheduled: the selected Plan tile's sweep and gloss
+   * (`planTileActive` / `planTileGloss`) at this card's own 169.37°.
+   */
+  visitTabActiveAngleDeg: 169.37065492527108,
+  /**
+   * `444:10299` — the 1.5pt edge of the visit being scheduled: a vertical stroke, `#FFF7CC` at the
+   * top through `#FFE666` (55 %) to `#FFD600` at the foot.
+   */
+  visitTabRim: {
+    colors: [palette.yellow200, palette.yellow400, palette.yellow500],
+    locations: [0, 0.55, 1],
+    angleDeg: 180,
+  },
+  planAddGloss: {
+    colors: [withAlpha(palette.yellow200, 0.7), withAlpha(palette.yellow200, 0)],
+    locations: [0, 0.45],
+    angleDeg: 180,
+  },
+  /**
+   * Step 1's Plan header as the current frames draw it (`1366:2937` selected, `1366:2914`
+   * unselected, `1366:2938` "+"): RADIAL gradients, an ellipse centred on the box that reaches its
+   * four sides (`farthest-side`; the transform's radii are exactly half the width and height).
+   * `radialBackground` turns one into a style, since `expo-linear-gradient` is linear only. The
+   * selected tile's mid stops are the file's own eased ramp from `#FFE666` to `#FFD600`.
+   */
+  planHeaderActive: {
+    colors: [
+      palette.yellow300,
+      palette.yellow400,
+      '#FFE24D',
+      palette.yellow33,
+      '#FFDA1A',
+      '#FFD80D',
+      palette.yellow500,
+    ],
+    locations: [0, 0.71635, 0.78726, 0.85817, 0.92909, 0.96454, 1],
+  },
+  /** `1366:2914` — an unselected tile: white at the centre into `#FFF7CC` at the edge. */
+  planHeaderIdle: {
+    colors: [palette.white, palette.yellow200],
+    locations: [0, 1],
+  },
+  /** `1366:2938` — the "+": white into `#FFE666` through `#FFF3B3` and `#FFEC8C`. */
+  planHeaderAdd: {
+    colors: [palette.white, '#FFF3B3', '#FFEC8C', palette.yellow400],
+    locations: [0, 0.5, 0.75, 1],
+  },
 } as const;
+
+/** The CSS a radial gradient token resolves to: an ellipse reaching the box's four sides. */
+export function radialBackground(token: {
+  readonly colors: readonly string[];
+  readonly locations: readonly number[];
+}): string {
+  const stops = token.colors.map(
+    (color, index) => `${color} ${(token.locations[index] ?? 0) * 100}%`,
+  );
+  return `radial-gradient(ellipse farthest-side at 50% 50%, ${stops.join(', ')})`;
+}
 
 export type GradientToken = keyof typeof gradients;
 
@@ -805,6 +1030,125 @@ export const typography = {
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
+  /** Recurring setup, Step 1 — the footer caption ("Pick 2 more days to continue"): Regular 13/16. */
+  captionStep: {
+    fontSize: 13,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — an idle visit tab, a time of day ("Morning"): Livvic Bold 14/18. */
+  labelStrong: {
+    fontSize: fontSize.lg,
+    lineHeight: 18,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — the line under a visit tab ("1:15 PM · 1.5 hr"): Regular 10/12. */
+  tabMeta: {
+    fontSize: fontSize.xs,
+    lineHeight: 12,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — a day cell's weekday ("Tue"): Livvic Bold 10/13. */
+  weekdayMicro: {
+    fontSize: fontSize.xs,
+    lineHeight: 13,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — a start time's coverage ("all days", "9/11 days"): Bold 10/16. */
+  slotCaption: {
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — a duration ("1.5 hr"): Livvic Black 16/22 at −0.4. */
+  durationTitle: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.tight,
+  },
+  /** Recurring setup, Step 2 — a duration's struck list price ("₹450"): Regular 11/15. */
+  priceMicro: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — a duration's price ("₹189"): Livvic Bold 11/15. */
+  priceMicroBold: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 2 — the footer total ("11 visits · 11 days"): Livvic Bold 15/19. */
+  titleTotal: {
+    fontSize: 15,
+    lineHeight: 19,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 3 — "Not available at 1:15 PM": Livvic Regular 12/15. */
+  noticeSmall: {
+    fontSize: fontSize.md,
+    lineHeight: 15,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 3 — a visit's label over its time ("Visit 1 · 1.5 hr"): Bold 11/14. */
+  labelMicro: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 4 — a visit line's detail and price ("· 1:15 PM · 1.5 hr"): 14/18. */
+  bodyTight: {
+    fontSize: fontSize.lg,
+    lineHeight: 18,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 4 — the charge note above the CTA: Livvic Regular 13/18. */
+  footnote: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 4 — the amounts inside that note ("₹198"): Livvic Bold 13/18. */
+  footnoteBold: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup, Step 1 — the day counter ("3 / 14"): Livvic Black 14/18. */
+  labelCounter: {
+    fontSize: fontSize.lg,
+    lineHeight: 18,
+    fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1302:2618` — the "?" on Recurring's help button: Livvic Bold 22/28. */
+  helpGlyph: {
+    fontSize: fontSize.xxxl,
+    lineHeight: lineHeight.xxl,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Recurring setup — the screen title ("Pick your days"): Livvic Black 22/28. */
+  headingStep: {
+    fontSize: fontSize.xxxl,
+    lineHeight: lineHeight.xxl,
+    fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.none,
+  },
   /** Recurring setup, Steps 5–6 — intro and subtitle copy: Livvic Regular 15/22. */
   bodyRelaxed: {
     fontSize: 15,
@@ -812,25 +1156,32 @@ export const typography = {
     fontFamily: fontFamily.regular,
     letterSpacing: letterSpacing.none,
   },
-  /** Recurring setup, Step 5 — a payment option's name ("UPI Autopay"): Livvic Black 15/20. */
+  /** Recurring setup, Step 5 — a payment option's name ("UPI Autopay"): Livvic Black 15/19. */
   optionTitle: {
     fontSize: 15,
-    lineHeight: lineHeight.lg,
+    lineHeight: 19,
     fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.none,
   },
-  /** Recurring setup, Step 4 — the plan total ("11 days · 17 visits"): Livvic Bold 17/22. */
+  /** Recurring setup, Step 4 — the plan total ("11 days · 17 visits"): Livvic Bold 17/21. */
   titleLarge: {
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 21,
     fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
-  /** Recurring setup, Step 6 — the first-visit time: Livvic Black 17/22. */
+  /** Recurring setup — the CTA labels and Step 6's first-visit time: Livvic Black 17/21. */
   titleLargeBlack: {
     fontSize: 17,
-    lineHeight: 22,
+    lineHeight: 21,
     fontFamily: fontFamily.black,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1219:4278` — Spoon `Display mid`, the focused duration card's label: Livvic Bold 26/32. */
+  displayMid: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontFamily: fontFamily.bold,
     letterSpacing: letterSpacing.none,
   },
   /** Recurring setup, Step 6 — "Plan confirmed!": Livvic Black 26/32. */
@@ -843,6 +1194,62 @@ export const typography = {
   /** Recurring setup, Step 1 — the "Sep 29 – Oct 19" range: Livvic Regular 14/20. */
   bodyLarge: {
     fontSize: fontSize.lg,
+    lineHeight: lineHeight.lg,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Body Strong`: Livvic SemiBold 14/20 (the Step 1 weekday and month labels). */
+  bodyLargeStrong: {
+    fontSize: fontSize.lg,
+    lineHeight: lineHeight.lg,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Heading`: Livvic SemiBold 18/26 ("Plan 1", "Selected days"). */
+  headingSection: {
+    fontSize: fontSize.xxl,
+    lineHeight: 26,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Display`: Livvic Bold 24/32 (the Edit date "Wed, 7 Oct"). */
+  display: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Emphasis`: Livvic SemiBold 16/24 (the Plan card's "Plan 1"). */
+  emphasis: {
+    fontSize: fontSize.xl,
+    lineHeight: lineHeight.xl,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Micro Strong`: Livvic SemiBold 10/14 (the "Selected days" weekdays). */
+  microSemibold: {
+    fontSize: fontSize.xs,
+    lineHeight: 14,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Micro`: Livvic Regular 10/14, the day-picker legend (`1351:4412`). */
+  microRegular: {
+    fontSize: fontSize.xs,
+    lineHeight: 14,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** Spoon — User `Spoon/Title`: Livvic Bold 20/28, the `Nav header 2` title (`44:66`). */
+  titleNav: {
+    fontSize: fontSize.xxl20,
+    lineHeight: lineHeight.xxl,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `155:1585` — Livvic Regular 12 on a 20pt line: inline validation under a field or grid. */
+  captionError: {
+    fontSize: fontSize.md,
     lineHeight: lineHeight.lg,
     fontFamily: fontFamily.regular,
     letterSpacing: letterSpacing.none,
@@ -996,6 +1403,8 @@ export const elevation = {
   glow: elevations.glow,
   sheet: elevations.raised,
   cta: elevations.cta,
+  /** `983:6074` — the Recurring landing's "Schedule Now" tag. */
+  tag: elevations.tag,
 } as const satisfies Record<string, Elevation>;
 
 export type ElevationRole = keyof typeof elevation;

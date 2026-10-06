@@ -128,43 +128,13 @@ export const DEV_ROUTES: readonly DevRoute[] = [
   { path: '/splash', label: 'Login · Loading page', note: '73:1036' },
   {
     path: '/recurring-setup',
-    label: 'Recurring setup · 1 Pick days (preview)',
-    note: 'IN PROGRESS · dev preview, no session needed — see docs/CLAUDE_DESIGN_RECURRING_SETUP.md',
+    label: 'Recurring setup · full flow (preview)',
+    note: 'IN PROGRESS · dev preview, no session needed',
   },
   {
-    path: '/recurring-setup?step=2',
-    label: 'Recurring setup · 2 Time & duration (preview)',
-    note: 'IN PROGRESS · dev preview, no session needed — see docs/CLAUDE_DESIGN_RECURRING_SETUP.md',
-  },
-  {
-    path: '/recurring-setup?step=3',
-    label: 'Recurring setup · 3 Times by date · 3 visits (preview)',
-    note: 'IN PROGRESS · dev preview, no session needed — see docs/CLAUDE_DESIGN_RECURRING_SETUP.md',
-  },
-  {
-    path: '/recurring-setup?step=3&visits=1',
-    label: 'Recurring setup · 3 Times by date · 1 visit (preview)',
-    note: 'IN PROGRESS · dev preview, no session needed — see docs/CLAUDE_DESIGN_RECURRING_SETUP.md',
-  },
-  {
-    path: '/recurring-setup?step=3&visits=2',
-    label: 'Recurring setup · 3 Times by date · 2 visits (preview)',
-    note: 'IN PROGRESS · dev preview, no session needed — see docs/CLAUDE_DESIGN_RECURRING_SETUP.md',
-  },
-  {
-    path: '/recurring-setup?step=4',
-    label: 'Recurring setup · 4 Review plan (preview)',
-    note: 'IN PROGRESS · dev preview, no session needed — see docs/CLAUDE_DESIGN_RECURRING_SETUP.md',
-  },
-  {
-    path: '/recurring-setup?step=5',
-    label: 'Recurring setup · 5 Autopay (preview)',
-    note: 'IN PROGRESS · dev preview, no session needed — see docs/CLAUDE_DESIGN_RECURRING_SETUP.md',
-  },
-  {
-    path: '/recurring-setup?step=6',
-    label: 'Recurring setup · 6 Plan confirmed (preview)',
-    note: 'IN PROGRESS · dev preview, no session needed — see docs/CLAUDE_DESIGN_RECURRING_SETUP.md',
+    path: '/recurring-setup?step=1',
+    label: 'Recurring setup · Pick days only (preview)',
+    note: 'IN PROGRESS · dev preview, no session needed',
   },
 ];
 
