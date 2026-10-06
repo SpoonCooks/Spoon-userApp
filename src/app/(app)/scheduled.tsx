@@ -25,11 +25,19 @@ import type { ScheduleSelection } from '@features/scheduled';
  */
 export default function ScheduledRoute() {
   const router = useRouter();
-  const { step } = useLocalSearchParams<{ step?: string }>();
+  const { step, durationId: presetDuration } = useLocalSearchParams<{
+    step?: string;
+    durationId?: string;
+  }>();
+  /**
+   * Home's Schedule CTA passes the duration the customer already chose (`?durationId=dur-90`),
+   * so it stays pre-selected here and only a slot and payment remain.
+   */
+  const preset = presetDuration?.startsWith('dur-') === true ? presetDuration : null;
   const [selection, setSelection] = useState<ScheduleSelection>({
     dayId: null,
     periodId: null,
-    durationId: null,
+    durationId: preset,
     slotId: null,
   });
 
@@ -44,7 +52,8 @@ export default function ScheduledRoute() {
     scheduledStart: selection.slotId,
   });
 
-  const seed = __DEV__ ? devScheduleSelection(state, step) : undefined;
+  const devSeed = __DEV__ ? devScheduleSelection(state, step) : undefined;
+  const seed = devSeed ?? (preset === null ? undefined : { durationId: preset });
 
   /**
    * Home. Reached from the Home tile and from the Instant sheet's "Schedule instead", both of

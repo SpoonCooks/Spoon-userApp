@@ -279,13 +279,18 @@ export function durationMerchandisingFor(duration: {
   readonly durationMinutes: number;
   readonly serviceAmountPaise: number;
 }): { readonly strikePrice?: string } {
+  const strikePaise = strikePaiseFor(duration);
+  return strikePaise === null ? {} : { strikePrice: formatPaise(strikePaise) };
+}
+
+/** The same anchor in paise, or `null` when it would not undercut the real price. */
+export function strikePaiseFor(duration: {
+  readonly durationMinutes: number;
+  readonly serviceAmountPaise: number;
+}): number | null {
   const anchorPaise = duration.durationMinutes * ANCHOR_RATE_PAISE_PER_MINUTE;
-
-  if (anchorPaise <= duration.serviceAmountPaise || duration.serviceAmountPaise === 0) {
-    return {};
-  }
-
-  return { strikePrice: formatPaise(anchorPaise) };
+  if (anchorPaise <= duration.serviceAmountPaise || duration.serviceAmountPaise === 0) return null;
+  return anchorPaise;
 }
 
 /** `dur-90` <-> 90. The id is the client's own handle for a server duration, not a server id. */

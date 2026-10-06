@@ -39,6 +39,8 @@ export {
   CLIENT_ONLY_CANCELLATION_REASONS,
   durationLabelFor,
   durationMerchandisingFor,
+  durationIdFor,
+  strikePaiseFor,
   useBookingDetailData,
   useBookingSubmission,
   useExtensionCheckout,

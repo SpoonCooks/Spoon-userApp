@@ -509,48 +509,37 @@ describe('Home is a root', () => {
    */
   it('draws no back control at all', async () => {
     render(<HomeRoute />);
-    await screen.findByTestId('home-screen');
+    await screen.findByTestId('home-redesign-screen');
 
     expect(screen.queryByTestId('screen-header-back')).toBeNull();
     expect(screen.queryByTestId('address-header')).toBeNull();
     expect(screen.queryByTestId('booking-back')).toBeNull();
   });
 
-  it('opens the Instant sheet locally, with no navigation', async () => {
+  it('routes the address and profile controls to real destinations', async () => {
     render(<HomeRoute />);
-
-    fireEvent.press(await screen.findByTestId('home-tile-instant'));
-
-    expect(await screen.findByTestId('instant-sheet')).toBeTruthy();
-    // §18 — opening a sheet is local state. Nothing navigates and nothing is fetched to do it.
-    expect(mockRouter.push).not.toHaveBeenCalled();
-  });
-
-  /**
-   * §2 — a sheet is a native `Modal`, so Android's hardware back reaches `onRequestClose` before
-   * the navigator sees it. Closing the sheet must not touch the stack.
-   */
-  it('closes the Instant sheet without navigating', async () => {
-    render(<HomeRoute />);
-    fireEvent.press(await screen.findByTestId('home-tile-instant'));
-    await screen.findByTestId('instant-sheet');
-
-    fireEvent(screen.getByTestId('instant-sheet-modal'), 'requestClose');
-
-    expect(mockRouter.back).not.toHaveBeenCalled();
-    expect(mockRouter.replace).not.toHaveBeenCalled();
-  });
-
-  it('routes the Home tiles and the profile control to real destinations', async () => {
-    render(<HomeRoute />);
-
-    fireEvent.press(await screen.findByTestId('home-tile-scheduled'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/scheduled');
 
     // Tagged with its entry point, so Saved addresses' back control can send it straight home
     // rather than through Profile — see "Saved addresses back target follows its entry point".
-    fireEvent.press(await screen.findByTestId('home-address'));
+    fireEvent.press(await screen.findByRole('button', { name: /^Delivery address/ }));
     expect(mockRouter.push).toHaveBeenCalledWith('/address?from=home');
+
+    fireEvent.press(screen.getByRole('button', { name: 'Profile' }));
+    expect(mockRouter.push).toHaveBeenCalledWith('/profile');
+  });
+
+  it('hands the chosen duration to Schedule on Later', async () => {
+    render(<HomeRoute />);
+
+    const tiles = await screen.findAllByRole('radio', { name: /, ₹/ });
+    fireEvent.press(tiles[0]!);
+    fireEvent.press(screen.getByRole('radio', { name: 'Later' }));
+    fireEvent.press(screen.getByRole('button', { name: /^Schedule/ }));
+
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      pathname: '/scheduled',
+      params: { durationId: expect.stringMatching(/^dur-\d+$/) },
+    });
   });
 });
 
@@ -761,34 +750,8 @@ describe('Home banner destinations', () => {
     expect(BANNER_DESTINATION_PAGE[variant]).toBe(page);
   });
 
-  it('opens the REAL booking id, never a fixture route', async () => {
-    const api = createStubApi({
-      ...NAV_STUBS,
-      // The banner needs the SUMMARY (which booking is active) and then the DETAIL (what state it
-      // is in). Both are stubbed so the card renders from a real payload shape.
-      'GET /v1/bookings/bk-live-1': () => ({ booking: { ...BOOKING, id: 'bk-live-1' } }),
-      'GET /v1/me/bookings/active': () => ({
-        bookings: [
-          {
-            id: 'bk-live-1',
-            status: 'assigned',
-            slotType: 'scheduled',
-            scheduledStart: '2026-08-20T07:30:00.000Z',
-            durationMinutes: 60,
-            price: PRICE,
-            addressLabel: 'Home',
-          },
-        ],
-      }),
-    });
-    renderWithRuntime(<HomeRoute />, { runtime: createTestRuntime({ api }) });
-
-    // One booking in the stub, so the carousel draws exactly one card, at track position 0.
-    const banner = await screen.findByTestId('home-booking-carousel-card-0');
-    fireEvent.press(banner);
-
-    expect(mockRouter.push).toHaveBeenCalledWith('/booking/bk-live-1');
-  });
+  // The old Home's carousel opened these destinations; the redesign has no bookings section, so
+  // only the banner state machine (still used by the booking surfaces) is asserted above.
 });
 
 /**
