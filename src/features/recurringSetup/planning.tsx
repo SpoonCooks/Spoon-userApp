@@ -3,23 +3,20 @@ import type { ReactNode } from 'react';
 
 import { formatPaise } from '@core/format';
 import { useAddresses } from '@features/address';
-import { durationMerchandisingFor } from '@features/booking';
-import { useCatalogue } from '@features/catalogue';
-import type { Catalogue } from '@features/catalogue';
 
 import { useRecurringCalendar, useRecurringEligibility } from './api';
-import type { RecurringCalendarDto, RecurringEligibilityDto } from './api';
+import type { DurationPriceDto, RecurringCalendarDto, RecurringEligibilityDto } from './api';
 import { DURATION_OPTIONS, durationIdFor, durationLabelForMinutes } from './data';
 import type { RecurringDurationOption } from './types';
 
 /**
- * What the flow plans against: the window, the day limits, the days nobody can take, and the
- * durations on offer — DEC-084's planning reads, gathered once for every step.
+ * What the flow plans against: the window, the day limits, the days a live Recurring booking
+ * already has, and the durations on offer with their prices — DEC-086's planning reads, gathered
+ * once for every step.
  *
  * Each field falls back to the flow's local rules on its own until the backend has answered for
- * it. The routes are not deployed everywhere yet (SpoonCooks/V0#101), and the dev preview runs
- * without a session at all, so a missing answer must leave the flow working exactly as it did
- * before rather than blank. The save, when it is wired, is the authority either way.
+ * it. The dev preview runs without a session at all, so a missing answer must leave the flow
+ * working exactly as it did before rather than blank. The save is the authority either way.
  */
 export interface RecurringPlanning {
   /** The household's default address: what the calendar and start times are asked about. */
@@ -28,7 +25,7 @@ export interface RecurringPlanning {
   readonly windowStartId: string | null;
   readonly minDays: number;
   readonly maxDays: number;
-  /** Window days no pool Cook can take — greyed out, like a day held by another plan. */
+  /** Window days a live Recurring booking already has — greyed out, like another plan's day. */
   readonly unavailableDayIds: ReadonlySet<string>;
   readonly durations: readonly RecurringDurationOption[];
 }
@@ -44,14 +41,21 @@ export const LOCAL_PLANNING: RecurringPlanning = {
   durations: DURATION_OPTIONS,
 };
 
-/** The catalogue's durations as the Schedule tiles draw them, priced the way Instant prices them. */
-export function durationOptionsFrom(catalogue: Catalogue): readonly RecurringDurationOption[] {
-  return catalogue.durations.map((duration) => ({
+/**
+ * Recurring's durations as the Schedule tiles draw them: the effective price (pre-GST, as the
+ * design shows it) and the struck-through base price, both from the backend's published policies.
+ */
+export function durationOptionsFrom(
+  durations: readonly DurationPriceDto[],
+): readonly RecurringDurationOption[] {
+  return durations.map((duration) => ({
     id: durationIdFor(duration.durationMinutes),
     label: durationLabelForMinutes(duration.durationMinutes),
     minutes: duration.durationMinutes,
-    price: formatPaise(duration.serviceAmountPaise),
-    ...durationMerchandisingFor(duration),
+    price: formatPaise(duration.pricePaise),
+    ...(duration.basePricePaise > duration.pricePaise
+      ? { strikePrice: formatPaise(duration.basePricePaise) }
+      : {}),
   }));
 }
 
@@ -59,10 +63,9 @@ export function planningFrom(input: {
   readonly addressId: string | null;
   readonly eligibility: RecurringEligibilityDto | null;
   readonly calendar: RecurringCalendarDto | null;
-  readonly catalogue: Catalogue | null;
 }): RecurringPlanning {
-  const { eligibility, calendar, catalogue } = input;
-  const durations = catalogue === null ? [] : durationOptionsFrom(catalogue);
+  const { eligibility, calendar } = input;
+  const durations = eligibility === null ? [] : durationOptionsFrom(eligibility.durations);
   return {
     addressId: input.addressId,
     windowStartId: eligibility?.window.startDate ?? calendar?.window.startDate ?? null,
@@ -71,7 +74,7 @@ export function planningFrom(input: {
     unavailableDayIds:
       calendar === null
         ? NO_DAYS
-        : new Set(calendar.days.filter((day) => !day.available).map((day) => day.date)),
+        : new Set(calendar.days.filter((day) => !day.selectable).map((day) => day.date)),
     durations: durations.length === 0 ? LOCAL_PLANNING.durations : durations,
   };
 }
@@ -97,8 +100,8 @@ export function useRecurringPlanning(): RecurringPlanning {
 
 /**
  * Reads everything `RecurringPlanning` needs. The calendar is only asked once eligibility says the
- * household is unlocked: a locked household gets a bare 403 from it, which says nothing the
- * eligibility read has not already said.
+ * household is unlocked: a locked household gets 403 `RECURRING_LOCKED` from it, which says
+ * nothing the eligibility read has not already said.
  */
 export function useRecurringPlanningSource(): RecurringPlanning {
   const addresses = useAddresses();
@@ -110,20 +113,11 @@ export function useRecurringPlanningSource(): RecurringPlanning {
 
   const eligibility = useRecurringEligibility();
   const eligible = eligibility.state.status === 'ready' ? eligibility.state.data : null;
-  const calendar = useRecurringCalendar({ addressId, enabled: eligible?.unlocked === true });
-  const catalogue = useCatalogue();
-
+  const calendar = useRecurringCalendar({ enabled: eligible?.unlocked === true });
   const calendarData = calendar.state.status === 'ready' ? calendar.state.data : null;
-  const catalogueData = catalogue.state.status === 'ready' ? catalogue.state.data : null;
 
   return useMemo(
-    () =>
-      planningFrom({
-        addressId,
-        eligibility: eligible,
-        calendar: calendarData,
-        catalogue: catalogueData,
-      }),
-    [addressId, eligible, calendarData, catalogueData],
+    () => planningFrom({ addressId, eligibility: eligible, calendar: calendarData }),
+    [addressId, eligible, calendarData],
   );
 }

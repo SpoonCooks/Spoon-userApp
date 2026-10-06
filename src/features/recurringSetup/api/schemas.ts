@@ -1,241 +1,413 @@
 import { z } from 'zod';
 
 /**
- * Recurring Plan DTOs — DEC-084, V0 `feat/cook-pool-recurring-plans` (SpoonCooks/V0#101).
+ * Recurring booking DTOs — DEC-086 (V2), V0 `feat/cook-pool-recurring-plans`.
  *
- * Transcribed from the backend's own types (`src/recurring/plan-capacity.ts`, `plan-service.ts`,
- * `mandate-service.ts`) and its OpenAPI `Recurring` tag, not yet from a live instance: the routes
- * are not deployed anywhere at the time of writing.
+ * Transcribed from the backend's own response builders (`src/recurring/booking-capacity.ts`,
+ * `recurring-booking-service.ts`, `recurring-cancellation.ts`, `mandate-service.ts`) and its
+ * OpenAPI `Recurring` tag, not yet from a live instance.
  *
  * ## Dates and times are wall-clock, instants are ISO
  *
  * `date` is an Asia/Kolkata calendar date (`YYYY-MM-DD`) and `startTime` an Asia/Kolkata `HH:MM`.
- * `start`, `chargeDueAt` and `reminderDueAt` are instants. The client sends dates and times, and
- * reads instants only to display them.
+ * `start` and `cookConfirmBy` are instants. The client sends dates and times, and reads instants
+ * only to display them.
  *
  * ## Statuses are the backend's, exactly
  *
- * Same rule as the booking DTOs: the app adds no plan or visit status of its own, and does not
- * re-derive what a status allows.
+ * Same rule as the booking DTOs: the app adds no booking or visit status of its own, and does not
+ * re-derive what a status allows — `displayState` and `cancellable` are the server's rulings.
  */
 
 const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const localTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 const instant = z.string().datetime({ offset: true });
 const paise = z.number().int().nonnegative();
-const visitNumber = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+const count = z.number().int().nonnegative();
 
-export const planWindowSchema = z.object({ startDate: localDate, endDate: localDate });
+export const timeOfDaySchema = z.enum(['morning', 'afternoon', 'evening']);
+export type TimeOfDayDto = z.infer<typeof timeOfDaySchema>;
 
-export type PlanWindowDto = z.infer<typeof planWindowSchema>;
+export const recurringWindowSchema = z.object({ startDate: localDate, endDate: localDate });
+export type RecurringWindowDto = z.infer<typeof recurringWindowSchema>;
+
+/** A duration's prices: the struck-through base, the effective price, its GST and the debit. */
+export const durationPriceSchema = z.object({
+  durationMinutes: z.number().int().positive(),
+  basePricePaise: paise,
+  pricePaise: paise,
+  gstPaise: paise,
+  totalPaise: paise,
+  pricingVersion: z.string(),
+});
+export type DurationPriceDto = z.infer<typeof durationPriceSchema>;
+
+const priceSchema = durationPriceSchema.omit({ durationMinutes: true });
 
 /**
- * `GET /v1/recurring/eligibility`.
+ * `GET /v1/recurring/eligibility` — the landing, Home's chip and Step 1's limits in one read.
  *
- * `unlocked` is the only way the app learns that recurring is locked: the planning routes refuse a
- * locked household with a bare 403 `FORBIDDEN`, whose reason the backend does not expose.
+ * `unlocked` is how the app learns Recurring is locked; the planning routes refuse a locked
+ * household with 403 `RECURRING_LOCKED`.
  */
 export const recurringEligibilitySchema = z.object({
   policyVersion: z.string(),
   unlocked: z.boolean(),
-  poolCount: z.number().int().nonnegative(),
-  unlockThreshold: z.number().int().nonnegative(),
-  window: planWindowSchema,
-  limits: z.object({
-    minDays: z.number().int().positive(),
-    maxDays: z.number().int().positive(),
-    maxVisitsPerDay: z.number().int().positive(),
-  }),
+  poolCount: count,
+  unlockThreshold: z.number().int().positive(),
+  /** Home's Recurring chip. */
+  chip: z.enum(['locked', 'book', 'live']),
+  liveBookings: z.array(
+    z.object({
+      recurringBookingId: z.string(),
+      status: z.enum(['pending_mandate', 'active']),
+      windowStart: localDate,
+      windowEnd: localDate,
+    }),
+  ),
+  window: recurringWindowSchema,
+  limits: z.object({ minDays: z.number().int().positive(), maxDays: z.number().int().positive() }),
+  timesOfDay: z.array(
+    z.object({ timeOfDay: timeOfDaySchema, firstStart: localTime, lastStart: localTime }),
+  ),
+  durations: z.array(durationPriceSchema),
   charging: z.object({
-    chargeLeadHours: z.number().int().nonnegative(),
-    reminderLeadHours: z.number().int().nonnegative(),
+    notifyLeadHours: z.number().int().positive(),
+    debitLeadHours: z.number().int().positive(),
     mandateMaxChargePaise: paise,
   }),
-  rescheduleGraceDays: z.number().int().nonnegative(),
 });
-
 export type RecurringEligibilityDto = z.infer<typeof recurringEligibilitySchema>;
 
-/** `GET /v1/recurring/calendar?addressId` — every window day, and whether a pool Cook has room. */
+/** `GET /v1/recurring/calendar` — the window's 21 days; a live booking's dates are not selectable. */
 export const recurringCalendarSchema = z.object({
-  window: planWindowSchema,
-  days: z.array(z.object({ date: localDate, available: z.boolean() })),
+  window: recurringWindowSchema,
+  days: z.array(z.object({ date: localDate, selectable: z.boolean() })),
 });
-
 export type RecurringCalendarDto = z.infer<typeof recurringCalendarSchema>;
 
-/** `POST /v1/recurring/start-times` — one visit duration, measured across the picked days. */
+/**
+ * `POST /v1/recurring/start-times` — the starts one visit can have on every one of its dates,
+ * grouped by time of day. A time of day with none left is `available: false`.
+ */
 export const recurringStartTimesSchema = z.object({
   durationMinutes: z.number().int().positive(),
-  startTimes: z.array(
+  timesOfDay: z.array(
     z.object({
-      startTime: localTime,
-      availableDates: z.array(localDate),
-      /** `all` every picked day, `partial` some, `full` none. */
-      coverage: z.enum(['all', 'partial', 'full']),
+      timeOfDay: timeOfDaySchema,
+      available: z.boolean(),
+      startTimes: z.array(localTime),
     }),
   ),
 });
-
 export type RecurringStartTimesDto = z.infer<typeof recurringStartTimesSchema>;
 
-const quotedPriceSchema = z.object({
-  serviceAmountPaise: paise,
-  taxRateBps: z.number().int().nonnegative(),
-  taxAmountPaise: paise,
-  totalAmountPaise: paise,
-  pricingVersion: z.string(),
-});
-
-/** `POST /v1/recurring/plans/quote` — read-only; nothing is held. */
-export const recurringPlanQuoteSchema = z.object({
+/** `POST /v1/recurring/bookings/quote` — read-only; nothing is held, no Cook is named. */
+export const recurringQuoteSchema = z.object({
   policyVersion: z.string(),
-  /** True when every visit can be reserved and none of the plan's own visits overlap. */
+  /** True when every visit can be held and none of the booking's own visits overlap. */
   bookable: z.boolean(),
-  window: planWindowSchema,
+  window: recurringWindowSchema,
   firstDate: localDate,
   lastDate: localDate,
-  daysCount: z.number().int().nonnegative(),
-  visitsCount: z.number().int().nonnegative(),
-  overlaps: z.array(z.object({ date: localDate, visitNumbers: z.array(visitNumber) })),
+  daysCount: count,
+  visitsCount: count,
+  overlaps: z.array(
+    z.object({ planNumber: z.number().int(), date: localDate, visitNumbers: z.array(z.number()) }),
+  ),
   visits: z.array(
     z.object({
+      planNumber: z.number().int().positive(),
+      visitNumber: z.number().int().positive(),
       date: localDate,
-      visitNumber,
+      timeOfDay: timeOfDaySchema,
       startTime: localTime,
       durationMinutes: z.number().int().positive(),
       start: instant,
-      overridden: z.boolean(),
       available: z.boolean(),
       /**
        * `AVAILABLE`, an availability-engine reason, or one of `CUSTOMER_BOOKING_OVERLAP`,
-       * `VISIT_OVERLAP`, `POOL_CAPACITY_EXHAUSTED`. Left open: the engine's reasons move with it.
+       * `VISIT_OVERLAP`, `POOL_CAPACITY_EXHAUSTED`, `DATE_IN_LIVE_RECURRING`. Left open: the
+       * engine's reasons move with it.
        */
       reason: z.string(),
     }),
   ),
   visitSummaries: z.array(
     z.object({
-      visitNumber,
+      planNumber: z.number().int().positive(),
+      visitNumber: z.number().int().positive(),
+      timeOfDay: timeOfDaySchema,
       durationMinutes: z.number().int().positive(),
       startTime: localTime,
-      daysCount: z.number().int().nonnegative(),
-      price: quotedPriceSchema,
+      daysCount: count,
+      price: durationPriceSchema,
     }),
   ),
-  /** The smallest and largest single charge autopay will be asked for. */
+  /** The smallest and largest single debit Autopay will be asked for. */
   chargeRange: z.object({ minPaise: paise, maxPaise: paise }),
-  /** Every visit's charge added up, tax included, if every visit runs. */
+  /** Every visit's debit added up, GST included, if every visit runs. */
   totalPaise: paise,
   mandateMaxChargePaise: paise,
 });
+export type RecurringQuoteDto = z.infer<typeof recurringQuoteSchema>;
 
-export type RecurringPlanQuoteDto = z.infer<typeof recurringPlanQuoteSchema>;
-
-export const planStatusSchema = z.enum(['pending_mandate', 'active', 'completed', 'cancelled']);
-export const planVisitStatusSchema = z.enum([
-  'reserved',
-  'charging',
-  'confirmed',
-  'charge_failed',
+export const bookingStatusSchema = z.enum(['pending_mandate', 'active', 'completed', 'cancelled']);
+export const visitStatusSchema = z.enum([
+  'scheduled',
+  'notified',
+  'charged',
+  'completed',
   'cancelled',
 ]);
-export const mandateMethodSchema = z.enum(['upi', 'card']);
+/** The four visit-details states (DEC-086). */
+export const visitDisplayStateSchema = z.enum([
+  'cook_pending',
+  'cook_assigned',
+  'completed',
+  'cancelled',
+]);
+export const mandateDisplayStatusSchema = z.enum([
+  'pending',
+  'active',
+  'paused',
+  'revoked',
+  'expired',
+  'rejected',
+]);
 export const mandateStatusSchema = z.enum([
   'pending',
   'initiated',
   'confirmed',
+  'paused',
   'rejected',
   'cancelled',
+  'expired',
 ]);
 
-export type PlanStatus = z.infer<typeof planStatusSchema>;
-export type PlanVisitStatus = z.infer<typeof planVisitStatusSchema>;
-export type MandateMethod = z.infer<typeof mandateMethodSchema>;
+export type RecurringBookingStatus = z.infer<typeof bookingStatusSchema>;
+export type RecurringVisitStatus = z.infer<typeof visitStatusSchema>;
+export type VisitDisplayState = z.infer<typeof visitDisplayStateSchema>;
+export type MandateDisplayStatus = z.infer<typeof mandateDisplayStatusSchema>;
 export type MandateStatus = z.infer<typeof mandateStatusSchema>;
 
-/** The plan view every plan route returns: create, list, detail, cancel, reschedule, keep-going. */
-export const recurringPlanSchema = z.object({
-  planId: z.string(),
-  status: planStatusSchema,
-  addressId: z.string(),
-  window: planWindowSchema,
-  keepGoing: z.boolean(),
-  mealNotes: z.string().nullable(),
-  policyVersion: z.string(),
-  templates: z.array(
-    z.object({
-      visitNumber,
-      durationMinutes: z.number().int().positive(),
-      startTime: localTime,
-      daysScope: z.enum(['all', 'some']),
-      price: z.object({
-        totalAmountPaise: paise,
-        serviceAmountPaise: paise,
-        taxAmountPaise: paise,
-        pricingVersion: z.string(),
-      }),
-    }),
-  ),
-  visits: z.array(
-    z.object({
-      visitId: z.string(),
-      date: localDate,
-      visitNumber,
-      start: instant,
-      durationMinutes: z.number().int().positive(),
-      pricePaise: paise,
-      status: planVisitStatusSchema,
-      /** Set once the visit has become an ordinary booking, at T-24h. */
-      bookingId: z.string().nullable(),
-      chargeDueAt: instant,
-      reminderDueAt: instant,
-    }),
-  ),
-  autopay: z
+/**
+ * One visit on one date. `cook` and `bookingId` appear only once its T−3h debit succeeded: before
+ * that the backend never names, shows or hints at the Cook held for it.
+ */
+export const visitSummarySchema = z.object({
+  visitId: z.string(),
+  planNumber: z.number().int().positive(),
+  visitNumber: z.number().int().positive(),
+  date: localDate,
+  timeOfDay: timeOfDaySchema,
+  startTime: localTime,
+  start: instant,
+  durationMinutes: z.number().int().positive(),
+  status: visitStatusSchema,
+  displayState: visitDisplayStateSchema,
+  /** "Cook confirmed by" — the visit's T−3h. */
+  cookConfirmBy: instant,
+  cook: z
     .object({
-      mandateId: z.string(),
-      method: mandateMethodSchema,
-      status: mandateStatusSchema,
+      cookId: z.string(),
+      displayName: z.string(),
+      profileImageUrl: z.string().nullable(),
+      rating: z.object({ average: z.number(), count: z.number().int() }),
     })
     .nullable(),
+  bookingId: z.string().nullable(),
+  totalPaise: paise,
+  cancelledBy: z.enum(['customer', 'payment_failed', 'spoon']).nullable(),
+});
+export type VisitSummaryDto = z.infer<typeof visitSummarySchema>;
+
+export const mandateSummarySchema = z.object({
+  mandateId: z.string(),
+  method: z.literal('upi'),
+  status: mandateDisplayStatusSchema,
+  /** e.g. `ra••••@okhdfc`. Null until the bank confirms. */
+  handleMasked: z.string().nullable(),
+  maxAmountPaise: paise,
+});
+export type MandateSummaryDto = z.infer<typeof mandateSummarySchema>;
+
+const supportSchema = z.object({ whatsappUrl: z.string().nullable() });
+
+/** The Recurring tab: Live booking and Manage plans in one read. */
+export const recurringBookingSchema = z.object({
+  recurringBookingId: z.string(),
+  status: bookingStatusSchema,
+  addressId: z.string(),
+  window: recurringWindowSchema,
+  policyVersion: z.string(),
+  mandate: mandateSummarySchema.nullable(),
+  /** The re-approve banner while later visits cannot be debited. */
+  banner: z
+    .object({
+      kind: z.enum(['MANDATE_PAUSED', 'MANDATE_REVOKED', 'MANDATE_EXPIRED']),
+      action: z.literal('REAPPROVE_MANDATE'),
+    })
+    .nullable(),
+  counts: z.object({ done: count, cancelled: count, toGo: count }),
+  plans: z.array(
+    z.object({
+      planNumber: z.number().int().positive(),
+      days: z.array(localDate),
+      visits: z.array(
+        z.object({
+          visitNumber: z.number().int().positive(),
+          timeOfDay: timeOfDaySchema,
+          durationMinutes: z.number().int().positive(),
+          startTime: localTime,
+          days: z.array(localDate),
+          price: priceSchema,
+        }),
+      ),
+      history: z.array(visitSummarySchema),
+    }),
+  ),
+  days: z.array(
+    z.object({
+      date: localDate,
+      group: z.enum(['past', 'today', 'upcoming']),
+      visits: z.array(visitSummarySchema),
+    }),
+  ),
+  upNext: visitSummarySchema.nullable(),
+  chargeRange: z.object({ minPaise: paise, maxPaise: paise }),
+  support: supportSchema,
   createdAt: instant,
   cancelledAt: instant.nullable(),
+  cancelledBy: z.enum(['customer', 'spoon', 'system']).nullable(),
 });
+export type RecurringBookingDto = z.infer<typeof recurringBookingSchema>;
 
-export type RecurringPlanDto = z.infer<typeof recurringPlanSchema>;
+export const recurringBookingListSchema = z.array(recurringBookingSchema);
 
-export const recurringPlanListSchema = z.array(recurringPlanSchema);
+/** One visit's details: price, payment once debited, the cancellation outcome, prep checks. */
+export const visitDetailSchema = visitSummarySchema.extend({
+  recurringBookingId: z.string(),
+  price: priceSchema,
+  payment: z
+    .object({
+      bookingId: z.string(),
+      pricePaise: paise,
+      gstPaise: paise,
+      totalPaise: paise,
+      chargedAt: instant.nullable(),
+      mode: z.literal('upi_autopay'),
+    })
+    .nullable(),
+  cancellation: z
+    .object({
+      cancelledBy: z.enum(['customer', 'payment_failed', 'spoon']),
+      cancelledAt: instant,
+      window: z.number().int().min(1).max(3).nullable(),
+      reasonCode: z.string().nullable(),
+      feePercent: z.number().int(),
+      feePaise: paise,
+      refundPaise: paise,
+      refundStatus: z.enum(['processing', 'refunded', 'failed']).nullable(),
+      /** True when nothing was charged at all. */
+      nothingCharged: z.boolean(),
+    })
+    .nullable(),
+  mandate: mandateSummarySchema.nullable(),
+  prep: z
+    .object({
+      entryApproved: z.boolean(),
+      groceriesReady: z.boolean(),
+      utensilsReady: z.boolean(),
+    })
+    .nullable(),
+  support: supportSchema,
+});
+export type VisitDetailDto = z.infer<typeof visitDetailSchema>;
 
-/** `POST /v1/me/recurring-plans/:planId/mandate` — what Razorpay's recurring checkout needs. */
+/** `POST .../mandate` — what Razorpay's UPI Autopay checkout needs. */
 export const mandateCheckoutSchema = z.object({
   mandateId: z.string(),
-  planId: z.string(),
-  method: mandateMethodSchema,
-  status: z.literal('pending'),
+  recurringBookingId: z.string(),
+  method: z.literal('upi'),
+  status: mandateStatusSchema,
   provider: z.literal('razorpay'),
   providerOrderId: z.string(),
   providerCustomerId: z.string(),
-  /** The authorisation charge (₹1), refunded once the mandate is confirmed. */
+  /** The authorisation amount (₹1), refunded once the mandate is confirmed. */
   amountPaise: paise,
   currency: z.literal('INR'),
-  /** The most any single visit charge may take. */
+  /** The per-debit ceiling. */
   maxAmountPaise: paise,
-  authoriseBy: instant,
+  /** When an unapproved booking is released. Null for a re-approval of a live booking. */
+  approveBy: instant.nullable(),
   /** Null when the backend has no Razorpay key configured — checkout cannot open. */
   keyId: z.string().nullable(),
 });
-
 export type MandateCheckoutDto = z.infer<typeof mandateCheckoutSchema>;
 
-/** `POST /v1/me/recurring-plans/:planId/mandate/verify`. */
+/** `POST .../mandate/verify`. `initiated` is normal for UPI: the bank confirms by webhook. */
 export const mandateVerifySchema = z.object({
   mandateId: z.string(),
-  planId: z.string(),
-  method: mandateMethodSchema,
+  recurringBookingId: z.string(),
+  method: z.literal('upi'),
   status: mandateStatusSchema,
-  planStatus: planStatusSchema,
+  bookingStatus: bookingStatusSchema,
+  handleMasked: z.string().nullable(),
   confirmedAt: instant.nullable(),
 });
-
 export type MandateVerifyDto = z.infer<typeof mandateVerifySchema>;
+
+/** What cancelling one visit now would cost. */
+export const visitCancellationQuoteSchema = z.object({
+  visitId: z.string(),
+  cancellable: z.boolean(),
+  refusalReason: z
+    .enum(['VISIT_STARTED', 'VISIT_COMPLETED', 'VISIT_CANCELLED', 'COOK_DISPATCHED'])
+    .optional(),
+  /** 1 before T−27h, 2 until T−3h (both free), 3 after the debit (the V0 fee bands). */
+  window: z.number().int().min(1).max(3).nullable(),
+  feePercent: z.number().int(),
+  feePaise: paise,
+  refundPaise: paise,
+  chargedPaise: paise,
+  nothingCharged: z.boolean(),
+});
+export type VisitCancellationQuoteDto = z.infer<typeof visitCancellationQuoteSchema>;
+
+export const bookingCancellationQuoteSchema = z.object({
+  recurringBookingId: z.string(),
+  cancellable: z.boolean(),
+  freeCount: count,
+  debited: z.array(
+    z.object({
+      visitId: z.string(),
+      date: localDate,
+      feePercent: z.number().int(),
+      feePaise: paise,
+      refundPaise: paise,
+    }),
+  ),
+  startedCount: count,
+  totals: z.object({ feePaise: paise, refundPaise: paise }),
+});
+export type BookingCancellationQuoteDto = z.infer<typeof bookingCancellationQuoteSchema>;
+
+export const bookingCancellationSchema = z.object({
+  booking: recurringBookingSchema,
+  visitsCancelled: count,
+  totals: z.object({ feePaise: paise, refundPaise: paise }),
+  /** The optional WhatsApp message to the team, prefilled with the booking and reason. */
+  whatsappUrl: z.string().nullable(),
+});
+export type BookingCancellationDto = z.infer<typeof bookingCancellationSchema>;
+
+/** `GET/PUT /v1/bookings/:bookingId/prep`. */
+export const bookingPrepSchema = z.object({
+  bookingId: z.string(),
+  entryApproved: z.boolean(),
+  groceriesReady: z.boolean(),
+  utensilsReady: z.boolean(),
+  updatedAt: instant,
+});
+export type BookingPrepDto = z.infer<typeof bookingPrepSchema>;

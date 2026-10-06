@@ -12,16 +12,16 @@ import { useSafeBack } from '@core/navigation';
  * Reachable at `spoon://recurring-setup/days`. (The file keeps its name: `/recurring-setup` itself
  * is the dev preview's path, `(dev)/recurring-setup.tsx`, and two routes can't share it.)
  *
- * The flow plans against the backend's recurring reads (DEC-084): the window and day limits, the
- * days a pool Cook can take, catalogue durations and prices, and start times per visit
- * (`useRecurringPlanningSource`). Each falls back to the local rules until it has answered.
+ * The flow plans against the backend's Recurring reads (DEC-086): the window and day limits, the
+ * days a live Recurring booking already has, the durations with their base and effective prices,
+ * and start times per visit by time of day (`useRecurringPlanningSource`). Each falls back to the
+ * local rules until it has answered.
  *
  * The "?" on every screen opens the Recurring landing page (`/recurring`, `1302:2617`).
  *
- * Not linked from anywhere in the app yet, and "Book Now" (`onComplete`) is left unwired: saving a
- * plan needs the autopay step, which has no design yet, and the flow builds several plans where
- * the backend keeps one live plan per household. `/home` is a placeholder fallback for the same
- * reason: nothing has decided yet where this flow is entered from.
+ * Not linked from anywhere in the app yet, and "Book Now" (`onComplete`) is left unwired: saving
+ * and UPI Autopay are ready in `useBookRecurring`, but the Autopay step has no design yet. `/home`
+ * is a placeholder fallback for the same reason: nothing has decided where this flow is entered.
  */
 export default function RecurringSetupRoute() {
   const router = useRouter();

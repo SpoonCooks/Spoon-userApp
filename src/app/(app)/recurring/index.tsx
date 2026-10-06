@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 
 import { useSafeBack } from '@core/navigation';
 import { RecurringLandingScreen, useExplainerVideoSource } from '@features/recurringLanding';
+import { useRecurringEligibility } from '@features/recurringSetup';
 
 /**
  * Recurring — the landing. "Make your Cook Pool" opens the Cook Pool landing. Both "schedule"
@@ -19,11 +20,13 @@ export default function RecurringRoute() {
   const router = useRouter();
   const goBack = useSafeBack('/home');
   const videoSource = useExplainerVideoSource();
+  const eligibility = useRecurringEligibility();
+  const locked = eligibility.state.status === 'ready' && !eligibility.state.data.unlocked;
 
   return (
     <RecurringLandingScreen
       onBack={goBack}
-      onSchedule={() => router.push('/recurring-setup/days')}
+      onSchedule={() => router.push(locked ? '/cook-pool' : '/recurring-setup/days')}
       onMakeCookPool={() => router.push('/cook-pool')}
       {...(videoSource === undefined ? {} : { videoSource })}
     />

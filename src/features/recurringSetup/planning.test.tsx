@@ -1,12 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
-import { catalogueSchema } from '@features/catalogue';
-import {
-  DEFAULT_API_STUBS,
-  createStubApi,
-  createTestRuntime,
-  renderWithRuntime,
-} from '@/test/renderWithRuntime';
+import { createStubApi, createTestRuntime, renderWithRuntime } from '@/test/renderWithRuntime';
 
 import { VisitChoices } from './components/VisitChoices';
 import { durationIdFor, durationLabel, durationMinutes } from './data';
@@ -14,28 +8,50 @@ import { LOCAL_PLANNING, RecurringPlanningProvider, planningFrom } from './plann
 import type { RecurringEligibilityDto } from './api';
 
 /**
- * The flow's planning inputs (DEC-084): what the backend says wins, field by field, and anything
+ * The flow's planning inputs (DEC-086): what the backend says wins, field by field, and anything
  * it has not said yet falls back to the local rules the flow already ran on.
  */
 
-const CATALOGUE = catalogueSchema.parse(DEFAULT_API_STUBS['GET /v1/catalogue']!(undefined));
-
 const ELIGIBILITY: RecurringEligibilityDto = {
-  policyVersion: 'recurring-v1',
+  policyVersion: 'recurring-v2-spec-1',
   unlocked: true,
-  poolCount: 3,
-  unlockThreshold: 3,
+  poolCount: 2,
+  unlockThreshold: 2,
+  chip: 'book',
+  liveBookings: [],
   window: { startDate: '2026-10-05', endDate: '2026-10-25' },
-  limits: { minDays: 4, maxDays: 10, maxVisitsPerDay: 3 },
-  charging: { chargeLeadHours: 24, reminderLeadHours: 48, mandateMaxChargePaise: 100000 },
-  rescheduleGraceDays: 7,
+  limits: { minDays: 4, maxDays: 10 },
+  timesOfDay: [
+    { timeOfDay: 'morning', firstStart: '05:00', lastStart: '11:45' },
+    { timeOfDay: 'afternoon', firstStart: '12:00', lastStart: '16:45' },
+    { timeOfDay: 'evening', firstStart: '17:00', lastStart: '23:45' },
+  ],
+  durations: [
+    {
+      durationMinutes: 30,
+      basePricePaise: 15000,
+      pricePaise: 6900,
+      gstPaise: 345,
+      totalPaise: 7245,
+      pricingVersion: 'p',
+    },
+    {
+      durationMinutes: 60,
+      basePricePaise: 12900,
+      pricePaise: 12900,
+      gstPaise: 645,
+      totalPaise: 13545,
+      pricingVersion: 'p',
+    },
+  ],
+  charging: { notifyLeadHours: 27, debitLeadHours: 3, mandateMaxChargePaise: 100000 },
 };
 
 describe('planningFrom', () => {
   it('is the local rules when nothing has answered', () => {
-    expect(
-      planningFrom({ addressId: null, eligibility: null, calendar: null, catalogue: null }),
-    ).toEqual(LOCAL_PLANNING);
+    expect(planningFrom({ addressId: null, eligibility: null, calendar: null })).toEqual(
+      LOCAL_PLANNING,
+    );
   });
 
   it('takes the window and limits from eligibility', () => {
@@ -43,7 +59,6 @@ describe('planningFrom', () => {
       addressId: 'addr-1',
       eligibility: ELIGIBILITY,
       calendar: null,
-      catalogue: null,
     });
 
     expect(planning).toMatchObject({
@@ -54,18 +69,17 @@ describe('planningFrom', () => {
     });
   });
 
-  it('greys exactly the days the calendar says no pool Cook can take', () => {
+  it('greys exactly the days a live Recurring booking already has', () => {
     const planning = planningFrom({
       addressId: 'addr-1',
       eligibility: null,
       calendar: {
         window: ELIGIBILITY.window,
         days: [
-          { date: '2026-10-05', available: true },
-          { date: '2026-10-06', available: false },
+          { date: '2026-10-05', selectable: true },
+          { date: '2026-10-06', selectable: false },
         ],
       },
-      catalogue: null,
     });
 
     expect([...planning.unavailableDayIds]).toEqual(['2026-10-06']);
@@ -73,23 +87,25 @@ describe('planningFrom', () => {
     expect(planning.windowStartId).toBe('2026-10-05');
   });
 
-  it('offers the catalogue durations, priced like Instant', () => {
-    const planning = planningFrom({
-      addressId: null,
-      eligibility: null,
-      calendar: null,
-      catalogue: CATALOGUE,
-    });
+  it('prices durations at the effective price, striking the base only when it is higher', () => {
+    const planning = planningFrom({ addressId: null, eligibility: ELIGIBILITY, calendar: null });
 
-    expect(planning.durations.map((option) => [option.id, option.label, option.price])).toEqual([
-      ['d30', '30 mins', '₹69'],
-      ['d60', '1 hr', '₹129'],
+    expect(
+      planning.durations.map((option) => [
+        option.id,
+        option.label,
+        option.price,
+        option.strikePrice,
+      ]),
+    ).toEqual([
+      ['d30', '30 mins', '₹69', '₹150'],
+      ['d60', '1 hr', '₹129', undefined],
     ]);
   });
 });
 
 describe('duration ids', () => {
-  it('name their minutes, so a new catalogue duration reads back everywhere', () => {
+  it('name their minutes, so a new duration reads back everywhere', () => {
     expect(durationIdFor(180)).toBe('d180');
     expect(durationMinutes('d180')).toBe(180);
     expect(durationLabel('d90')).toBe('1.5 hr');
@@ -106,7 +122,9 @@ describe('duration ids', () => {
 describe('VisitChoices start times', () => {
   const DAYS = ['2026-10-06', '2026-10-07'];
 
-  function renderChoices() {
+  function renderChoices(
+    busy: { fromMinutes: number; toMinutes: number; dayIds?: string[] }[] = [],
+  ) {
     const startTimesBodies: unknown[] = [];
     const runtime = createTestRuntime({
       api: createStubApi({
@@ -114,19 +132,18 @@ describe('VisitChoices start times', () => {
           startTimesBodies.push(body);
           return {
             durationMinutes: 60,
-            startTimes: [
-              { startTime: '08:00', availableDates: DAYS, coverage: 'all' },
-              { startTime: '08:30', availableDates: ['2026-10-06'], coverage: 'partial' },
+            timesOfDay: [
+              { timeOfDay: 'morning', available: true, startTimes: ['08:00'] },
+              { timeOfDay: 'afternoon', available: false, startTimes: [] },
+              { timeOfDay: 'evening', available: true, startTimes: ['18:00'] },
             ],
           };
         },
       }),
     });
     renderWithRuntime(
-      <RecurringPlanningProvider
-        value={{ ...LOCAL_PLANNING, addressId: 'addr-1', durations: LOCAL_PLANNING.durations }}
-      >
-        <VisitChoices busy={[]} dayIds={DAYS} timeLabel="Time of the day" onChange={jest.fn()} />
+      <RecurringPlanningProvider value={{ ...LOCAL_PLANNING, addressId: 'addr-1' }}>
+        <VisitChoices busy={busy} dayIds={DAYS} timeLabel="Time of the day" onChange={jest.fn()} />
       </RecurringPlanningProvider>,
       { runtime },
     );
@@ -136,28 +153,35 @@ describe('VisitChoices start times', () => {
   const disabled = (label: string) =>
     screen.getByRole('radio', { name: label }).props.accessibilityState?.disabled === true;
 
-  it('asks for this visit’s days and the picked duration', async () => {
-    const { startTimesBodies } = renderChoices();
+  it('asks for this visit’s days, the picked duration and the Plan’s other visits', async () => {
+    const { startTimesBodies } = renderChoices([
+      { fromMinutes: 9 * 60, toMinutes: 10 * 60, dayIds: ['2026-10-06'] },
+    ]);
 
-    // The time of the day first (`229:1802`), then the Duration it opens (`288:401`).
     fireEvent.press(screen.getByRole('radio', { name: 'Morning' }));
     fireEvent.press(screen.getByRole('radio', { name: /^1 hr/ }));
 
     await waitFor(() =>
-      expect(startTimesBodies).toEqual([{ addressId: 'addr-1', dates: DAYS, durationMinutes: 60 }]),
+      expect(startTimesBodies).toEqual([
+        {
+          addressId: 'addr-1',
+          dates: DAYS,
+          durationMinutes: 60,
+          sameDayVisits: [{ date: '2026-10-06', startTime: '09:00', durationMinutes: 60 }],
+        },
+      ]),
     );
   });
 
-  it('offers only starts a pool Cook can take on every day', async () => {
+  it('offers only starts the backend offers, and closes a time of day with none left', async () => {
     renderChoices();
 
-    // The time of the day first (`229:1802`), then the Duration it opens (`288:401`).
     fireEvent.press(screen.getByRole('radio', { name: 'Morning' }));
     fireEvent.press(screen.getByRole('radio', { name: /^1 hr/ }));
 
     await waitFor(() => expect(disabled('8:30 AM')).toBe(true));
     expect(disabled('8:00 AM')).toBe(false);
-    // Not offered by the backend at all — outside its grid — so greyed too.
-    expect(disabled('9:00 AM')).toBe(true);
+    expect(disabled('Afternoon')).toBe(true);
+    expect(disabled('Evening')).toBe(false);
   });
 });

@@ -2,115 +2,152 @@ import type { ApiClient, JsonValue } from '@core/api';
 import { idempotencyHeader } from '@core/api';
 
 import {
+  bookingCancellationQuoteSchema,
+  bookingCancellationSchema,
+  bookingPrepSchema,
   mandateCheckoutSchema,
   mandateVerifySchema,
+  recurringBookingListSchema,
+  recurringBookingSchema,
   recurringCalendarSchema,
   recurringEligibilitySchema,
-  recurringPlanListSchema,
-  recurringPlanQuoteSchema,
-  recurringPlanSchema,
+  recurringQuoteSchema,
   recurringStartTimesSchema,
+  visitCancellationQuoteSchema,
+  visitDetailSchema,
 } from './schemas';
 import type {
+  BookingCancellationDto,
+  BookingCancellationQuoteDto,
+  BookingPrepDto,
   MandateCheckoutDto,
-  MandateMethod,
   MandateVerifyDto,
+  RecurringBookingDto,
   RecurringCalendarDto,
   RecurringEligibilityDto,
-  RecurringPlanDto,
-  RecurringPlanQuoteDto,
+  RecurringQuoteDto,
   RecurringStartTimesDto,
+  TimeOfDayDto,
+  VisitCancellationQuoteDto,
+  VisitDetailDto,
 } from './schemas';
 
 /**
- * Recurring Plan endpoints — DEC-084.
+ * Recurring booking endpoints — DEC-086 (V2).
  *
  * The planning reads (`eligibility`, `calendar`, `startTimes`, `quote`) hold nothing. Every route
- * that changes a plan carries an Idempotency-Key scoped to its intent, except `keepGoing` and
- * `verifyMandate`, which the backend makes idempotent on their own.
+ * that changes a booking carries an Idempotency-Key scoped to its intent, except `verifyMandate`
+ * and the prep checks, which the backend makes idempotent on their own.
  *
- * Every planning route answers a locked household (fewer "My Cooks" than the unlock threshold)
- * with 403 `FORBIDDEN`, so `eligibility` is read first and decides whether the flow opens at all.
+ * Every planning route answers a locked household (fewer pool Cooks than the unlock threshold)
+ * with 403 `RECURRING_LOCKED`, so `eligibility` is read first and decides whether the flow opens.
  */
 
 export const RECURRING_PATHS = {
   eligibility: '/v1/recurring/eligibility',
   calendar: '/v1/recurring/calendar',
   startTimes: '/v1/recurring/start-times',
-  quote: '/v1/recurring/plans/quote',
-  create: '/v1/recurring/plans',
-  list: '/v1/me/recurring-plans',
-  detail: (planId: string) => `/v1/me/recurring-plans/${planId}`,
-  cancel: (planId: string) => `/v1/me/recurring-plans/${planId}/cancel`,
-  keepGoing: (planId: string) => `/v1/me/recurring-plans/${planId}/keep-going`,
-  cancelVisit: (planId: string, visitId: string) =>
-    `/v1/me/recurring-plans/${planId}/visits/${visitId}/cancel`,
-  rescheduleVisit: (planId: string, visitId: string) =>
-    `/v1/me/recurring-plans/${planId}/visits/${visitId}/reschedule`,
-  mandate: (planId: string) => `/v1/me/recurring-plans/${planId}/mandate`,
-  mandateVerify: (planId: string) => `/v1/me/recurring-plans/${planId}/mandate/verify`,
+  quote: '/v1/recurring/bookings/quote',
+  create: '/v1/recurring/bookings',
+  list: '/v1/me/recurring-bookings',
+  detail: (id: string) => `/v1/me/recurring-bookings/${id}`,
+  visit: (id: string, visitId: string) => `/v1/me/recurring-bookings/${id}/visits/${visitId}`,
+  visitCancellationQuote: (id: string, visitId: string) =>
+    `/v1/me/recurring-bookings/${id}/visits/${visitId}/cancellation-quote`,
+  cancelVisit: (id: string, visitId: string) =>
+    `/v1/me/recurring-bookings/${id}/visits/${visitId}/cancel`,
+  cancellationQuote: (id: string) => `/v1/me/recurring-bookings/${id}/cancellation-quote`,
+  cancel: (id: string) => `/v1/me/recurring-bookings/${id}/cancel`,
+  mandate: (id: string) => `/v1/me/recurring-bookings/${id}/mandate`,
+  mandateVerify: (id: string) => `/v1/me/recurring-bookings/${id}/mandate/verify`,
+  prep: (bookingId: string) => `/v1/bookings/${bookingId}/prep`,
 } as const;
 
 /**
- * One visit of the plan, sent as the backend's draft expects.
+ * One visit of a Plan, as the backend's draft expects it.
  *
- * Visit 1 always runs on every plan date (`daysScope: 'all'`, no `dates`); visits 2 and 3 run on
- * every date or on a subset (`'some'` plus the subset). The backend refuses anything else with a
- * bare 400, so the adapter that builds this from the flow's state is what keeps it valid.
+ * Visit 1 always runs on every date of its Plan (no `dates`); a later visit lists the Plan dates
+ * it runs on. The start must fall inside its time of day. The backend refuses anything else with
+ * a 400, so the adapter that builds this from the flow's state is what keeps it valid.
  */
-export interface PlanVisitInput {
-  readonly visitNumber: 1 | 2 | 3;
+export interface DraftVisitInput {
+  readonly visitNumber: number;
+  readonly timeOfDay: TimeOfDayDto;
   readonly durationMinutes: number;
   /** Asia/Kolkata `HH:MM`. */
   readonly startTime: string;
-  readonly daysScope: 'all' | 'some';
   readonly dates?: readonly string[];
 }
 
-/** A one-day change to a visit's start time, e.g. a date moved to a later slot. */
-export interface PlanOverrideInput {
-  readonly date: string;
-  readonly visitNumber: 1 | 2 | 3;
-  readonly startTime: string;
-}
-
-export interface PlanDraftInput {
-  readonly addressId: string;
-  /** The plan's service dates, Asia/Kolkata `YYYY-MM-DD`. */
+export interface DraftPlanInput {
+  readonly planNumber: number;
+  /** The Plan's dates, Asia/Kolkata `YYYY-MM-DD`. Each date is in one Plan only. */
   readonly dates: readonly string[];
-  readonly visits: readonly PlanVisitInput[];
-  readonly overrides?: readonly PlanOverrideInput[];
+  readonly visits: readonly DraftVisitInput[];
 }
 
-export interface PlanCreateInput extends PlanDraftInput {
-  readonly keepGoing?: boolean;
-  readonly mealNotes?: string;
+export interface RecurringDraftInput {
+  readonly addressId: string;
+  readonly plans: readonly DraftPlanInput[];
 }
 
-/** What Razorpay's checkout handed back after the customer approved autopay. */
+/** A visit already placed on a date, which a new start must fit beside (Step 5). */
+export interface SameDayVisitInput {
+  readonly date: string;
+  readonly startTime: string;
+  readonly durationMinutes: number;
+}
+
+export interface StartTimesInput {
+  readonly addressId: string;
+  readonly dates: readonly string[];
+  readonly durationMinutes: number;
+  readonly sameDayVisits?: readonly SameDayVisitInput[];
+}
+
+/** A reason from the published cancellation catalogue; `OTHER` needs `reasonDetail`. */
+export interface CancelReasonInput {
+  readonly reasonCode: string;
+  readonly reasonDetail?: string;
+}
+
+/** What Razorpay's checkout handed back after the customer approved Autopay. */
 export interface MandateVerifyInput {
   readonly providerOrderId: string;
   readonly providerPaymentId: string;
   readonly signature: string;
 }
 
-function draftBody(input: PlanDraftInput): Record<string, JsonValue> {
+export interface BookingPrepInput {
+  readonly entryApproved?: boolean;
+  readonly groceriesReady?: boolean;
+  readonly utensilsReady?: boolean;
+}
+
+function draftBody(input: RecurringDraftInput): Record<string, JsonValue> {
   return {
     addressId: input.addressId,
-    dates: [...input.dates],
-    visits: input.visits.map((visit) => ({
-      visitNumber: visit.visitNumber,
-      durationMinutes: visit.durationMinutes,
-      startTime: visit.startTime,
-      daysScope: visit.daysScope,
-      // `dates` is forbidden on an `all` visit, not merely ignored.
-      ...(visit.daysScope === 'some' && visit.dates !== undefined
-        ? { dates: [...visit.dates] }
-        : {}),
+    plans: input.plans.map((plan) => ({
+      planNumber: plan.planNumber,
+      dates: [...plan.dates],
+      visits: plan.visits.map((visit) => ({
+        visitNumber: visit.visitNumber,
+        timeOfDay: visit.timeOfDay,
+        durationMinutes: visit.durationMinutes,
+        startTime: visit.startTime,
+        // `dates` is refused on Visit 1, not merely ignored.
+        ...(visit.visitNumber !== 1 && visit.dates !== undefined
+          ? { dates: [...visit.dates] }
+          : {}),
+      })),
     })),
-    ...(input.overrides === undefined || input.overrides.length === 0
-      ? {}
-      : { overrides: input.overrides.map((override) => ({ ...override })) }),
+  };
+}
+
+function reasonBody(input: CancelReasonInput): Record<string, JsonValue> {
+  return {
+    reasonCode: input.reasonCode,
+    ...(input.reasonDetail === undefined ? {} : { reasonDetail: input.reasonDetail }),
   };
 }
 
@@ -120,7 +157,7 @@ function withSignal(signal: AbortSignal | undefined): { signal?: AbortSignal } {
 
 export function createRecurringApi(api: ApiClient) {
   return {
-    /** `GET /v1/recurring/eligibility` — unlocked or not, the window, and the plan limits. */
+    /** Unlocked or not, Home's chip, the window, limits, times of day and duration prices. */
     async eligibility(signal?: AbortSignal): Promise<RecurringEligibilityDto> {
       return api.request(RECURRING_PATHS.eligibility, {
         parse: (data) => recurringEligibilitySchema.parse(data),
@@ -128,18 +165,17 @@ export function createRecurringApi(api: ApiClient) {
       });
     },
 
-    /** `GET /v1/recurring/calendar?addressId` — Step 1, which window days have room. */
-    async calendar(addressId: string, signal?: AbortSignal): Promise<RecurringCalendarDto> {
-      const search = new URLSearchParams({ addressId }).toString();
-      return api.request(`${RECURRING_PATHS.calendar}?${search}`, {
+    /** Step 1: the window's days, and which a live Recurring booking already has. */
+    async calendar(signal?: AbortSignal): Promise<RecurringCalendarDto> {
+      return api.request(RECURRING_PATHS.calendar, {
         parse: (data) => recurringCalendarSchema.parse(data),
         ...withSignal(signal),
       });
     },
 
-    /** `POST /v1/recurring/start-times` — Step 2, one visit duration across the picked days. */
+    /** Steps 3 and 5: one visit's starts across its dates, beside the Plan's other visits. */
     async startTimes(
-      input: { addressId: string; dates: readonly string[]; durationMinutes: number },
+      input: StartTimesInput,
       signal?: AbortSignal,
     ): Promise<RecurringStartTimesDto> {
       return api.request(RECURRING_PATHS.startTimes, {
@@ -148,121 +184,121 @@ export function createRecurringApi(api: ApiClient) {
           addressId: input.addressId,
           dates: [...input.dates],
           durationMinutes: input.durationMinutes,
+          ...(input.sameDayVisits === undefined || input.sameDayVisits.length === 0
+            ? {}
+            : { sameDayVisits: input.sameDayVisits.map((visit) => ({ ...visit })) }),
         },
         parse: (data) => recurringStartTimesSchema.parse(data),
         ...withSignal(signal),
       });
     },
 
-    /** `POST /v1/recurring/plans/quote`. No idempotency key — a quote holds nothing. */
-    async quote(input: PlanDraftInput, signal?: AbortSignal): Promise<RecurringPlanQuoteDto> {
+    /** No idempotency key — a quote holds nothing. */
+    async quote(input: RecurringDraftInput, signal?: AbortSignal): Promise<RecurringQuoteDto> {
       return api.request(RECURRING_PATHS.quote, {
         method: 'POST',
         body: draftBody(input),
-        parse: (data) => recurringPlanQuoteSchema.parse(data),
+        parse: (data) => recurringQuoteSchema.parse(data),
         ...withSignal(signal),
       });
     },
 
     /**
-     * `POST /v1/recurring/plans` — 201, `pending_mandate`.
-     *
-     * Saving reserves every visit, and the plan is cancelled if autopay is not approved within the
-     * policy's pending window (30 minutes), so a save is only worth making on the way into the
-     * autopay step.
+     * 201, `pending_mandate`. Saving holds one pool Cook per visit, and the booking is cancelled
+     * if Autopay is not approved within the policy's window (30 minutes), so a save is only worth
+     * making on the way into the Autopay step. 409 `VISIT_UNAVAILABLE` → re-quote to find which
+     * dates need another time.
      */
-    async create(input: PlanCreateInput, scope: string): Promise<RecurringPlanDto> {
+    async create(input: RecurringDraftInput, scope: string): Promise<RecurringBookingDto> {
       return api.request(RECURRING_PATHS.create, {
         method: 'POST',
         headers: idempotencyHeader(scope),
-        body: {
-          ...draftBody(input),
-          ...(input.keepGoing === undefined ? {} : { keepGoing: input.keepGoing }),
-          ...(input.mealNotes === undefined ? {} : { mealNotes: input.mealNotes }),
-        },
-        parse: (data) => recurringPlanSchema.parse(data),
+        body: draftBody(input),
+        parse: (data) => recurringBookingSchema.parse(data),
       });
     },
 
-    /** `GET /v1/me/recurring-plans` — newest first, at most 20. Two may be live around a renewal. */
-    async list(signal?: AbortSignal): Promise<RecurringPlanDto[]> {
+    async list(signal?: AbortSignal): Promise<RecurringBookingDto[]> {
       return api.request(RECURRING_PATHS.list, {
-        parse: (data) => recurringPlanListSchema.parse(data),
+        parse: (data) => recurringBookingListSchema.parse(data),
         ...withSignal(signal),
       });
     },
 
-    async detail(planId: string, signal?: AbortSignal): Promise<RecurringPlanDto> {
-      return api.request(RECURRING_PATHS.detail(planId), {
-        parse: (data) => recurringPlanSchema.parse(data),
+    async detail(id: string, signal?: AbortSignal): Promise<RecurringBookingDto> {
+      return api.request(RECURRING_PATHS.detail(id), {
+        parse: (data) => recurringBookingSchema.parse(data),
         ...withSignal(signal),
       });
     },
 
-    /** Cancels every still-reserved visit and revokes autopay. Charged visits stay bookings. */
-    async cancel(planId: string, scope: string): Promise<RecurringPlanDto> {
-      return api.request(RECURRING_PATHS.cancel(planId), {
-        method: 'POST',
-        headers: idempotencyHeader(scope),
-        parse: (data) => recurringPlanSchema.parse(data),
+    async visit(id: string, visitId: string, signal?: AbortSignal): Promise<VisitDetailDto> {
+      return api.request(RECURRING_PATHS.visit(id, visitId), {
+        parse: (data) => visitDetailSchema.parse(data),
+        ...withSignal(signal),
       });
     },
 
-    async setKeepGoing(planId: string, keepGoing: boolean): Promise<RecurringPlanDto> {
-      return api.request(RECURRING_PATHS.keepGoing(planId), {
-        method: 'POST',
-        body: { keepGoing },
-        parse: (data) => recurringPlanSchema.parse(data),
-      });
-    },
-
-    /**
-     * Free, and only while the visit is `reserved`. Once it has become a booking (`bookingId`
-     * set), it is cancelled like any other booking instead.
-     */
-    async cancelVisit(planId: string, visitId: string, scope: string): Promise<RecurringPlanDto> {
-      return api.request(RECURRING_PATHS.cancelVisit(planId, visitId), {
-        method: 'POST',
-        headers: idempotencyHeader(scope),
-        parse: (data) => recurringPlanSchema.parse(data),
-      });
-    },
-
-    /** Once per visit, only while `reserved`, and only to a start more than 24h away. */
-    async rescheduleVisit(
-      planId: string,
+    async visitCancellationQuote(
+      id: string,
       visitId: string,
-      input: { date: string; startTime: string },
-      scope: string,
-    ): Promise<RecurringPlanDto> {
-      return api.request(RECURRING_PATHS.rescheduleVisit(planId, visitId), {
-        method: 'POST',
-        headers: idempotencyHeader(scope),
-        body: { date: input.date, startTime: input.startTime },
-        parse: (data) => recurringPlanSchema.parse(data),
+      signal?: AbortSignal,
+    ): Promise<VisitCancellationQuoteDto> {
+      return api.request(RECURRING_PATHS.visitCancellationQuote(id, visitId), {
+        parse: (data) => visitCancellationQuoteSchema.parse(data),
+        ...withSignal(signal),
       });
     },
 
-    /** Starts (or restarts, with another method) the autopay approval for a pending plan. */
-    async startMandate(
-      planId: string,
-      method: MandateMethod,
+    /** The window and the money are decided by the backend at its own time, never sent. */
+    async cancelVisit(
+      id: string,
+      visitId: string,
+      reason: CancelReasonInput,
       scope: string,
-    ): Promise<MandateCheckoutDto> {
-      return api.request(RECURRING_PATHS.mandate(planId), {
+    ): Promise<VisitDetailDto> {
+      return api.request(RECURRING_PATHS.cancelVisit(id, visitId), {
         method: 'POST',
         headers: idempotencyHeader(scope),
-        body: { method },
+        body: reasonBody(reason),
+        parse: (data) => visitDetailSchema.parse(data),
+      });
+    },
+
+    async cancellationQuote(
+      id: string,
+      signal?: AbortSignal,
+    ): Promise<BookingCancellationQuoteDto> {
+      return api.request(RECURRING_PATHS.cancellationQuote(id), {
+        parse: (data) => bookingCancellationQuoteSchema.parse(data),
+        ...withSignal(signal),
+      });
+    },
+
+    async cancel(
+      id: string,
+      reason: CancelReasonInput,
+      scope: string,
+    ): Promise<BookingCancellationDto> {
+      return api.request(RECURRING_PATHS.cancel(id), {
+        method: 'POST',
+        headers: idempotencyHeader(scope),
+        body: reasonBody(reason),
+        parse: (data) => bookingCancellationSchema.parse(data),
+      });
+    },
+
+    /** Approve Autopay for a saved booking, or re-approve it for a live one whose mandate lapsed. */
+    async startMandate(id: string, scope: string): Promise<MandateCheckoutDto> {
+      return api.request(RECURRING_PATHS.mandate(id), {
+        method: 'POST',
+        headers: idempotencyHeader(scope),
         parse: (data) => mandateCheckoutSchema.parse(data),
       });
     },
 
-    /**
-     * `initiated` is a normal answer, common for UPI: the bank has not confirmed yet, and a
-     * webhook will. The plan's own `status` / `autopay.status` is then the thing to watch.
-     */
-    async verifyMandate(planId: string, input: MandateVerifyInput): Promise<MandateVerifyDto> {
-      return api.request(RECURRING_PATHS.mandateVerify(planId), {
+    async verifyMandate(id: string, input: MandateVerifyInput): Promise<MandateVerifyDto> {
+      return api.request(RECURRING_PATHS.mandateVerify(id), {
         method: 'POST',
         body: {
           providerOrderId: input.providerOrderId,
@@ -270,6 +306,22 @@ export function createRecurringApi(api: ApiClient) {
           signature: input.signature,
         },
         parse: (data) => mandateVerifySchema.parse(data),
+      });
+    },
+
+    async prep(bookingId: string, signal?: AbortSignal): Promise<BookingPrepDto> {
+      return api.request(RECURRING_PATHS.prep(bookingId), {
+        parse: (data) => bookingPrepSchema.parse(data),
+        ...withSignal(signal),
+      });
+    },
+
+    /** Writable once a Cook is assigned (`409 PREP_NOT_OPEN` before). */
+    async updatePrep(bookingId: string, input: BookingPrepInput): Promise<BookingPrepDto> {
+      return api.request(RECURRING_PATHS.prep(bookingId), {
+        method: 'PUT',
+        body: { ...input },
+        parse: (data) => bookingPrepSchema.parse(data),
       });
     },
   };

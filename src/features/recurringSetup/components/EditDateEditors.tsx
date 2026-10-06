@@ -13,6 +13,7 @@ import {
   clashes,
   durationMinutes,
   formatStartTime,
+  sameDayVisitsFor,
   startTimesFor,
 } from '../data';
 import type { RecurringBusyWindow } from '../data';
@@ -100,18 +101,22 @@ export function StartTimeEditor({
   readonly onPick: (startMinutes: number) => void;
 }) {
   const planning = useRecurringPlanning();
-  const startTimes = useRecurringStartTimes({
-    addressId: planning.addressId,
-    dates: [dayId],
-    durationMinutes: draft.durationId === null ? null : durationMinutes(draft.durationId),
-  });
+  const startTimes = useRecurringStartTimes(
+    planning.addressId === null || draft.durationId === null
+      ? null
+      : {
+          addressId: planning.addressId,
+          dates: [dayId],
+          durationMinutes: durationMinutes(draft.durationId),
+          // The date's other visits, which the edited one must fit beside.
+          sameDayVisits: sameDayVisitsFor(busy.map((window) => ({ ...window, dayIds: [dayId] }))),
+        },
+  );
   /** Starts a pool Cook can take on the date; `null` until the backend answers. */
   const offered = useMemo(() => {
     if (startTimes.state.status !== 'ready') return null;
     return new Set(
-      startTimes.state.data.startTimes
-        .filter((slot) => slot.coverage === 'all')
-        .map((slot) => minutesOf(slot.startTime)),
+      startTimes.state.data.timesOfDay.flatMap((band) => band.startTimes.map(minutesOf)),
     );
   }, [startTimes.state]);
 
