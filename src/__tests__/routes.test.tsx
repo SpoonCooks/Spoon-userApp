@@ -40,6 +40,16 @@ import OtpRoute from '@/app/(auth)/otp';
 import NotFoundRoute from '@/app/+not-found';
 
 /**
+ * Home reads the Cook Pool, whose module carries the swipe deck. Reanimated and worklets are
+ * native runtimes with no headless implementation, so they run against their own jest mocks, as
+ * the Cook Pool's own tests do.
+ */
+jest.mock('react-native-worklets', () =>
+  jest.requireActual('react-native-worklets/lib/module/mock'),
+);
+jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));
+
+/**
  * Mutable so a test can drive a route's params. Reset in `beforeEach` so one test's params
  * cannot leak into the next.
  */

@@ -28,8 +28,10 @@ const logger = getLogger('home');
  * An address OUTSIDE the service area now renders the not-live Home (waitlist + referral) rather
  * than bouncing to the map; only an account with no saved address at all is sent to add one.
  *
- * Destinations that do not exist in this app yet (plan tracker, recurring explainer, cook pool,
- * cook profile) answer "coming soon" on the screen rather than doing nothing.
+ * The pool block: "Check Recurring" opens the Recurring landing (explainer + "Make your Cook
+ * Pool"), "Book Recurring" the plan flow, the pool card the Cook Pool, and a bead that cook's
+ * profile. The plan tracker ("Recurring · Live") does not exist in this app yet and answers
+ * "coming soon" on the screen rather than doing nothing.
  */
 export default function HomeRoute() {
   const router = useRouter();
@@ -89,7 +91,11 @@ export default function HomeRoute() {
       router.push('/recurring-setup/days');
       return true;
     }
-    // Plan tracker and the recurring explainer are not built yet.
+    if (target === 'explainer') {
+      router.push('/recurring');
+      return true;
+    }
+    // The plan tracker is not built yet.
     return false;
   };
 
@@ -114,6 +120,10 @@ export default function HomeRoute() {
             })
           }
           onPressRecurring={openRecurring}
+          onPressCookPool={() => router.push('/cook-pool')}
+          onPressPoolCook={(cook) =>
+            router.push({ pathname: '/cook-pool/[cookId]', params: { cookId: cook.id } })
+          }
           onRefreshAvailability={home.refetch}
           onJoinWaitlist={async () => {
             const meData = me.state.status === 'ready' ? me.state.data : null;

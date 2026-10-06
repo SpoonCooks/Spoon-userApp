@@ -137,6 +137,19 @@ describe('recurring', () => {
       tone: 'outline',
     });
   });
+  it("follows the backend's chip over the local pool count once it has answered", () => {
+    const two = [cook('a'), cook('b')];
+    expect(
+      recurringChipFor({ cookPool: two, activeRecurringPlan: null, recurringChip: 'locked' })
+        .target,
+    ).toBe('explainer');
+    expect(
+      recurringChipFor({ cookPool: [], activeRecurringPlan: null, recurringChip: 'book' }).target,
+    ).toBe('recurringFlow');
+    expect(
+      recurringChipFor({ cookPool: two, activeRecurringPlan: null, recurringChip: 'live' }).target,
+    ).toBe('planTracker');
+  });
   it('draws only real cooks, at most six', () => {
     const pool = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id) => cook(id));
     expect(poolBeads({ cookPool: [cook('x', false), ...pool] }).map((c) => c.id)).toEqual([

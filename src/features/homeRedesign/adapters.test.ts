@@ -2,6 +2,8 @@ import type { AddressDto } from '@features/address';
 import type { InstantAvailabilityDto } from '@features/availability';
 import type { BookingSummaryDto } from '@features/booking';
 import type { Catalogue } from '@features/catalogue';
+import type { CookPoolListDto } from '@features/cookPool';
+import type { RecurringEligibilityDto } from '@features/recurringSetup';
 
 import { addressLabelOf, homeDurationLabel, homeModelFrom } from './adapters';
 import type { HomeSources } from './adapters';
@@ -120,6 +122,41 @@ describe('homeModelFrom', () => {
       pricingStatus: 'error',
       durations: [],
     });
+  });
+
+  it('builds the pool block from the Cook Pool and Recurring eligibility', () => {
+    const card = (cookId: string, profileImageUrl: string | null) => ({
+      cook: { cookId, displayName: `Cook ${cookId}`, profileImageUrl },
+      available: true,
+      addedAt: '2026-10-01T00:00:00.000Z',
+    });
+    const pool = {
+      cooks: [card('a', 'https://img/a.jpg'), card('b', null)],
+      count: 2,
+    } as unknown as CookPoolListDto;
+    const recurring = {
+      chip: 'live',
+      liveBookings: [
+        { recurringBookingId: 'rb-pending', status: 'pending_mandate' },
+        { recurringBookingId: 'rb-active', status: 'active' },
+      ],
+    } as unknown as RecurringEligibilityDto;
+
+    const model = homeModelFrom(sources({ pool, recurring }));
+
+    expect(model.cookPool).toEqual([
+      { id: 'a', name: 'Cook a', photo: { uri: 'https://img/a.jpg' } },
+      { id: 'b', name: 'Cook b', photo: null },
+    ]);
+    expect(model.activeRecurringPlan).toEqual({ id: 'rb-active' });
+    expect(model.recurringChip).toBe('live');
+  });
+
+  it('shows no pool and leaves the chip to the pool count while those reads are pending', () => {
+    const model = homeModelFrom(sources());
+    expect(model.cookPool).toEqual([]);
+    expect(model.activeRecurringPlan).toBeNull();
+    expect(model.recurringChip).toBeUndefined();
   });
 });
 

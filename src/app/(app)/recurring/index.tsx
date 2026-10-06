@@ -14,7 +14,7 @@ import { useRecurringEligibility } from '@features/recurringSetup';
  *
  * The explainer video's URL is set in one place, `@features/recurringLanding`'s `video.ts`.
  *
- * Not linked from Home yet: its entry point has not been designed in.
+ * Opened from Home's "Check Recurring" chip (a household below the unlock).
  */
 export default function RecurringRoute() {
   const router = useRouter();
