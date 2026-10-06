@@ -128,6 +128,21 @@ profile (`719:1568`) render from a local store seeded by `src/demo/fixtures/cook
 their menus, none returns one cook's profile with a categorised menu and dish photos, and dish
 favourites do not exist. The full list of changes is in `docs/COOK_POOL_BACKEND.md`.
 
+**BE-5 — the redesigned Home is partly wired.** `/home` now renders `src/features/homeRedesign`
+on live data (`useHomeRedesignData`, `adapters.ts`): serviceability from the current address,
+`GET /v1/catalogue` durations (price, GST-inclusive total, `taxRateBps`),
+`GET /v1/availability/instant` per duration (availability + ETA), `GET /v1/me/bookings` for
+"returning", Razorpay via `useBookingSubmission`, and `PUT /v1/me/waitlist`. Still missing, so
+deliberately empty on Home:
+- `GET /v1/me/cooks` and `GET /v1/me/recurring-plans` — only on V0
+  `feat/cook-pool-recurring-plans` (unmerged); the pool shows no beads and the chip reads
+  "Check Recurring".
+- Waitlist demand (`countForPincode`, `launchThreshold`) and a read of membership — the meter is
+  hidden and "You're on the list" lasts for the session.
+- A "most booked" flag and "serves" per duration; a per-duration roll-up of scheduled capacity
+  (Later treats every duration as bookable; the slot picker answers per date).
+- A list of live hubs — the not-live map uses the dev note's static HSR Layout / Haralur pins.
+
 ### BACKEND_DEPLOYMENT_GAP
 
 **DEP-4 — DEPLOYMENT DRIFT: Render is running older code than `D:\spoon-backend`. Blocking for
@@ -352,6 +367,11 @@ repo's own `rzp_test` sandbox key, with the publishable `keyId` on the response 
   needs changing, or the policy does.
 - **Meal brief has no store.** The catalogue publishes its BOUNDS (guest range, four-valued diet
   axis) but no endpoint persists a brief.
+- **Redesigned Home — open rules.** Plan tracker, recurring explainer, cook pool and cook profile
+  screens do not exist yet (Home says "coming soon"). The dial's recommendation formula (`recommendDuration` is a
+  placeholder tuned to the frame), the share-sheet copy and store link, and the destinations not
+  built yet (confirm step, tax dialog, recurring flow, plan tracker, explainer, cook pool, cook
+  profile).
 
 ---
 

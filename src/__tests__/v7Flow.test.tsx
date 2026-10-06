@@ -23,7 +23,6 @@ import SavedAddressesRoute from '@/app/(app)/address/index';
 import BookingConfirmingRoute from '@/app/(app)/booking/confirming';
 import PaymentFailedRoute from '@/app/(app)/booking/payment-failed';
 import BookingRoute from '@/app/(app)/booking/[id]';
-import HomeRoute from '@/app/(app)/home';
 
 import { HOME_USECASE_SLIDES } from '@features/home/assets';
 import { sessionStore } from '@core/store';
@@ -612,37 +611,6 @@ describe('service lifecycle — every back button goes Home (task §11)', () => 
 });
 
 /* ------------------------------------------------------------- Page 4a Instant */
-
-describe('`1:728` Page 4a Instant — the arrow returns to Home (task §13)', () => {
-  /**
-   * `4a` is drawn as a full frame but presented as a SHEET over Home, which is what the design
-   * shows and what makes "the arrow goes to Home" true by construction: closing the sheet reveals
-   * the screen underneath, and that screen is Home. What must be true is that nothing navigates —
-   * a router call would take the customer somewhere Home is not.
-   */
-  it('closes back onto Home without navigating', async () => {
-    renderWithRuntime(<HomeRoute />, {
-      runtime: createTestRuntime({
-        api: createStubApi({ ...DEFAULT_API_STUBS, 'GET /v1/me/bookings/active': () => [] }),
-      }),
-    });
-
-    fireEvent.press(await screen.findByTestId('home-tile-instant'));
-    fireEvent.press(await screen.findByTestId('instant-sheet-back'));
-
-    /**
-     * The sheet plays an exit animation before it unmounts, so what is asserted is the thing the
-     * comment is actually about: NOTHING NAVIGATED. Home is still the screen, so the arrow has
-     * already arrived where the founder says it should — there is nowhere else to go.
-     */
-    expect(screen.getByTestId('home-screen')).toBeTruthy();
-    expect(mockRouter.push).not.toHaveBeenCalled();
-    expect(mockRouter.replace).not.toHaveBeenCalled();
-    expect(mockRouter.back).not.toHaveBeenCalled();
-  });
-});
-
-/* ------------------------------------------------------------------- carousel */
 
 describe('`378:189` + `406:1325` — the carousel is nine cards in the founder order (task §16)', () => {
   /**
