@@ -196,6 +196,10 @@ export const razorpayCheckoutLauncher: CheckoutLauncher = {
         name: 'Spoon',
         description: input.description,
         ...(input.prefill === undefined ? {} : { prefill: input.prefill }),
+        // Razorpay's recurring checkout: the token is created on this Customer.
+        ...(input.recurring === undefined
+          ? {}
+          : { customer_id: input.recurring.providerCustomerId, recurring: '1' }),
       });
     } catch (error) {
       const { code, description, reason } = readRejection(error);

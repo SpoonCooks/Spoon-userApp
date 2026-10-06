@@ -44,3 +44,5 @@ export {
 } from './planning';
 export type { RecurringPlanning } from './planning';
 export * from './api';
+export { draftFromPlans, unavailableVisitKeys, useBookRecurring } from './booking';
+export type { BookRecurringOutcome } from './booking';
