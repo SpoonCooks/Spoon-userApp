@@ -13,6 +13,10 @@ import { COOK_ICON } from '../art';
  * `Elevation/3`; a 48pt `#FFE666` badge with the cook glyph, the question (SemiBold 16/24), then
  * "Keep" in gold and "Remove" outlined. Keep — or a tap outside — closes it and stays on the
  * profile.
+ *
+ * While the removal is in flight Remove shows its spinner; a failed one is said under the
+ * question, the way the cancel sheet says a failed cancel (`cancel-error`) — the frame draws no
+ * error, so the line is the app's convention, not the design's.
  */
 export interface RemoveCookDialogProps {
   readonly visible: boolean;
@@ -20,6 +24,9 @@ export interface RemoveCookDialogProps {
   readonly cookName: string;
   readonly onKeep: () => void;
   readonly onRemove: () => void;
+  readonly removing?: boolean;
+  /** Why the last Remove failed, in the customer's words; `null` when it has not. */
+  readonly errorMessage?: string | null;
   readonly testID?: string;
 }
 
@@ -28,6 +35,8 @@ export function RemoveCookDialog({
   cookName,
   onKeep,
   onRemove,
+  removing = false,
+  errorMessage = null,
   testID = 'remove-cook-dialog',
 }: RemoveCookDialogProps) {
   return (
@@ -39,6 +48,16 @@ export function RemoveCookDialog({
         <Text variant="emphasis" color="textPrimary" testID={`${testID}-title`}>
           Remove {cookName} from your Cook Pool?
         </Text>
+        {errorMessage === null ? null : (
+          <Text
+            variant="body"
+            color="textSecondary"
+            accessibilityRole="alert"
+            testID={`${testID}-error`}
+          >
+            {errorMessage}
+          </Text>
+        )}
         <View style={styles.actions}>
           <Button
             label="Keep"
@@ -52,6 +71,7 @@ export function RemoveCookDialog({
           <Button
             label="Remove"
             onPress={onRemove}
+            loading={removing}
             variant="secondary"
             size="pillLg"
             labelColor="textPrimary"

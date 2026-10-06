@@ -1,7 +1,8 @@
 /**
- * Feature: Cook Pool — the household's preferred cooks. The landing shows the pool; the deck adds
- * cooks who have served the household by swiping; a cook's profile shows their menu and can take
- * them out of the pool. `CookPoolFlow` runs all three in one place for the dev preview.
+ * Feature: Cook Pool — the household's preferred cooks (DEC-085). The landing shows the pool; the
+ * deck adds cooks who have served the household by swiping; a cook's profile shows their menu and
+ * can take them out of the pool. `CookPoolFlow` runs all three in one place for the dev preview,
+ * over `createDemoCookPoolSource` in a `CookPoolSourceProvider`.
  */
 export { CookPoolScreen } from './screens/CookPoolScreen';
 export type { CookPoolScreenProps } from './screens/CookPoolScreen';
@@ -11,7 +12,10 @@ export { CookProfileScreen } from './screens/CookProfileScreen';
 export type { CookProfileScreenProps } from './screens/CookProfileScreen';
 export { CookPoolFlow } from './screens/CookPoolFlow';
 export type { CookPoolFlowProps } from './screens/CookPoolFlow';
-export { resetCookPoolDemo } from './data';
+export { API_COOK_POOL_SOURCE, CookPoolSourceProvider } from './data';
+export type { CookPoolActions, CookPoolSource } from './data';
+export { createDemoCookPoolSource } from './demoSource';
+export * from './api';
 export type { CookPoolState, ServedCook } from './pool';
 export type {
   CookDish,

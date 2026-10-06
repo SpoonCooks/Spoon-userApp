@@ -1,108 +1,177 @@
-import { useMemo, useSyncExternalStore } from 'react';
+import { createContext, createElement, useCallback, useContext, useMemo } from 'react';
+import type { ReactNode } from 'react';
 
-import { failed, useDevFixture } from '@core/data';
+import { LOADING, ready } from '@core/data';
 import type { DataState, ScreenQuery } from '@core/data';
-import { fromStatus } from '@core/errors';
+import { normalizeError } from '@core/errors';
+import { useRecurringEligibility } from '@features/recurringSetup';
 
-import { DEMO_COOK_POOL } from '@/demo/fixtures/cookPool';
 import {
-  addCook,
-  cookProfile,
-  deckCooks,
-  poolSummary,
-  removeCook,
-  toggleFavouriteDish,
-} from './pool';
-import type { CookPoolState } from './pool';
+  DEFAULT_MINIMUM_SIZE,
+  cookPoolSummaryFrom,
+  cookProfileFrom,
+  deckCooksFrom,
+} from './adapters';
+import {
+  useAddCookToPool,
+  useCookPoolCandidates,
+  useCookPoolList,
+  useCookPoolProfile,
+  useRemoveCookFromPool,
+} from './api';
+import type { CookPoolCandidatesDto } from './api';
 import type { CookPoolSummary, CookProfile } from './types';
 
+export { toggleFavouriteDish, useFavouriteDishIds } from './favourites';
+
 /**
- * The Cook Pool's data seam.
+ * The Cook Pool's data seam — DEC-085's `/v1/me/cooks` routes.
  *
- * TODO(backend-contract): no endpoint serves the deck (the cooks who have served the household,
- * with their menus), a cook's profile, or dish favourites, so the whole feature reads a local
- * store seeded from `DEMO_COOK_POOL`. `GET/POST/DELETE /v1/me/cooks` exist on V0 but carry
- * neither a menu nor dish images; `docs/COOK_POOL_BACKEND.md` lists what has to be added. When it
- * lands, each read below becomes a `useApiQuery` and each action a mutation that invalidates
- * them — the screens already render from `DataState` and do not change.
+ *  - the landing (`719:1507`)  ← `GET /v1/me/cooks`, with Recurring's `unlockThreshold` as the
+ *    pool's minimum
+ *  - the deck (`755:2333`)     ← `GET /v1/me/cooks/candidates`
+ *  - a profile (`719:1568`)    ← `GET /v1/me/cooks/:cookId`
+ *  - Add / swipe right         → `POST /v1/me/cooks`; Remove → `DELETE /v1/me/cooks/:cookId`
  *
- * Every change is applied the moment it is made, the way the landing expects each swipe to be
- * saved (`844:5842`'s note): the deck adds a cook as its card leaves, and the landing, deck and
- * profile all read the same store, so each shows the change on return.
+ * Skip and Undo stay on the device (the backend stores no skips), and so do dish favourites,
+ * which have no endpoint (`favourites.ts`).
+ *
+ * The reads come from a `CookPoolSource`. The app's is the API, and it is the default, so a
+ * screen outside any provider reads the backend. The dev preview, which runs with no session,
+ * provides the local demo store instead (`demoSource.ts`); the screens cannot tell the two apart.
  */
 
-let current: CookPoolState = DEMO_COOK_POOL;
-const listeners = new Set<() => void>();
-
-function update(next: CookPoolState) {
-  if (next === current) return;
-  current = next;
-  listeners.forEach((listener) => listener());
+export interface CookPoolActions {
+  /**
+   * Puts the cook in the pool. The deck does not wait: the card has already flown, and the
+   * landing reads the pool as the server has it when the customer returns to it.
+   */
+  readonly addCook: (cookId: string) => void;
+  /** Resolves once the pool no longer holds the cook; rejects with the failure otherwise. */
+  readonly removeCook: (cookId: string) => Promise<void>;
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
+export interface CookPoolSource {
+  readonly usePool: () => ScreenQuery<CookPoolSummary>;
+  readonly useDeck: () => ScreenQuery<readonly CookProfile[]>;
+  readonly useProfile: (cookId: string) => ScreenQuery<CookProfile>;
+  readonly useActions: () => CookPoolActions;
 }
 
-function usePoolState(): CookPoolState {
-  return useSyncExternalStore(subscribe, () => current);
+/**
+ * A read's state carried through an adapter: loading and errors pass through untouched. `adapt`
+ * must be a stable (module-level) function.
+ */
+function useMapped<TFrom, TTo>(
+  query: ScreenQuery<TFrom>,
+  adapt: (data: TFrom) => TTo,
+): ScreenQuery<TTo> {
+  const state = useMemo<DataState<TTo>>(
+    () => (query.state.status === 'ready' ? ready(adapt(query.state.data)) : query.state),
+    [query.state, adapt],
+  );
+  return { state, refetch: query.refetch };
+}
+
+/**
+ * The landing waits for Recurring's eligibility as well as the pool, so its empty places do not
+ * jump from one count to another a moment after it draws. An eligibility read that FAILS does not
+ * fail the landing: the pool is still worth showing, with the design's minimum.
+ */
+function useApiPool(): ScreenQuery<CookPoolSummary> {
+  const pool = useCookPoolList();
+  const eligibility = useRecurringEligibility();
+
+  const state = useMemo<DataState<CookPoolSummary>>(() => {
+    if (pool.state.status !== 'ready') return pool.state;
+    if (eligibility.state.status === 'loading') return LOADING;
+    const minimumSize =
+      eligibility.state.status === 'ready'
+        ? eligibility.state.data.unlockThreshold
+        : DEFAULT_MINIMUM_SIZE;
+    return ready(cookPoolSummaryFrom(pool.state.data, minimumSize));
+  }, [pool.state, eligibility.state]);
+
+  const { refetch: refetchPool } = pool;
+  const { refetch: refetchEligibility } = eligibility;
+  const refetch = useCallback(() => {
+    refetchPool();
+    refetchEligibility();
+  }, [refetchPool, refetchEligibility]);
+
+  return { state, refetch };
+}
+
+const deckFrom = (candidates: CookPoolCandidatesDto) => deckCooksFrom(candidates.cooks);
+
+function useApiDeck(): ScreenQuery<readonly CookProfile[]> {
+  return useMapped(useCookPoolCandidates(), deckFrom);
+}
+
+/** A cook the household has neither tried nor pooled is the backend's 404. */
+function useApiProfile(cookId: string): ScreenQuery<CookProfile> {
+  return useMapped(useCookPoolProfile(cookId), cookProfileFrom);
+}
+
+function useApiActions(): CookPoolActions {
+  const { mutate: add } = useAddCookToPool();
+  const { mutateAsync: remove } = useRemoveCookFromPool();
+
+  return useMemo<CookPoolActions>(
+    () => ({
+      // A refused add (an unavailable cook) has nothing to show on a card that has already
+      // gone; the invalidation that follows puts the landing and the deck right.
+      addCook: (cookId) => add({ cookId }),
+      removeCook: (cookId) =>
+        remove({ cookId }).catch((error: unknown) => {
+          // Already out of the pool (removed on another device): what was asked for is true.
+          if (normalizeError(error).code === 'RESOURCE_NOT_FOUND') return;
+          throw error;
+        }),
+    }),
+    [add, remove],
+  );
+}
+
+export const API_COOK_POOL_SOURCE: CookPoolSource = {
+  usePool: useApiPool,
+  useDeck: useApiDeck,
+  useProfile: useApiProfile,
+  useActions: useApiActions,
+};
+
+const CookPoolSourceContext = createContext<CookPoolSource>(API_COOK_POOL_SOURCE);
+
+/**
+ * Swaps where the Cook Pool reads from. The value must stay the same object for the provider's
+ * lifetime: its members are hooks, and changing them between renders would change the hooks a
+ * screen calls.
+ */
+export function CookPoolSourceProvider({
+  source,
+  children,
+}: {
+  readonly source: CookPoolSource;
+  readonly children: ReactNode;
+}) {
+  return createElement(CookPoolSourceContext.Provider, { value: source }, children);
 }
 
 /** The landing (`719:1507`): the household's pool and its minimum size. */
 export function useCookPool(): ScreenQuery<CookPoolSummary> {
-  const state = usePoolState();
-  return useDevFixture(useMemo(() => poolSummary(state), [state]));
+  return useContext(CookPoolSourceContext).usePool();
 }
 
 /** The deck (`755:2333`): the cooks who have served the household and are not in its pool. */
 export function useCookPoolDeck(): ScreenQuery<readonly CookProfile[]> {
-  const state = usePoolState();
-  return useDevFixture(useMemo(() => deckCooks(state), [state]));
+  return useContext(CookPoolSourceContext).useDeck();
 }
 
-/** One cook's profile (`719:1568`). A cook the household has never had is a 404. */
+/** One cook's profile (`719:1568`). */
 export function useCookProfile(cookId: string): ScreenQuery<CookProfile> {
-  const state = usePoolState();
-  const profile = useMemo(() => cookProfile(state, cookId) ?? null, [state, cookId]);
-  const query = useDevFixture(profile);
-  const result = useMemo<DataState<CookProfile>>(() => {
-    if (query.state.status !== 'ready') return query.state;
-    return query.state.data === null
-      ? failed(fromStatus(404, { code: 'RESOURCE_NOT_FOUND', message: 'Cook not found' }))
-      : { status: 'ready', data: query.state.data };
-  }, [query.state]);
-  return { state: result, refetch: query.refetch };
+  return useContext(CookPoolSourceContext).useProfile(cookId);
 }
-
-/** The dishes the household has hearted (`848:7809`). */
-export function useFavouriteDishIds(): ReadonlySet<string> {
-  const state = usePoolState();
-  return useMemo(() => new Set(state.favouriteDishIds), [state]);
-}
-
-export interface CookPoolActions {
-  readonly addCook: (cookId: string) => void;
-  readonly removeCook: (cookId: string) => void;
-  readonly toggleFavouriteDish: (dishId: string) => void;
-}
-
-const ACTIONS: CookPoolActions = {
-  addCook: (cookId) => update(addCook(current, cookId)),
-  removeCook: (cookId) => update(removeCook(current, cookId)),
-  toggleFavouriteDish: (dishId) => update(toggleFavouriteDish(current, dishId)),
-};
 
 export function useCookPoolActions(): CookPoolActions {
-  return ACTIONS;
-}
-
-/**
- * Development only: starts the store over, optionally with cooks already in the pool — the dev
- * preview's way to open on `719:1507` rather than the new-user `844:5842`.
- */
-export function resetCookPoolDemo(poolIds: readonly string[] = []) {
-  update({ ...DEMO_COOK_POOL, poolIds });
+  return useContext(CookPoolSourceContext).useActions();
 }

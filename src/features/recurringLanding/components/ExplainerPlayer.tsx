@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Animated, Image, Modal, PanResponder, Pressable, StyleSheet, View } from 'react-native';
 import type { GestureResponderEvent, LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { VideoPlayer } from 'expo-video';
 
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { PAUSE_BUTTON, SKIP_ARROW } from '../art';
+import { loadExpoVideo } from '../expoVideo';
+import type { ExpoVideo } from '../expoVideo';
 import {
   SKIP_SECONDS,
   VIDEO_DURATION_SECONDS,
   advance,
+  clampPosition,
   formatClock,
   hasEnded,
   positionAt,
@@ -24,15 +29,14 @@ import {
  * corners, on `#1A1A1A`. From the top: a drag zone with a grab handle, the video's surface, and
  * the transport — elapsed time, back 10 s, play/pause, forward 10 s, the total.
  *
- * ## The video is not wired up
+ * ## The video
  *
- * No video library is installed (the app has neither `expo-video` nor `expo-av`), and no video
- * file exists yet. So the surface is the pale placeholder the frame draws, and the playhead is
- * driven by a clock here (`useClock`) that stands in for the video's own progress. The two places
- * to change when the video lands are marked `INTEGRATION POINT`: `VideoSurface` renders the
- * `source`, and `useClock` is replaced by the player's progress and end callbacks. Everything
- * else — the transport, the scrubber, `onEnded` — already runs off the position and does not
- * change.
+ * Given a `source` the surface plays it with `expo-video` and the transport follows the video:
+ * its position, its length, its end. Without one — no URL set yet (`../video.ts`), or a build
+ * made before `expo-video` was added, which has no native module for it (`../expoVideo.ts`) — the
+ * surface is the pale placeholder the frame draws and a clock stands in for the playhead, so the
+ * page, its transport and the "watched" state all still work. Either way the sheet itself only
+ * sees a `Playback`: a position, a length, whether it plays, and how to play, pause and seek.
  *
  * ## What is not in the frame
  *
@@ -58,26 +62,106 @@ export interface ExplainerPlayerProps {
   readonly testID?: string;
 }
 
-export function ExplainerPlayer({
+/** What the sheet needs of whatever is playing: the video, or the placeholder's clock. */
+interface Playback {
+  /** Seconds in. */
+  readonly position: number;
+  /** The length in seconds. */
+  readonly duration: number;
+  readonly playing: boolean;
+  /** The playhead is at the end, played there or scrubbed there. */
+  readonly ended: boolean;
+  readonly play: () => void;
+  readonly pause: () => void;
+  readonly seekTo: (seconds: number) => void;
+}
+
+export function ExplainerPlayer(props: ExplainerPlayerProps) {
+  const video = props.source === undefined ? null : loadExpoVideo();
+  return props.source !== undefined && video !== null ? (
+    <VideoBackedPlayer {...props} source={props.source} video={video} />
+  ) : (
+    <PlaceholderPlayer {...props} />
+  );
+}
+
+/** No video to play: the pale surface, and a clock for the playhead. */
+function PlaceholderPlayer({
+  durationSeconds = VIDEO_DURATION_SECONDS,
+  initialPosition = 0,
+  ...sheet
+}: ExplainerPlayerProps) {
+  const playback = useClockPlayback({ initialPosition, duration: durationSeconds });
+  return (
+    <PlayerSheet
+      {...sheet}
+      playback={playback}
+      surface={<View style={styles.scene} testID="explainer-player-surface" />}
+    />
+  );
+}
+
+/** A real video, played by `expo-video`. */
+function VideoBackedPlayer({
+  video,
   source,
   durationSeconds = VIDEO_DURATION_SECONDS,
   initialPosition = 0,
+  ...sheet
+}: ExplainerPlayerProps & {
+  readonly video: ExpoVideo;
+  readonly source: ExplainerVideoSource;
+}) {
+  const { useVideoPlayer, VideoView } = video;
+  const player = useVideoPlayer(source.uri, (instance) => {
+    instance.timeUpdateEventInterval = TIME_UPDATE_SECONDS;
+    if (initialPosition > 0) instance.currentTime = initialPosition;
+    instance.play();
+  });
+  const { playback, failed } = useVideoPlayback(player, durationSeconds, initialPosition);
+  return (
+    <PlayerSheet
+      {...sheet}
+      playback={playback}
+      surface={
+        <View style={styles.scene} testID="explainer-player-surface">
+          {/* The pale scene shows until the first frame, and as the video's letterbox. */}
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            contentFit="contain"
+            nativeControls={false}
+            allowsPictureInPicture={false}
+          />
+          {failed ? (
+            <View style={styles.failure} pointerEvents="none">
+              <Text variant="bodyLargeStrong" color="textPrimary" align="center">
+                We couldn&apos;t load the video. Please try again in a moment.
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      }
+    />
+  );
+}
+
+/** The sheet: drag zone, the video's surface (given), and the transport. */
+function PlayerSheet({
+  playback,
+  surface,
   onEnded,
   onClose,
   testID = 'explainer-player',
-}: ExplainerPlayerProps) {
+}: Pick<ExplainerPlayerProps, 'onEnded' | 'onClose' | 'testID'> & {
+  readonly playback: Playback;
+  readonly surface: ReactNode;
+}) {
   const insets = useSafeAreaInsets();
-  const [wantsPlay, setWantsPlay] = useState(true);
   const [trackWidth, setTrackWidth] = useState(0);
-  const [position, setPosition] = useClock({
-    playing: wantsPlay,
-    initialPosition,
-    duration: durationSeconds,
-  });
+  const { position, duration, playing, ended, play, pause, seekTo } = playback;
 
   // The end, however it was reached: nothing is playing any more, and the page is told.
-  const ended = hasEnded(position, durationSeconds);
-  const playing = wantsPlay && !ended;
   const onEndedRef = useRef(onEnded);
   useEffect(() => {
     onEndedRef.current = onEnded;
@@ -122,11 +206,11 @@ export function ExplainerPlayer({
 
   const seek = useCallback(
     (event: GestureResponderEvent) =>
-      setPosition(positionAt(event.nativeEvent.locationX, trackWidth, durationSeconds)),
-    [durationSeconds, setPosition, trackWidth],
+      seekTo(positionAt(event.nativeEvent.locationX, trackWidth, duration)),
+    [duration, seekTo, trackWidth],
   );
 
-  const progress = progressOf(position, durationSeconds);
+  const progress = progressOf(position, duration);
 
   return (
     <Modal transparent animationType="none" statusBarTranslucent onRequestClose={requestClose}>
@@ -159,7 +243,7 @@ export function ExplainerPlayer({
             </Pressable>
           </View>
 
-          <VideoSurface source={source} />
+          {surface}
 
           {/* `970:5609` */}
           <View style={styles.transport}>
@@ -173,7 +257,7 @@ export function ExplainerPlayer({
               onResponderMove={seek}
               accessibilityRole="adjustable"
               accessibilityLabel="Video position"
-              accessibilityValue={{ min: 0, max: durationSeconds, now: Math.floor(position) }}
+              accessibilityValue={{ min: 0, max: duration, now: Math.floor(position) }}
               testID={`${testID}-scrubber`}
             >
               <View style={styles.trackRail} pointerEvents="none" />
@@ -189,7 +273,7 @@ export function ExplainerPlayer({
             <View style={styles.buttons}>
               <SkipButton
                 direction="back"
-                onPress={() => setPosition(skipBy(position, -SKIP_SECONDS, durationSeconds))}
+                onPress={() => seekTo(skipBy(position, -SKIP_SECONDS, duration))}
                 testID={`${testID}-back`}
               />
               <PlayPauseButton
@@ -197,22 +281,24 @@ export function ExplainerPlayer({
                 onPress={() => {
                   // Pressing play at the end starts it again.
                   if (ended) {
-                    setPosition(0);
-                    setWantsPlay(true);
+                    seekTo(0);
+                    play();
+                  } else if (playing) {
+                    pause();
                   } else {
-                    setWantsPlay((current) => !current);
+                    play();
                   }
                 }}
                 testID={`${testID}-toggle`}
               />
               <SkipButton
                 direction="forward"
-                onPress={() => setPosition(skipBy(position, SKIP_SECONDS, durationSeconds))}
+                onPress={() => seekTo(skipBy(position, SKIP_SECONDS, duration))}
                 testID={`${testID}-forward`}
               />
             </View>
             <Text variant="bodyStrong" color="textPlayerTime" testID={`${testID}-total`}>
-              {formatClock(durationSeconds)}
+              {formatClock(duration)}
             </Text>
           </View>
 
@@ -225,31 +311,20 @@ export function ExplainerPlayer({
 }
 
 /**
- * INTEGRATION POINT (1 of 2): the video itself. `970:5608` draws it as a `#FFF9DC` surface filling
- * the sheet between the drag zone and the transport, with the video's scene art over it. With a
- * video library, render `source` here (`expo-video`'s `VideoView`, say, `contentFit="contain"`) and
- * hand its position and end back to `useClock`'s replacement. The placeholder shows no art: none
- * has been exported.
+ * The placeholder's playhead: a clock. Plays the position forward in real time while playing and
+ * stops at the end; seeks set it directly. There is no video, so this is all "playing" means.
  */
-function VideoSurface({ source: _source }: { readonly source: ExplainerVideoSource | undefined }) {
-  return <View style={styles.scene} testID="explainer-player-surface" />;
-}
-
-/**
- * INTEGRATION POINT (2 of 2): the playhead. Plays the position forward in real time while
- * `playing`, to a stand-in for the video's own progress; seeks set it directly. Returns it and its
- * setter, and stops at `duration`.
- */
-function useClock({
-  playing,
+function useClockPlayback({
   initialPosition,
   duration,
 }: {
-  readonly playing: boolean;
   readonly initialPosition: number;
   readonly duration: number;
-}) {
-  const [position, setPosition] = useState(() => Math.min(Math.max(initialPosition, 0), duration));
+}): Playback {
+  const [position, setPosition] = useState(() => clampPosition(initialPosition, duration));
+  const [wantsPlay, setWantsPlay] = useState(true);
+  const ended = hasEnded(position, duration);
+  const playing = wantsPlay && !ended;
 
   useEffect(() => {
     if (!playing) return;
@@ -263,7 +338,76 @@ function useClock({
     return () => clearInterval(timer);
   }, [playing, duration]);
 
-  return [position, setPosition] as const;
+  return useMemo(
+    () => ({
+      position,
+      duration,
+      playing,
+      ended,
+      play: () => setWantsPlay(true),
+      pause: () => setWantsPlay(false),
+      seekTo: (seconds: number) => setPosition(clampPosition(seconds, duration)),
+    }),
+    [position, duration, playing, ended],
+  );
+}
+
+/** Seeks the video to `seconds`. `expo-video` seeks by setting `currentTime`. */
+function seekPlayer(player: VideoPlayer, seconds: number) {
+  player.currentTime = seconds;
+}
+
+/**
+ * The video's playhead: `expo-video`'s own position, length, play state and end, read from its
+ * events. A seek moves the playhead at once (the video catches up) so the scrubber follows the
+ * finger. The length is the video's, once it has loaded; until then the one the page was given.
+ */
+function useVideoPlayback(
+  player: VideoPlayer,
+  fallbackDuration: number,
+  initialPosition: number,
+): { readonly playback: Playback; readonly failed: boolean } {
+  const [duration, setDuration] = useState(
+    player.duration > 0 ? player.duration : fallbackDuration,
+  );
+  const [position, setPosition] = useState(() => clampPosition(initialPosition, duration));
+  const [playing, setPlaying] = useState(player.playing);
+  const [playedToEnd, setPlayedToEnd] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const subscriptions = [
+      player.addListener('timeUpdate', ({ currentTime }) => setPosition(currentTime)),
+      player.addListener('playingChange', ({ isPlaying }) => setPlaying(isPlaying)),
+      player.addListener('playToEnd', () => setPlayedToEnd(true)),
+      player.addListener('sourceLoad', ({ duration: length }) => {
+        if (length > 0) setDuration(length);
+      }),
+      player.addListener('statusChange', ({ status }) => setFailed(status === 'error')),
+    ];
+    return () => subscriptions.forEach((subscription) => subscription.remove());
+  }, [player]);
+
+  const ended = playedToEnd || hasEnded(position, duration);
+
+  const playback = useMemo<Playback>(
+    () => ({
+      position: clampPosition(position, duration),
+      duration,
+      playing: playing && !ended,
+      ended,
+      play: () => player.play(),
+      pause: () => player.pause(),
+      seekTo: (seconds: number) => {
+        const target = clampPosition(seconds, duration);
+        setPosition(target);
+        setPlayedToEnd(false);
+        seekPlayer(player, target);
+      },
+    }),
+    [position, duration, playing, ended, player],
+  );
+  return { playback, failed };
 }
 
 /** `970:5612` / `970:5620` — a 44pt button: a circular arrow with "10" in it, forward being the back one mirrored. */
@@ -336,6 +480,8 @@ const DRAG_DISMISS = 80;
 /** `970:5601` — 87 from the top, with the status bar's 54 above: 33 under it. */
 const SHEET_TOP = 33;
 const TICK_MS = 250;
+/** How often `expo-video` reports the position, in seconds. */
+const TIME_UPDATE_SECONDS = 0.25;
 const TRACK_HIT_SLOP = { top: 14, bottom: 14 };
 /** The scrubber's track height. */
 const TRACK = 4;
@@ -366,6 +512,13 @@ const styles = StyleSheet.create({
   },
   /** `970:5608`. */
   scene: { flex: 1, backgroundColor: lightTheme.colors.surfaceVideoScene },
+  /** Over the scene, when the video would not load. */
+  failure: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: lightTheme.space.xl,
+  },
   /** `970:5609` — px 24 / py 16, the times at the sides and the buttons between. */
   transport: {
     flexDirection: 'row',

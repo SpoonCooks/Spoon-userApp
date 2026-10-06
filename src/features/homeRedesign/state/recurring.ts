@@ -15,19 +15,23 @@ export interface RecurringChip {
   readonly tone: 'lime' | 'outline';
 }
 
-type RecurringInput = Pick<HomeModel, 'cookPool' | 'activeRecurringPlan'>;
+type RecurringInput = Pick<HomeModel, 'cookPool' | 'activeRecurringPlan' | 'recurringChip'>;
 
 /**
  * The lime chip on the pool block:
  *   plan active            → "Recurring · Live" → plan tracker
  *   pool qualifies (≥ 2)   → "Book Recurring"   → recurring flow
  *   pool under 2           → "Check Recurring"  → explainer  (proposed in the dev note)
+ *
+ * The backend's `chip` (eligibility) decides when it has answered — its unlock threshold is policy,
+ * not this file's constant. Until then the pool is counted locally.
  */
 export function recurringChipFor(model: RecurringInput): RecurringChip {
-  if (model.activeRecurringPlan !== null) {
+  const chip = model.recurringChip;
+  if (chip === 'live' || (chip === undefined && model.activeRecurringPlan !== null)) {
     return { label: 'Recurring · Live', target: 'planTracker', tone: 'lime' };
   }
-  if (model.cookPool.length >= RECURRING_MIN_POOL) {
+  if (chip === 'book' || (chip === undefined && model.cookPool.length >= RECURRING_MIN_POOL)) {
     return { label: 'Book Recurring', target: 'recurringFlow', tone: 'lime' };
   }
   return { label: 'Check Recurring', target: 'explainer', tone: 'outline' };

@@ -14,6 +14,7 @@ import {
   clashes,
   durationMinutes,
   formatStartTime,
+  sameDayVisitsFor,
   startTimesFor,
 } from '../data';
 import type { RecurringBusyWindow } from '../data';
@@ -35,11 +36,11 @@ import { DurationCarousel } from './DurationCarousel';
  * band greys too, and so does a time of day with none left for the chosen duration. Rendered as
  * siblings so they take the screen's own spacing.
  *
- * Durations and prices come from the catalogue, and once a time of day is picked the start times
- * are asked of `POST /v1/recurring/start-times` for this visit's days: a start is offered only
- * when a pool Cook can take it on EVERY one of them (`coverage: 'all'`). The design draws no "some
- * days" state, so a partly free start is greyed like a taken one. Until the backend answers, every
- * start in the band is offered, as before — the save re-checks each visit either way.
+ * Durations and prices come from Recurring eligibility, and once a duration is picked the start
+ * times are asked of `POST /v1/recurring/start-times` for this visit's days, beside the Plan's
+ * other visits on them (`sameDayVisits`): the backend offers a start only when a pool Cook can take
+ * it on EVERY one of those days, and calls a time of day with nothing left unavailable. Until the
+ * backend answers, every start in the band is offered, as before — the save re-checks either way.
  */
 export interface VisitChoicesProps {
   /** A choice already saved, or the part of one already made (the dev preview's states). */
@@ -72,18 +73,30 @@ export function VisitChoices({
   const [durationId, setDurationId] = useState<string | null>(initial?.durationId ?? null);
   const [startMinutes, setStartMinutes] = useState<number | null>(initial?.startMinutes ?? null);
 
-  const startTimes = useRecurringStartTimes({
-    addressId: planning.addressId,
-    dates: dayIds,
-    durationMinutes: durationId === null ? null : durationMinutes(durationId),
-  });
+  const startTimes = useRecurringStartTimes(
+    planning.addressId === null || durationId === null
+      ? null
+      : {
+          addressId: planning.addressId,
+          dates: dayIds,
+          durationMinutes: durationMinutes(durationId),
+          sameDayVisits: sameDayVisitsFor(busy),
+        },
+  );
   /** Starts a pool Cook can take on every day of this visit; `null` until the backend answers. */
   const offered = useMemo(() => {
     if (startTimes.state.status !== 'ready') return null;
     return new Set(
-      startTimes.state.data.startTimes
-        .filter((slot) => slot.coverage === 'all')
-        .map((slot) => minutesOf(slot.startTime)),
+      startTimes.state.data.timesOfDay.flatMap((band) => band.startTimes.map(minutesOf)),
+    );
+  }, [startTimes.state]);
+  /** Times of day with no start left on every day; empty until the backend answers. */
+  const closedBands = useMemo(() => {
+    if (startTimes.state.status !== 'ready') return new Set<RecurringTimeOfDay>();
+    return new Set(
+      startTimes.state.data.timesOfDay
+        .filter((band) => !band.available)
+        .map((band) => band.timeOfDay),
     );
   }, [startTimes.state]);
 
@@ -157,7 +170,10 @@ export function VisitChoices({
               id={band.id}
               label={band.label}
               selected={band.id === timeOfDay}
-              disabled={durationId !== null && !bandFits(band.id, durationMinutes(durationId))}
+              disabled={
+                durationId !== null &&
+                (!bandFits(band.id, durationMinutes(durationId)) || closedBands.has(band.id))
+              }
               onPress={() => pickTimeOfDay(band.id)}
             />
           ))}

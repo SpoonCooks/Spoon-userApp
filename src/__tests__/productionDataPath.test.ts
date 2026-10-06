@@ -34,9 +34,6 @@ const ALLOWED_PENDING = new Set([
   // The meal brief: no endpoint persists a draft, and the catalogue publishes only its BOUNDS
   // (guest count, diet axis). PRODUCT_DECISION_PENDING on where a brief is stored.
   'src/features/mealBrief/data.ts',
-  // The Cook Pool: no endpoint serves the deck (served cooks with their menus), a cook's profile
-  // or dish favourites. `GET/POST/DELETE /v1/me/cooks` exist but carry no menu or dish images.
-  'src/features/cookPool/data.ts',
 ]);
 
 describe('production data path', () => {

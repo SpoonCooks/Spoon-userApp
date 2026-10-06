@@ -1,16 +1,16 @@
 import type { ApiClient, RequestOptions } from '@core/api';
 
 import { createRecurringApi } from './recurringApi';
-import type { PlanDraftInput } from './recurringApi';
+import type { RecurringDraftInput } from './recurringApi';
 
 /**
- * The Recurring Plan wire contract — DEC-084, SpoonCooks/V0#101.
+ * The Recurring booking wire contract — DEC-086 (V2).
  *
- * Payloads are transcribed from the backend's own response builders (`plan-capacity.ts`,
- * `plan-service.ts`, `mandate-service.ts`), not a live instance: the routes were not deployed
- * when this was written. The body assertions matter more than usual, because every plan body is
- * `additionalProperties: false` and the draft rules (visit 1 on every day, `dates` forbidden on an
- * `all` visit) come back as a bare 400 with no reason.
+ * Payloads are transcribed from the backend's own response builders (`booking-capacity.ts`,
+ * `recurring-booking-service.ts`, `recurring-cancellation.ts`, `mandate-service.ts`), not a live
+ * instance. The body assertions matter more than usual: every Recurring body is
+ * `additionalProperties: false`, and the draft rules (Visit 1 on every day of its Plan, `dates`
+ * refused on Visit 1) come back as a 400.
  */
 
 interface Captured {
@@ -37,141 +37,157 @@ function recording(response: unknown) {
 }
 
 const PRICE = {
-  serviceAmountPaise: 10932,
-  taxRateBps: 1800,
-  taxAmountPaise: 1968,
-  totalAmountPaise: 12900,
+  durationMinutes: 60,
+  basePricePaise: 30000,
+  pricePaise: 12900,
+  gstPaise: 645,
+  totalPaise: 13545,
   pricingVersion: 'pricing-2026-09-01',
 };
 
 const ELIGIBILITY = {
-  policyVersion: 'recurring-v1',
+  policyVersion: 'recurring-v2-spec-1',
   unlocked: true,
-  poolCount: 3,
-  unlockThreshold: 3,
+  poolCount: 2,
+  unlockThreshold: 2,
+  chip: 'book',
+  liveBookings: [],
   window: { startDate: '2026-10-05', endDate: '2026-10-25' },
-  limits: { minDays: 5, maxDays: 14, maxVisitsPerDay: 3 },
-  charging: { chargeLeadHours: 24, reminderLeadHours: 48, mandateMaxChargePaise: 100000 },
-  rescheduleGraceDays: 7,
+  limits: { minDays: 5, maxDays: 14 },
+  timesOfDay: [{ timeOfDay: 'morning', firstStart: '05:00', lastStart: '11:45' }],
+  durations: [PRICE],
+  charging: { notifyLeadHours: 27, debitLeadHours: 3, mandateMaxChargePaise: 100000 },
 };
 
-const DRAFT: PlanDraftInput = {
+const DRAFT: RecurringDraftInput = {
   addressId: '11111111-1111-4111-8111-111111111111',
-  dates: ['2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10'],
-  visits: [
-    { visitNumber: 1, durationMinutes: 60, startTime: '08:00', daysScope: 'all' },
+  plans: [
     {
-      visitNumber: 2,
-      durationMinutes: 30,
-      startTime: '19:30',
-      daysScope: 'some',
-      dates: ['2026-10-06', '2026-10-08'],
+      planNumber: 1,
+      dates: ['2026-10-06', '2026-10-07', '2026-10-08'],
+      visits: [
+        { visitNumber: 1, timeOfDay: 'morning', durationMinutes: 60, startTime: '08:00' },
+        {
+          visitNumber: 2,
+          timeOfDay: 'evening',
+          durationMinutes: 30,
+          startTime: '19:30',
+          dates: ['2026-10-06'],
+        },
+      ],
+    },
+    {
+      planNumber: 2,
+      dates: ['2026-10-09', '2026-10-10'],
+      visits: [{ visitNumber: 1, timeOfDay: 'afternoon', durationMinutes: 60, startTime: '13:00' }],
     },
   ],
 };
 
-const QUOTE = {
-  policyVersion: 'recurring-v1',
-  bookable: true,
-  window: ELIGIBILITY.window,
-  firstDate: '2026-10-06',
-  lastDate: '2026-10-10',
-  daysCount: 5,
-  visitsCount: 7,
-  overlaps: [],
-  visits: [
-    {
-      date: '2026-10-06',
-      visitNumber: 1,
-      startTime: '08:00',
-      durationMinutes: 60,
-      start: '2026-10-06T02:30:00.000Z',
-      overridden: false,
-      available: true,
-      reason: 'AVAILABLE',
-    },
-  ],
-  visitSummaries: [
-    { visitNumber: 1, durationMinutes: 60, startTime: '08:00', daysCount: 5, price: PRICE },
-  ],
-  chargeRange: { minPaise: 6900, maxPaise: 12900 },
-  totalPaise: 78300,
-  mandateMaxChargePaise: 100000,
+const VISIT = {
+  visitId: 'visit-1',
+  planNumber: 1,
+  visitNumber: 1,
+  date: '2026-10-06',
+  timeOfDay: 'morning',
+  startTime: '08:00',
+  start: '2026-10-06T02:30:00.000Z',
+  durationMinutes: 60,
+  status: 'scheduled',
+  displayState: 'cook_pending',
+  cookConfirmBy: '2026-10-05T23:30:00.000Z',
+  cook: null,
+  bookingId: null,
+  totalPaise: 13545,
+  cancelledBy: null,
 };
 
-const PLAN = {
-  planId: 'plan-1',
+const BOOKING = {
+  recurringBookingId: 'rb-1',
   status: 'pending_mandate',
   addressId: DRAFT.addressId,
   window: ELIGIBILITY.window,
-  keepGoing: false,
-  mealNotes: null,
-  policyVersion: 'recurring-v1',
-  templates: [
+  policyVersion: 'recurring-v2-spec-1',
+  mandate: null,
+  banner: null,
+  counts: { done: 0, cancelled: 0, toGo: 6 },
+  plans: [
     {
-      visitNumber: 1,
-      durationMinutes: 60,
-      startTime: '08:00',
-      daysScope: 'all',
-      price: {
-        totalAmountPaise: 12900,
-        serviceAmountPaise: 10932,
-        taxAmountPaise: 1968,
-        pricingVersion: 'pricing-2026-09-01',
-      },
+      planNumber: 1,
+      days: ['2026-10-06', '2026-10-07', '2026-10-08'],
+      visits: [
+        {
+          visitNumber: 1,
+          timeOfDay: 'morning',
+          durationMinutes: 60,
+          startTime: '08:00',
+          days: ['2026-10-06', '2026-10-07', '2026-10-08'],
+          price: {
+            basePricePaise: 30000,
+            pricePaise: 12900,
+            gstPaise: 645,
+            totalPaise: 13545,
+            pricingVersion: 'p',
+          },
+        },
+      ],
+      history: [],
     },
   ],
-  visits: [
-    {
-      visitId: 'visit-1',
-      date: '2026-10-06',
-      visitNumber: 1,
-      start: '2026-10-06T02:30:00.000Z',
-      durationMinutes: 60,
-      pricePaise: 12900,
-      status: 'reserved',
-      bookingId: null,
-      chargeDueAt: '2026-10-05T02:30:00.000Z',
-      reminderDueAt: '2026-10-04T02:30:00.000Z',
-    },
-  ],
-  autopay: null,
+  days: [{ date: '2026-10-06', group: 'upcoming', visits: [VISIT] }],
+  upNext: VISIT,
+  chargeRange: { minPaise: 7245, maxPaise: 13545 },
+  support: { whatsappUrl: null },
   createdAt: '2026-10-02T06:00:00.000Z',
   cancelledAt: null,
+  cancelledBy: null,
+};
+
+const VISIT_DETAIL = {
+  ...VISIT,
+  recurringBookingId: 'rb-1',
+  price: BOOKING.plans[0]!.visits[0]!.price,
+  payment: null,
+  cancellation: null,
+  mandate: null,
+  prep: null,
+  support: { whatsappUrl: 'https://wa.me/919800000001?text=hi' },
 };
 
 describe('planning reads', () => {
-  it('reads eligibility with no parameters', async () => {
+  it('reads eligibility, with the chip, times of day and duration prices', async () => {
     const { calls, recurring } = recording(ELIGIBILITY);
 
     const eligibility = await recurring.eligibility();
 
     expect(calls[0]).toMatchObject({ path: '/v1/recurring/eligibility', method: 'GET' });
-    expect(eligibility.limits).toEqual({ minDays: 5, maxDays: 14, maxVisitsPerDay: 3 });
+    expect(eligibility.chip).toBe('book');
+    expect(eligibility.durations[0]?.basePricePaise).toBe(30000);
   });
 
-  it('asks the calendar about one address', async () => {
+  it('reads the calendar with no address', async () => {
     const { calls, recurring } = recording({
       window: ELIGIBILITY.window,
-      days: [{ date: '2026-10-05', available: false }],
+      days: [{ date: '2026-10-05', selectable: false }],
     });
 
-    const calendar = await recurring.calendar(DRAFT.addressId);
+    const calendar = await recurring.calendar();
 
-    expect(calls[0]?.path).toBe(`/v1/recurring/calendar?addressId=${DRAFT.addressId}`);
-    expect(calendar.days[0]).toEqual({ date: '2026-10-05', available: false });
+    expect(calls[0]?.path).toBe('/v1/recurring/calendar');
+    expect(calendar.days[0]).toEqual({ date: '2026-10-05', selectable: false });
   });
 
-  it('posts the picked days and one duration for start times', async () => {
+  it('posts the dates, the duration and the Plan’s other visits for start times', async () => {
     const { calls, recurring } = recording({
       durationMinutes: 60,
-      startTimes: [{ startTime: '08:00', availableDates: ['2026-10-06'], coverage: 'partial' }],
+      timesOfDay: [{ timeOfDay: 'morning', available: true, startTimes: ['08:00'] }],
     });
 
     await recurring.startTimes({
       addressId: DRAFT.addressId,
       dates: ['2026-10-06', '2026-10-07'],
       durationMinutes: 60,
+      sameDayVisits: [{ date: '2026-10-06', startTime: '09:00', durationMinutes: 60 }],
     });
 
     expect(calls[0]).toMatchObject({
@@ -181,126 +197,208 @@ describe('planning reads', () => {
         addressId: DRAFT.addressId,
         dates: ['2026-10-06', '2026-10-07'],
         durationMinutes: 60,
+        sameDayVisits: [{ date: '2026-10-06', startTime: '09:00', durationMinutes: 60 }],
       },
     });
+  });
+
+  it('leaves sameDayVisits out when there are none', async () => {
+    const { calls, recurring } = recording({ durationMinutes: 60, timesOfDay: [] });
+
+    await recurring.startTimes({
+      addressId: DRAFT.addressId,
+      dates: ['2026-10-06'],
+      durationMinutes: 60,
+    });
+
+    expect(calls[0]?.body).not.toHaveProperty('sameDayVisits');
   });
 });
 
 describe('the draft body', () => {
   it('quotes without an idempotency key, since a quote holds nothing', async () => {
-    const { calls, recurring } = recording(QUOTE);
+    const { calls, recurring } = recording({
+      policyVersion: 'p',
+      bookable: true,
+      window: ELIGIBILITY.window,
+      firstDate: '2026-10-06',
+      lastDate: '2026-10-10',
+      daysCount: 5,
+      visitsCount: 6,
+      overlaps: [],
+      visits: [],
+      visitSummaries: [
+        {
+          planNumber: 1,
+          visitNumber: 1,
+          timeOfDay: 'morning',
+          durationMinutes: 60,
+          startTime: '08:00',
+          daysCount: 3,
+          price: PRICE,
+        },
+      ],
+      chargeRange: { minPaise: 7245, maxPaise: 13545 },
+      totalPaise: 75000,
+      mandateMaxChargePaise: 100000,
+    });
 
     const quote = await recurring.quote(DRAFT);
 
-    expect(calls[0]).toMatchObject({ path: '/v1/recurring/plans/quote', method: 'POST' });
+    expect(calls[0]).toMatchObject({ path: '/v1/recurring/bookings/quote', method: 'POST' });
     expect(calls[0]?.headers['Idempotency-Key']).toBeUndefined();
-    expect(quote.totalPaise).toBe(78300);
+    expect(quote.totalPaise).toBe(75000);
   });
 
-  it('sends visit 1 without dates and a "some" visit with its subset', async () => {
-    const { calls, recurring } = recording(QUOTE);
+  it('sends Plans with Visit 1 dateless and a later visit with its days', async () => {
+    const { calls, recurring } = recording(BOOKING);
 
-    await recurring.quote(DRAFT);
+    await recurring.create(DRAFT, 'recurring.create:x');
 
     expect(calls[0]?.body).toEqual({
       addressId: DRAFT.addressId,
-      dates: DRAFT.dates,
-      visits: [
-        { visitNumber: 1, durationMinutes: 60, startTime: '08:00', daysScope: 'all' },
+      plans: [
         {
-          visitNumber: 2,
-          durationMinutes: 30,
-          startTime: '19:30',
-          daysScope: 'some',
-          dates: ['2026-10-06', '2026-10-08'],
+          planNumber: 1,
+          dates: ['2026-10-06', '2026-10-07', '2026-10-08'],
+          visits: [
+            { visitNumber: 1, timeOfDay: 'morning', durationMinutes: 60, startTime: '08:00' },
+            {
+              visitNumber: 2,
+              timeOfDay: 'evening',
+              durationMinutes: 30,
+              startTime: '19:30',
+              dates: ['2026-10-06'],
+            },
+          ],
+        },
+        {
+          planNumber: 2,
+          dates: ['2026-10-09', '2026-10-10'],
+          visits: [
+            { visitNumber: 1, timeOfDay: 'afternoon', durationMinutes: 60, startTime: '13:00' },
+          ],
         },
       ],
     });
   });
 
-  // `dates` on an `all` visit is a 400, not an ignored extra.
-  it('drops dates from an "all" visit even if the caller supplied them', async () => {
-    const { calls, recurring } = recording(QUOTE);
+  // `dates` on Visit 1 is a 400, not an ignored extra.
+  it('drops dates from Visit 1 even if the caller supplied them', async () => {
+    const { calls, recurring } = recording(BOOKING);
+    const plan = DRAFT.plans[0]!;
 
-    await recurring.quote({
-      ...DRAFT,
-      visits: [{ ...DRAFT.visits[0]!, dates: ['2026-10-06'] }],
-    });
+    await recurring.create(
+      { ...DRAFT, plans: [{ ...plan, visits: [{ ...plan.visits[0]!, dates: ['2026-10-06'] }] }] },
+      'recurring.create:y',
+    );
 
-    const body = calls[0]?.body as { visits: Record<string, unknown>[] };
-    expect(body.visits[0]).not.toHaveProperty('dates');
-  });
-
-  it('leaves overrides out when there are none', async () => {
-    const { calls, recurring } = recording(QUOTE);
-
-    await recurring.quote({ ...DRAFT, overrides: [] });
-
-    expect(calls[0]?.body).not.toHaveProperty('overrides');
+    const body = calls[0]?.body as { plans: { visits: Record<string, unknown>[] }[] };
+    expect(body.plans[0]?.visits[0]).not.toHaveProperty('dates');
   });
 });
 
-describe('plan writes', () => {
-  it('saves with an Idempotency-Key and the optional fields only when given', async () => {
-    const { calls, recurring } = recording(PLAN);
+describe('booking writes', () => {
+  it('saves with an Idempotency-Key and reads back a pending_mandate booking', async () => {
+    const { calls, recurring } = recording(BOOKING);
 
-    const plan = await recurring.create({ ...DRAFT, mealNotes: 'Less oil' }, 'recurring.create:x');
+    const booking = await recurring.create(DRAFT, 'recurring.create:z');
 
-    expect(calls[0]).toMatchObject({ path: '/v1/recurring/plans', method: 'POST' });
+    expect(calls[0]).toMatchObject({ path: '/v1/recurring/bookings', method: 'POST' });
     expect(calls[0]?.headers['Idempotency-Key']).toEqual(expect.any(String));
-    expect(calls[0]?.body).toMatchObject({ mealNotes: 'Less oil' });
-    expect(calls[0]?.body).not.toHaveProperty('keepGoing');
-    expect(plan.status).toBe('pending_mandate');
+    expect(booking.status).toBe('pending_mandate');
+    expect(booking.upNext?.cook).toBeNull();
   });
 
-  it('cancels a plan and a visit on their own routes, each idempotent', async () => {
-    const { calls, recurring } = recording(PLAN);
-
-    await recurring.cancel('plan-1', 'recurring.cancel:plan-1');
-    await recurring.cancelVisit('plan-1', 'visit-1', 'recurring.visit.cancel:visit-1');
-
-    expect(calls.map((call) => call.path)).toEqual([
-      '/v1/me/recurring-plans/plan-1/cancel',
-      '/v1/me/recurring-plans/plan-1/visits/visit-1/cancel',
-    ]);
-    expect(calls.every((call) => call.headers['Idempotency-Key'] !== undefined)).toBe(true);
-    expect(calls.every((call) => call.body === undefined)).toBe(true);
-  });
-
-  it('reschedules a visit to a date and a start time', async () => {
-    const { calls, recurring } = recording(PLAN);
-
-    await recurring.rescheduleVisit(
-      'plan-1',
+  it('cancels a visit and a booking on their own routes, with a reason, each idempotent', async () => {
+    const visit = recording({
+      ...VISIT_DETAIL,
+      status: 'cancelled',
+      displayState: 'cancelled',
+      cancelledBy: 'customer',
+      cancellation: {
+        cancelledBy: 'customer',
+        cancelledAt: '2026-10-03T06:00:00.000Z',
+        window: 1,
+        reasonCode: 'OTHER',
+        feePercent: 0,
+        feePaise: 0,
+        refundPaise: 0,
+        refundStatus: null,
+        nothingCharged: true,
+      },
+    });
+    await visit.recurring.cancelVisit(
+      'rb-1',
       'visit-1',
-      { date: '2026-10-12', startTime: '09:00' },
-      'recurring.visit.reschedule:visit-1',
+      { reasonCode: 'OTHER', reasonDetail: 'Travelling' },
+      'recurring.visit.cancel:visit-1',
     );
-
-    expect(calls[0]).toMatchObject({
-      path: '/v1/me/recurring-plans/plan-1/visits/visit-1/reschedule',
-      body: { date: '2026-10-12', startTime: '09:00' },
+    const whole = recording({
+      booking: { ...BOOKING, status: 'cancelled' },
+      visitsCancelled: 6,
+      totals: { feePaise: 0, refundPaise: 0 },
+      whatsappUrl: null,
     });
+    await whole.recurring.cancel('rb-1', { reasonCode: 'URGENT_CHANGE' }, 'recurring.cancel:rb-1');
+
+    expect(visit.calls[0]).toMatchObject({
+      path: '/v1/me/recurring-bookings/rb-1/visits/visit-1/cancel',
+      body: { reasonCode: 'OTHER', reasonDetail: 'Travelling' },
+    });
+    expect(whole.calls[0]).toMatchObject({
+      path: '/v1/me/recurring-bookings/rb-1/cancel',
+      body: { reasonCode: 'URGENT_CHANGE' },
+    });
+    expect(visit.calls[0]?.headers['Idempotency-Key']).toBeDefined();
+    expect(whole.calls[0]?.headers['Idempotency-Key']).toBeDefined();
   });
 
-  it('sets keep-going without an idempotency key', async () => {
-    const { calls, recurring } = recording({ ...PLAN, keepGoing: true });
+  it('reads a visit’s cancellation quote without sending any amount', async () => {
+    const { calls, recurring } = recording({
+      visitId: 'visit-1',
+      cancellable: true,
+      window: 3,
+      feePercent: 25,
+      feePaise: 3386,
+      refundPaise: 10159,
+      chargedPaise: 13545,
+      nothingCharged: false,
+    });
 
-    await recurring.setKeepGoing('plan-1', true);
+    const quote = await recurring.visitCancellationQuote('rb-1', 'visit-1');
 
     expect(calls[0]).toMatchObject({
-      path: '/v1/me/recurring-plans/plan-1/keep-going',
-      body: { keepGoing: true },
+      path: '/v1/me/recurring-bookings/rb-1/visits/visit-1/cancellation-quote',
+      method: 'GET',
     });
-    expect(calls[0]?.headers['Idempotency-Key']).toBeUndefined();
+    expect(quote.feePercent).toBe(25);
+  });
+
+  it('writes prep checks with PUT, sending only the checks given', async () => {
+    const { calls, recurring } = recording({
+      bookingId: 'b-1',
+      entryApproved: true,
+      groceriesReady: false,
+      utensilsReady: false,
+      updatedAt: '2026-10-06T00:00:00.000Z',
+    });
+
+    await recurring.updatePrep('b-1', { entryApproved: true });
+
+    expect(calls[0]).toMatchObject({
+      path: '/v1/bookings/b-1/prep',
+      method: 'PUT',
+      body: { entryApproved: true },
+    });
   });
 });
 
 describe('autopay', () => {
-  it('starts a mandate for a method and parses the checkout', async () => {
+  it('starts a UPI mandate with no body and parses the checkout', async () => {
     const { calls, recurring } = recording({
       mandateId: 'mandate-1',
-      planId: 'plan-1',
+      recurringBookingId: 'rb-1',
       method: 'upi',
       status: 'pending',
       provider: 'razorpay',
@@ -309,30 +407,29 @@ describe('autopay', () => {
       amountPaise: 100,
       currency: 'INR',
       maxAmountPaise: 100000,
-      authoriseBy: '2026-10-02T06:30:00.000Z',
+      approveBy: '2026-10-02T06:30:00.000Z',
       keyId: null,
     });
 
-    const checkout = await recurring.startMandate('plan-1', 'upi', 'recurring.mandate:plan-1');
+    const checkout = await recurring.startMandate('rb-1', 'recurring.mandate:rb-1');
 
-    expect(calls[0]).toMatchObject({
-      path: '/v1/me/recurring-plans/plan-1/mandate',
-      body: { method: 'upi' },
-    });
+    expect(calls[0]).toMatchObject({ path: '/v1/me/recurring-bookings/rb-1/mandate' });
+    expect(calls[0]?.body).toBeUndefined();
     expect(checkout.keyId).toBeNull();
   });
 
   it('verifies with the three values Razorpay returns', async () => {
     const { calls, recurring } = recording({
       mandateId: 'mandate-1',
-      planId: 'plan-1',
+      recurringBookingId: 'rb-1',
       method: 'upi',
       status: 'initiated',
-      planStatus: 'pending_mandate',
+      bookingStatus: 'pending_mandate',
+      handleMasked: null,
       confirmedAt: null,
     });
 
-    const result = await recurring.verifyMandate('plan-1', {
+    const result = await recurring.verifyMandate('rb-1', {
       providerOrderId: 'order_1',
       providerPaymentId: 'pay_1',
       signature: 'sig',
@@ -348,16 +445,16 @@ describe('autopay', () => {
 });
 
 describe('the boundary refuses a malformed payload', () => {
-  it('rejects a plan status the app does not know', async () => {
-    const { recurring } = recording({ ...PLAN, status: 'paused' });
+  it('rejects a booking status the app does not know', async () => {
+    const { recurring } = recording({ ...BOOKING, status: 'paused' });
 
-    await expect(recurring.detail('plan-1')).rejects.toThrow();
+    await expect(recurring.detail('rb-1')).rejects.toThrow();
   });
 
   it('rejects a wall-clock start time that is not HH:MM', async () => {
     const { recurring } = recording({
       durationMinutes: 60,
-      startTimes: [{ startTime: '8:00', availableDates: [], coverage: 'full' }],
+      timesOfDay: [{ timeOfDay: 'morning', available: true, startTimes: ['8:00'] }],
     });
 
     await expect(

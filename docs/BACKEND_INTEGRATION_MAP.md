@@ -120,13 +120,35 @@ is deliberately permissive and the screen degrades to a sparse card. Non-blockin
 and the Profile "Help" tile still have nowhere to go (the long-standing product blocker B-10, now
 visible in the contract).
 
-**BE-COOKPOOL — the Cook Pool has no read model for its deck, profiles or favourites
-(2026-10-02).** The landing (`844:5842` / `719:1507`), the selection deck (`755:2333`) and the cook
-profile (`719:1568`) render from a local store seeded by `src/demo/fixtures/cookPool.ts`, through
-`src/features/cookPool/data.ts` (`useDevFixture`, listed in `ALLOWED_PENDING`). V0 already has
-`GET/POST/DELETE /v1/me/cooks`, but no endpoint lists the cooks who have served the household with
-their menus, none returns one cook's profile with a categorised menu and dish photos, and dish
-favourites do not exist. The full list of changes is in `docs/COOK_POOL_BACKEND.md`.
+**BE-COOKPOOL — RESOLVED by V0 `feat/cook-pool-recurring-plans` (DEC-085, 2026-10-06).** The
+backend now serves the pool (`GET /v1/me/cooks`), Pool selection's deck — tried, active, unpooled
+Cooks only (`GET /v1/me/cooks/candidates`), a Cook's profile with dishes by category
+(`GET /v1/me/cooks/:cookId`, tried or pooled Cooks only), add by `cookId` (refused
+`COOK_NOT_TRIED` for a Cook who never completed a booking for the household) and remove. Dish
+favourites were dropped by the V2 spec and stay a local, per-device preference. Dish photos still
+come from the bundled card content by `profileCode`. Not deployed: the branch is unmerged.
+
+**BE-RECURRING — Recurring V2 is wired against an unmerged, undeployed backend (2026-10-06).**
+`src/features/recurringSetup/api` speaks DEC-086's contract (V0 `feat/cook-pool-recurring-plans`):
+eligibility (Home's chip, times of day, base/effective prices), the 21-day calendar, start times by
+time of day with the Plan's other visits (`sameDayVisits`), the multi-Plan quote and save, UPI
+Autopay start/verify (re-approval included), visit and whole-booking cancellation with quotes and
+reasons, and visit prep checks. Gaps on the app side:
+- The Autopay step after "Book Now" and the confirmation after it have no Figma frames; they are
+  built from the spec's Step 8 with the flow's own components (`RecurringAutopayScreen`,
+  `RecurringBookedScreen`) and run save → mandate → Razorpay recurring checkout → verify.
+- The Live booking / Manage plans / visit-details screens are not on this branch.
+- None of it has run against a live backend: the routes exist only on the unmerged V0 branch.
+
+**BE-RECURRING-VIDEO — the Recurring landing's explainer video has no source of truth yet
+(2026-10-05).** The player (`src/features/recurringLanding/components/ExplainerPlayer.tsx`) plays
+whatever `useExplainerVideoSource()` returns (`src/features/recurringLanding/video.ts`): today the
+constant `EXPLAINER_VIDEO_URL`, `null` until a URL is pasted there (an `https://` `.mp4` or HLS
+`.m3u8`; the 3:45 length is read from the video once it loads). If the backend should send it
+instead — so the video can change without an app release — expose the URL on a read the app
+already makes (or a small config read) and have `useExplainerVideoSource` return it; the player and
+the screens do not change. Playback uses `expo-video`, a native module: a build made before it was
+added plays a placeholder instead (`expoVideo.ts` checks for the module first).
 
 **BE-5 — the redesigned Home is partly wired.** `/home` now renders `src/features/homeRedesign`
 on live data (`useHomeRedesignData`, `adapters.ts`): serviceability from the current address,

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { LOADING, failed, ready, useApiQueries } from '@core/data';
 import type { DataState } from '@core/data';
@@ -8,6 +8,8 @@ import { availabilityKeys, createAvailabilityApi } from '@features/availability'
 import type { InstantAvailabilityDto } from '@features/availability';
 import { useBookingHistory } from '@features/booking';
 import { useCatalogue } from '@features/catalogue';
+import { useCookPoolList } from '@features/cookPool';
+import { useRecurringEligibility } from '@features/recurringSetup';
 
 import { homeModelFrom } from './adapters';
 import type { InstantReads } from './adapters';
@@ -36,6 +38,10 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
   const addresses = useAddresses();
   const catalogue = useCatalogue();
   const history = useBookingHistory();
+  // The pool block (beads + Recurring chip). Neither gates Home: while loading or failed there
+  // are no beads and the chip counts the (empty) pool.
+  const pool = useCookPoolList();
+  const recurring = useRecurringEligibility();
 
   const address =
     addresses.state.status === 'ready' ? currentAddressOf(addresses.state.data) : null;
@@ -79,6 +85,8 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
         instant,
         history: history.state.status === 'ready' ? history.state.data : undefined,
         waitlistJoined: options.waitlistJoined,
+        pool: pool.state.status === 'ready' ? pool.state.data : undefined,
+        recurring: recurring.state.status === 'ready' ? recurring.state.data : undefined,
       }),
     );
   }, [
@@ -89,14 +97,27 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
     instantReads,
     minutes,
     options.waitlistJoined,
+    pool.state,
+    recurring.state,
   ]);
 
+  // ONE identity for the life of Home. The route calls this from `useFocusEffect`, which re-runs
+  // whenever its callback changes; a `refetch` that changed with the reads (every failed fetch is
+  // a new error, so a new state) re-fired on every render and flooded the API until it rate
+  // limited us. The ref always holds the latest reads.
+  const reads = useRef({ addresses, catalogue, history, pool, recurring, instantReads });
+  useEffect(() => {
+    reads.current = { addresses, catalogue, history, pool, recurring, instantReads };
+  });
   const refetch = useCallback(() => {
-    addresses.refetch();
-    catalogue.refetch();
-    history.refetch();
-    for (const read of instantReads) read.refetch();
-  }, [addresses, catalogue, history, instantReads]);
+    const latest = reads.current;
+    latest.addresses.refetch();
+    latest.catalogue.refetch();
+    latest.history.refetch();
+    latest.pool.refetch();
+    latest.recurring.refetch();
+    for (const read of latest.instantReads) read.refetch();
+  }, []);
 
   return {
     state,

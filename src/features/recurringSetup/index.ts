@@ -13,6 +13,10 @@ export type { RecurringVisitDaysScreenProps } from './screens/RecurringVisitDays
 export { RecurringEditDateScreen } from './screens/RecurringEditDateScreen';
 export type { RecurringEditDateScreenProps } from './screens/RecurringEditDateScreen';
 export { RecurringPlanFlow } from './screens/RecurringPlanFlow';
+export { RecurringAutopayScreen } from './screens/RecurringAutopayScreen';
+export type { RecurringAutopayScreenProps } from './screens/RecurringAutopayScreen';
+export { RecurringBookedScreen } from './screens/RecurringBookedScreen';
+export type { RecurringBookedScreenProps } from './screens/RecurringBookedScreen';
 export type {
   RecurringPlanFlowProps,
   RecurringPlanFlowSeed,
@@ -44,3 +48,5 @@ export {
 } from './planning';
 export type { RecurringPlanning } from './planning';
 export * from './api';
+export { draftFromPlans, unavailableVisitKeys, useBookRecurring } from './booking';
+export type { BookRecurringOutcome } from './booking';

@@ -106,6 +106,11 @@ export interface CheckoutLauncher {
     readonly currency: 'INR';
     readonly description: string;
     readonly prefill?: { readonly contact?: string; readonly name?: string };
+    /**
+     * A UPI Autopay approval (Recurring, DEC-086): the order carries a token block, and checkout
+     * must be opened against the Razorpay Customer the token will belong to, flagged recurring.
+     */
+    readonly recurring?: { readonly providerCustomerId: string };
   }): Promise<RazorpayCheckoutResult>;
 }
 

@@ -76,9 +76,13 @@ export function useApiQuery<TData>(options: ApiQueryOptions<TData>): ScreenQuery
     return LOADING;
   }, [query.data, query.error]);
 
+  // `query` is a new object every render; its `refetch` is bound to the observer and is not. Keying
+  // off the method keeps this callback — and the returned object — stable, so a caller can put
+  // `refetch` in an effect's deps (Home's focus refetch) without re-running it every render.
+  const queryRefetch = query.refetch;
   const refetch = useCallback(() => {
-    void query.refetch();
-  }, [query]);
+    void queryRefetch();
+  }, [queryRefetch]);
 
-  return { state, refetch };
+  return useMemo(() => ({ state, refetch }), [state, refetch]);
 }

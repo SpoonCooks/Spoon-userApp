@@ -222,6 +222,11 @@ export function visitCaption(visit: RecurringVisitChoice): string {
 export interface RecurringBusyWindow {
   readonly fromMinutes: number;
   readonly toMinutes: number;
+  /**
+   * The days this window applies on, when known — what the start-times read is told about the
+   * Plan's other visits (`sameDayVisits`). Absent, the window is checked locally only.
+   */
+  readonly dayIds?: readonly string[] | undefined;
 }
 
 /**
@@ -234,12 +239,37 @@ export function busyWindowsFor(
   dayIds: readonly string[],
 ): readonly RecurringBusyWindow[] {
   const wanted = new Set(dayIds);
-  return visits
-    .filter((visit) => visitDays(planDayIds, visit).some((id) => wanted.has(id)))
-    .map((visit) => ({
-      fromMinutes: visit.startMinutes,
-      toMinutes: visit.startMinutes + durationMinutes(visit.durationId),
-    }));
+  return visits.flatMap((visit) => {
+    const shared = visitDays(planDayIds, visit).filter((id) => wanted.has(id));
+    return shared.length === 0
+      ? []
+      : [
+          {
+            fromMinutes: visit.startMinutes,
+            toMinutes: visit.startMinutes + durationMinutes(visit.durationId),
+            dayIds: shared,
+          },
+        ];
+  });
+}
+
+/** `510` → `"08:30"`: the backend's Asia/Kolkata `HH:MM` for the flow's minutes-after-midnight. */
+export function clockTime(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  return `${String(hours).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+/** The Plan's other visits on these days, as `POST /v1/recurring/start-times` takes them. */
+export function sameDayVisitsFor(
+  busy: readonly RecurringBusyWindow[],
+): readonly { date: string; startTime: string; durationMinutes: number }[] {
+  return busy.flatMap((window) =>
+    (window.dayIds ?? []).map((date) => ({
+      date,
+      startTime: clockTime(window.fromMinutes),
+      durationMinutes: window.toMinutes - window.fromMinutes,
+    })),
+  );
 }
 
 /** Whether a visit starting at `startMinutes` for `minutes` would overlap a busy window. */

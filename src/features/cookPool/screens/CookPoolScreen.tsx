@@ -17,7 +17,8 @@ import type { CookPoolMember, CookPoolSummary } from '../types';
  *
  * Reached from Home and from the recurring landing; back returns to whichever it came from. The
  * pool grid shows the household's cooks in the backend's order, then empty places up to the
- * pool's minimum — always at least one, "Add", which opens the deck. A cook's photo opens their
+ * pool's minimum (Recurring's `unlockThreshold`) — always at least one, "Add", which opens the
+ * deck. A cook's photo opens their
  * profile. Every change made on the deck or a profile is saved as it happens, so the grid is
  * current whenever the screen shows.
  */

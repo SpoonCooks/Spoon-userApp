@@ -50,6 +50,16 @@ import { routeForNotification } from '@features/notifications';
 import { BANNER_DESTINATION_PAGE, homeBannerFor } from '@features/home';
 import { sessionStore } from '@core/store';
 
+/**
+ * Home reads the Cook Pool, whose module carries the swipe deck. Reanimated and worklets are
+ * native runtimes with no headless implementation, so they run against their own jest mocks, as
+ * the Cook Pool's own tests do.
+ */
+jest.mock('react-native-worklets', () =>
+  jest.requireActual('react-native-worklets/lib/module/mock'),
+);
+jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));
+
 /** Reassigned per test so one test's stack shape cannot leak into the next. */
 let mockRouter: {
   push: jest.Mock;

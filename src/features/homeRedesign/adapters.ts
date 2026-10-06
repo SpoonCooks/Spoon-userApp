@@ -3,8 +3,10 @@ import type { InstantAvailabilityDto } from '@features/availability';
 import { durationIdFor, strikePaiseFor } from '@features/booking';
 import type { BookingSummaryDto } from '@features/booking';
 import type { Catalogue } from '@features/catalogue';
+import type { CookPoolListDto } from '@features/cookPool';
+import type { RecurringEligibilityDto } from '@features/recurringSetup';
 
-import type { DurationOption, HomeModel, LiveHub } from './types';
+import type { DurationOption, HomeModel, LiveHub, PoolCook } from './types';
 
 /**
  * Real responses → `HomeModel`. Pure, so every rule below is testable without a network.
@@ -17,11 +19,22 @@ import type { DurationOption, HomeModel, LiveHub } from './types';
  *   durations          GET /v1/catalogue — price, GST-inclusive total; MRP is the shared ₹5/min
  *                      anchor (`strikePaiseFor`), as the old Home drew it
  *   tax                catalogue `taxRateBps`
+ *   cookPool           GET /v1/me/cooks, newest first — every pooled cook, paused ones included
+ *                      (the pool's count is what unlocks Recurring, available or not)
+ *   activeRecurringPlan / recurringChip
+ *                      GET /v1/recurring/eligibility `liveBookings` and `chip`
  *
  * TODO(backend-contract) — not available yet, so deliberately empty:
- *   mostBooked (no flag), serves (no field), cookPool and activeRecurringPlan (V0
- *   `feat/cook-pool-recurring-plans`, unmerged), waitlist count/threshold (no endpoint).
+ *   mostBooked (no flag), serves (no field), waitlist count/threshold (no endpoint).
  */
+
+function poolCookOf(row: CookPoolListDto['cooks'][number]): PoolCook {
+  return {
+    id: row.cook.cookId,
+    name: row.cook.displayName,
+    photo: row.cook.profileImageUrl === null ? null : { uri: row.cook.profileImageUrl },
+  };
+}
 
 /** The dev note: map pins are static — HSR Layout and Haralur are the live hubs. */
 export const STATIC_LIVE_HUBS: readonly LiveHub[] = [
@@ -58,6 +71,10 @@ export interface HomeSources {
   readonly history: readonly BookingSummaryDto[] | undefined;
   /** Joined in this session (there is no read of waitlist membership yet). */
   readonly waitlistJoined: boolean;
+  /** `undefined` while loading or failed — Home then shows no beads. */
+  readonly pool?: CookPoolListDto | undefined;
+  /** `undefined` while loading or failed — the chip then counts the pool itself. */
+  readonly recurring?: RecurringEligibilityDto | undefined;
 }
 
 export function homeModelFrom(sources: HomeSources): HomeModel {
@@ -93,6 +110,9 @@ export function homeModelFrom(sources: HomeSources): HomeModel {
   const instantKnown = durations.some((d) => sources.instant.get(d.minutes) !== undefined);
 
   const live = address.serviceability.status !== 'outside_service_area';
+  // An active booking first; one still waiting on Autopay is live too (it holds its cooks).
+  const liveBookings = sources.recurring?.liveBookings ?? [];
+  const liveBooking = liveBookings.find((b) => b.status === 'active') ?? liveBookings[0];
 
   return {
     serviceability: live ? 'live' : 'not_live',
@@ -111,8 +131,9 @@ export function homeModelFrom(sources: HomeSources): HomeModel {
     pricingStatus: sources.catalogueStatus,
     tax: { gstPercent: (catalogue?.taxRateBps ?? 0) / 100 },
     focusedDurationId: focus?.id ?? '',
-    cookPool: [],
-    activeRecurringPlan: null,
+    cookPool: (sources.pool?.cooks ?? []).map(poolCookOf),
+    activeRecurringPlan: liveBooking === undefined ? null : { id: liveBooking.recurringBookingId },
+    ...(sources.recurring === undefined ? {} : { recurringChip: sources.recurring.chip }),
     liveHubs: live ? [] : STATIC_LIVE_HUBS,
     waitlist: live
       ? null

@@ -71,6 +71,11 @@ export interface HomeModel {
   /** Returning users only; up to 6 beads. */
   readonly cookPool: readonly PoolCook[];
   readonly activeRecurringPlan: RecurringPlan | null;
+  /**
+   * The backend's own answer for the chip (`GET /v1/recurring/eligibility` `chip`). Absent until
+   * that read lands; the chip then falls back to counting `cookPool`.
+   */
+  readonly recurringChip?: 'locked' | 'book' | 'live';
   /** Not-live only. */
   readonly liveHubs: readonly LiveHub[];
   readonly waitlist: Waitlist | null;
