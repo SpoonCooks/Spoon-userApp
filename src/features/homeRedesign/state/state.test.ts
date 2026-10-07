@@ -102,7 +102,10 @@ describe('booking draft', () => {
 });
 
 describe('recommendDuration', () => {
-  it("lands the frame's inputs on the frame's 1.5 hrs", () => {
+  it("lands the frame's inputs (Complex, 2 dishes, 4 people) on the frame's 1.5 hrs", () => {
+    expect(
+      recommendDuration({ complexity: 'complex', dishes: 2, people: 4 }, DURATIONS)?.minutes,
+    ).toBe(90);
     expect(
       recommendDuration({ complexity: 'simple', dishes: 2, people: 4 }, DURATIONS)?.minutes,
     ).toBe(90);

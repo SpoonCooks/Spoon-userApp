@@ -41,6 +41,11 @@ export interface DurationDialProps {
    * (`1255:3217` / `1290:1829`): an unpadded card adding the meal-type switch and both counters.
    */
   readonly onChangeInputs?: (next: DialInputs) => void;
+  /**
+   * `1622:2011` "Select duration" — drawn under the card wherever the dial is editable: takes the
+   * recommended duration. Absent (no button) on the read-only dial.
+   */
+  readonly onSelectDuration?: () => void;
 }
 
 /** `784:4072` "Duration · Dial". Changing an input re-recommends; the screen selects that tile. */
@@ -49,6 +54,7 @@ export function DurationDial({
   recommended,
   inputs,
   onChangeInputs,
+  onSelectDuration,
 }: DurationDialProps) {
   const editable = onChangeInputs !== undefined;
   const arc = durations
@@ -142,6 +148,18 @@ export function DurationDial({
           </View>
         )}
       </View>
+
+      {editable && onSelectDuration !== undefined ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: recommended === null }}
+          disabled={recommended === null}
+          onPress={onSelectDuration}
+          style={[styles.select, SHADOW_SOFT]}
+        >
+          <Text style={styles.selectLabel}>Select duration</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -275,6 +293,18 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
   },
   tagText: { fontFamily: F.semibold, fontSize: 10, lineHeight: 14, color: C.text },
+  /** `1622:2011` — 370 wide, min 48, `#FFE666` pill, Elevation/1, "Select duration" in Button. */
+  select: {
+    width: '100%',
+    minHeight: 48,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9999,
+    backgroundColor: C.tint,
+  },
+  selectLabel: { fontFamily: F.bold, fontSize: 16, lineHeight: 24, color: C.text },
   dishType: {
     width: '100%',
     height: 44,

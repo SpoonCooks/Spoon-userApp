@@ -110,6 +110,8 @@ export function HomeRedesignView({
   const scroll = useRef<ScrollView>(null);
   const bodyY = useRef(0);
   const dialY = useRef(0);
+  /** The Book section's offset in the body — where "Select duration" brings the customer back. */
+  const bookY = useRef(0);
 
   const [draft, dispatch] = useReducer(
     draftReducer,
@@ -206,6 +208,21 @@ export function HomeRedesignView({
     if (pick !== null) selectDuration(pick.id, 'dial');
   };
 
+  /**
+   * `1622:2011` "Select duration": takes the dial's recommendation (among the tiles that can be
+   * booked in this mode), centres it in the carousel and brings the Book section back into view.
+   */
+  const selectRecommended = () => {
+    const pick = recommendDuration(
+      inputs,
+      model.durations.filter((d) => available(d)),
+    );
+    if (pick === null) return;
+    dispatch({ type: 'focusDuration', id: pick.id });
+    selectDuration(pick.id, 'dial');
+    scroll.current?.scrollTo({ y: bodyY.current + bookY.current - top, animated: true });
+  };
+
   const request = (): BookingRequest | null => {
     const duration = model.durations.find((d) => d.id === selectedId);
     if (duration === undefined) return null;
@@ -248,7 +265,7 @@ export function HomeRedesignView({
         <Image source={ART.glows} style={styles.glows} resizeMode="stretch" />
         <HomeHeader
           addressLabel={model.address.label}
-          notLive={variant === 'inactive'}
+          addressDetail={model.address.detail}
           onPressAddress={actions.onPressAddress}
           onPressProfile={actions.onPressProfile}
         />
@@ -273,31 +290,40 @@ export function HomeRedesignView({
           ) : null}
 
           {variant === 'inactive' ? null : (
-            <BookSection
-              etaMins={model.instant.available ? model.instant.etaMins : null}
-              mode={mode}
-              onChangeMode={changeMode}
-              durations={model.durations}
-              focusedDurationId={focusedId}
-              selectedDurationId={selectedId}
-              onFocusDuration={(id) => dispatch({ type: 'focusDuration', id })}
-              onSelectDuration={(id) => selectDuration(id, 'tile')}
-              isAvailable={available}
-              pricingStatus={model.pricingStatus ?? 'ready'}
-              onPressUnavailable={(d) =>
-                toast.current?.show(
-                  `${d.label} isn’t available ${cta === 'book' ? 'right now' : 'to schedule'}.`,
-                )
-              }
-              onRetryPricing={() => actions.onRefreshAvailability?.()}
-              canBook={bookable}
-              onPressBook={book}
-              onPressHelpMePick={() =>
-                scroll.current?.scrollTo({ y: bodyY.current + dialY.current - top, animated: true })
-              }
-              onPressPaymentDetails={() => setTaxOpen(true)}
-              cta={cta}
-            />
+            <View
+              onLayout={(e) => {
+                bookY.current = e.nativeEvent.layout.y;
+              }}
+            >
+              <BookSection
+                etaMins={model.instant.available ? model.instant.etaMins : null}
+                mode={mode}
+                onChangeMode={changeMode}
+                durations={model.durations}
+                focusedDurationId={focusedId}
+                selectedDurationId={selectedId}
+                onFocusDuration={(id) => dispatch({ type: 'focusDuration', id })}
+                onSelectDuration={(id) => selectDuration(id, 'tile')}
+                isAvailable={available}
+                pricingStatus={model.pricingStatus ?? 'ready'}
+                onPressUnavailable={(d) =>
+                  toast.current?.show(
+                    `${d.label} isn’t available ${cta === 'book' ? 'right now' : 'to schedule'}.`,
+                  )
+                }
+                onRetryPricing={() => actions.onRefreshAvailability?.()}
+                canBook={bookable}
+                onPressBook={book}
+                onPressHelpMePick={() =>
+                  scroll.current?.scrollTo({
+                    y: bodyY.current + dialY.current - top,
+                    animated: true,
+                  })
+                }
+                onPressPaymentDetails={() => setTaxOpen(true)}
+                cta={cta}
+              />
+            </View>
           )}
 
           {showPool ? (
@@ -325,7 +351,9 @@ export function HomeRedesignView({
               durations={model.durations}
               recommended={recommended}
               inputs={inputs}
-              {...(variant === 'inactive' ? {} : { onChangeInputs: changeInputs })}
+              {...(variant === 'inactive'
+                ? {}
+                : { onChangeInputs: changeInputs, onSelectDuration: selectRecommended })}
             />
           </View>
 

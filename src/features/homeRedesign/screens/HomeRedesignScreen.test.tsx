@@ -33,7 +33,9 @@ describe('Duration carousel', () => {
   it('opens with nothing selected and the CTA off', () => {
     render(<HomeRedesignView model={DEMO_HOME_FIRST_TIME} {...actions()} />);
     expect(tile(/^1 hour/).props.accessibilityState).toMatchObject({ checked: false });
-    expect(screen.getByRole('button', { name: /Book now/ })).toBeDisabled();
+    // `1255:3181` — just "Book Now", greyed, with no payment link until a duration is chosen.
+    expect(screen.getByRole('button', { name: 'Book Now' })).toBeDisabled();
+    expect(screen.queryByText('Check payment details')).toBeNull();
   });
 
   it('selects on tap, raises duration_selected and books the payable total', () => {
@@ -71,10 +73,28 @@ describe('Duration carousel', () => {
     act(() => jest.advanceTimersByTime(3000));
   });
 
+  it('opens the dial on Complex, as `1625:11215` draws it', () => {
+    render(<HomeRedesignView model={DEMO_HOME_FIRST_TIME} {...actions()} />);
+    expect(
+      screen.getByRole('button', { name: 'Complex (biryani, kofta)' }).props.accessibilityState,
+    ).toMatchObject({ selected: true });
+  });
+
+  it('takes the recommended duration from the dial’s Select duration button', () => {
+    const a = actions();
+    render(<HomeRedesignView model={DEMO_HOME_FIRST_TIME} {...a} />);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Select duration' }));
+
+    expect(a.onDurationSelected).toHaveBeenCalledWith(expect.objectContaining({ source: 'dial' }));
+    expect(screen.getByRole('button', { name: /^Book now/ })).toBeEnabled();
+    expect(screen.getByText('Check payment details')).toBeTruthy();
+  });
+
   it('shows six skeleton tiles while pricing loads', () => {
     render(<HomeRedesignView model={DEMO_HOME_PRICING_LOADING} {...actions()} />);
     expect(screen.getAllByTestId('duration-skeleton')).toHaveLength(6);
-    expect(screen.getByRole('button', { name: /Book now/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Book now/i })).toBeDisabled();
   });
 
   it('offers a retry when pricing fails', () => {
@@ -82,5 +102,29 @@ describe('Duration carousel', () => {
     render(<HomeRedesignView model={DEMO_HOME_PRICING_ERROR} {...a} />);
     fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
     expect(a.onRefreshAvailability).toHaveBeenCalled();
+  });
+});
+
+describe('Header', () => {
+  it('shows the address label over its building and flat (`1625:11065`)', () => {
+    render(<HomeRedesignView model={DEMO_HOME_FIRST_TIME} {...actions()} />);
+    expect(screen.getByText('Label')).toBeTruthy();
+    expect(screen.getByText('Building_name · Flat/House #')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Delivery address Label, Building_name · Flat/House #' }),
+    ).toBeTruthy();
+  });
+
+  it('leaves the second line out when the address has no building or flat', () => {
+    render(
+      <HomeRedesignView
+        model={{
+          ...DEMO_HOME_FIRST_TIME,
+          address: { ...DEMO_HOME_FIRST_TIME.address, detail: null },
+        }}
+        {...actions()}
+      />,
+    );
+    expect(screen.queryByText('Building_name · Flat/House #')).toBeNull();
   });
 });
