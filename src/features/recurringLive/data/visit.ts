@@ -286,6 +286,8 @@ export interface VisitDetailsModel {
   readonly paymentSheet: PaymentDetailsSheetData;
   /** Upcoming and cancellable; `null` leaves "Modify booking" out of the dock. */
   readonly modifySheet: ModifyBookingSheetData | null;
+  /** Cancelled because its T−3h debit failed: offers a one-time visit for the same slot. */
+  readonly paymentFailed: boolean;
 }
 
 const DEMO_POOL_PHOTOS: Record<VisitPoolCook['key'], ImageSourcePropType> = {
@@ -337,5 +339,6 @@ export function visitDemoModel(
     refund: variant === 'cancelled' ? { ...f.refund } : null,
     paymentSheet: PAYMENT_DETAILS_SHEET,
     modifySheet: variant === 'assigned' || variant === 'pending' ? MODIFY_BOOKING_SHEET : null,
+    paymentFailed: false,
   };
 }

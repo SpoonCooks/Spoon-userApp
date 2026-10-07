@@ -11,7 +11,12 @@ import { useSafeBack } from '@core/navigation';
 import { ratingScopeFor, useBookingDetail, useRateBooking } from '@features/booking';
 import { CancelBookingSheet, useCancellationData } from '@features/cancellation';
 import type { CancellationStep } from '@features/cancellation';
-import { cookProfileFrom, useCookPoolList, useCookPoolProfile } from '@features/cookPool';
+import {
+  cookProfileFrom,
+  useAddCookToPool,
+  useCookPoolList,
+  useCookPoolProfile,
+} from '@features/cookPool';
 import {
   ModifyBookingSheet,
   PaymentDetailsSheet,
@@ -19,6 +24,7 @@ import {
   TellUsMoreSheet,
   VisitDetailsScreen,
   rateVisitInfo,
+  useCancelWholeBooking,
   ratingRequestFor,
   todayInKolkata,
   visitDetailsFrom,
@@ -42,7 +48,11 @@ import { QueryBoundary } from '@ui';
  *   Modify        the cancellation timeline from the visit's quote; "Cancel this visit" asks for a
  *                 reason with the app's own cancellation sheet (opened at the reason step — its fee
  *                 table is the one-time booking's, not Recurring's) and cancels the visit
- *   Payment       the price, GST and Autopay mandate
+ *   Payment       the price, GST and Autopay mandate; "Manage" cancels the whole booking
+ *   Cook          a completed visit offers adding its cook to the Pool (while not in it) and a
+ *                 tip, which opens the visit's booking on the V0 tip sheet
+ *   Rebook        a past visit's "Book again" starts a new Recurring plan; one whose debit failed
+ *                 also books a one-time visit for the same day and length
  *   Help, Share   WhatsApp with Spoon (`1434:2205`), when the backend gives the link
  *   Cook Pool     the pool landing; the next-visit row that visit's own details
  *   Rate          a completed visit's own booking, while the server still allows it
@@ -225,6 +235,44 @@ export default function RecurringVisitRoute() {
       />
     ) : undefined;
 
+  // ─── A completed visit's cook: add to Pool, tip (spec, "Rating") ─────────────────────────────
+  const addToPool = useAddCookToPool();
+  const cookInPool =
+    cookId !== null && profile.state.status === 'ready' ? profile.state.data.inPool : null;
+  const canTip =
+    ratedBooking.state.status === 'ready' && ratedBooking.state.data.allowedActions.canTip;
+  const offerAddToPool =
+    detail?.displayState === 'completed' && cookId !== null && cookInPool === false;
+  const addCookToPool = () => {
+    if (cookId === null) return;
+    addToPool.mutate(
+      { cookId },
+      {
+        onSuccess: () => {
+          profile.refetch();
+          Alert.alert('Added to your Cook Pool', 'They can now cook your Recurring visits.');
+        },
+        onError: (error) =>
+          Alert.alert(
+            'Couldn’t add to your Cook Pool',
+            isAppError(error) ? getUserMessage(error) : 'Please try again.',
+          ),
+      },
+    );
+  };
+
+  // ─── Payment details → Manage: cancel the whole booking (spec, "Per-visit payment record") ───
+  const bookingActive = booking.state.status === 'ready' && booking.state.data.status === 'active';
+  const wholeBooking = useCancelWholeBooking({
+    bookingId: bookingId ?? null,
+    // Not tied to the sheet being open: Manage closes it, and the quote must still be there.
+    enabled: bookingActive,
+    onCancelled: () => {
+      visit.refetch();
+      booking.refetch();
+    },
+  });
+
   const nextVisitId =
     booking.state.status === 'ready' ? (booking.state.data.upNext?.visitId ?? null) : null;
 
@@ -250,6 +298,26 @@ export default function RecurringVisitRoute() {
                     }),
                 })}
             onPrepChange={savePrep}
+            onBookAgain={() => router.push('/recurring-setup/days')}
+            {...(offerAddToPool ? { onAddCookToPool: addCookToPool } : {})}
+            addingCookToPool={addToPool.isPending}
+            {...(canTip && completedBookingId !== null
+              ? {
+                  onTipCook: () =>
+                    router.push({
+                      pathname: '/booking/[id]',
+                      params: { id: completedBookingId, tip: '1' },
+                    }),
+                }
+              : {})}
+            onBookOneTime={() =>
+              detail === null
+                ? undefined
+                : router.push({
+                    pathname: '/scheduled',
+                    params: { date: detail.date, durationId: `dur-${detail.durationMinutes}` },
+                  })
+            }
             ratingSlot={ratingSlot}
           />
           <TellUsMoreSheet
@@ -266,7 +334,16 @@ export default function RecurringVisitRoute() {
             visible={paymentOpen}
             data={model.paymentSheet}
             onClose={() => setPaymentOpen(false)}
+            {...(bookingActive
+              ? {
+                  onManageAutopay: () => {
+                    setPaymentOpen(false);
+                    wholeBooking.askToCancel();
+                  },
+                }
+              : {})}
           />
+          {wholeBooking.sheet}
           {model.modifySheet === null ? null : (
             <ModifyBookingSheet
               visible={modifyOpen}

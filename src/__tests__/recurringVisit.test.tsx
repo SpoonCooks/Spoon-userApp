@@ -264,6 +264,124 @@ describe('Recurring Visit details route', () => {
     await screen.findByTestId('visit-details-screen');
     await waitFor(() => expect(screen.queryByTestId('rate-visit-card')).toBeNull());
   });
+
+  it('offers a one-time visit for the same slot, and Book again, after a failed debit', async () => {
+    render(jest.fn(), {
+      ...VISIT,
+      status: 'cancelled',
+      displayState: 'cancelled',
+      cancelledBy: 'payment_failed',
+    } as unknown as typeof VISIT);
+    await screen.findByTestId('visit-details-screen');
+
+    fireEvent.press(await screen.findByTestId('visit-details-screen-rebook-one-time'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/scheduled',
+      params: { date: '2026-10-14', durationId: 'dur-60' },
+    });
+    fireEvent.press(screen.getByTestId('visit-details-screen-rebook-again'));
+    expect(mockPush).toHaveBeenCalledWith('/recurring-setup/days');
+  });
+
+  it('offers only Book again on a visit the customer cancelled', async () => {
+    render(jest.fn(), {
+      ...VISIT,
+      status: 'cancelled',
+      displayState: 'cancelled',
+      cancelledBy: 'customer',
+    } as unknown as typeof VISIT);
+    expect(await screen.findByTestId('visit-details-screen-rebook-again')).toBeTruthy();
+    expect(screen.queryByTestId('visit-details-screen-rebook-one-time')).toBeNull();
+  });
+
+  it('cancels the whole booking from Payment details → Manage', async () => {
+    const onCancelBooking = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert');
+    render(jest.fn(), VISIT, {
+      'GET /v1/me/recurring-bookings/rb-1/cancellation-quote': () => ({
+        recurringBookingId: 'rb-1',
+        cancellable: true,
+        freeCount: 5,
+        debited: [],
+        startedCount: 0,
+        totals: { feePaise: 0, refundPaise: 0 },
+      }),
+      'POST /v1/me/recurring-bookings/rb-1/cancel': (body) => {
+        onCancelBooking(body);
+        return {
+          booking: { ...BOOKING, status: 'cancelled' },
+          visitsCancelled: 5,
+          totals: { feePaise: 0, refundPaise: 0 },
+          whatsappUrl: null,
+        };
+      },
+    });
+    await screen.findByTestId('visit-details-screen');
+
+    fireEvent.press(screen.getByTestId('visit-details-screen-dock-payment'));
+    await waitFor(() => {
+      fireEvent.press(screen.getByText('Manage'));
+      expect(alert).toHaveBeenCalledWith(
+        'Cancel this booking?',
+        expect.any(String),
+        expect.any(Array),
+      );
+    });
+    const buttons = alert.mock.calls.find((call) => call[0] === 'Cancel this booking?')![2]!;
+    alert.mockImplementation(() => undefined);
+    buttons.find((button) => button.text === 'Cancel booking')!.onPress!();
+    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
+    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
+    fireEvent.press(await screen.findByTestId('cancel-confirm'));
+
+    await waitFor(() =>
+      expect(onCancelBooking).toHaveBeenCalledWith({ reasonCode: 'URGENT_CHANGE' }),
+    );
+    alert.mockRestore();
+  });
+
+  it('offers adding the cook to the Pool, and a tip, on a completed visit', async () => {
+    const onAdd = jest.fn();
+    render(jest.fn(), COMPLETED, {
+      'GET /v1/bookings/bk-9': () => ({
+        booking: {
+          ...completedBooking({ canRate: false }),
+          allowedActions: { ...completedBooking({ canRate: false }).allowedActions, canTip: true },
+        },
+        serverTime: '2026-10-14T06:00:00.000Z',
+      }),
+      'GET /v1/me/cooks/c-1': () => POOL_PROFILE(false),
+      'POST /v1/me/cooks': (body) => {
+        onAdd(body);
+        return { cookId: 'c-1', added: true, addedAt: '2026-10-14T06:00:00.000Z', count: 3 };
+      },
+    });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+
+    fireEvent.press(await screen.findByTestId('visit-details-screen-cook-actions-add-to-pool'));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith({ cookId: 'c-1' }));
+
+    fireEvent.press(screen.getByTestId('visit-details-screen-cook-actions-tip'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/booking/[id]',
+      params: { id: 'bk-9', tip: '1' },
+    });
+    alert.mockRestore();
+  });
+
+  it('does not offer adding a cook who is already in the Pool', async () => {
+    render(jest.fn(), COMPLETED, {
+      'GET /v1/bookings/bk-9': () => ({
+        booking: completedBooking({ canRate: false }),
+        serverTime: '2026-10-14T06:00:00.000Z',
+      }),
+      'GET /v1/me/cooks/c-1': () => POOL_PROFILE(true),
+    });
+    await screen.findByTestId('visit-details-screen');
+    await waitFor(() =>
+      expect(screen.queryByTestId('visit-details-screen-cook-actions')).toBeNull(),
+    );
+  });
 });
 
 /** The visit's one-time booking as `GET /v1/bookings/:id` returns it, completed. */
@@ -314,5 +432,46 @@ function completedBooking({ canRate }: { readonly canRate: boolean }) {
       canTip: false,
       canCallCook: false,
     },
+  };
+}
+
+const COMPLETED = {
+  ...VISIT,
+  status: 'completed',
+  displayState: 'completed',
+  bookingId: 'bk-9',
+  cook: {
+    cookId: 'c-1',
+    displayName: 'Cook Meera',
+    profileImageUrl: null,
+    rating: { average: 4.8, count: 12 },
+  },
+} as unknown as typeof VISIT;
+
+/** `GET /v1/me/cooks/:cookId` for Meera, in or out of the household's Pool. */
+function POOL_PROFILE(inPool: boolean) {
+  return {
+    cook: {
+      cookId: 'c-1',
+      profileCode: null,
+      displayName: 'Cook Meera',
+      profileImageUrl: null,
+      region: 'West Bengal',
+      languages: ['Hindi'],
+      cuisines: [],
+      specialties: null,
+      gender: null,
+      spoonTrained: true,
+      backgroundVerified: true,
+      hygieneVerified: true,
+      specialtyDishes: [],
+      profileVariant: 'veg',
+      rating: { average: 4.8, count: 12 },
+      visitsWithYou: 1,
+    },
+    available: true,
+    inPool,
+    addedAt: null,
+    dishesByCategory: [],
   };
 }
