@@ -584,7 +584,7 @@ describe('Home is a root', () => {
     const tiles = await screen.findAllByRole('radio', { name: /, ₹/ });
     fireEvent.press(tiles[0]!);
     fireEvent.press(screen.getByRole('radio', { name: 'Later' }));
-    fireEvent.press(screen.getByRole('button', { name: /^Schedule/ }));
+    fireEvent.press(screen.getByRole('button', { name: 'Book for later' }));
 
     expect(mockRouter.push).toHaveBeenCalledWith({
       pathname: '/scheduled',

@@ -37,10 +37,11 @@ export interface BookSectionProps {
  * The header caption is a function of instant availability only: "Arriving in x mins" while it
  * is available, "Instant · Unavailable" with a grey bolt while it is not, whichever tab is on.
  *
- * CTA:
- *   book      lime "Book now · ₹payable" (the server's price incl. GST) + "Check payment details";
- *             before a tap it is the disabled grey "Book Now" alone (`1255:3181`).
- *   schedule  yellow "Schedule", no payment link; grey until a duration is tapped.
+ * CTA (the front tile is always the selection):
+ *   book      lime "Book Now  ·  1 hr · ₹total" (the server's price incl. GST) + "Check payment
+ *             details"; with nothing selectable (prices loading) a grey "Book Now" (`1255:3181`).
+ *   schedule  yellow "Book for later" — Later, and Now while Instant is unavailable — no payment
+ *             link; it opens the slot picker with the duration carried over.
  */
 export function BookSection({
   etaMins,
@@ -63,27 +64,24 @@ export function BookSection({
 }: BookSectionProps) {
   const selected = durations.find((d) => d.id === selectedDurationId);
   const live = canBook && selected !== undefined && pricingStatus === 'ready';
-  // The design has no Selected variant for a side tile, so when the choice is scrolled off-centre
-  // the CTA names it (the tile dev note's proposal).
-  const named = selected !== undefined && selected.id !== focusedDurationId;
 
+  // `1222:23640` "Book Now  ·  1 hr · ₹75" (the selected SKU and its GST-inclusive total);
+  // `1222:24666` / `1303:1343` "Book for later". Nothing selected yet: a grey "Book Now"
+  // (`1255:3181`) or "Book for later".
   const label =
     cta === 'schedule'
-      ? live && named
-        ? `Schedule  ·  ${selected.label}`
-        : 'Schedule'
+      ? 'Book for later'
       : live
-        ? named
-          ? `Book now  ·  ${selected.label}  ·  ${formatPaise(selected.payablePaise)}`
-          : `Book now  ·  ${formatPaise(selected.payablePaise)}`
-        : // `1255:3181` — before a duration is tapped the disabled button reads just "Book Now".
-          'Book Now';
+        ? `Book Now  ·  ${selected.label} · ${formatPaise(selected.payablePaise)}`
+        : 'Book Now';
+  // The book CTA carries "Check payment details" under it; the schedule CTA pads below instead.
+  const withLink = cta === 'book' && live;
 
   return (
     <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.titles}>
-          <Text style={styles.title}>Select duration to book</Text>
+          <Text style={styles.title}>Select a duration to book</Text>
           <View style={styles.eta}>
             <Image source={etaMins === null ? ART.flashOff : ART.flash} style={styles.flash} />
             {etaMins === null ? (
@@ -127,7 +125,7 @@ export function BookSection({
             onPressUnavailable={onPressUnavailable}
             onRetry={onRetryPricing}
           />
-          <View style={styles.cta}>
+          <View style={[styles.cta, withLink ? null : styles.ctaNoLink]}>
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ disabled: !live }}
@@ -140,6 +138,8 @@ export function BookSection({
                   : cta === 'book'
                     ? styles.buttonBook
                     : styles.buttonSchedule,
+                // Elevation/2 on the live button (`drop-shadow 6px` in the export); none disabled.
+                live ? SHADOW_PILL : null,
               ]}
             >
               <Text style={[styles.buttonLabel, live ? null : styles.buttonLabelDisabled]}>
@@ -147,7 +147,7 @@ export function BookSection({
               </Text>
             </Pressable>
             {/* `1255:3181` draws no link under the disabled button; it comes with the price. */}
-            {cta === 'book' && live ? (
+            {withLink ? (
               <Pressable accessibilityRole="link" onPress={onPressPaymentDetails}>
                 <Text style={styles.link}>Check payment details</Text>
               </Pressable>
@@ -195,6 +195,8 @@ const styles = StyleSheet.create({
   helpLabel: { fontFamily: F.semibold, fontSize: 14, lineHeight: 20, color: C.text },
   helpIcon: { width: 16, height: 16 },
   cta: { alignItems: 'center', gap: 4, paddingTop: 4, paddingHorizontal: 16 },
+  /** `1222:24665` / `1303:1342` — the schedule CTA is padded 4 below as well as above. */
+  ctaNoLink: { paddingBottom: 4 },
   button: {
     minHeight: 48,
     width: '100%',
@@ -205,9 +207,9 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
   },
   buttonDisabled: { backgroundColor: C.surfaceDisabled },
-  /** `1222:23640` — lime "Book now". */
+  /** `1222:23640` — lime "Book Now  ·  SKU · ₹total". */
   buttonBook: { backgroundColor: C.lime },
-  /** `1222:24666` — yellow "Schedule". */
+  /** `1222:24666` / `1303:1343` — yellow "Book for later". */
   buttonSchedule: { backgroundColor: C.brand },
   buttonLabel: { fontFamily: F.bold, fontSize: 16, lineHeight: 24, color: C.text },
   buttonLabelDisabled: { color: C.textDisabled },
