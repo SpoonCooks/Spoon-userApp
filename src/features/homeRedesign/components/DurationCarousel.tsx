@@ -48,7 +48,8 @@ export interface DurationCarouselProps {
 
 /**
  * `1555:10863` "Duration carousel/ selected" — a 176pt strip of "liquid" tiles and a page
- * indicator (one dot per tile, the focused one a 12pt pill; tapping a dot centres its tile).
+ * indicator (one dot per tile, the focused one a 12pt pill; tapping a dot centres its tile). The
+ * strip loops: after the last tile comes the first again.
  *
  * The focused tile is always centred: the track is padded by half the viewport less half the
  * focused tile, so focusing tile `i` scrolls to `i × 112` — "1 hr" focused puts the first tile at
@@ -69,15 +70,62 @@ export function DurationCarousel({
   const { width: screen } = useWindowDimensions();
   const scroll = useRef<ScrollView>(null);
   const reduceMotion = useReduceMotion();
+  const n = durations.length;
+  /**
+   * INFINITE: the tiles are drawn three times over and the strip is kept on the middle set, so
+   * "30 mins" follows "2.5 hrs" and the other way round. Whenever a swipe comes to rest in an outer
+   * set it is moved, without animation, to the same tile in the middle set — the three sets look
+   * identical, so nothing visibly jumps. One set when there is nothing to loop.
+   */
+  const copies = n >= 2 ? 3 : 1;
+  const base = copies === 3 ? n : 0;
   const index = Math.max(
     0,
     durations.findIndex((d) => d.id === focusedId),
   );
+  /**
+   * Which DRAWN tile is centred. Only that one is drawn focused (128pt): the focused tile is wider
+   * than the rest, so a second focused copy would push every tile after it off the 112pt step.
+   */
+  const [picked, setPicked] = useState({ v: base + index, n });
+  const setCentre = (v: number) => setPicked({ v, n });
+  const realOf = (v: number) => (n === 0 ? 0 : ((v % n) + n) % n);
+  /**
+   * DERIVED from the last drawn tile a swipe or tap settled on and the focus the screen holds. When
+   * focus moves from outside (a dot, Help me pick, a refresh) the nearest copy of that tile is the
+   * centre; a list that changed length (e.g. the tiles arriving after the skeletons) starts again
+   * on the middle set.
+   */
+  const centre = (() => {
+    if (n === 0) return 0;
+    const from = picked.n === n ? picked.v : base + index;
+    if (realOf(from) === index) return from;
+    let target = base + index;
+    for (let copy = 0; copy < copies; copy += 1) {
+      const v = copy * n + index;
+      if (Math.abs(v - from) < Math.abs(target - from)) target = v;
+    }
+    return target;
+  })();
   const inset = (screen - FOCUSED.width) / 2;
 
+  /**
+   * The tile an animated scroll of OURS is heading for, until its settle event arrives. iOS reports
+   * the end of a programmatic animated scroll as a momentum end too — and when that scroll is cut
+   * short (a native snap racing it), answering with another animated scroll can cancel itself
+   * forever without moving. So a settle of our own scroll only ever corrects without animation.
+   */
+  const scrollingTo = useRef<number | null>(null);
+  const scrollToTile = (v: number, animated: boolean) => {
+    scrollingTo.current = animated ? v : null;
+    scroll.current?.scrollTo({ x: v * STEP, animated });
+  };
+
+  // Keep the strip on the centred tile whenever it moves for a reason other than the finger.
   useEffect(() => {
-    scroll.current?.scrollTo({ x: index * STEP, animated: !reduceMotion });
-  }, [index, reduceMotion]);
+    scrollingTo.current = reduceMotion ? null : centre;
+    scroll.current?.scrollTo({ x: centre * STEP, animated: !reduceMotion });
+  }, [centre, reduceMotion]);
 
   const animate = () => {
     if (!reduceMotion) {
@@ -94,24 +142,42 @@ export function DurationCarousel({
   /**
    * Snap offsets only list bookable tiles, but iOS also treats the end of the list as one, and a
    * drag without momentum skips snapping. So wherever the scroll rests, settle on the nearest
-   * bookable tile and centre it.
+   * bookable tile, centre it, and move back onto the middle set if it landed on an outer one.
    */
   const onSettle = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const landed = Math.round(e.nativeEvent.contentOffset.x / STEP);
+    const x = e.nativeEvent.contentOffset.x;
+    const ours = scrollingTo.current;
+    if (ours !== null) {
+      scrollingTo.current = null;
+      if (Math.abs(x - ours * STEP) > 0.5) scrollToTile(ours, false);
+      return;
+    }
+    const landed = Math.round(x / STEP);
     const next = nearestAvailableIndex(landed);
     if (next === null) return;
-    const option = durations[next]!;
-    if (next * STEP !== e.nativeEvent.contentOffset.x) {
-      scroll.current?.scrollTo({ x: next * STEP, animated: !reduceMotion });
+    const real = realOf(next);
+    const option = durations[real]!;
+    const settled = copies === 3 && (next < n || next >= 2 * n) ? base + real : next;
+    if (settled !== next) {
+      // Same picture one set over, then the last few points of the snap from there.
+      scroll.current?.scrollTo({ x: x + (settled - next) * STEP, animated: false });
+    }
+    if (Math.abs(settled * STEP - (x + (settled - next) * STEP)) > 0.5) {
+      scrollToTile(settled, !reduceMotion);
+    }
+    if (settled !== centre) {
+      animate();
+      setCentre(settled);
     }
     focus(option.id);
   };
 
   const nearestAvailableIndex = (from: number): number | null => {
-    for (let step = 0; step < durations.length; step += 1) {
-      for (const i of [from - step, from + step]) {
-        const option = durations[i];
-        if (option !== undefined && isAvailable(option)) return i;
+    for (let step = 0; step < copies * n; step += 1) {
+      for (const v of [from - step, from + step]) {
+        if (v < 0 || v >= copies * n) continue;
+        const option = durations[realOf(v)];
+        if (option !== undefined && isAvailable(option)) return v;
       }
     }
     return null;
@@ -148,9 +214,15 @@ export function DurationCarousel({
         ref={scroll}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentOffset={{ x: index * STEP, y: 0 }}
-        snapToOffsets={durations.flatMap((d, i) => (isAvailable(d) ? [i * STEP] : []))}
+        contentOffset={{ x: centre * STEP, y: 0 }}
+        snapToOffsets={Array.from({ length: copies * n }, (_, v) => v).flatMap((v) =>
+          isAvailable(durations[realOf(v)]!) ? [v * STEP] : [],
+        )}
         decelerationRate="fast"
+        onScrollBeginDrag={() => {
+          // The finger takes over: whatever settles next is the customer's, not ours.
+          scrollingTo.current = null;
+        }}
         onMomentumScrollEnd={onSettle}
         onScrollEndDrag={(e) => {
           // No momentum means no momentum-end event; settle here instead.
@@ -161,22 +233,27 @@ export function DurationCarousel({
         accessibilityRole="radiogroup"
         accessibilityLabel="Duration"
       >
-        {durations.map((d) => {
+        {Array.from({ length: copies * n }, (_, v) => {
+          const d = durations[realOf(v)]!;
           const available = isAvailable(d);
           return (
             <Tile
-              key={d.id}
+              key={`${Math.floor(v / n)}-${d.id}`}
               option={d}
-              focused={d.id === focusedId}
+              focused={v === centre}
               selected={d.id === selectedId}
               available={available}
+              // The copies are scenery for the loop; a screen reader hears the middle set once.
+              hidden={copies === 3 && Math.floor(v / n) !== 1}
               onPress={() => {
                 if (!available) {
                   onPressUnavailable(d);
                   return;
                 }
-                // Selecting brings the tile to the front (the screen focuses it with the choice).
+                // Selecting brings THIS copy to the front (the screen focuses it with the choice).
                 animate();
+                // The centre moving scrolls the strip (the effect above).
+                if (v !== centre) setCentre(v);
                 onSelect(d.id);
               }}
             />
@@ -184,18 +261,22 @@ export function DurationCarousel({
         })}
       </ScrollView>
       <View style={styles.dots}>
-        {durations.map((d) => (
-          <Pressable
-            key={d.id}
-            accessibilityRole="button"
-            accessibilityLabel={`Show ${spokenDuration(d.minutes)}`}
-            hitSlop={6}
-            disabled={!isAvailable(d)}
-            onPress={() => focus(d.id)}
-          >
-            <View style={d.id === focusedId ? styles.dotActive : styles.dot} />
-          </Pressable>
-        ))}
+        {durations.map((d, i) => {
+          const front = i === realOf(centre);
+          return (
+            <Pressable
+              key={d.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${spokenDuration(d.minutes)}`}
+              accessibilityState={{ selected: front, disabled: !isAvailable(d) }}
+              hitSlop={6}
+              disabled={!isAvailable(d)}
+              onPress={() => focus(d.id)}
+            >
+              <View style={front ? styles.dotActive : styles.dot} />
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -228,26 +309,30 @@ const LIQUID: Record<Tone, readonly [string, string, ...string[]]> = {
 };
 
 /**
- * One duration. Side tiles (`1555:10724`) have Default and Unavailable only; the centred tile
- * (`1555:10507`) adds Selected — lime liquid and a check. A selected tile scrolled off-centre is
- * drawn Default (the design has no side Selected variant); the CTA names it instead.
+ * One duration. Side tiles (`1555:10724`) have Default and Unavailable; the centred tile
+ * (`1555:10507`) adds Selected — lime liquid and a check. The selection stays put while the strip
+ * scrolls, so a selected tile off-centre keeps the lime and check at side size (the design draws
+ * no side Selected variant, but the customer must still see which tile they chose).
  */
 function Tile({
   option,
   focused,
   selected,
   available,
+  hidden = false,
   onPress,
 }: {
   option: DurationOption;
   focused: boolean;
   selected: boolean;
   available: boolean;
+  /** A looping copy: drawn and tappable, but not read out twice by a screen reader. */
+  hidden?: boolean;
   onPress: () => void;
 }) {
   const tone: Tone = !available
     ? 'unavailable'
-    : focused && selected
+    : selected
       ? 'selected'
       : focused
         ? 'focused'
@@ -279,6 +364,8 @@ function Tile({
       accessibilityRole="radio"
       accessibilityLabel={spoken}
       accessibilityState={{ checked: selected, disabled: !available }}
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
       onPress={onPress}
       // The shadow sits on the outer box: iOS clips a shadow drawn by an `overflow: hidden` view.
       style={[

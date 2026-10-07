@@ -91,7 +91,7 @@ export function ctaKind(mode: BookingMode, instantAvailable: boolean): CtaKind {
   return mode === 'now' && instantAvailable ? 'book' : 'schedule';
 }
 
-/** The CTA is live once a duration is selected — on Home, the tile at the front always is. */
+/** The CTA is live once a duration is selected — on Home, only by a tap or Help me pick. */
 export function canBook(draft: BookingDraft): boolean {
   return draft.mode !== 'recurring' && draft.selectedDurationId !== null;
 }
