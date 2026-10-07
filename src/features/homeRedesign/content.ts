@@ -43,14 +43,14 @@ export const DISH_TYPES = [
 ] as const;
 
 /**
- * `1170:608` stacks four cards at the same position, so the LAST one (`1171:18724`, Sucharita) is
- * the card on top. It is listed first here; `photo` indexes `ART.cooks` (`imgHeaderImage…3`).
+ * `1290:1280` — the stack's cards in the order they rise in (`Cook card · 1`…`4`), so the last,
+ * Sucharita, lands on top. `photo` indexes `ART.cooks` (`imgHeaderImage…3`).
  */
 export const COOKS = [
-  { name: 'Cook Sucharita', region: 'West Bengal', rating: 5, photo: 3 },
   { name: 'Cook Sanchita', region: 'Assam', rating: 5, photo: 0 },
   { name: 'Cook Rekha', region: 'Assam', rating: 5, photo: 1 },
   { name: 'Cook Jyoti', region: 'Bihar', rating: 5, photo: 2 },
+  { name: 'Cook Sucharita', region: 'West Bengal', rating: 5, photo: 3 },
 ] as const;
 
 export const TRUST_POINTS = [
