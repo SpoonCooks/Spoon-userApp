@@ -10,7 +10,6 @@ const img = (source: unknown) => source as ImageSourcePropType;
 
 export const ART = {
   glows: img(require('../../../assets/figma/home2/background-glows.png')),
-  hero: img(require('../../../assets/figma/home2/hero-scene.png')),
   pin: img(require('../../../assets/figma/home2/icon-pin.png')),
   /** `1625:11068` Icon/Dropdown. */
   dropdown: img(require('../../../assets/figma/home2/icon-dropdown.png')),
@@ -33,7 +32,6 @@ export const ART = {
   beadCook1: img(require('../../../assets/figma/home2/bead-cook-1.png')),
   beadCook3: img(require('../../../assets/figma/home2/bead-cook-3.png')),
   dayArc: img(require('../../../assets/figma/home2/day-arc.png')),
-  dayLine: img(require('../../../assets/figma/home2/day-line.png')),
   noon: img(require('../../../assets/figma/home2/icon-noon.png')),
   noonB: img(require('../../../assets/figma/home2/icon-noon-b.png')),
   sunrise: img(require('../../../assets/figma/home2/icon-sunrise.png')),
@@ -66,4 +64,28 @@ export const ART = {
     img(require('../../../assets/figma/home2/cook-3.png')),
     img(require('../../../assets/figma/home2/cook-4.png')),
   ],
+} as const;
+
+/**
+ * `1255:2991` — the hero scene's layers, rasterised at 3× from its vectors, each with a 20pt
+ * transparent margin round its Figma box (see `HeroBanner`). `bg` is the still backdrop: tiles,
+ * counter and stove with the burners off.
+ */
+export const HERO = {
+  bg: img(require('../../../assets/figma/home2/hero/bg.png')),
+  flameGlow: img(require('../../../assets/figma/home2/hero/flame-glow.png')),
+  flame: img(require('../../../assets/figma/home2/hero/flame.png')),
+  pan: img(require('../../../assets/figma/home2/hero/pan.png')),
+  food: img(require('../../../assets/figma/home2/hero/food.png')),
+  wisps: [
+    img(require('../../../assets/figma/home2/hero/wisp-1.png')),
+    img(require('../../../assets/figma/home2/hero/wisp-2.png')),
+    img(require('../../../assets/figma/home2/hero/wisp-3.png')),
+  ],
+  armBack: img(require('../../../assets/figma/home2/hero/arm-back.png')),
+  legBack: img(require('../../../assets/figma/home2/hero/leg-back.png')),
+  legFront: img(require('../../../assets/figma/home2/hero/leg-front.png')),
+  body: img(require('../../../assets/figma/home2/hero/cook-body.png')),
+  armFront: img(require('../../../assets/figma/home2/hero/arm-front.png')),
+  eyeBall: img(require('../../../assets/figma/home2/hero/eye-ball.png')),
 } as const;

@@ -21,6 +21,8 @@ export const C = {
   textSecondary: 'rgba(0,0,0,0.6)',
   textDisabled: 'rgba(0,0,0,0.25)',
   surfaceDisabled: 'rgba(0,0,0,0.03)',
+  /** `1095:8027` — the day spine's dashes. */
+  spine: 'rgba(0,0,0,0.25)',
 } as const;
 
 export const F = fontFamily;
