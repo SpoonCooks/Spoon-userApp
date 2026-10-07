@@ -1,11 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
 
 import { Text } from '@ui';
 
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import { FillImage } from '../FillImage';
-import { CALENDAR_CHEVRON_RIGHT, UP_NEXT_BACKDROP, UP_NEXT_COOK_PHOTO } from './assets';
+import { CALENDAR_CHEVRON_RIGHT, UP_NEXT_BACKDROP } from './assets';
 
 /**
  * `Up next banner / recurring / assigned` — Figma component `1461:6288`, "Late evening" variant,
@@ -22,6 +23,8 @@ export interface UpNextBannerProps {
   readonly label: string;
   readonly title: string;
   readonly meta: string;
+  /** The visit's cook. Omitted while no cook is named, so no face is shown that is not theirs. */
+  readonly photo?: ImageSourcePropType | undefined;
   readonly onPress?: (() => void) | undefined;
   readonly testID?: string;
 }
@@ -30,6 +33,7 @@ export function UpNextBanner({
   label,
   title,
   meta,
+  photo,
   onPress,
   testID = 'up-next-banner',
 }: UpNextBannerProps) {
@@ -62,9 +66,11 @@ export function UpNextBanner({
         </Text>
       </View>
 
-      <View style={styles.photoSlot}>
-        <Image source={UP_NEXT_COOK_PHOTO} style={styles.photo} />
-      </View>
+      {photo === undefined ? null : (
+        <View style={styles.photoSlot}>
+          <Image source={photo} style={styles.photo} />
+        </View>
+      )}
 
       <View style={styles.go}>
         <Image source={CALENDAR_CHEVRON_RIGHT} style={styles.chevron} />

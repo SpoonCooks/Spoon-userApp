@@ -4,10 +4,8 @@ import { useSafeBack } from '@core/navigation';
 import { CookPoolScreen } from '@features/cookPool';
 
 /**
- * Your Cook Pool — the landing. Entered from Home and from the recurring landing; back returns to
- * whichever opened it (`/home` when nothing did, as on a deep link).
- *
- * Not linked from Home or the recurring landing yet: neither has its entry point designed in.
+ * Your Cook Pool — the landing. Entered from Home's pool card and from the recurring landing; back
+ * returns to whichever opened it (`/home` when nothing did, as on a deep link).
  */
 export default function CookPoolRoute() {
   const router = useRouter();

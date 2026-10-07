@@ -1,4 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 
 import {
   DEFAULT_API_STUBS as ROUTE_STUBS,
@@ -38,6 +39,7 @@ import ScheduledRoute from '@/app/(app)/scheduled';
 import LoginRoute from '@/app/(auth)/login';
 import OtpRoute from '@/app/(auth)/otp';
 import NotFoundRoute from '@/app/+not-found';
+import RecurringBookingRoute from '@/app/(app)/recurring/[bookingId]';
 
 /**
  * Home reads the Cook Pool, whose module carries the swipe deck. Reanimated and worklets are
@@ -324,6 +326,75 @@ describe('routes render', () => {
     expect(screen.getByText(/Resend OTP in/)).toBeTruthy();
     expect(screen.getByText('26s')).toBeTruthy();
     expect(screen.getByText('OTP has been sent to +91 9876543210')).toBeTruthy();
+  });
+
+  /**
+   * The Live booking tab on a real booking: Home's "Recurring · Live" opens it. It draws the
+   * booking's own Up next, progress and dates, and the parts still on fixture data (Manage plans)
+   * say "coming soon" rather than opening the static screens.
+   */
+  it('renders a live Recurring booking from the backend, not the fixture', async () => {
+    mockSearchParams = { bookingId: 'rb-1' };
+    const cook = {
+      cookId: 'cook-1',
+      displayName: 'Cook Meera',
+      profileImageUrl: null,
+      rating: { average: 4.8, count: 3 },
+    };
+    const visit = {
+      visitId: 'visit-1',
+      planNumber: 1,
+      visitNumber: 1,
+      date: '2026-10-14',
+      timeOfDay: 'morning',
+      startTime: '09:00',
+      start: '2026-10-14T03:30:00.000Z',
+      durationMinutes: 60,
+      status: 'charged',
+      displayState: 'cook_assigned',
+      cookConfirmBy: '2026-10-14T00:30:00.000Z',
+      cook,
+      bookingId: 'b-1',
+      totalPaise: 13545,
+      cancelledBy: null,
+    };
+    renderWithRuntime(<RecurringBookingRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...ROUTE_STUBS,
+          'GET /v1/me/recurring-bookings/rb-1': () => ({
+            recurringBookingId: 'rb-1',
+            status: 'active',
+            addressId: 'addr-1',
+            window: { startDate: '2026-10-10', endDate: '2026-10-30' },
+            policyVersion: 'recurring-v2-spec-1',
+            mandate: null,
+            banner: null,
+            counts: { done: 2, cancelled: 0, toGo: 3 },
+            plans: [],
+            days: [{ date: '2026-10-14', group: 'upcoming', visits: [visit] }],
+            upNext: visit,
+            chargeRange: { minPaise: 13545, maxPaise: 13545 },
+            support: { whatsappUrl: null },
+            createdAt: '2026-10-07T06:00:00.000Z',
+            cancelledAt: null,
+            cancelledBy: null,
+          }),
+        }),
+      }),
+    });
+
+    expect(await screen.findByTestId('recurring-live-screen')).toBeTruthy();
+    expect(screen.getByText('1st Visit, 9:00 AM')).toBeTruthy();
+    expect(screen.getByText('1 hr • Cook Meera')).toBeTruthy();
+    expect(screen.getByText('2 done · 0 cancelled · 3 to go')).toBeTruthy();
+    // The fixture's Cook Sanchita / "3 done · 1 cancelled" never appear.
+    expect(screen.queryByText(/Sanchita/)).toBeNull();
+
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    fireEvent.press(screen.getByTestId('recurring-live-screen-header-plans'));
+    expect(alert).toHaveBeenCalledWith('Coming soon', expect.any(String));
+    alert.mockRestore();
   });
 
   /**

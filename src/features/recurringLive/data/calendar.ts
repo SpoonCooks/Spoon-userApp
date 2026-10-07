@@ -1,3 +1,7 @@
+import type { ImageSourcePropType } from 'react-native';
+
+import { POOL_COOK_PHOTOS, UP_NEXT_COOK_PHOTO } from '../components/calendar/assets';
+
 /**
  * Fixture data for the Live booking calendar — Figma `cCQlzTeiObQkpVBzwI8mZi`, frames `1005:132`
  * (calendar), `1354:1543` (calendar with a pop-up open) and the pop-ups `1006:323` (past),
@@ -45,7 +49,12 @@ export interface DayVisit {
   /** "Completed · Cook Sanchita". */
   readonly meta: string;
   /** Unassigned visits only — the `1006:740` "Cook pending" card. */
-  readonly pool?: { readonly title: string; readonly subtitle: string };
+  readonly pool?: {
+    readonly title: string;
+    readonly subtitle: string;
+    /** The overlapped faces. Omitted where there are no real cooks to show. */
+    readonly photos?: readonly ImageSourcePropType[];
+  };
 }
 
 export interface DayVisits {
@@ -58,6 +67,8 @@ export interface UpNextFixture {
   readonly label: string;
   readonly title: string;
   readonly meta: string;
+  /** The visit's cook; absent while none is named. */
+  readonly photo?: ImageSourcePropType;
 }
 
 export interface CalendarFixture {
@@ -110,6 +121,7 @@ export const CALENDAR_FIXTURE: CalendarFixture = {
     label: 'UP NEXT · TODAY',
     title: '2nd Visit, 7:00 PM',
     meta: '1 hr • Cook Sanchita',
+    photo: UP_NEXT_COOK_PHOTO,
   },
   progressLabel: '3 done · 1 cancelled · 3 to go',
   progressFraction: 154 / 370,
@@ -158,6 +170,7 @@ export const CALENDAR_FIXTURE: CalendarFixture = {
 const POOL = {
   title: 'Cook confirmed by 5 PM',
   subtitle: 'Familiar cooks from your Pool',
+  photos: POOL_COOK_PHOTOS,
 } as const;
 
 /** `1006:323` — Date pop-up / past. */
@@ -244,3 +257,41 @@ export function visitsForDay(day: CalendarDay): DayVisits | undefined {
 export function dayHeading(day: CalendarDay): string {
   return `${day.kind === 'today' ? 'Today' : day.weekday}, ${day.day} ${day.month}`;
 }
+
+/**
+ * Everything the Live booking tab draws: the fixture's shape, with the visits of each date keyed by
+ * its id and an Up-next card that may be absent (nothing left to run). The dev preview renders
+ * `CALENDAR_DEMO_MODEL`; the real route builds one from the booking (`liveCalendarFrom`).
+ */
+export interface LiveCalendarModel {
+  readonly upNext: UpNextFixture | null;
+  readonly progressLabel: string;
+  readonly progressFraction: number;
+  readonly weekdays: readonly string[];
+  readonly weeks: readonly CalendarWeek[];
+  readonly hint: string;
+  readonly visitsByDay: Readonly<Record<string, DayVisits>>;
+}
+
+/** A date of `weeks` by id. */
+export function findDayIn(weeks: readonly CalendarWeek[], id: string): CalendarDay | undefined {
+  for (const row of weeks) {
+    for (const day of row.days) {
+      if (day?.id === id) return day;
+    }
+  }
+  return undefined;
+}
+
+/** The fixture as a model: each marked date lists the rows of its kind's pop-up frame. */
+export const CALENDAR_DEMO_MODEL: LiveCalendarModel = {
+  ...CALENDAR_FIXTURE,
+  visitsByDay: Object.fromEntries(
+    CALENDAR_FIXTURE.weeks.flatMap((row) =>
+      row.days.flatMap((day) => {
+        const visits = day === null ? undefined : visitsForDay(day);
+        return day === null || visits === undefined ? [] : [[day.id, visits] as const];
+      }),
+    ),
+  ),
+};

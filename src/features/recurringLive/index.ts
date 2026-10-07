@@ -8,15 +8,18 @@
  *    Before-arrival prep card and the Modify booking / Payment details sheets
  *  - Rate card (inline on a completed visit) and the "Tell us more" sheet
  *
- * STATIC UI ONLY for now: every screen reads fixture data from `data/` and leaves its actions as
- * callbacks. Nothing is wired to the backend or to the real routes yet.
+ * The Live booking tab runs on the booking itself (`liveCalendarFrom`, route `/recurring/[bookingId]`).
+ * Manage plans, Visit details, the sheets and the rate card are STILL STATIC: they read fixture
+ * data from `data/` and are reachable only from the dev preview, not from a real route.
  */
 export { RecurringTabsHeader } from './components/RecurringTabsHeader';
 export type { RecurringTab, RecurringTabsHeaderProps } from './components/RecurringTabsHeader';
 
 export { RecurringLiveScreen } from './screens/RecurringLiveScreen';
 export type { RecurringLiveScreenProps, VisitRef } from './screens/RecurringLiveScreen';
-export { CALENDAR_DEMO_DATES } from './data/calendar';
+export { CALENDAR_DEMO_DATES, CALENDAR_DEMO_MODEL } from './data/calendar';
+export type { LiveCalendarModel } from './data/calendar';
+export { liveCalendarFrom, todayInKolkata } from './adapters';
 
 export { RecurringPlansScreen } from './screens/RecurringPlansScreen';
 export type { RecurringPlansScreenProps } from './screens/RecurringPlansScreen';

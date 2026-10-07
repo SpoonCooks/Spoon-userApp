@@ -19,8 +19,8 @@ import {
   dateDiscFrame,
   locateDay,
 } from '../components/calendar/VisitsCalendar';
-import { CALENDAR_FIXTURE, dayHeading, findCalendarDay, visitsForDay } from '../data/calendar';
-import type { CalendarDay, DayVisit } from '../data/calendar';
+import { CALENDAR_DEMO_MODEL, dayHeading, findDayIn } from '../data/calendar';
+import type { CalendarDay, DayVisit, LiveCalendarModel } from '../data/calendar';
 
 /**
  * Recurring — "Live booking" tab. Figma `cCQlzTeiObQkpVBzwI8mZi`, page `1005:131`:
@@ -41,7 +41,8 @@ import type { CalendarDay, DayVisit } from '../data/calendar';
  * bottom of the screen it opens upward instead, 1pt above the disc — so the later rows, whose
  * pop-ups the frames don't place, stay on screen.
  *
- * STATIC: everything shown is `CALENDAR_FIXTURE` (`../data/calendar`).
+ * Everything shown comes from `model`: the booking's own (`liveCalendarFrom`) on the real route,
+ * `CALENDAR_DEMO_MODEL` in the dev preview. No Up-next card is drawn when nothing is left to run.
  */
 export interface VisitRef {
   readonly dateId: string;
@@ -50,6 +51,8 @@ export interface VisitRef {
 }
 
 export interface RecurringLiveScreenProps {
+  /** What the tab draws. Defaults to the Figma fixture, for the dev preview. */
+  readonly model?: LiveCalendarModel;
   readonly onBack: () => void;
   readonly onTabChange?: ((tab: RecurringTab) => void) | undefined;
   /** A visit row in the pop-up — Visit details, or the live booking page for today's. */
@@ -72,6 +75,7 @@ const THREAD = { left: -20, right: -8, height: 54.05, bottom: 31.95 } as const;
 const POPUP_OFFSET = 1;
 
 export function RecurringLiveScreen({
+  model = CALENDAR_DEMO_MODEL,
   onBack,
   onTabChange,
   onOpenVisit,
@@ -80,7 +84,7 @@ export function RecurringLiveScreen({
   initialSelectedDate,
   testID = 'recurring-live-screen',
 }: RecurringLiveScreenProps) {
-  const fixture = CALENDAR_FIXTURE;
+  const fixture = model;
   const insets = useSafeAreaInsets();
 
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedDate ?? null);
@@ -88,8 +92,8 @@ export function RecurringLiveScreen({
   const [grid, setGrid] = useState<LayoutRectangle | null>(null);
   const [popupSize, setPopupSize] = useState<{ id: string; height: number } | null>(null);
 
-  const selectedDay = selectedId === null ? undefined : findCalendarDay(selectedId);
-  const dayVisits = selectedDay ? visitsForDay(selectedDay) : undefined;
+  const selectedDay = selectedId === null ? undefined : findDayIn(fixture.weeks, selectedId);
+  const dayVisits = selectedDay ? fixture.visitsByDay[selectedDay.id] : undefined;
 
   const onSelectDay = useCallback((day: CalendarDay) => {
     setSelectedId((current) => (current === day.id ? null : day.id));
@@ -176,13 +180,16 @@ export function RecurringLiveScreen({
           resizeMode="stretch"
         />
 
-        <UpNextBanner
-          label={fixture.upNext.label}
-          title={fixture.upNext.title}
-          meta={fixture.upNext.meta}
-          onPress={onOpenUpNext}
-          testID={`${testID}-up-next`}
-        />
+        {fixture.upNext === null ? null : (
+          <UpNextBanner
+            label={fixture.upNext.label}
+            title={fixture.upNext.title}
+            meta={fixture.upNext.meta}
+            photo={fixture.upNext.photo}
+            onPress={onOpenUpNext}
+            testID={`${testID}-up-next`}
+          />
+        )}
 
         <ProgressThread
           label={fixture.progressLabel}

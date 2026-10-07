@@ -30,8 +30,7 @@ const logger = getLogger('home');
  *
  * The pool block: "Check Recurring" opens the Recurring landing (explainer + "Make your Cook
  * Pool"), "Book Recurring" the plan flow, the pool card the Cook Pool, and a bead that cook's
- * profile. The plan tracker ("Recurring · Live") does not exist in this app yet and answers
- * "coming soon" on the screen rather than doing nothing.
+ * profile. "Recurring · Live" opens that booking's Live booking tab (`/recurring/[bookingId]`).
  */
 export default function HomeRoute() {
   const router = useRouter();
@@ -86,7 +85,8 @@ export default function HomeRoute() {
     );
   };
 
-  const openRecurring = (target: RecurringTarget): boolean => {
+  /** `liveBookingId`: the household's live Recurring booking, which the "Live" chip opens. */
+  const openRecurring = (target: RecurringTarget, liveBookingId: string | null): boolean => {
     if (target === 'recurringFlow') {
       router.push('/recurring-setup/days');
       return true;
@@ -95,8 +95,11 @@ export default function HomeRoute() {
       router.push('/recurring');
       return true;
     }
-    // The plan tracker is not built yet.
-    return false;
+    // "Recurring · Live" without a booking to open (eligibility and the pool disagreeing for a
+    // moment) falls back to the screen's "coming soon" rather than a blank page.
+    if (liveBookingId === null) return false;
+    router.push({ pathname: '/recurring/[bookingId]', params: { bookingId: liveBookingId } });
+    return true;
   };
 
   return (
@@ -119,7 +122,9 @@ export default function HomeRoute() {
               params: { durationId: request.duration.id },
             })
           }
-          onPressRecurring={openRecurring}
+          onPressRecurring={(target) =>
+            openRecurring(target, model.activeRecurringPlan?.id ?? null)
+          }
           onPressCookPool={() => router.push('/cook-pool')}
           onPressPoolCook={(cook) =>
             router.push({ pathname: '/cook-pool/[cookId]', params: { cookId: cook.id } })

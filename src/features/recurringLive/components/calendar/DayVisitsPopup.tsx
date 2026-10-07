@@ -8,7 +8,6 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { CalendarDayKind, DayVisit } from '../../data/calendar';
 import {
   CALENDAR_CHEVRON_RIGHT,
-  POOL_COOK_PHOTOS,
   VISIT_CANCELLED_GLYPH,
   VISIT_DONE_GLYPH,
   VISIT_PENDING_GLYPH,
@@ -132,7 +131,7 @@ function VisitRow({
       {visit.pool ? (
         <View style={styles.pool}>
           <View style={styles.poolAvatars}>
-            {POOL_COOK_PHOTOS.map((photo, index) => (
+            {(visit.pool.photos ?? []).map((photo, index) => (
               <Image
                 key={index}
                 source={photo}
