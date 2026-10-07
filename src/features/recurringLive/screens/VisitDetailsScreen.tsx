@@ -14,8 +14,8 @@ import { VisitCancelledCard } from '../components/visit/VisitCancelledCard';
 import { VisitChargeCard } from '../components/visit/VisitChargeCard';
 import { VisitHeader } from '../components/visit/VisitHeader';
 import { VisitStatusBanner } from '../components/visit/VisitStatusBanner';
-import { VISIT_FIXTURE } from '../data/visit';
-import type { VisitPrepKey, VisitPrepReady, VisitVariant } from '../data/visit';
+import { visitDemoModel } from '../data/visit';
+import type { VisitDetailsModel, VisitPrepKey, VisitPrepReady, VisitVariant } from '../data/visit';
 
 /**
  * Recurring live booking — "Visit details".
@@ -35,12 +35,17 @@ import type { VisitPrepKey, VisitPrepReady, VisitVariant } from '../data/visit';
  * The `Action dock` (`1444:730`) is the pinned footer; Completed and Cancelled have no "Modify
  * booking".
  *
- * STATIC ONLY: every value is `VISIT_FIXTURE`. The prep ticks are local UI state; Call, Share,
- * View Cook Pool and the next-visit row are optional callbacks; the dock's sheets and the Help
- * WhatsApp deep link (`1434:2205`) belong to the caller.
+ * Everything shown comes from `model`: the visit's own (`visitDetailsFrom`) on the real route, or
+ * the frame's (`visitDemoModel(variant)`) in the dev preview. Sections the model leaves out (no
+ * recipe row, no checklist, no "Modify booking") are not drawn. Call, Share, View Cook Pool and
+ * the next-visit row are optional callbacks; the dock's sheets and the Help WhatsApp deep link
+ * (`1434:2205`) belong to the caller.
  */
 export interface VisitDetailsScreenProps {
-  readonly variant: VisitVariant;
+  /** What the screen draws. Without it, the frame's content for `variant` and `prepState`. */
+  readonly model?: VisitDetailsModel;
+  /** The dev preview's frame; ignored when `model` is given. */
+  readonly variant?: VisitVariant;
   readonly onBack: () => void;
   readonly onPaymentDetails?: (() => void) | undefined;
   readonly onModifyBooking?: (() => void) | undefined;
@@ -58,10 +63,9 @@ export interface VisitDetailsScreenProps {
   readonly testID?: string | undefined;
 }
 
-const { charge } = VISIT_FIXTURE;
-
 export function VisitDetailsScreen({
-  variant,
+  model: given,
+  variant: demoVariant = 'assigned',
   onBack,
   onPaymentDetails,
   onModifyBooking,
@@ -75,6 +79,8 @@ export function VisitDetailsScreen({
   onPrepChange,
   testID = 'visit-details-screen',
 }: VisitDetailsScreenProps) {
+  const model = given ?? visitDemoModel(demoVariant, prepState);
+  const { variant } = model;
   const upcoming = variant === 'assigned' || variant === 'pending';
 
   return (
@@ -86,7 +92,7 @@ export function VisitDetailsScreen({
       header={<VisitHeader title="Visit details" onBack={onBack} testID={`${testID}-header`} />}
       footer={
         <ActionDock
-          showModify={upcoming}
+          showModify={upcoming && model.modifySheet !== null}
           onPaymentDetails={onPaymentDetails}
           onModifyBooking={onModifyBooking}
           onHelp={onHelp}
@@ -98,41 +104,60 @@ export function VisitDetailsScreen({
         state={
           variant === 'pending' ? 'upcoming' : variant === 'cancelled' ? 'cancelled' : 'confirmed'
         }
-        date={VISIT_FIXTURE.date}
-        slot={VISIT_FIXTURE.slot}
-        daysToGo={VISIT_FIXTURE.daysToGo}
+        date={model.banner.date}
+        slot={model.banner.slot}
+        daysToGo={model.banner.daysToGo}
         testID={`${testID}-banner`}
       />
 
       {variant === 'assigned' ? (
-        <CookAssignedCard onCall={onCall} testID={`${testID}-cook`} />
+        <CookAssignedCard
+          cook={model.cook}
+          menu={model.menu}
+          onCall={onCall}
+          testID={`${testID}-cook`}
+        />
       ) : null}
       {variant === 'pending' ? (
-        <CookPendingCard onViewPool={onViewCookPool} testID={`${testID}-cook`} />
+        <CookPendingCard
+          pending={model.pending}
+          onViewPool={onViewCookPool}
+          testID={`${testID}-cook`}
+        />
       ) : null}
       {variant === 'cancelled' ? (
-        <VisitCancelledCard onNextVisit={onNextVisit} testID={`${testID}-cook`} />
+        <VisitCancelledCard
+          cancelled={model.cancelled}
+          onNextVisit={onNextVisit}
+          testID={`${testID}-cook`}
+        />
       ) : null}
       {variant === 'completed' ? (ratingSlot ?? null) : null}
 
       {upcoming ? (
         <>
-          <RecipeShareRow onShare={onShareRecipe} testID={`${testID}-recipe`} />
-          <BeforeArrivalCard
-            initialReady={prepState}
-            onChange={onPrepChange}
-            testID={`${testID}-prep`}
-          />
+          {model.recipe === null ? null : (
+            <RecipeShareRow
+              recipe={model.recipe}
+              onShare={onShareRecipe}
+              testID={`${testID}-recipe`}
+            />
+          )}
+          {model.prep === null ? null : (
+            <BeforeArrivalCard
+              prep={model.prep}
+              initialChecked={model.prepChecked}
+              onChange={onPrepChange}
+              testID={`${testID}-prep`}
+            />
+          )}
         </>
       ) : null}
 
-      {variant === 'cancelled' ? (
-        <RefundSummaryCard testID={`${testID}-refund`} />
+      {model.refund !== null ? (
+        <RefundSummaryCard refund={model.refund} testID={`${testID}-refund`} />
       ) : (
-        <VisitChargeCard
-          body={variant === 'assigned' ? charge.bodyAssigned : charge.bodyNotice}
-          testID={`${testID}-charge`}
-        />
+        <VisitChargeCard charge={model.charge} testID={`${testID}-charge`} />
       )}
     </Screen>
   );

@@ -3,7 +3,8 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { VISIT_FIXTURE } from '../../data/visit';
+import { visitDemoModel } from '../../data/visit';
+import type { VisitRecipeData } from '../../data/visit';
 import { VISIT_DISH_GLYPH, VISIT_WHATSAPP_20 } from './assets';
 
 /**
@@ -12,13 +13,18 @@ import { VISIT_DISH_GLYPH, VISIT_WHATSAPP_20 } from './assets';
  * "Share" pill (`1454:7949`: px 12 / py 8, 4 gap).
  */
 export interface RecipeShareRowProps {
+  readonly recipe?: VisitRecipeData;
   readonly onShare?: (() => void) | undefined;
   readonly testID?: string | undefined;
 }
 
-const { recipe } = VISIT_FIXTURE;
+const DEMO = visitDemoModel('assigned');
 
-export function RecipeShareRow({ onShare, testID = 'visit-recipe-share' }: RecipeShareRowProps) {
+export function RecipeShareRow({
+  recipe = DEMO.recipe ?? { title: '', body: '', cta: '' },
+  onShare,
+  testID = 'visit-recipe-share',
+}: RecipeShareRowProps) {
   return (
     <View style={styles.row} testID={testID}>
       <View style={styles.lead}>

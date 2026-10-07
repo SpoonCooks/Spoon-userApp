@@ -3,8 +3,8 @@ import { Image, StyleSheet, View } from 'react-native';
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { VISIT_FIXTURE } from '../../data/visit';
-import type { VisitRefundLine } from '../../data/visit';
+import { visitDemoModel } from '../../data/visit';
+import type { VisitRefundData, VisitRefundLine } from '../../data/visit';
 import { VISIT_MONEY_24, VISIT_REFUND_NODE, VISIT_STITCH_HORIZONTAL } from './assets';
 
 /**
@@ -16,12 +16,18 @@ import { VISIT_MONEY_24, VISIT_REFUND_NODE, VISIT_STITCH_HORIZONTAL } from './as
  * the refund went and its two-step timeline.
  */
 export interface RefundSummaryCardProps {
+  /** Defaults to the frame's. A value the backend does not give (refund id, mode) is left out. */
+  readonly refund?: VisitRefundData;
   readonly testID?: string | undefined;
 }
 
-const { refund } = VISIT_FIXTURE;
+const DEMO = visitDemoModel('cancelled');
+const DEMO_REFUND = DEMO.refund!;
 
-export function RefundSummaryCard({ testID = 'visit-refund-summary' }: RefundSummaryCardProps) {
+export function RefundSummaryCard({
+  refund = DEMO_REFUND,
+  testID = 'visit-refund-summary',
+}: RefundSummaryCardProps) {
   return (
     <View style={styles.card} testID={testID}>
       <View style={styles.header}>
@@ -32,9 +38,11 @@ export function RefundSummaryCard({ testID = 'visit-refund-summary' }: RefundSum
           <Text variant="spoonHeading" color="textPrimary">
             {refund.title}
           </Text>
-          <Text variant="spoonCaption" color="textSecondarySoft">
-            {refund.booking}
-          </Text>
+          {refund.booking === undefined ? null : (
+            <Text variant="spoonCaption" color="textSecondarySoft">
+              {refund.booking}
+            </Text>
+          )}
         </View>
         <View style={styles.badge}>
           <Text variant="spoonCaptionStrong" color="textPrimary">
@@ -58,9 +66,11 @@ export function RefundSummaryCard({ testID = 'visit-refund-summary' }: RefundSum
             </Text>
           </View>
           <View style={[styles.price, styles.priceEnd]}>
-            <Text variant="spoonBody" color="textSecondarySoft" style={styles.struck}>
-              {refund.total.was}
-            </Text>
+            {refund.total.was === undefined ? null : (
+              <Text variant="spoonBody" color="textSecondarySoft" style={styles.struck}>
+                {refund.total.was}
+              </Text>
+            )}
             <Text variant="spoonDisplay" color="textPrimary">
               {refund.total.amount}
             </Text>
@@ -70,22 +80,26 @@ export function RefundSummaryCard({ testID = 'visit-refund-summary' }: RefundSum
 
       <View style={styles.status}>
         <View style={styles.mode}>
-          <View style={styles.modeText}>
-            <Text variant="spoonMicroStrong" color="textSecondarySoft">
-              {refund.modeEyebrow}
-            </Text>
-            <Text variant="spoonBodyStrong" color="textPrimary">
-              {refund.mode}
-            </Text>
-          </View>
-          <View style={styles.refundId}>
-            <Text variant="spoonMicroStrong" color="textSecondarySoft">
-              {refund.idEyebrow}
-            </Text>
-            <Text variant="spoonCaptionStrong" color="textPrimary">
-              {refund.refundId}
-            </Text>
-          </View>
+          {refund.mode === undefined ? null : (
+            <View style={styles.modeText}>
+              <Text variant="spoonMicroStrong" color="textSecondarySoft">
+                {refund.modeEyebrow}
+              </Text>
+              <Text variant="spoonBodyStrong" color="textPrimary">
+                {refund.mode}
+              </Text>
+            </View>
+          )}
+          {refund.refundId === undefined ? null : (
+            <View style={styles.refundId}>
+              <Text variant="spoonMicroStrong" color="textSecondarySoft">
+                {refund.idEyebrow}
+              </Text>
+              <Text variant="spoonCaptionStrong" color="textPrimary">
+                {refund.refundId}
+              </Text>
+            </View>
+          )}
         </View>
         <View style={styles.timeline}>
           {refund.steps.map((step) => (
@@ -95,9 +109,11 @@ export function RefundSummaryCard({ testID = 'visit-refund-summary' }: RefundSum
                 <Text variant="spoonBodyStrong" color="textPrimary">
                   {step.title}
                 </Text>
-                <Text variant="spoonCaption" color="textSecondarySoft">
-                  {step.when}
-                </Text>
+                {step.when === undefined ? null : (
+                  <Text variant="spoonCaption" color="textSecondarySoft">
+                    {step.when}
+                  </Text>
+                )}
               </View>
             </View>
           ))}

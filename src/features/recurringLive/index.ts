@@ -8,9 +8,10 @@
  *    Before-arrival prep card and the Modify booking / Payment details sheets
  *  - Rate card (inline on a completed visit) and the "Tell us more" sheet
  *
- * The Live booking tab runs on the booking itself (`liveCalendarFrom`, route `/recurring/[bookingId]`).
- * Manage plans, Visit details, the sheets and the rate card are STILL STATIC: they read fixture
- * data from `data/` and are reachable only from the dev preview, not from a real route.
+ * On real data: the Live booking tab (`liveCalendarFrom`, route `/recurring/[bookingId]`) and Visit
+ * details with its Modify booking / Payment details sheets (`visitDetailsFrom`, route
+ * `/recurring/[bookingId]/visits/[visitId]`). Manage plans and the rate card are STILL STATIC: they
+ * read fixture data from `data/` and are reachable only from the dev preview.
  */
 export { RecurringTabsHeader } from './components/RecurringTabsHeader';
 export type { RecurringTab, RecurringTabsHeaderProps } from './components/RecurringTabsHeader';
@@ -26,7 +27,10 @@ export type { RecurringPlansScreenProps } from './screens/RecurringPlansScreen';
 
 export { VisitDetailsScreen } from './screens/VisitDetailsScreen';
 export type { VisitDetailsScreenProps } from './screens/VisitDetailsScreen';
-export type { VisitPrepReady, VisitVariant } from './data/visit';
+export type { VisitDetailsModel, VisitPrepKey, VisitPrepReady, VisitVariant } from './data/visit';
+export { visitDemoModel } from './data/visit';
+export { visitDetailsFrom } from './visitDetails';
+export type { VisitDetailsSources } from './visitDetails';
 
 export { ModifyBookingSheet } from './components/sheets/ModifyBookingSheet';
 export type { ModifyBookingSheetProps } from './components/sheets/ModifyBookingSheet';

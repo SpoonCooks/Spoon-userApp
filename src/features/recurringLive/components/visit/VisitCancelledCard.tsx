@@ -3,7 +3,8 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { VISIT_FIXTURE } from '../../data/visit';
+import { visitDemoModel } from '../../data/visit';
+import type { VisitCancelledData } from '../../data/visit';
 import {
   VISIT_CALENDAR_CLOSE,
   VISIT_CHEVRON_20,
@@ -20,13 +21,16 @@ import {
  * grey one) and "Your plan continues" with its 40pt yellow chevron well.
  */
 export interface VisitCancelledCardProps {
+  /** Defaults to the frame's. No next visit leaves out "Your plan continues". */
+  readonly cancelled?: VisitCancelledData;
   readonly onNextVisit?: (() => void) | undefined;
   readonly testID?: string | undefined;
 }
 
-const { cancelled } = VISIT_FIXTURE;
+const DEMO = visitDemoModel('cancelled');
 
 export function VisitCancelledCard({
+  cancelled = DEMO.cancelled,
   onNextVisit,
   testID = 'visit-cancelled-card',
 }: VisitCancelledCardProps) {
@@ -46,33 +50,37 @@ export function VisitCancelledCard({
         </View>
       </View>
 
-      {/* `1466:734` — the snipped thread, 28 tall. */}
-      <View style={styles.snip} accessibilityElementsHidden importantForAccessibility="no">
-        <Image source={VISIT_THREAD_SNIPPED_LEFT} style={styles.threadLeft} />
-        <Image source={VISIT_THREAD_SNIPPED_RIGHT} style={styles.threadRight} />
-        <View style={styles.snipWell}>
-          <Image source={VISIT_CLOSE_14} style={styles.close} />
-        </View>
-      </View>
+      {cancelled.nextVisit === null ? null : (
+        <>
+          {/* `1466:734` — the snipped thread, 28 tall. */}
+          <View style={styles.snip} accessibilityElementsHidden importantForAccessibility="no">
+            <Image source={VISIT_THREAD_SNIPPED_LEFT} style={styles.threadLeft} />
+            <Image source={VISIT_THREAD_SNIPPED_RIGHT} style={styles.threadRight} />
+            <View style={styles.snipWell}>
+              <Image source={VISIT_CLOSE_14} style={styles.close} />
+            </View>
+          </View>
 
-      <Pressable
-        onPress={onNextVisit}
-        accessibilityRole="button"
-        style={styles.plan}
-        testID={`${testID}-next-visit`}
-      >
-        <View style={styles.planText}>
-          <Text variant="spoonMicroStrong" color="textSecondarySoft">
-            {cancelled.eyebrow}
-          </Text>
-          <Text variant="spoonBodyStrong" color="textPrimary">
-            {cancelled.nextVisit}
-          </Text>
-        </View>
-        <View style={styles.well40}>
-          <Image source={VISIT_CHEVRON_20} style={styles.glyph20} />
-        </View>
-      </Pressable>
+          <Pressable
+            onPress={onNextVisit}
+            accessibilityRole="button"
+            style={styles.plan}
+            testID={`${testID}-next-visit`}
+          >
+            <View style={styles.planText}>
+              <Text variant="spoonMicroStrong" color="textSecondarySoft">
+                {cancelled.eyebrow}
+              </Text>
+              <Text variant="spoonBodyStrong" color="textPrimary">
+                {cancelled.nextVisit}
+              </Text>
+            </View>
+            <View style={styles.well40}>
+              <Image source={VISIT_CHEVRON_20} style={styles.glyph20} />
+            </View>
+          </Pressable>
+        </>
+      )}
     </View>
   );
 }

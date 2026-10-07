@@ -36,8 +36,8 @@ export interface PaymentDetailsSheetData {
   readonly taxLine: PaymentLine;
   readonly totalLabel: string;
   readonly totalCaption: string;
-  /** `1474:2506` — the struck-through list price. */
-  readonly totalOriginal: string;
+  /** `1474:2506` — the struck-through list price; absent when there is none. */
+  readonly totalOriginal?: string | undefined;
   readonly total: string;
   readonly methodEyebrow: string;
   readonly methodName: string;

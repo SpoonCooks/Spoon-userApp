@@ -4,15 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { VISIT_FIXTURE } from '../../data/visit';
+import { visitDemoModel } from '../../data/visit';
+import type { VisitCookData, VisitMenuSection } from '../../data/visit';
 import {
   VISIT_BAND_CURVE,
   VISIT_BELL_ASSIGNED,
   VISIT_CALL_GLYPH,
   VISIT_CHEVRON_16,
-  VISIT_COOK_PHOTO,
   VISIT_DISH_FAVORITE,
-  VISIT_DISH_PHOTO,
   VISIT_STAR,
 } from './assets';
 
@@ -27,20 +26,26 @@ import {
  * menu" cue (`1463:7967`), a `#FFF7CC` wash that clears to 0 % at its top.
  */
 export interface CookAssignedCardProps {
+  /** The cook; a line the backend has no value for is left out. Defaults to the frame's. */
+  readonly cook?: VisitCookData;
+  /** The cook's dishes by category; empty hides the carousels and the scroll cue. */
+  readonly menu?: readonly VisitMenuSection[];
+  /** Absent: no Call button (there is no way to reach the cook yet). */
   readonly onCall?: (() => void) | undefined;
   readonly testID?: string | undefined;
 }
 
-const { cook, menu } = VISIT_FIXTURE;
-const DISHES = Array.from({ length: menu.dishesPerSection }, (_, index) => index);
+const DEMO = visitDemoModel('assigned');
 
 export function CookAssignedCard({
+  cook = DEMO.cook,
+  menu = DEMO.menu,
   onCall,
   testID = 'visit-cook-assigned',
 }: CookAssignedCardProps) {
   return (
     <View style={styles.shadow} testID={testID}>
-      <View style={styles.window}>
+      <View style={[styles.window, menu.length === 0 ? styles.windowFit : null]}>
         <ScrollView
           nestedScrollEnabled
           showsVerticalScrollIndicator={false}
@@ -55,18 +60,20 @@ export function CookAssignedCard({
                 {cook.note}
               </Text>
             </View>
-            <Pressable
-              onPress={onCall}
-              accessibilityRole="button"
-              accessibilityLabel="Call the cook"
-              style={styles.call}
-              testID={`${testID}-call`}
-            >
-              <Image source={VISIT_CALL_GLYPH} style={styles.glyph20} />
-              <Text variant="spoonBodyStrong" color="textPrimary">
-                Call
-              </Text>
-            </Pressable>
+            {onCall === undefined ? null : (
+              <Pressable
+                onPress={onCall}
+                accessibilityRole="button"
+                accessibilityLabel="Call the cook"
+                style={styles.call}
+                testID={`${testID}-call`}
+              >
+                <Image source={VISIT_CALL_GLYPH} style={styles.glyph20} />
+                <Text variant="spoonBodyStrong" color="textPrimary">
+                  Call
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {/* `1380:3210` — Cook profile card. */}
@@ -88,34 +95,42 @@ export function CookAssignedCard({
                   <Text variant="spoonHeading" color="textPrimary">
                     {cook.name}
                   </Text>
-                  <Text variant="spoonCaption" color="textSecondarySoft">
-                    {cook.origin}
-                  </Text>
+                  {cook.origin === undefined ? null : (
+                    <Text variant="spoonCaption" color="textSecondarySoft">
+                      {cook.origin}
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.gap4}>
-                  <Text variant="spoonBodyStrong" color="textPrimary">
-                    {cook.visits}
-                  </Text>
-                  <View style={styles.rating}>
+                  {cook.visits === undefined ? null : (
                     <Text variant="spoonBodyStrong" color="textPrimary">
-                      {cook.rating}
+                      {cook.visits}
                     </Text>
-                    <Image source={VISIT_STAR} style={styles.star} />
-                  </View>
+                  )}
+                  {cook.rating === undefined ? null : (
+                    <View style={styles.rating}>
+                      <Text variant="spoonBodyStrong" color="textPrimary">
+                        {cook.rating}
+                      </Text>
+                      <Image source={VISIT_STAR} style={styles.star} />
+                    </View>
+                  )}
                 </View>
               </View>
               {/* `1380:3206` — the 120pt photo on `#FFF7CC`, drawn `contain`. */}
               <View style={styles.photo}>
-                <Image source={VISIT_COOK_PHOTO} style={styles.photoImage} resizeMode="contain" />
+                {cook.photo === undefined ? null : (
+                  <Image source={cook.photo} style={styles.photoImage} resizeMode="contain" />
+                )}
               </View>
             </View>
 
             {/* `1380:3076` — the carousels. */}
             <View style={styles.carousels}>
-              {menu.sections.map((section) => (
-                <View key={section} style={styles.carousel}>
+              {menu.map((section) => (
+                <View key={section.id} style={styles.carousel}>
                   <Text variant="spoonBodyStrong" color="textPrimary" style={styles.sectionTitle}>
-                    {menu.sectionTitle}
+                    {section.title}
                   </Text>
                   <ScrollView
                     horizontal
@@ -123,18 +138,20 @@ export function CookAssignedCard({
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.dishRow}
                   >
-                    {DISHES.map((dish) => (
-                      <View key={`${section}-${dish}`} style={styles.dish}>
+                    {section.dishes.map((dish) => (
+                      <View key={dish.id} style={styles.dish}>
                         <View style={styles.dishPhoto}>
-                          <Image
-                            source={VISIT_DISH_PHOTO}
-                            style={styles.dishImage}
-                            resizeMode="contain"
-                          />
+                          {dish.image === undefined ? null : (
+                            <Image
+                              source={dish.image}
+                              style={styles.dishImage}
+                              resizeMode="contain"
+                            />
+                          )}
                           <Image source={VISIT_DISH_FAVORITE} style={styles.favorite} />
                         </View>
                         <Text variant="spoonCaption" color="textVisitDish" numberOfLines={1}>
-                          {menu.dishName}
+                          {dish.name}
                         </Text>
                       </View>
                     ))}
@@ -145,24 +162,26 @@ export function CookAssignedCard({
           </View>
         </ScrollView>
 
-        {/* `1463:7967` — the pinned scroll cue. */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={[
-            lightTheme.colors.surfaceVisitCueClear,
-            lightTheme.colors.surfaceVisitCueMid,
-            lightTheme.colors.surfaceAccent,
-          ]}
-          locations={[0, 0.55, 1]}
-          style={styles.cue}
-        >
-          <View style={styles.cuePill}>
-            <Text variant="spoonCaptionStrong" color="textSecondarySoft">
-              Scroll for full menu
-            </Text>
-            <Image source={VISIT_CHEVRON_16} style={styles.chevronDown} />
-          </View>
-        </LinearGradient>
+        {/* `1463:7967` — the pinned scroll cue; only when there is a menu to scroll to. */}
+        {menu.length === 0 ? null : (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              lightTheme.colors.surfaceVisitCueClear,
+              lightTheme.colors.surfaceVisitCueMid,
+              lightTheme.colors.surfaceAccent,
+            ]}
+            locations={[0, 0.55, 1]}
+            style={styles.cue}
+          >
+            <View style={styles.cuePill}>
+              <Text variant="spoonCaptionStrong" color="textSecondarySoft">
+                Scroll for full menu
+              </Text>
+              <Image source={VISIT_CHEVRON_16} style={styles.chevronDown} />
+            </View>
+          </LinearGradient>
+        )}
       </View>
     </View>
   );
@@ -174,6 +193,8 @@ const styles = StyleSheet.create({
     borderRadius: lightTheme.radius.md,
     boxShadow: [{ offsetX: 0, offsetY: 0, blurRadius: 1.5, color: 'rgba(0,0,0,0.08)' }],
   },
+  /** Without a menu there is nothing to scroll: the window fits the profile instead. */
+  windowFit: { height: 'auto' },
   /** `1462:5794` — the 450pt window. */
   window: {
     height: 450,
