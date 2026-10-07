@@ -71,7 +71,7 @@ export interface HomeModel {
   readonly pricingStatus?: 'ready' | 'loading' | 'error';
   /** The GST rate the tax dialog states, from config — never a literal in copy. */
   readonly tax: { readonly gstPercent: number };
-  /** The tile the carousel opens centred on ("1 hr"). Focused, never pre-selected. */
+  /** The tile the carousel opens centred on ("1 hr"); the front tile is also the selection. */
   readonly focusedDurationId: string;
   /** Returning users only; up to 6 beads. */
   readonly cookPool: readonly PoolCook[];

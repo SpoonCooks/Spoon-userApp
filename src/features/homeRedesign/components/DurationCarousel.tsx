@@ -175,6 +175,7 @@ export function DurationCarousel({
                   onPressUnavailable(d);
                   return;
                 }
+                // Selecting brings the tile to the front (the screen focuses it with the choice).
                 animate();
                 onSelect(d.id);
               }}

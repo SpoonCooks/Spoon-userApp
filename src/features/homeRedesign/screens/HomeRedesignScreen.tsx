@@ -68,11 +68,14 @@ export interface HomeRedesignActions {
    * the tap (see `joinWaitlist`). Rejects only if the register fails.
    */
   readonly onJoinWaitlist: (pincode: string) => Promise<void>;
-  /** Analytics `duration_selected`, raised on every new selection. */
+  /**
+   * Analytics `duration_selected`, raised on every new selection. `focus`: the tile came to the
+   * front (on open, after a swipe, or after a refresh / Now–Later switch) and was selected with it.
+   */
   readonly onDurationSelected?: (event: {
     durationMin: number;
     pricePaise: number;
-    source: 'tile' | 'dial';
+    source: 'tile' | 'dial' | 'focus';
   }) => void;
   /** Re-read availability (Home focus is handled by the screen; this is the Now/Later switch). */
   readonly onRefreshAvailability?: () => void;
@@ -128,6 +131,19 @@ export function HomeRedesignView({
       }),
   );
 
+  /**
+   * `1303:1333` dev note: "When Instant is not available, user is automatically taken to the
+   * Later / schedule state." `initialDraft` does that when Home opens already knowing; Instant's
+   * read usually lands a moment later, so the switch also happens then — until the customer picks
+   * a tab. Choosing Now themselves shows the instantNA state: the same SKUs, grey Now, "Book for
+   * later".
+   */
+  const modeChosen = useRef(initialMode !== undefined);
+  useEffect(() => {
+    if (modeChosen.current || model.instant.available || draft.mode !== 'now') return;
+    dispatch({ type: 'setMode', mode: 'later' });
+  }, [model.instant.available, draft.mode]);
+
   // Every mode can be chosen (the toggle never deactivates a tab); the content below decides
   // what each can do — Now without instant simply leaves the CTA off.
   const mode = draft.mode;
@@ -160,13 +176,13 @@ export function HomeRedesignView({
   useEffect(() => {
     if (!lostSelection) return;
     const lost = model.durations.find((d) => d.id === draft.selectedDurationId);
-    toast.current?.show(
-      `${lost?.label ?? 'That duration'} is no longer available. Pick another duration.`,
-    );
+    // The front tile (the nearest bookable one) is selected in its place just below.
+    toast.current?.show(`${lost?.label ?? 'That duration'} is no longer available.`);
     dispatch({ type: 'clearSelection' });
   }, [lostSelection, draft.selectedDurationId, model.durations]);
 
-  const selectDuration = (id: string, source: 'tile' | 'dial') => {
+  /** Selecting a duration brings it to the front: the front tile and the selection are one. */
+  const selectDuration = (id: string, source: 'tile' | 'dial' | 'focus') => {
     const option = model.durations.find((d) => d.id === id);
     if (option === undefined || !available(option)) return;
     if (id !== draft.selectedDurationId) {
@@ -176,8 +192,21 @@ export function HomeRedesignView({
         source,
       });
     }
+    if (id !== draft.focusedDurationId) dispatch({ type: 'focusDuration', id });
     dispatch({ type: 'selectDuration', id });
   };
+
+  // The tile at the front is always the selected one — on open, after a swipe settles, and when a
+  // refresh or a Now/Later switch moves the front to the nearest bookable tile — so the CTA is
+  // live without a tap. Recurring has no carousel and selects nothing.
+  const pricingReady = (model.pricingStatus ?? 'ready') === 'ready';
+  useEffect(() => {
+    if (cta === 'none' || !pricingReady || focusedId === selectedId) return;
+    if (!model.durations.some((d) => d.id === focusedId)) return;
+    selectDuration(focusedId, 'focus');
+    // `selectDuration` is rebuilt every render; the inputs that matter are listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cta, pricingReady, focusedId, selectedId, model.durations]);
 
   const inputs: DialInputs = {
     complexity: draft.complexity,
@@ -187,6 +216,7 @@ export function HomeRedesignView({
   const recommended = recommendDuration(inputs, model.durations);
 
   const changeMode = (next: BookingMode) => {
+    modeChosen.current = true;
     if (next === mode) return;
     // Recurring removes the strip and CTA; animate the content moving up (and back).
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -218,7 +248,6 @@ export function HomeRedesignView({
       model.durations.filter((d) => available(d)),
     );
     if (pick === null) return;
-    dispatch({ type: 'focusDuration', id: pick.id });
     selectDuration(pick.id, 'dial');
     scroll.current?.scrollTo({ y: bodyY.current + bookY.current - top, animated: true });
   };
