@@ -23,8 +23,8 @@ export interface PlanVisitBarProps {
   readonly activeVisitId: string;
   readonly onPlanChange?: (planId: string) => void;
   readonly onVisitChange?: (visitId: string) => void;
-  readonly onAddPlan?: () => void;
-  readonly onAddVisit?: () => void;
+  readonly onAddPlan?: (() => void) | undefined;
+  readonly onAddVisit?: (() => void) | undefined;
   readonly testID?: string;
 }
 
@@ -74,20 +74,22 @@ export function PlanVisitBar({
             </Pressable>
           );
         })}
-        <Pressable
-          onPress={onAddPlan}
-          accessibilityRole="button"
-          accessibilityLabel="Add plan"
-          style={styles.addTab}
-          testID={`${testID}-add-plan`}
-        >
-          {/* `754:3538` — dashed on the left, top and right only. RN can't dash individual
+        {onAddPlan === undefined ? null : (
+          <Pressable
+            onPress={onAddPlan}
+            accessibilityRole="button"
+            accessibilityLabel="Add plan"
+            style={styles.addTab}
+            testID={`${testID}-add-plan`}
+          >
+            {/* `754:3538` — dashed on the left, top and right only. RN can't dash individual
               sides, so a fully dashed box runs 2pt past the tab and the clip drops its base. */}
-          <View style={styles.addTabOutline} />
-          <View style={[styles.plusDisc, styles.plusDiscSm]}>
-            <Image source={SUMMARY_PLUS_GLYPH} style={styles.plusGlyph} />
-          </View>
-        </Pressable>
+            <View style={styles.addTabOutline} />
+            <View style={[styles.plusDisc, styles.plusDiscSm]}>
+              <Image source={SUMMARY_PLUS_GLYPH} style={styles.plusGlyph} />
+            </View>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.visitsPanel}>
@@ -113,15 +115,17 @@ export function PlanVisitBar({
               </Pressable>
             );
           })}
-          <Pressable
-            onPress={onAddVisit}
-            accessibilityRole="button"
-            accessibilityLabel="Add visit"
-            style={[styles.plusDisc, styles.plusDiscMd]}
-            testID={`${testID}-add-visit`}
-          >
-            <Image source={SUMMARY_PLUS_GLYPH} style={styles.plusGlyph} />
-          </Pressable>
+          {onAddVisit === undefined ? null : (
+            <Pressable
+              onPress={onAddVisit}
+              accessibilityRole="button"
+              accessibilityLabel="Add visit"
+              style={[styles.plusDisc, styles.plusDiscMd]}
+              testID={`${testID}-add-visit`}
+            >
+              <Image source={SUMMARY_PLUS_GLYPH} style={styles.plusGlyph} />
+            </Pressable>
+          )}
         </View>
       </View>
     </View>

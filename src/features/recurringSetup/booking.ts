@@ -85,29 +85,20 @@ export type BookRecurringOutcome =
   | { readonly kind: 'cancelled'; readonly booking: RecurringBookingDto };
 
 /**
- * Save, then approve UPI Autopay. A retry after a failure re-uses the same save (its scope names
- * the draft), so it can never hold Cooks twice; checkout can be reopened for the saved booking.
+ * Approve UPI Autopay for a booking that is already saved: the mandate's checkout order, Razorpay's
+ * recurring checkout, and the verify call. Used right after saving, and again from the live
+ * booking for one still waiting on approval, or whose mandate was paused, revoked or expired.
+ * Closing checkout is `cancelled`, never an error: the booking stays saved either way.
  */
-export function useBookRecurring(launcher: CheckoutLauncher = razorpayCheckoutLauncher) {
-  const create = useCreateRecurringBooking();
+export function useApproveRecurringMandate(launcher: CheckoutLauncher = razorpayCheckoutLauncher) {
   const startMandate = useStartRecurringMandate();
   const verify = useVerifyRecurringMandate();
   const [pending, setPending] = useState(false);
-  const saved = useRef<{ key: string; booking: RecurringBookingDto } | null>(null);
 
-  const book = useCallback(
-    async (draft: RecurringDraftInput): Promise<BookRecurringOutcome> => {
+  const approve = useCallback(
+    async (booking: RecurringBookingDto): Promise<BookRecurringOutcome> => {
       setPending(true);
       try {
-        const key = JSON.stringify(draft);
-        let booking = saved.current?.key === key ? saved.current.booking : null;
-        if (booking === null) {
-          booking = await create.mutateAsync({
-            input: draft,
-            scope: `recurring.booking.create:${key}`,
-          });
-          saved.current = { key, booking };
-        }
         const checkout = await startMandate.mutateAsync({
           id: booking.recurringBookingId,
           scope: `recurring.mandate:${booking.recurringBookingId}`,
@@ -142,8 +133,42 @@ export function useBookRecurring(launcher: CheckoutLauncher = razorpayCheckoutLa
         setPending(false);
       }
     },
-    [create, startMandate, verify, launcher],
+    [startMandate, verify, launcher],
   );
 
-  return { book, pending };
+  return { approve, pending };
+}
+
+/**
+ * Save, then approve UPI Autopay. A retry after a failure re-uses the same save (its scope names
+ * the draft), so it can never hold Cooks twice; checkout can be reopened for the saved booking.
+ */
+export function useBookRecurring(launcher: CheckoutLauncher = razorpayCheckoutLauncher) {
+  const create = useCreateRecurringBooking();
+  const mandate = useApproveRecurringMandate(launcher);
+  const [saving, setSaving] = useState(false);
+  const saved = useRef<{ key: string; booking: RecurringBookingDto } | null>(null);
+
+  const book = useCallback(
+    async (draft: RecurringDraftInput): Promise<BookRecurringOutcome> => {
+      setSaving(true);
+      try {
+        const key = JSON.stringify(draft);
+        let booking = saved.current?.key === key ? saved.current.booking : null;
+        if (booking === null) {
+          booking = await create.mutateAsync({
+            input: draft,
+            scope: `recurring.booking.create:${key}`,
+          });
+          saved.current = { key, booking };
+        }
+        return await mandate.approve(booking);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [create, mandate],
+  );
+
+  return { book, pending: saving || mandate.pending };
 }

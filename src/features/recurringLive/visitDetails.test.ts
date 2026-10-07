@@ -5,7 +5,13 @@ import type {
   VisitDetailDto,
 } from '@features/recurringSetup';
 
-import { dayLabel, visitDetailsFrom, visitWhatsAppLink } from './visitDetails';
+import {
+  dayLabel,
+  rateVisitInfo,
+  ratingRequestFor,
+  visitDetailsFrom,
+  visitWhatsAppLink,
+} from './visitDetails';
 import type { VisitDetailsSources } from './visitDetails';
 
 /**
@@ -371,5 +377,36 @@ describe('dayLabel', () => {
       'Mon, 28 Sept',
       'Thu, 1 Oct',
     ]);
+  });
+});
+
+describe('rating a visit', () => {
+  it('heads the card with the meal, the cook and the slot', () => {
+    expect(rateVisitInfo(visit({ cook: COOK, timeOfDay: 'afternoon' }))).toEqual({
+      title: 'Lunch with Cook Meera',
+      meta: 'Wed, 14 Oct · 9:00 AM · 1 hr',
+      cookName: 'Meera',
+      photoUri: 'https://img/meera.jpg',
+    });
+    expect(rateVisitInfo(visit())).toBeNull();
+  });
+
+  it('sends 5+ as five stars marked exceptional', () => {
+    expect(ratingRequestFor({ rating: '5+', chips: [] }, '')).toEqual({
+      stars: 5,
+      exceptional: true,
+    });
+    expect(ratingRequestFor({ rating: 4.5, chips: [] }, '')).toEqual({ stars: 4.5 });
+  });
+
+  it('carries the note, then the picked chips under the card’s own question', () => {
+    expect(ratingRequestFor({ rating: 4.5, chips: ['taste', 'onTime'] }, '  Lovely dal ')).toEqual({
+      stars: 4.5,
+      feedback: 'Lovely dal\n\nWhat stood out? Taste, On time',
+    });
+    expect(ratingRequestFor({ rating: 2, chips: ['slow', 'oil'] }, '')).toEqual({
+      stars: 2,
+      feedback: 'What went wrong? Slow, Too much oil',
+    });
   });
 });

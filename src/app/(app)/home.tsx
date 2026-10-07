@@ -95,9 +95,13 @@ export default function HomeRoute() {
       router.push('/recurring');
       return true;
     }
-    // "Recurring · Live" without a booking to open (eligibility and the pool disagreeing for a
-    // moment) falls back to the screen's "coming soon" rather than a blank page.
-    if (liveBookingId === null) return false;
+    // "Recurring · Live" comes from the same eligibility answer as its booking, so this has a
+    // booking to open. Should it ever not (a refresh caught between the two), the Recurring
+    // explainer is a real page to land on rather than a dead tap.
+    if (liveBookingId === null) {
+      router.push('/recurring');
+      return true;
+    }
     router.push({ pathname: '/recurring/[bookingId]', params: { bookingId: liveBookingId } });
     return true;
   };

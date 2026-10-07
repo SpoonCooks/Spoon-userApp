@@ -101,6 +101,11 @@ function RecurringLivePreview({ params }: { readonly params: PreviewParams }) {
           onTabChange={onTabChange}
           initialVisit={params.visit === '2' ? 2 : 1}
           edited={params.edited === '1'}
+          // The frames draw every editing control; nothing behind them in the preview.
+          onDelete={() => undefined}
+          onEditDates={() => undefined}
+          onAddPlan={() => undefined}
+          onAddVisit={() => undefined}
         />
       );
     case 'visit': {

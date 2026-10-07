@@ -3,6 +3,7 @@ import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-nati
 import type { ImageSourcePropType } from 'react-native';
 
 import { Text } from '@ui';
+import { lightTick } from '@ui/motion/haptics';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { ColorToken } from '@ui/tokens/semantic';
 
@@ -39,8 +40,8 @@ import {
  * Motion, per `1441:1981` "Note · Prep check motion" (all under 0.5s): a tapped tile squishes to
  * 96 % and springs back; the tick pops 0 → 120 % → 100 %; the matching segment fills left to
  * right; the tick's well washes to lime; the counter rolls up; at 3/3 six yellow/lime dots burst from the pill (once per mount)
- * and the banner slides in; un-ticking is a gentle 300ms. The note's haptic tick is left out —
- * the app has no haptics module. Tick state is local UI state; nothing persists it.
+ * and the banner slides in; un-ticking is a gentle 300ms. Each tap gives the note's light haptic
+ * tick. Tick state is local UI state; nothing persists it.
  */
 export interface BeforeArrivalCardProps {
   readonly prep?: VisitPrepData;
@@ -308,6 +309,9 @@ function PrepTile({
   }, [checked, tick, wash]);
 
   const press = () => {
+    // `1441:1983` — a light haptic tick. Best effort: a device without a taptic engine, or a
+    // simulator, simply has nothing to play.
+    lightTick();
     // `1441:1983` — squish to 96 % and spring back (bouncy, ~400ms).
     squish.setValue(0.96);
     Animated.spring(squish, {

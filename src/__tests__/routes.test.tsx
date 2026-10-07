@@ -391,9 +391,12 @@ describe('routes render', () => {
     // The fixture's Cook Sanchita / "3 done · 1 cancelled" never appear.
     expect(screen.queryByText(/Sanchita/)).toBeNull();
 
+    // Manage plans opens on the same booking — no "Coming soon", no fixture plans.
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     fireEvent.press(screen.getByTestId('recurring-live-screen-header-plans'));
-    expect(alert).toHaveBeenCalledWith('Coming soon', expect.any(String));
+    expect(await screen.findByTestId('recurring-plans-screen')).toBeTruthy();
+    expect(alert).not.toHaveBeenCalledWith('Coming soon', expect.any(String));
+    expect(screen.queryByText(/Sanchita/)).toBeNull();
     alert.mockRestore();
   });
 

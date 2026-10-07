@@ -19,7 +19,7 @@ import { SUMMARY_EDIT_GLYPH } from './assets';
  */
 export interface SummaryCalendarProps {
   readonly calendar: SummaryCalendarData;
-  readonly onEdit?: () => void;
+  readonly onEdit?: (() => void) | undefined;
   readonly testID?: string;
 }
 
@@ -39,17 +39,19 @@ export function SummaryCalendar({
       <Text variant="spoonHeading" color="textPrimary">
         {calendar.title}
       </Text>
-      <Pressable
-        onPress={onEdit}
-        accessibilityRole="button"
-        accessibilityLabel="Edit selected dates"
-        style={styles.editHitArea}
-        testID={`${testID}-edit`}
-      >
-        <View style={styles.editClip}>
-          <Image source={SUMMARY_EDIT_GLYPH} style={styles.editGlyph} />
-        </View>
-      </Pressable>
+      {onEdit === undefined ? null : (
+        <Pressable
+          onPress={onEdit}
+          accessibilityRole="button"
+          accessibilityLabel="Edit selected dates"
+          style={styles.editHitArea}
+          testID={`${testID}-edit`}
+        >
+          <View style={styles.editClip}>
+            <Image source={SUMMARY_EDIT_GLYPH} style={styles.editGlyph} />
+          </View>
+        </Pressable>
+      )}
 
       <View style={styles.calendar}>
         <View style={styles.grid}>

@@ -12,12 +12,14 @@ import {
   RATING_CHIPS_NEGATIVE_PICKED,
   RATING_CHIPS_POSITIVE,
   RATING_CHIPS_POSITIVE_PICKED,
+  RATING_SAY_MORE_WRITTEN,
   RATING_SUBMIT_CALL_BACK,
-  RATING_TIER_COPY,
   RATING_VISIT_FIXTURE,
   ratingTier,
+  ratingTierCopy,
 } from '../../data/rating';
 import type { RatingSupportKind, RatingTier, VisitRatingValue } from '../../data/rating';
+import { VISIT_EDIT } from '../visit/assets';
 import { CONFETTI_ART, RATING_ART } from './assets';
 import {
   CONFETTI,
@@ -67,8 +69,11 @@ import { IdleSticker, ScoreSticker } from './ScoreSticker';
  * Motion follows Figma's 2 s timelines (`ratingMotion.ts`): the first look loops; a picked score
  * plays its entrance once, again on every new pick. Reduce Motion rests each on its final frame.
  *
- * STATIC: no submission or recording. Chips and toggles flip locally; `onSubmit` hands the
- * current picks up, `onTellUsMore` opens the "Tell us more" sheet.
+ * The preview draws the frames as drawn. On a real visit (`live`) the card draws the visit's own
+ * cook and slot, starts with no chips ticked, and offers only what the rating endpoint takes —
+ * stars, the 5+ appreciation and words: the say-more row becomes "Add a note" (the written half of
+ * "Tell us more"), and the call-back / different-cook toggles are left out until something acts
+ * on them. `onSubmit` hands the picks up; the caller sends them.
  */
 
 export interface RateVisitSubmission {
@@ -77,8 +82,25 @@ export interface RateVisitSubmission {
   readonly support?: { readonly kind: RatingSupportKind; readonly on: boolean };
 }
 
+/** The visit being rated: the header row and the cook named in the copy. */
+export interface RateVisitInfo {
+  readonly title: string;
+  readonly meta: string;
+  /** First name, as the copy uses it ("Meera will be thrilled"). */
+  readonly cookName: string;
+  readonly photoUri?: string | null;
+}
+
 export interface RateVisitCardProps {
   readonly initialRating?: VisitRatingValue | null;
+  /** Defaults to the frames' sample visit. */
+  readonly visit?: RateVisitInfo;
+  /** A real visit — see above. */
+  readonly live?: boolean;
+  /** Whether the submit is on its way: the CTA reads "Sending…" and takes no taps. */
+  readonly submitting?: boolean;
+  /** A real visit's note has been written; the note row says so. */
+  readonly noteAdded?: boolean;
   readonly onSubmit?: (submission: RateVisitSubmission) => void;
   /** The say-more row — mic, camera or video — opens "Tell us more". */
   readonly onTellUsMore?: () => void;
@@ -91,6 +113,10 @@ const LOW_TIERS: readonly RatingTier[] = ['belowPar', 'disappointing', 'veryPoor
 
 export function RateVisitCard({
   initialRating = null,
+  visit = RATING_VISIT_FIXTURE,
+  live = false,
+  submitting = false,
+  noteAdded = false,
   onSubmit,
   onTellUsMore,
   onLater,
@@ -98,10 +124,10 @@ export function RateVisitCard({
 }: RateVisitCardProps) {
   const [rating, setRating] = useState<VisitRatingValue | null>(initialRating);
   const [positivePicked, setPositivePicked] = useState<readonly string[]>(
-    RATING_CHIPS_POSITIVE_PICKED,
+    live ? [] : RATING_CHIPS_POSITIVE_PICKED,
   );
   const [negativePicked, setNegativePicked] = useState<readonly string[]>(
-    RATING_CHIPS_NEGATIVE_PICKED,
+    live ? [] : RATING_CHIPS_NEGATIVE_PICKED,
   );
   const [supportOn, setSupportOn] = useState<Partial<Record<RatingSupportKind, boolean>>>({});
 
@@ -165,13 +191,21 @@ export function RateVisitCard({
 
         {/* `1501:6631` — cook row. */}
         <View style={styles.cook}>
-          <Image source={RATING_ART.cookPhoto} style={styles.cookPhoto} />
+          {live ? (
+            visit.photoUri ? (
+              <Image source={{ uri: visit.photoUri }} style={styles.cookPhotoLive} />
+            ) : (
+              <View style={styles.cookPhotoLive} />
+            )
+          ) : (
+            <Image source={RATING_ART.cookPhoto} style={styles.cookPhoto} />
+          )}
           <View style={styles.cookText}>
             <Text variant="spoonBodyStrong" numberOfLines={1}>
-              {RATING_VISIT_FIXTURE.title}
+              {visit.title}
             </Text>
             <Text variant="spoonCaption" color="textRatingSubtle" numberOfLines={1}>
-              {RATING_VISIT_FIXTURE.meta}
+              {visit.meta}
             </Text>
           </View>
           {tier === 'idle' ? (
@@ -189,7 +223,14 @@ export function RateVisitCard({
         </View>
 
         {rating === null || tier === 'idle' ? (
-          <FirstLook rating={rating} onRate={setRating} tapRef={tapRef} testID={testID} />
+          <FirstLook
+            rating={rating}
+            onRate={setRating}
+            tapRef={tapRef}
+            cookName={visit.cookName}
+            live={live}
+            testID={testID}
+          />
         ) : (
           <RatedBody
             tier={tier}
@@ -210,6 +251,10 @@ export function RateVisitCard({
             onTellUsMore={onTellUsMore}
             onSubmit={onSubmit}
             clock={entrance}
+            cookName={visit.cookName}
+            live={live}
+            submitting={submitting}
+            noteAdded={noteAdded}
             testID={testID}
           />
         )}
@@ -226,11 +271,15 @@ function FirstLook({
   rating,
   onRate,
   tapRef,
+  cookName,
+  live,
   testID,
 }: {
   readonly rating: VisitRatingValue | null;
   readonly onRate: (value: VisitRatingValue) => void;
   readonly tapRef: MutableRefObject<StarTap | null>;
+  readonly cookName: string;
+  readonly live: boolean;
   readonly testID: string;
 }) {
   const loop = useTimeline({ durationMs: RATING_TIMELINE_MS, loop: true, restAt: 0 });
@@ -281,7 +330,9 @@ function FirstLook({
         <Text variant="spoonCaption" style={styles.flex}>
           {'Blown away? Give a '}
           <Text variant="ratingCaptionBold">5+</Text>
-          {`, it tells ${RATING_VISIT_FIXTURE.cookName} she went above & beyond to deliver that extra delight!`}
+          {live
+            ? `, it tells ${cookName} the visit went above & beyond and delivered that extra delight!`
+            : `, it tells ${cookName} she went above & beyond to deliver that extra delight!`}
         </Text>
       </View>
     </>
@@ -301,6 +352,10 @@ interface RatedBodyProps {
   readonly onSubmit?: ((submission: RateVisitSubmission) => void) | undefined;
   /** The entrance, played on each new score. */
   readonly clock: Animated.Value;
+  readonly cookName: string;
+  readonly live: boolean;
+  readonly submitting: boolean;
+  readonly noteAdded: boolean;
   readonly testID: string;
 }
 
@@ -316,13 +371,24 @@ function RatedBody({
   onTellUsMore,
   onSubmit,
   clock,
+  cookName,
+  live,
+  submitting,
+  noteAdded,
   testID,
 }: RatedBodyProps) {
   const motion = STICKER_MOTION[tier];
-  const copy = RATING_TIER_COPY[tier];
+  const tierCopy = ratingTierCopy(cookName)[tier];
+  const copy = live
+    ? {
+        ...tierCopy,
+        ...RATING_SAY_MORE_WRITTEN,
+        ...(noteAdded ? { sayMoreBody: 'Note added · tap to edit' } : {}),
+      }
+    : tierCopy;
   const low = LOW_TIERS.includes(tier);
   const chips = low ? RATING_CHIPS_NEGATIVE : RATING_CHIPS_POSITIVE;
-  const support = copy.support;
+  const support = live ? undefined : copy.support;
   const supportActive = support ? (supportOn[support.kind] ?? support.initiallyOn) : false;
   const submitLabel =
     support?.kind === 'callBack' && supportActive ? RATING_SUBMIT_CALL_BACK : copy.submit;
@@ -397,7 +463,7 @@ function RatedBody({
         <Animated.View
           style={[styles.micDisc, low ? keyframedStyle(clock, { scale: MIC_PULSE }) : null]}
         >
-          <Image source={RATING_ART.mic} style={styles.icon} />
+          <Image source={live ? VISIT_EDIT : RATING_ART.mic} style={styles.icon} />
         </Animated.View>
         <View style={styles.sayMoreText}>
           <Text variant="spoonBodyStrong" numberOfLines={1}>
@@ -407,12 +473,16 @@ function RatedBody({
             {copy.sayMoreBody}
           </Text>
         </View>
-        <View style={styles.mediaDisc}>
-          <Image source={RATING_ART.camera} style={styles.icon} />
-        </View>
-        <View style={styles.mediaDisc}>
-          <Image source={RATING_ART.video} style={styles.icon} />
-        </View>
+        {live ? null : (
+          <>
+            <View style={styles.mediaDisc}>
+              <Image source={RATING_ART.camera} style={styles.icon} />
+            </View>
+            <View style={styles.mediaDisc}>
+              <Image source={RATING_ART.video} style={styles.icon} />
+            </View>
+          </>
+        )}
       </Pressable>
 
       {/* `1501:7471` / `1501:7619` — low-score support toggle. */}
@@ -454,11 +524,17 @@ function RatedBody({
               : { rating, chips: picked },
           )
         }
+        disabled={submitting}
         accessibilityRole="button"
-        style={[styles.submit, tier === 'magic' ? styles.submitLime : null]}
+        accessibilityState={{ busy: submitting, disabled: submitting }}
+        style={[
+          styles.submit,
+          tier === 'magic' ? styles.submitLime : null,
+          submitting ? styles.submitBusy : null,
+        ]}
         testID={`${testID}-submit`}
       >
-        <Text variant="spoonButton">{submitLabel}</Text>
+        <Text variant="spoonButton">{submitting ? 'Sending…' : submitLabel}</Text>
       </Pressable>
     </>
   );
@@ -502,6 +578,15 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.md,
   },
   cookPhoto: { width: 44, height: 44 },
+  /** A real cook's photo in the frame's 44pt ring (`1501:6632`). */
+  cookPhotoLive: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: lightTheme.colors.borderNotice,
+    backgroundColor: lightTheme.colors.surfaceAccent,
+  },
   cookText: { flex: 1, gap: lightTheme.space.xxs },
   idleHero: { alignSelf: 'stretch', alignItems: 'center', gap: lightTheme.space.md },
   idleInput: { alignSelf: 'stretch', alignItems: 'center', gap: lightTheme.space.s10 },
@@ -629,4 +714,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   submitLime: { backgroundColor: lightTheme.colors.surfaceRatingLime },
+  submitBusy: { opacity: 0.6 },
 });

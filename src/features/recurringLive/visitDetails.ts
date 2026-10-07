@@ -9,6 +9,14 @@ import type {
 } from '@features/recurringSetup';
 
 import { clockText, durationText } from './adapters';
+import type { RateVisitInfo, RateVisitSubmission } from './components/rating/RateVisitCard';
+import {
+  RATING_CHIPS_NEGATIVE,
+  RATING_CHIPS_POSITIVE,
+  VISIT_RATING_PLUS,
+  ratingTier,
+  ratingTierCopy,
+} from './data/rating';
 import { REFUND_CREDIT_NOTE, VISIT_FIXTURE } from './data/visit';
 import type {
   VisitDetailsModel,
@@ -390,4 +398,52 @@ export function visitWhatsAppLink(
   const parts = [opening, `${dayLabel(visit.date)}, ${clockText(visit.startTime)}`];
   if (visit.cook !== null) parts.push(visit.cook.displayName);
   return `${url.split('?')[0] ?? url}?text=${encodeURIComponent(`${parts.join(' · ')}.`)}`;
+}
+
+const MEALS = { morning: 'Breakfast', afternoon: 'Lunch', evening: 'Dinner' } as const;
+
+/**
+ * The rate card's header for a real visit (`1501:6631`: "Lunch with Cook Rekha" over
+ * "Sun, 12 Apr · 1:15 PM · 1 hr"). Null with no cook — there is no one to rate.
+ */
+export function rateVisitInfo(visit: VisitDetailDto): RateVisitInfo | null {
+  if (visit.cook === null) return null;
+  return {
+    title: `${MEALS[visit.timeOfDay]} with ${visit.cook.displayName}`,
+    meta: `${dayLabel(visit.date)} · ${clockText(visit.startTime)} · ${durationText(visit.durationMinutes)}`,
+    cookName: visit.cook.displayName.replace(/^Cook\s+/, ''),
+    photoUri: visit.cook.profileImageUrl,
+  };
+}
+
+const FEEDBACK_MAX = 2000;
+
+/**
+ * What `PUT /v1/bookings/:id/rating` is sent for a rate-card submission. The endpoint takes stars
+ * (1–5 in halves), `exceptional` for 5+ — which is 5 stars, never a sixth — and free text. The
+ * card's chips have no field of their own yet, so they ride in the text after the customer's
+ * note, under the card's own question: "What stood out? Taste, On time".
+ */
+export function ratingRequestFor(
+  submission: RateVisitSubmission,
+  note: string,
+): { readonly stars: number; readonly exceptional?: true; readonly feedback?: string } {
+  const plus = submission.rating === VISIT_RATING_PLUS;
+  const stars = plus ? 5 : (submission.rating as number);
+  const tier = ratingTier(submission.rating);
+  const low = tier === 'belowPar' || tier === 'disappointing' || tier === 'veryPoor';
+  const chips = (low ? RATING_CHIPS_NEGATIVE : RATING_CHIPS_POSITIVE)
+    .filter((chip) => submission.chips.includes(chip.key))
+    .map((chip) => chip.label);
+  const question = tier === 'idle' ? '' : ratingTierCopy('')[tier].chipsLabel;
+  const parts = [
+    note.trim(),
+    chips.length === 0 ? '' : `${question} ${chips.join(', ')}`.trim(),
+  ].filter((part) => part !== '');
+  const feedback = parts.join('\n\n').slice(0, FEEDBACK_MAX);
+  return {
+    stars,
+    ...(plus ? { exceptional: true as const } : {}),
+    ...(feedback === '' ? {} : { feedback }),
+  };
 }

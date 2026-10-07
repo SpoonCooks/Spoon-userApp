@@ -165,9 +165,10 @@ export function DurationDial({
 }
 
 /**
- * `1290:1222` "Toggle/ dish" — 370 × 44, 1pt `#FFD600` border. The 175 × 36 fill sits at y 3,
- * x 190 under "Complex" (mirrored to x 4 under "Simple"); the labels are a 346pt
- * space-between row at x 11, y 11 — SemiBold black when active, Regular secondary when not.
+ * `1290:1222` "Toggle/ dish" — 44 tall, 1pt `#FFD600` border, the active half filled `#FFD600`.
+ * The frame places a fixed 175 × 36 fill at y 3 (5pt under it) and its labels on a space-between
+ * row; here the two halves are equal, each fill inset an even 3pt inside the border, and each
+ * label centred in its half — SemiBold black when active, Regular secondary when not.
  */
 function DishToggle({
   value,
@@ -178,26 +179,23 @@ function DishToggle({
 }) {
   return (
     <View style={styles.dishType}>
-      <View style={[styles.dishPill, { left: (value === 'simple' ? 4 : 190) - 1 }]} />
-      <View style={styles.dishLabels} pointerEvents="none">
-        {DISH_TYPES.map((type) => (
-          <Text key={type.id} style={value === type.id ? styles.dishLabelActive : styles.dishLabel}>
-            {type.label}
-          </Text>
-        ))}
-      </View>
-      <View style={styles.dishHits}>
-        {DISH_TYPES.map((type) => (
+      {DISH_TYPES.map((type) => {
+        const active = value === type.id;
+        return (
           <Pressable
             key={type.id}
             accessibilityRole="button"
             accessibilityLabel={type.label}
-            accessibilityState={{ selected: value === type.id }}
+            accessibilityState={{ selected: active }}
             onPress={() => onChange(type.id)}
-            style={styles.dishHit}
-          />
-        ))}
-      </View>
+            style={[styles.dishHalf, active ? styles.dishHalfActive : null]}
+          >
+            <Text style={active ? styles.dishLabelActive : styles.dishLabel} numberOfLines={1}>
+              {type.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -305,34 +303,26 @@ const styles = StyleSheet.create({
     backgroundColor: C.tint,
   },
   selectLabel: { fontFamily: F.bold, fontSize: 16, lineHeight: 24, color: C.text },
+  /** The 44pt track: 1pt border, its halves inset 3pt on every side. */
   dishType: {
     width: '100%',
     height: 44,
+    flexDirection: 'row',
+    padding: 3,
     borderRadius: 9999,
     borderWidth: 1,
     borderColor: C.brand,
-    overflow: 'hidden',
   },
-  dishPill: {
-    position: 'absolute',
-    top: 2,
-    width: 175,
-    height: 36,
+  dishHalf: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
     borderRadius: 9999,
-    backgroundColor: C.brand,
   },
-  dishLabels: {
-    position: 'absolute',
-    left: 10,
-    right: 10,
-    top: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
+  dishHalfActive: { backgroundColor: C.brand },
   dishLabel: { fontFamily: F.regular, fontSize: 14, lineHeight: 20, color: C.textSecondary },
   dishLabelActive: { fontFamily: F.semibold, fontSize: 14, lineHeight: 20, color: C.text },
-  dishHits: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, flexDirection: 'row' },
-  dishHit: { flex: 1 },
   stepperRow: {
     width: '100%',
     height: 44,

@@ -47,35 +47,38 @@ export function VisitHistory({
         </Text>
       </View>
 
-      <View style={styles.list}>
-        {rows.map((row, index) => {
-          const disc = STATUS_DISC[row.status];
-          return (
-            <Fragment key={row.id}>
-              {index === 0 ? null : <View style={styles.divider} />}
-              <Pressable
-                onPress={() => onRowPress?.(row.id)}
-                accessibilityRole="button"
-                style={styles.row}
-                testID={`${testID}-row-${row.id}`}
-              >
-                <View style={[styles.disc, { backgroundColor: disc.fill }]}>
-                  <Image source={disc.glyph} style={{ width: disc.size, height: disc.size }} />
-                </View>
-                <View style={styles.lines}>
-                  <Text variant="summaryRowTitle" color="textPrimary" numberOfLines={1}>
-                    {row.title}
-                  </Text>
-                  <Text variant="recurringMeta" color="textRecurringMeta" numberOfLines={1}>
-                    {row.meta}
-                  </Text>
-                </View>
-                <Image source={SUMMARY_CHEVRON_GLYPH} style={styles.chevron} />
-              </Pressable>
-            </Fragment>
-          );
-        })}
-      </View>
+      {/* No past visits yet: the count says so, and no empty card is drawn under it. */}
+      {rows.length === 0 ? null : (
+        <View style={styles.list}>
+          {rows.map((row, index) => {
+            const disc = STATUS_DISC[row.status];
+            return (
+              <Fragment key={row.id}>
+                {index === 0 ? null : <View style={styles.divider} />}
+                <Pressable
+                  onPress={() => onRowPress?.(row.id)}
+                  accessibilityRole="button"
+                  style={styles.row}
+                  testID={`${testID}-row-${row.id}`}
+                >
+                  <View style={[styles.disc, { backgroundColor: disc.fill }]}>
+                    <Image source={disc.glyph} style={{ width: disc.size, height: disc.size }} />
+                  </View>
+                  <View style={styles.lines}>
+                    <Text variant="summaryRowTitle" color="textPrimary" numberOfLines={1}>
+                      {row.title}
+                    </Text>
+                    <Text variant="recurringMeta" color="textRecurringMeta" numberOfLines={1}>
+                      {row.meta}
+                    </Text>
+                  </View>
+                  <Image source={SUMMARY_CHEVRON_GLYPH} style={styles.chevron} />
+                </Pressable>
+              </Fragment>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
