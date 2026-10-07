@@ -1,29 +1,40 @@
-import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import { useMemo } from 'react';
+import { Animated, Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+
+import { keyframedStyle, useTimeline } from '@ui/motion/keyframes';
 
 import { ART } from '../assets';
 import { COOKS, TRUST_POINTS } from '../content';
 import { C, F, SHADOW_CARD } from '../theme';
+import { COOKS_LOOP_MS, COOKS_REST_PROGRESS, cookCardTracks } from './cooksTimeline';
 
 /** `1170:609` — 368 × 305 inside a 368 × 335 stack that leaves 30pt of air above it. */
 const CARD = { width: 368, height: 305 };
+const STACK_AIR = 30;
 /** `inset-[calc(42.62%-0.15px)_-1px_-1px_-1px]` — the band's top, measured inside the border. */
 const BAND_TOP = 0.4262 * CARD.height - 0.15 - 1;
 
+type Cook = (typeof COOKS)[number];
+
 /**
- * `1134:604` "Cooks · Meet your cook". Figma stacks the cards on one spot, so exactly one card
- * shows; here each card is a full-width page, so at rest the screen matches the frame and a swipe
- * brings the next cook in.
+ * `1134:604` "Cooks · Meet your cook", animated as `1290:1280`: the four cards rise into one
+ * spot in turn, each new cook landing in front and pushing the earlier ones up and back into the
+ * 30pt of air above the stack, then the stack fades and the loop starts again (`cooksTimeline`).
+ * With Reduce Motion on, it holds all four stacked, Sucharita in front.
  */
 export function CooksTrust() {
   const { width } = useWindowDimensions();
   const cardWidth = Math.min(CARD.width, width - 32);
-  const [page, setPage] = useState(0);
-
-  const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
-    setPage(Math.round(e.nativeEvent.contentOffset.x / width));
+  const progress = useTimeline({
+    durationMs: COOKS_LOOP_MS,
+    loop: true,
+    restAt: COOKS_REST_PROGRESS,
+  });
+  const motion = useMemo(
+    () => COOKS.map((_, index) => keyframedStyle(progress, cookCardTracks(index))),
+    [progress],
+  );
 
   return (
     <View style={styles.section}>
@@ -35,55 +46,63 @@ export function CooksTrust() {
         </Text>
       </View>
 
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onEnd}
+      {/* The cards come and go on a loop, so a screen reader hears the cooks once, here. */}
+      <View
         style={styles.stack}
-        accessibilityLabel={`Cook ${page + 1} of ${COOKS.length}`}
+        accessible
+        accessibilityLabel={`Spoon cooks: ${COOKS.map((c) => `${c.name}, ${c.region}, rated ${c.rating}`).join('; ')}. ${TRUST_POINTS.map((p) => p.title).join(', ')}.`}
       >
-        {COOKS.map((cook) => (
-          <View key={cook.name} style={[styles.page, { width }]}>
-            <View style={[styles.card, { width: cardWidth }, SHADOW_CARD]}>
-              <View style={styles.cardHeader}>
-                <View style={styles.description}>
-                  <View style={styles.nameBlock}>
-                    <Text style={styles.name}>{cook.name}</Text>
-                    <Text style={styles.region}>{`Region: ${cook.region}`}</Text>
-                  </View>
-                  <View style={styles.rating}>
-                    <Text style={styles.ratingText}>{`Rating: ${cook.rating}`}</Text>
-                    <Image source={ART.star} style={styles.star} />
-                  </View>
-                </View>
-                <View style={styles.photoFrame}>
-                  <Image
-                    source={ART.cooks[cook.photo] ?? ART.cooks[0]!}
-                    style={styles.photo}
-                    resizeMode="contain"
-                  />
-                </View>
-              </View>
+        {COOKS.map((cook, index) => (
+          <Animated.View
+            key={cook.name}
+            style={[styles.slot, { width: cardWidth }, motion[index]]}
+            importantForAccessibility="no-hide-descendants"
+          >
+            <CookCard cook={cook} />
+          </Animated.View>
+        ))}
+      </View>
+    </View>
+  );
+}
 
-              <View style={styles.band}>
-                <Image source={ART.bandCurve} style={styles.curve} resizeMode="stretch" />
-                <LinearGradient colors={[C.softer, C.tint]} style={styles.bandBody}>
-                  {TRUST_POINTS.map((point) => (
-                    <View key={point.title} style={styles.point}>
-                      <Image source={ART.check} style={styles.check} />
-                      <View>
-                        <Text style={styles.pointTitle}>{point.title}</Text>
-                        <Text style={styles.pointBody}>{point.body}</Text>
-                      </View>
-                    </View>
-                  ))}
-                </LinearGradient>
+function CookCard({ cook }: { cook: Cook }) {
+  return (
+    <View style={[styles.card, SHADOW_CARD]}>
+      <View style={styles.cardHeader}>
+        <View style={styles.description}>
+          <View style={styles.nameBlock}>
+            <Text style={styles.name}>{cook.name}</Text>
+            <Text style={styles.region}>{`Region: ${cook.region}`}</Text>
+          </View>
+          <View style={styles.rating}>
+            <Text style={styles.ratingText}>{`Rating: ${cook.rating}`}</Text>
+            <Image source={ART.star} style={styles.star} />
+          </View>
+        </View>
+        <View style={styles.photoFrame}>
+          <Image
+            source={ART.cooks[cook.photo] ?? ART.cooks[0]!}
+            style={styles.photo}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
+
+      <View style={styles.band}>
+        <Image source={ART.bandCurve} style={styles.curve} resizeMode="stretch" />
+        <LinearGradient colors={[C.softer, C.tint]} style={styles.bandBody}>
+          {TRUST_POINTS.map((point) => (
+            <View key={point.title} style={styles.point}>
+              <Image source={ART.check} style={styles.check} />
+              <View>
+                <Text style={styles.pointTitle}>{point.title}</Text>
+                <Text style={styles.pointBody}>{point.body}</Text>
               </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -100,12 +119,12 @@ const styles = StyleSheet.create({
   },
   title: { fontFamily: F.bold, fontSize: 20, lineHeight: 28, color: C.text },
   sub: { fontFamily: F.regular, fontSize: 14, lineHeight: 20, color: C.textSecondary },
-  stack: { flexGrow: 0 },
-  /** 30pt of stack above the card, and the section's 8pt bottom padding inside the scroll view
-   *  so the card's 6pt shadow is not clipped. */
-  page: { paddingTop: 30, paddingBottom: 8, paddingLeft: 16 },
+  /** The 335pt stack; the cards share one spot, 30pt down, the air the earlier cooks rise into. */
+  /** 8pt below for the card's shadow, as the old pager left. */
+  stack: { height: STACK_AIR + CARD.height, marginHorizontal: 16, marginBottom: 8 },
+  slot: { position: 'absolute', top: STACK_AIR, left: 0, height: CARD.height },
   card: {
-    height: CARD.height,
+    flex: 1,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.brand,

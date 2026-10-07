@@ -69,13 +69,13 @@ export interface HomeRedesignActions {
    */
   readonly onJoinWaitlist: (pincode: string) => Promise<void>;
   /**
-   * Analytics `duration_selected`, raised on every new selection. `focus`: the tile came to the
-   * front (on open, after a swipe, or after a refresh / Now–Later switch) and was selected with it.
+   * Analytics `duration_selected`, raised on every new selection: `tile` a tap, `dial` a Help me
+   * pick suggestion. Taking a selection back (a second tap) raises nothing.
    */
   readonly onDurationSelected?: (event: {
     durationMin: number;
     pricePaise: number;
-    source: 'tile' | 'dial' | 'focus';
+    source: 'tile' | 'dial';
   }) => void;
   /** Re-read availability (Home focus is handled by the screen; this is the Now/Later switch). */
   readonly onRefreshAvailability?: () => void;
@@ -176,13 +176,13 @@ export function HomeRedesignView({
   useEffect(() => {
     if (!lostSelection) return;
     const lost = model.durations.find((d) => d.id === draft.selectedDurationId);
-    // The front tile (the nearest bookable one) is selected in its place just below.
+    // Nothing takes its place: the customer picks again.
     toast.current?.show(`${lost?.label ?? 'That duration'} is no longer available.`);
     dispatch({ type: 'clearSelection' });
   }, [lostSelection, draft.selectedDurationId, model.durations]);
 
-  /** Selecting a duration brings it to the front: the front tile and the selection are one. */
-  const selectDuration = (id: string, source: 'tile' | 'dial' | 'focus') => {
+  /** Selecting a duration (a tap, or Help me pick) also brings it to the front. */
+  const selectDuration = (id: string, source: 'tile' | 'dial') => {
     const option = model.durations.find((d) => d.id === id);
     if (option === undefined || !available(option)) return;
     if (id !== draft.selectedDurationId) {
@@ -196,17 +196,10 @@ export function HomeRedesignView({
     dispatch({ type: 'selectDuration', id });
   };
 
-  // The tile at the front is always the selected one — on open, after a swipe settles, and when a
-  // refresh or a Now/Later switch moves the front to the nearest bookable tile — so the CTA is
-  // live without a tap. Recurring has no carousel and selects nothing.
-  const pricingReady = (model.pricingStatus ?? 'ready') === 'ready';
-  useEffect(() => {
-    if (cta === 'none' || !pricingReady || focusedId === selectedId) return;
-    if (!model.durations.some((d) => d.id === focusedId)) return;
-    selectDuration(focusedId, 'focus');
-    // `selectDuration` is rebuilt every render; the inputs that matter are listed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cta, pricingReady, focusedId, selectedId, model.durations]);
+  /*
+   * Nothing is selected until the customer taps a tile (or takes a Help me pick suggestion). The
+   * tile at the front is only where the strip rests; on open that is 45 mins.
+   */
 
   const inputs: DialInputs = {
     complexity: draft.complexity,
@@ -332,7 +325,11 @@ export function HomeRedesignView({
                 focusedDurationId={focusedId}
                 selectedDurationId={selectedId}
                 onFocusDuration={(id) => dispatch({ type: 'focusDuration', id })}
-                onSelectDuration={(id) => selectDuration(id, 'tile')}
+                onSelectDuration={(id) => {
+                  // A second tap on the selected tile takes the selection back.
+                  if (id === selectedId) dispatch({ type: 'clearSelection' });
+                  else selectDuration(id, 'tile');
+                }}
                 isAvailable={available}
                 pricingStatus={model.pricingStatus ?? 'ready'}
                 onPressUnavailable={(d) =>

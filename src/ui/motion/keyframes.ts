@@ -22,6 +22,8 @@ export type Ease =
   | 'snap'
   /** `cubic-bezier(0.45, 1.45, 0.8, 1)` — an overshooting grow. */
   | 'overshoot'
+  /** `cubic-bezier(0.22, 1.2, 0.36, 1)` — a quick rise that overshoots a touch and lands. */
+  | 'land'
   /** Figma's springs, exported as CSS `linear()` stops (see `SPRINGS`). */
   | 'spring'
   | 'bouncy'
@@ -29,12 +31,16 @@ export type Ease =
 export type Keyframe = readonly [percent: number, value: number, ease?: Ease];
 export type Track = readonly Keyframe[];
 
-const BEZIERS: Record<'in' | 'out' | 'inOut' | 'snap' | 'overshoot', (t: number) => number> = {
+const BEZIERS: Record<
+  'in' | 'out' | 'inOut' | 'snap' | 'overshoot' | 'land',
+  (t: number) => number
+> = {
   in: Easing.bezier(0.42, 0, 1, 1),
   out: Easing.bezier(0, 0, 0.58, 1),
   inOut: Easing.bezier(0.42, 0, 0.58, 1),
   snap: Easing.bezier(0.5, 0, 0.5, 1),
   overshoot: Easing.bezier(0.45, 1.45, 0.8, 1),
+  land: Easing.bezier(0.22, 1.2, 0.36, 1),
 };
 
 /** The `linear()` stops Figma exports for its spring presets, evenly spaced in time. */

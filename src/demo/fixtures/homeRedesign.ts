@@ -92,7 +92,7 @@ export const DEMO_HOME_FIRST_TIME: HomeModel = {
   instant: { available: true, etaMins: 4 },
   durations: DURATIONS,
   tax: { gstPercent: 5 },
-  focusedDurationId: 'd60',
+  focusedDurationId: 'd45',
   cookPool: [],
   activeRecurringPlan: null,
   liveHubs: [],

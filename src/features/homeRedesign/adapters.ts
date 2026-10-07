@@ -43,7 +43,7 @@ export const STATIC_LIVE_HUBS: readonly LiveHub[] = [
 ];
 
 /** The tile the carousel opens centred on, when the catalogue offers it. */
-const FOCUS_MINUTES = 60;
+const FOCUS_MINUTES = 45;
 
 /** "30 mins", "1 hr", "1.5 hrs", "2 hrs" — the redesign's own tile copy (`1555:10724`). */
 export function homeDurationLabel(minutes: number): string {

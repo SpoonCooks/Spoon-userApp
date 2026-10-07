@@ -225,8 +225,8 @@ describe('routes render', () => {
 
     expect(await screen.findByText('Instant · Unavailable')).toBeTruthy();
     expect(screen.queryByText('Arriving in')).toBeNull();
-    // Now cannot book, so the section opens on Later's Schedule CTA.
-    expect(screen.getByRole('button', { name: 'Book for later' })).toBeTruthy();
+    // Now cannot book, so the section moves to Later's Schedule CTA (an effect, one render on).
+    expect(await screen.findByRole('button', { name: 'Book for later' })).toBeTruthy();
   });
 
   // The old Home's "keeps a live tracking ETA" case went with its active-bookings carousel: the
