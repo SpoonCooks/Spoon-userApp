@@ -212,13 +212,15 @@ describe('`433:2290` Page 21 — payment, then the SERVER (task §9, §10)', () 
   );
 
   /**
-   * A booking the server CANCELLED is an answer too, and Home is entitled to show it. Holding a
-   * spinner over a cancellation would be the app refusing to report bad news.
+   * A booking the server CANCELLED is an answer too. It goes to its own screen, which draws the
+   * cancellation (and, when the system cancelled it after the payment landed, the refund) — Home
+   * used to swallow it in silence.
    */
-  it('goes to Home on a cancellation rather than waiting forever', async () => {
+  it('goes to the booking’s cancelled screen on a cancellation', async () => {
     renderConfirming('cancelled');
 
-    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/home'));
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/booking/bk-1'));
+    expect(mockRouter.replace).not.toHaveBeenCalledWith('/home');
   });
 
   /** A read that failed is not a reason to hold a customer on a screen with no controls. */

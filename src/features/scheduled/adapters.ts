@@ -273,19 +273,45 @@ export function scheduleFrom(input: {
   // rather than silently identical to an empty grid.
   const rejection = input.availability?.rejection ?? undefined;
 
+  const slotsByPeriod = slotsByPeriodFrom({
+    catalogue,
+    availability: pending ? null : input.availability,
+  });
+  const clockPeriods = periodsFrom(catalogue, {
+    ...(input.serviceDate === undefined ? {} : { serviceDate: input.serviceDate }),
+    now,
+  });
+  /**
+   * A live window with nothing bookable in it is marked `noSlots`, so its chip does not lead to a
+   * grid of grey cards. Only once the server has ANSWERED for this day — never while the read is
+   * in flight, and never on a day-level refusal, which is its own message. The read is for the
+   * chosen duration, or the shortest one before any is chosen, which is the most a window can
+   * offer: a window empty at the shortest length is empty at every length.
+   *
+   * Only when ANOTHER window that day can be booked: the chips then point the customer at it. A
+   * day with nothing bookable anywhere keeps its chips, and the grid of grey cards is what says
+   * the day is full — every chip greyed would say nothing at all.
+   */
+  const bookable = (periodId: string) =>
+    (slotsByPeriod[periodId] ?? []).some((slot) => slot.disabled !== true);
+  const answered =
+    !pending &&
+    input.availability != null &&
+    rejection == null &&
+    clockPeriods.some((period) => period.disabled !== true && bookable(period.id));
+  const periods = clockPeriods.map((period) =>
+    answered && period.disabled !== true && !bookable(period.id)
+      ? { ...period, noSlots: true }
+      : period,
+  );
+
   return {
     ...base,
     days: daysFrom(catalogue, now),
-    periods: periodsFrom(catalogue, {
-      ...(input.serviceDate === undefined ? {} : { serviceDate: input.serviceDate }),
-      now,
-    }),
+    periods,
     // Reschedule moves WHEN, never HOW LONG — so it publishes no duration tiles.
     ...(base.mode === 'reschedule' ? {} : { durations: durationsFrom(catalogue) }),
-    slotsByPeriod: slotsByPeriodFrom({
-      catalogue,
-      availability: pending ? null : input.availability,
-    }),
+    slotsByPeriod,
     slotsPending: pending,
     ...(rejection === null || rejection === undefined
       ? {}

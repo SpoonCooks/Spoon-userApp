@@ -39,9 +39,12 @@ import { getLogger } from '@core/logging';
  *
  * ## Destination
  *
- * A CONFIRMED booking goes to `/booking/:id` — the confirmation page, headed "Booking
- * confirmed!". Confirmed, not merely settled: `cancelled` has also moved on, and sending it to a
- * page that says confirmed would announce a booking the server refused.
+ * A SETTLED booking goes to `/booking/:id`, which draws whatever the server settled it as: a
+ * confirmed booking gets the confirmation page, a cancelled one its cancelled screen — never the
+ * confirmation, because `/booking/:id` picks its view from the booking's own status. The cancelled
+ * case matters: a payment that landed after the server had already cancelled the booking (the
+ * hold lapsed, e.g. the app was killed mid-checkout) is refunded automatically, and the
+ * system-cancelled screen is what tells the customer so, with the refund. Home said nothing.
  * Task §10 sent every outcome to Home on the reasoning that Home's banner is the designed surface
  * for a live booking. It is, but it is not an ACKNOWLEDGEMENT: a customer who has just paid was
  * returned to the screen they started on and left to find their booking in a banner, which reads
@@ -93,14 +96,6 @@ export default function BookingConfirmingRoute() {
 
   const settled = state.status === 'ready' && !isAwaitingConfirmation(state.data.status);
   /**
-   * Settled is not the same as confirmed. `isAwaitingConfirmation` is false for `cancelled` too --
-   * a booking the server refused has also "moved on" -- and `/booking/:id` is headed "Booking
-   * confirmed!", so routing every settled booking there would announce a confirmation for a
-   * booking that was declined. Cancelled goes to Home with everything else the app cannot call
-   * confirmed.
-   */
-  const confirmed = settled && state.data.status !== 'cancelled';
-  /**
    * A read that FAILED is not a reason to hold the customer here. The booking exists — it was
    * created before checkout opened — so the honest move is Home, where the banner will show
    * whatever the next successful read returns.
@@ -123,9 +118,9 @@ export default function BookingConfirmingRoute() {
       });
     }
 
-    if (confirmed) goToBooking();
+    if (settled) goToBooking();
     else goHome();
-  }, [settled, confirmed, waitedOut, unreadable, nothingToWaitFor, goHome, goToBooking, bookingId]);
+  }, [settled, waitedOut, unreadable, nothingToWaitFor, goHome, goToBooking, bookingId]);
 
   /**
    * Android back goes HOME rather than being swallowed.

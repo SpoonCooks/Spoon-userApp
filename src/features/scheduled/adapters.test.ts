@@ -171,3 +171,55 @@ describe('a refused day says why', () => {
     expect(schedule.slotsMessage).toBeUndefined();
   });
 });
+
+/**
+ * Time chips over a grid of grey cards. Today is 25 Aug in Kolkata, 06:00 UTC = 11:30 AM, so no
+ * window has elapsed; evening has the only free cook.
+ */
+describe('time chips with nothing to book', () => {
+  const NOW = new Date('2026-08-25T06:00:00.000Z');
+  // 13:30 IST is NOON, 19:30 IST is EVENING, 11:45 IST is MORNING.
+  const slot = (start: string, available: boolean) => ({
+    start,
+    available,
+    ...(available ? {} : { reason: 'NO_COOK_AVAILABLE' }),
+  });
+  const schedule = (slots: readonly ReturnType<typeof slot>[], pending = false) =>
+    scheduleFrom({
+      base: BASE,
+      catalogue: CATALOGUE,
+      availability: {
+        date: '2026-08-25',
+        durationMinutes: 30,
+        slots,
+        validUntil: '2026-08-25T10:00:30.000Z',
+      } as never,
+      serviceDate: '2026-08-25',
+      slotsPending: pending,
+      now: NOW,
+    });
+  const noSlots = (s: ScheduleViewModel) =>
+    s.periods.filter((period) => period.noSlots === true).map((period) => period.id);
+
+  it('marks the windows with no bookable start when another window has one', () => {
+    const s = schedule([
+      slot('2026-08-25T06:15:00.000Z', false),
+      slot('2026-08-25T08:00:00.000Z', false),
+      slot('2026-08-25T14:00:00.000Z', true),
+    ]);
+    expect(noSlots(s)).toEqual(['MORNING', 'NOON']);
+  });
+
+  it('leaves every chip alone when the whole day is full — the grey grid says so', () => {
+    const s = schedule([
+      slot('2026-08-25T08:00:00.000Z', false),
+      slot('2026-08-25T14:00:00.000Z', false),
+    ]);
+    expect(noSlots(s)).toEqual([]);
+  });
+
+  it('judges nothing while the read is in flight', () => {
+    const s = schedule([slot('2026-08-25T14:00:00.000Z', true)], true);
+    expect(noSlots(s)).toEqual([]);
+  });
+});

@@ -48,7 +48,17 @@ export const addressSchema = z.object({
   tower: z.string().nullable(),
   society: z.string().nullable(),
   street: z.string(),
-  pincode: z.string(),
+  /**
+   * Nullable in the database: an address can be saved where neither geocoder knew a postcode.
+   * `GET /v1/me/addresses` coalesces it to `''` today, but this is a LIST schema — one strict field
+   * rejects every row, and a bare null took out the whole saved-address list on 2026-09-20. So a
+   * null is read as `''`, the same "no pincode" the server already sends, and nothing downstream
+   * has to know the difference.
+   */
+  pincode: z
+    .string()
+    .nullish()
+    .transform((value) => value ?? ''),
   city: z.string().nullable(),
   state: z.string().nullable(),
   /** Snake_case on the wire. See the note above. */
