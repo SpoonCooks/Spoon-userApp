@@ -5,15 +5,21 @@ import { C, F } from '../theme';
 
 export interface HomeHeaderProps {
   readonly addressLabel: string;
-  readonly notLive?: boolean;
+  /** "Building_name · Flat/House #"; the line is left out when `null`. */
+  readonly addressDetail?: string | null;
   readonly onPressAddress?: () => void;
   readonly onPressProfile?: () => void;
 }
 
-/** `1137:14505` — pin + address on the left, a 44pt profile disc pinned right. */
+/**
+ * `1255:2983` "Nav header/ home page" — the 44pt pin box, then `1625:11065` "Address/Default": a
+ * 200pt column of "Label" (SemiBold 16) with the 20pt dropdown 8 to its right, over
+ * "Building_name · Flat/House #" (Regular 12, primary). A 44pt profile disc is pinned right.
+ * The not-live Home (`1302:3539`) draws the same header, with no extra tag.
+ */
 export function HomeHeader({
   addressLabel,
-  notLive,
+  addressDetail = null,
   onPressAddress,
   onPressProfile,
 }: HomeHeaderProps) {
@@ -21,20 +27,27 @@ export function HomeHeader({
     <View style={styles.row}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Delivery address ${addressLabel}`}
+        accessibilityLabel={`Delivery address ${addressLabel}${addressDetail === null ? '' : `, ${addressDetail}`}`}
         onPress={onPressAddress}
         style={styles.address}
       >
         <View style={styles.pinBox}>
           <Image source={ART.pin} style={styles.pin} />
         </View>
-        <Text style={styles.label}>{addressLabel}</Text>
-      </Pressable>
-      {notLive ? (
-        <View style={styles.tag}>
-          <Text style={styles.tagText}>Not live yet</Text>
+        <View style={styles.addressText}>
+          <View style={styles.labelRow}>
+            <Text style={styles.label} numberOfLines={1}>
+              {addressLabel}
+            </Text>
+            <Image source={ART.dropdown} style={styles.dropdown} />
+          </View>
+          {addressDetail === null ? null : (
+            <Text style={styles.detail} numberOfLines={1}>
+              {addressDetail}
+            </Text>
+          )}
         </View>
-      ) : null}
+      </Pressable>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Profile"
@@ -59,14 +72,11 @@ const styles = StyleSheet.create({
   address: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pinBox: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   pin: { width: 20, height: 20 },
-  label: { fontFamily: F.regular, fontSize: 12, lineHeight: 16, color: C.text },
-  tag: {
-    backgroundColor: C.soft,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 9999,
-  },
-  tagText: { fontFamily: F.semibold, fontSize: 10, lineHeight: 14, color: C.text },
+  addressText: { width: 200 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  label: { flexShrink: 1, fontFamily: F.semibold, fontSize: 16, lineHeight: 24, color: C.text },
+  dropdown: { width: 20, height: 20 },
+  detail: { fontFamily: F.regular, fontSize: 12, lineHeight: 16, color: C.text },
   profile: {
     position: 'absolute',
     right: 16,

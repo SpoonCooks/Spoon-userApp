@@ -87,7 +87,7 @@ const POOL: readonly PoolCook[] = [
 /** `941:4884` — live pincode, no booking history, no pool. */
 export const DEMO_HOME_FIRST_TIME: HomeModel = {
   serviceability: 'live',
-  address: { label: 'Home · Building_name', pincode: '560102' },
+  address: { label: 'Label', detail: 'Building_name · Flat/House #', pincode: '560102' },
   user: { hasCompletedBooking: false },
   instant: { available: true, etaMins: 4 },
   durations: DURATIONS,
@@ -128,7 +128,7 @@ export const DEMO_HOME_NO_INSTANT: HomeModel = {
 export const DEMO_HOME_NOT_LIVE: HomeModel = {
   ...DEMO_HOME_FIRST_TIME,
   serviceability: 'not_live',
-  address: { label: 'Home · Building_name', pincode: '5600XX' },
+  address: { label: 'Label', detail: 'Building_name · Flat/House #', pincode: '5600XX' },
   instant: { available: false, etaMins: null },
   liveHubs: [
     { id: 'hsr', name: 'HSR Layout' },

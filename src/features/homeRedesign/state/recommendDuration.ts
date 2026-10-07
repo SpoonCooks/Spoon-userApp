@@ -12,12 +12,13 @@ export interface DialInputs {
  * The dial's recommended duration.
  *
  * TODO(product): PLACEHOLDER FORMULA. The dev notes say the dial result selects a tile but do not
- * give the rule. This one is tuned only so the frame's inputs (simple, 2 dishes, 4 people) land
- * on the frame's answer (1.5 hrs): 30 min base, 15 min per simple dish or 25 per complex dish,
- * and 7.5 min per person beyond two — rounded UP to the next offered duration.
+ * give the rule. This one is tuned only so the frames' inputs land on the frames' answer: the
+ * current Home frames (`1255:2973`, `1625:11215`) draw Complex, 2 dishes, 4 people → 1.5 hrs. 30 min
+ * base, 15 min per simple dish or 20 per complex dish, and 7.5 min per person beyond two — rounded
+ * UP to the next offered duration.
  */
 export function recommendedMinutes({ complexity, dishes, people }: DialInputs): number {
-  const perDish = complexity === 'complex' ? 25 : 15;
+  const perDish = complexity === 'complex' ? 20 : 15;
   return 30 + dishes * perDish + Math.max(0, people - 2) * 7.5;
 }
 

@@ -39,7 +39,7 @@ export interface BookSectionProps {
  *
  * CTA:
  *   book      lime "Book now · ₹payable" (the server's price incl. GST) + "Check payment details";
- *             before a tap it is the disabled grey button over the focused tile's price.
+ *             before a tap it is the disabled grey "Book Now" alone (`1255:3181`).
  *   schedule  yellow "Schedule", no payment link; grey until a duration is tapped.
  */
 export function BookSection({
@@ -62,7 +62,6 @@ export function BookSection({
   onPressPaymentDetails,
 }: BookSectionProps) {
   const selected = durations.find((d) => d.id === selectedDurationId);
-  const focused = durations.find((d) => d.id === focusedDurationId) ?? durations[0];
   const live = canBook && selected !== undefined && pricingStatus === 'ready';
   // The design has no Selected variant for a side tile, so when the choice is scrolled off-centre
   // the CTA names it (the tile dev note's proposal).
@@ -77,15 +76,14 @@ export function BookSection({
         ? named
           ? `Book now  ·  ${selected.label}  ·  ${formatPaise(selected.payablePaise)}`
           : `Book now  ·  ${formatPaise(selected.payablePaise)}`
-        : focused === undefined
-          ? 'Book now'
-          : `Book now  ·  ${formatPaise(focused.pricePaise)}`;
+        : // `1255:3181` — before a duration is tapped the disabled button reads just "Book Now".
+          'Book Now';
 
   return (
     <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.titles}>
-          <Text style={styles.title}>Select a duration to book</Text>
+          <Text style={styles.title}>Select duration to book</Text>
           <View style={styles.eta}>
             <Image source={etaMins === null ? ART.flashOff : ART.flash} style={styles.flash} />
             {etaMins === null ? (
@@ -148,7 +146,8 @@ export function BookSection({
                 {label}
               </Text>
             </Pressable>
-            {cta === 'book' ? (
+            {/* `1255:3181` draws no link under the disabled button; it comes with the price. */}
+            {cta === 'book' && live ? (
               <Pressable accessibilityRole="link" onPress={onPressPaymentDetails}>
                 <Text style={styles.link}>Check payment details</Text>
               </Pressable>

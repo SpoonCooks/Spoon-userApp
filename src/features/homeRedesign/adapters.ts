@@ -13,7 +13,7 @@ import type { DurationOption, HomeModel, LiveHub, PoolCook } from './types';
  *
  * What is wired today, and from where:
  *   serviceability     the current address's `serviceability.status` (GET /v1/me/addresses)
- *   address            label + building, pincode (same row)
+ *   address            label; building · flat; pincode (same row)
  *   hasCompletedBooking  any `completed` row in GET /v1/me/bookings
  *   instant / ETA      GET /v1/availability/instant, one read per catalogue duration
  *   durations          GET /v1/catalogue — price, GST-inclusive total; MRP is the shared ₹5/min
@@ -52,12 +52,17 @@ export function homeDurationLabel(minutes: number): string {
   return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} ${hours === 1 ? 'hr' : 'hrs'}`;
 }
 
-/** "Home · Prestige Lakeside" — the label, then the most specific building part present. */
-export function addressLabelOf(address: AddressDto): string {
+/**
+ * `1625:11069` — the header's second line, "Building_name · Flat/House #": the most specific
+ * building part present, then the flat. `null` when the address carries neither.
+ */
+export function addressDetailOf(address: AddressDto): string | null {
   const building = [address.society, address.tower, address.street]
     .map((part) => part?.trim() ?? '')
     .find((part) => part.length > 0);
-  return building === undefined ? address.label : `${address.label} · ${building}`;
+  const flat = address.flat?.trim() ?? '';
+  const parts = [building ?? '', flat].filter((part) => part.length > 0);
+  return parts.length === 0 ? null : parts.join(' · ');
 }
 
 /** One instant read per duration; `undefined` while it is still loading or it failed. */
@@ -116,7 +121,11 @@ export function homeModelFrom(sources: HomeSources): HomeModel {
 
   return {
     serviceability: live ? 'live' : 'not_live',
-    address: { label: addressLabelOf(address), pincode: address.pincode },
+    address: {
+      label: address.label,
+      detail: addressDetailOf(address),
+      pincode: address.pincode,
+    },
     user: {
       hasCompletedBooking: (sources.history ?? []).some((b) => b.status === 'completed'),
     },

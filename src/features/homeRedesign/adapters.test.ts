@@ -5,7 +5,7 @@ import type { Catalogue } from '@features/catalogue';
 import type { CookPoolListDto } from '@features/cookPool';
 import type { RecurringEligibilityDto } from '@features/recurringSetup';
 
-import { addressLabelOf, homeDurationLabel, homeModelFrom } from './adapters';
+import { addressDetailOf, homeDurationLabel, homeModelFrom } from './adapters';
 import type { HomeSources } from './adapters';
 
 const address = (status: AddressDto['serviceability']['status']) =>
@@ -172,7 +172,14 @@ describe('labels', () => {
     ]);
   });
 
-  it('labels the address with its most specific building part', () => {
-    expect(addressLabelOf(address('serviceable'))).toBe('Home · Prestige Lakeside');
+  it('writes the second header line as building · flat, and nothing when neither is known', () => {
+    const base = address('serviceable');
+    expect(addressDetailOf(base)).toBe('Prestige Lakeside');
+    expect(addressDetailOf({ ...base, flat: 'A-1203' } as AddressDto)).toBe(
+      'Prestige Lakeside · A-1203',
+    );
+    expect(
+      addressDetailOf({ ...base, society: null, street: '  ', flat: null } as AddressDto),
+    ).toBeNull();
   });
 });
