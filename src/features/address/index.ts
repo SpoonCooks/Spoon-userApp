@@ -61,6 +61,7 @@ export * from './api';
 export { useAddressLocation } from './location/useAddressLocation';
 export type { AddressLocationState } from './location/useAddressLocation';
 export { getCurrentCoordinates, reverseGeocode } from './location/deviceLocation';
+export { googleReverseGeocode } from './location/googlePlaces';
 export type {
   DeviceCoordinates,
   DeviceLocationFailure,

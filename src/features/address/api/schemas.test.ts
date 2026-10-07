@@ -30,6 +30,29 @@ describe('saved-address contract', () => {
     expect(parsed.serviceability).toEqual(serviceability);
   });
 
+  /** One address with no pincode used to reject the WHOLE list (2026-09-20). */
+  it('reads a missing pincode as empty instead of refusing the row', () => {
+    const row = {
+      id: 'addr-1',
+      label: 'Home',
+      flat: null,
+      tower: null,
+      society: null,
+      street: 'Haralur Main Road',
+      city: 'Bengaluru',
+      state: 'Karnataka',
+      hub_id: 'hub-1',
+      receiverName: null,
+      receiverPhone: null,
+      isDefault: true,
+      latitude: 12.8993,
+      longitude: 77.6591,
+      serviceability,
+    };
+    expect(addressSchema.parse({ ...row, pincode: null }).pincode).toBe('');
+    expect(addressSchema.parse(row).pincode).toBe('');
+  });
+
   it('requires the same evaluated serviceability projection on address writes', () => {
     const parsed = addressWriteResponseSchema.parse({
       address: {

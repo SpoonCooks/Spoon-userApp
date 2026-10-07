@@ -131,6 +131,15 @@ function toChipOptions(
   }));
 }
 
+/** A period chip that cannot be chosen: elapsed, or empty — unless it is the one already chosen. */
+function isBlocked(
+  period: { readonly id: string; readonly disabled?: boolean; readonly noSlots?: boolean },
+  chosenId: string | null,
+): boolean {
+  if (period.disabled === true) return true;
+  return period.noSlots === true && period.id !== chosenId;
+}
+
 export function ScheduleView({ state, onRetry, initialSelection, ...actions }: ScheduleViewProps) {
   /**
    * `333:3643` — "Help me pick". PURELY LOCAL: it opens a sheet over content the screen already
@@ -148,7 +157,9 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
 
   const soleLivePeriodId = useMemo(() => {
     if (state.status !== 'ready') return null;
-    const live = state.data.periods.filter((period) => period.disabled !== true);
+    const live = state.data.periods.filter(
+      (period) => period.disabled !== true && period.noSlots !== true,
+    );
     return live.length === 1 ? (live[0]?.id ?? null) : null;
   }, [state]);
 
@@ -212,11 +223,10 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
    *
    * ## What counts as the only one
    *
-   * `disabled`, which is the CLOCK: a period whose window has entirely passed today. Not whether
-   * the period holds bookable slots — a live window with no free start is a routing verdict that
-   * belongs to the server and is drawn as the grey cards in the grid, and it is read for the
-   * DEFAULT duration, so acting on it here could send someone to a period that stops qualifying
-   * the moment they pick two hours.
+   * `disabled` (the CLOCK: the window has entirely passed today) or `noSlots` (the server answered
+   * and nothing in the window can be booked). The grid is read for the shortest duration until one
+   * is chosen, and a window with no start at the shortest length has none at any length, so the
+   * chip this picks cannot stop qualifying when a longer duration is chosen.
    *
    * ## When it does not fire
    *
@@ -387,7 +397,8 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                     id: period.id,
                     label: period.label,
                     icon: period.icon,
-                    ...(period.disabled === undefined ? {} : { disabled: period.disabled }),
+                    // A chosen chip stays pressable even if its grid emptied for a longer duration.
+                    ...(isBlocked(period, periodId) ? { disabled: true } : {}),
                   }))}
                   selectedId={periodId}
                   onSelect={(periodId) => {
@@ -398,7 +409,7 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
                     // start times that are all in the past.
                     if (
                       schedule.periods.some(
-                        (period) => period.id === periodId && period.disabled === true,
+                        (period) => period.id === periodId && isBlocked(period, selection.periodId),
                       )
                     ) {
                       return;
