@@ -58,7 +58,12 @@ export interface Waitlist {
 
 export interface HomeModel {
   readonly serviceability: Serviceability;
-  readonly address: { readonly label: string; readonly pincode: string };
+  /** `1625:11065` — "Label ⌄" over "Building_name · Flat/House #" (`null`: no such parts). */
+  readonly address: {
+    readonly label: string;
+    readonly detail: string | null;
+    readonly pincode: string;
+  };
   readonly user: { readonly hasCompletedBooking: boolean };
   readonly instant: { readonly available: boolean; readonly etaMins: number | null };
   readonly durations: readonly DurationOption[];

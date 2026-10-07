@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import type { ViewStyle } from 'react-native';
 
 import { fontFamily } from '@ui/tokens/primitives';
@@ -26,35 +25,29 @@ export const C = {
 
 export const F = fontFamily;
 
-/** `0 0 12 rgba(0,0,0,0.1)` — the floating pills. */
-export const SHADOW_PILL: ViewStyle = Platform.select<ViewStyle>({
-  ios: {
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  default: { elevation: 4 },
-})!;
+/*
+ * Shadows as Figma states them, through `boxShadow` (CSS semantics on both platforms under the New
+ * Architecture this app runs). Figma's effect "radius" is a CSS blur; iOS's `shadowRadius` is not —
+ * it drew these about twice as soft and wide, so the duration tiles' shadows ran together into a
+ * grey band the carousel then clipped square.
+ */
 
-/** `0 0 6 rgba(0,0,0,0.1)` — the cook card. */
-export const SHADOW_CARD: ViewStyle = Platform.select<ViewStyle>({
-  ios: {
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  default: { elevation: 3 },
-})!;
+/** Elevation/2 — `0 0 12 #0000001A`: the floating pills and the focused tile. */
+export const SHADOW_PILL: ViewStyle = {
+  boxShadow: [{ offsetX: 0, offsetY: 0, blurRadius: 12, color: 'rgba(0,0,0,0.1)' }],
+};
 
-/** `0 0 3 rgba(0,0,0,0.08)` — duration tiles and stepper buttons. */
-export const SHADOW_SOFT: ViewStyle = Platform.select<ViewStyle>({
-  ios: {
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  default: { elevation: 2 },
-})!;
+/**
+ * The cook card. Its effect is Elevation/2, but the frame (`1255:3269`–`1255:3272`) stacks the four
+ * swipeable cards on the same spot, so what the design SHOWS is four of those shadows on top of
+ * each other. One card is on screen at a time here; four layers draw the shadow the frame draws.
+ */
+const ELEVATION_2 = { offsetX: 0, offsetY: 0, blurRadius: 12, color: 'rgba(0,0,0,0.1)' } as const;
+export const SHADOW_CARD: ViewStyle = {
+  boxShadow: [ELEVATION_2, ELEVATION_2, ELEVATION_2, ELEVATION_2],
+};
+
+/** Elevation/1 — `0 0 3 #00000014`: duration tiles and stepper buttons. */
+export const SHADOW_SOFT: ViewStyle = {
+  boxShadow: [{ offsetX: 0, offsetY: 0, blurRadius: 3, color: 'rgba(0,0,0,0.08)' }],
+};

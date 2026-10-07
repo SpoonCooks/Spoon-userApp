@@ -12,6 +12,8 @@ export const ART = {
   glows: img(require('../../../assets/figma/home2/background-glows.png')),
   hero: img(require('../../../assets/figma/home2/hero-scene.png')),
   pin: img(require('../../../assets/figma/home2/icon-pin.png')),
+  /** `1625:11068` Icon/Dropdown. */
+  dropdown: img(require('../../../assets/figma/home2/icon-dropdown.png')),
   profile: img(require('../../../assets/figma/home2/icon-profile.png')),
   flash: img(require('../../../assets/figma/home2/icon-flash.png')),
   time: img(require('../../../assets/figma/home2/icon-time.png')),

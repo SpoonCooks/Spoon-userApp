@@ -45,7 +45,8 @@ export function initialDraft(input: {
     mode: wanted === 'now' && !input.instantAvailable ? 'later' : wanted,
     focusedDurationId: input.focusedDurationId,
     selectedDurationId: null,
-    complexity: 'simple',
+    // `1625:11215` — the dial opens on Complex, 2 dishes, 4 people.
+    complexity: 'complex',
     dishes: 2,
     people: 4,
   };
