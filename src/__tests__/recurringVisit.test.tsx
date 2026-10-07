@@ -98,7 +98,11 @@ const QUOTE = {
   nothingCharged: true,
 };
 
-function render(onCancel = jest.fn(), visit: typeof VISIT = VISIT) {
+function render(
+  onCancel = jest.fn(),
+  visit: typeof VISIT = VISIT,
+  extra: Record<string, (body: unknown) => unknown> = {},
+) {
   renderWithRuntime(<RecurringVisitRoute />, {
     runtime: createTestRuntime({
       api: createStubApi({
@@ -107,6 +111,7 @@ function render(onCancel = jest.fn(), visit: typeof VISIT = VISIT) {
         'GET /v1/me/recurring-bookings/rb-1': () => BOOKING,
         'GET /v1/me/recurring-bookings/rb-1/visits/visit-1/cancellation-quote': () => QUOTE,
         'GET /v1/me/cooks': () => ({ cooks: [], count: 0 }),
+        ...extra,
         'POST /v1/me/recurring-bookings/rb-1/visits/visit-1/cancel': (body) => {
           onCancel(body);
           return {
@@ -174,4 +179,140 @@ describe('Recurring Visit details route', () => {
     expect(screen.getByText('Opening WhatsApp…')).toBeTruthy();
     open.mockRestore();
   });
+
+  it('rates a completed visit through its own booking while it can still be rated', async () => {
+    const onRate = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    render(
+      jest.fn(),
+      {
+        ...VISIT,
+        status: 'completed',
+        displayState: 'completed',
+        bookingId: 'bk-9',
+        cook: {
+          cookId: 'c-1',
+          displayName: 'Cook Meera',
+          profileImageUrl: null,
+          rating: { average: 4.8, count: 12 },
+        },
+      } as unknown as typeof VISIT,
+      {
+        'GET /v1/bookings/bk-9': () => ({
+          booking: completedBooking({ canRate: true }),
+          serverTime: '2026-10-14T06:00:00.000Z',
+        }),
+        'PUT /v1/bookings/bk-9/rating': (body) => {
+          onRate(body);
+          return {
+            ratingId: 'r-1',
+            bookingId: 'bk-9',
+            cookId: 'c-1',
+            stars: 4.5,
+            isFivePlus: false,
+            exceptional: false,
+            created: true,
+          };
+        },
+      },
+    );
+
+    // The real cook's name, not the frames' Rekha; no call-back toggle the backend can't act on.
+    expect(await screen.findByText('Breakfast with Cook Meera')).toBeTruthy();
+    // One tap on the 5th star is 4.5 (a fast second tap would make it 5).
+    fireEvent.press(screen.getByTestId('rate-visit-card-stars-star-5'), {
+      nativeEvent: { timestamp: 1_000 },
+    });
+    expect(
+      await screen.findByText('Meera will be thrilled. Anything that made it special?'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Rekha/)).toBeNull();
+    fireEvent.press(screen.getByTestId('rate-visit-card-chip-taste'));
+    fireEvent.press(screen.getByTestId('rate-visit-card-submit'));
+
+    await waitFor(() =>
+      expect(onRate).toHaveBeenCalledWith({ stars: 4.5, feedback: 'What stood out? Taste' }),
+    );
+    await waitFor(() =>
+      expect(alert).toHaveBeenCalledWith('Thanks for rating', expect.any(String)),
+    );
+    alert.mockRestore();
+  });
+
+  it('draws no rate card once the visit can no longer be rated', async () => {
+    render(
+      jest.fn(),
+      {
+        ...VISIT,
+        status: 'completed',
+        displayState: 'completed',
+        bookingId: 'bk-9',
+        cook: {
+          cookId: 'c-1',
+          displayName: 'Cook Meera',
+          profileImageUrl: null,
+          rating: { average: 4.8, count: 12 },
+        },
+      } as unknown as typeof VISIT,
+      {
+        'GET /v1/bookings/bk-9': () => ({
+          booking: completedBooking({ canRate: false }),
+          serverTime: '2026-10-14T06:00:00.000Z',
+        }),
+      },
+    );
+    await screen.findByTestId('visit-details-screen');
+    await waitFor(() => expect(screen.queryByTestId('rate-visit-card')).toBeNull());
+  });
 });
+
+/** The visit's one-time booking as `GET /v1/bookings/:id` returns it, completed. */
+function completedBooking({ canRate }: { readonly canRate: boolean }) {
+  return {
+    id: 'bk-9',
+    status: 'completed',
+    slotType: 'scheduled',
+    scheduledStart: '2026-10-14T03:30:00.000Z',
+    durationMinutes: 60,
+    price: {
+      amountPaise: 25339,
+      durationMinutes: 60,
+      serviceAmountPaise: 25339,
+      taxRateBps: 1800,
+      taxAmountPaise: 4561,
+      totalAmountPaise: 29900,
+      currency: 'INR',
+      pricingVersion: 'v1',
+    },
+    holdExpiresAt: null,
+    address: {
+      label: 'Home',
+      latitude: 12.9,
+      longitude: 77.6,
+      flat: 'E102',
+      tower: null,
+      society: 'Purva Skydale',
+      street: 'Silver County Road',
+      pincode: '560102',
+      city: 'Bengaluru',
+      state: 'Karnataka',
+      hubName: null,
+      receiverName: null,
+      receiverPhone: null,
+    },
+    mealNotes: null,
+    referenceUrl: null,
+    mealBrief: null,
+    cook: null,
+    timing: { arrivedAt: null, actualStart: null, expectedEnd: null, actualEnd: null },
+    cancellation: null,
+    allowedActions: {
+      canCancel: false,
+      canReschedule: false,
+      canExtend: false,
+      canRate,
+      canTip: false,
+      canCallCook: false,
+    },
+  };
+}

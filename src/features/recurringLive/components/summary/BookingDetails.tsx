@@ -36,7 +36,7 @@ export function BookingDetails({ tiles, testID = 'summary-booking-details' }: Bo
         {tiles.map((tile) => (
           <View key={tile.key} style={styles.tile}>
             <Image
-              source={SUMMARY_TILE_ART[tile.key]}
+              source={tile.source ?? SUMMARY_TILE_ART[tile.key]}
               resizeMode="cover"
               style={styles.photo}
               accessibilityIgnoresInvertColors

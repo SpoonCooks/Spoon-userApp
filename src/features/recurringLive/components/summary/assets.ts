@@ -52,6 +52,9 @@ export const SUMMARY_CHEVRON_GLYPH =
 export const SUMMARY_TILE_ART: Readonly<Record<SummaryTileKey, ImageSourcePropType>> = {
   morning:
     require('../../../../../assets/figma/recurring/summary/tile-morning.webp') as ImageSourcePropType,
+  /** Figma draws no afternoon tile here; the setup flow's Afternoon photo (`361:435`). */
+  afternoon:
+    require('../../../../../assets/figma/recurring/time-afternoon.png') as ImageSourcePropType,
   evening:
     require('../../../../../assets/figma/recurring/summary/tile-evening.webp') as ImageSourcePropType,
   duration:

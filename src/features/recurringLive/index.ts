@@ -17,8 +17,12 @@ export { RecurringTabsHeader } from './components/RecurringTabsHeader';
 export type { RecurringTab, RecurringTabsHeaderProps } from './components/RecurringTabsHeader';
 
 export { RecurringLiveScreen } from './screens/RecurringLiveScreen';
+export { AutopayNotice } from './components/calendar/AutopayNotice';
+export type { AutopayNoticeKind } from './components/calendar/AutopayNotice';
 export type { RecurringLiveScreenProps, VisitRef } from './screens/RecurringLiveScreen';
 export { CALENDAR_DEMO_DATES, CALENDAR_DEMO_MODEL } from './data/calendar';
+export { plansSummaryFrom } from './plansSummary';
+export type { PlansSummaryModel } from './data/summary';
 export type { LiveCalendarModel } from './data/calendar';
 export { liveCalendarFrom, todayInKolkata } from './adapters';
 
@@ -29,7 +33,12 @@ export { VisitDetailsScreen } from './screens/VisitDetailsScreen';
 export type { VisitDetailsScreenProps } from './screens/VisitDetailsScreen';
 export type { VisitDetailsModel, VisitPrepKey, VisitPrepReady, VisitVariant } from './data/visit';
 export { visitDemoModel } from './data/visit';
-export { visitDetailsFrom, visitWhatsAppLink } from './visitDetails';
+export {
+  rateVisitInfo,
+  ratingRequestFor,
+  visitDetailsFrom,
+  visitWhatsAppLink,
+} from './visitDetails';
 export type { VisitDetailsSources } from './visitDetails';
 
 export { ModifyBookingSheet } from './components/sheets/ModifyBookingSheet';
@@ -38,7 +47,11 @@ export { PaymentDetailsSheet } from './components/sheets/PaymentDetailsSheet';
 export type { PaymentDetailsSheetProps } from './components/sheets/PaymentDetailsSheet';
 
 export { RateVisitCard } from './components/rating/RateVisitCard';
-export type { RateVisitCardProps, RateVisitSubmission } from './components/rating/RateVisitCard';
+export type {
+  RateVisitCardProps,
+  RateVisitInfo,
+  RateVisitSubmission,
+} from './components/rating/RateVisitCard';
 export { TellUsMoreSheet } from './components/rating/TellUsMoreSheet';
 export type { TellUsMoreSheetProps } from './components/rating/TellUsMoreSheet';
 export type { VisitRatingValue } from './data/rating';

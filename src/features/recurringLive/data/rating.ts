@@ -71,6 +71,15 @@ const SAY_MORE_NEGATIVE = {
   sayMoreBody: 'A quick voice note helps us fix it',
 } as const;
 
+/**
+ * On a real visit the say-more row opens the WRITTEN half of "Tell us more" only: the rating
+ * endpoint takes words (`feedback`) but no voice note, photo or video yet.
+ */
+export const RATING_SAY_MORE_WRITTEN = {
+  sayMoreTitle: 'Add a note',
+  sayMoreBody: 'Tell us in your own words',
+} as const;
+
 const CALL_BACK = {
   kind: 'callBack',
   title: 'Get a call back from Spoon',
@@ -80,51 +89,58 @@ const CALL_BACK = {
 
 export const RATING_SUBMIT_CALL_BACK = 'Submit & request call back';
 
-export const RATING_TIER_COPY: Record<Exclude<RatingTier, 'idle'>, RatingTierCopy> = {
-  loved: {
-    headline: 'Loved it!',
-    body: 'Rekha will be thrilled. Anything that made it special?',
-    chipsLabel: 'What stood out?',
-    ...SAY_MORE_POSITIVE,
-    submit: 'Submit rating',
-  },
-  magic: {
-    headline: 'Off the charts!',
-    body: 'We’ll make sure Rekha hears this. What made it magic?',
-    chipsLabel: 'What made it magic?',
-    ...SAY_MORE_POSITIVE,
-    submit: 'Send 5+ to Rekha',
-  },
-  belowPar: {
-    headline: 'Not quite there',
-    body: 'Sorry it wasn’t great. What fell short?',
-    chipsLabel: 'What fell short?',
-    ...SAY_MORE_NEGATIVE,
-    support: {
-      kind: 'differentCook',
-      title: 'Prefer a different cook next time?',
-      body: 'We’ll match you with someone new',
-      initiallyOn: false,
+/** The tier copy for a cook by first name (the frames' Rekha in the preview). */
+export function ratingTierCopy(
+  cookName: string,
+): Record<Exclude<RatingTier, 'idle'>, RatingTierCopy> {
+  return {
+    loved: {
+      headline: 'Loved it!',
+      body: `${cookName} will be thrilled. Anything that made it special?`,
+      chipsLabel: 'What stood out?',
+      ...SAY_MORE_POSITIVE,
+      submit: 'Submit rating',
     },
-    submit: 'Submit rating',
-  },
-  disappointing: {
-    headline: 'That’s disappointing',
-    body: 'We’re sorry. Tell us what went wrong, we’ll act on it immediately.',
-    chipsLabel: 'What went wrong?',
-    ...SAY_MORE_NEGATIVE,
-    support: CALL_BACK,
-    submit: 'Submit rating',
-  },
-  veryPoor: {
-    headline: 'That’s not okay',
-    body: 'We’re really sorry. Someone from Spoon will look into this personally.',
-    chipsLabel: 'What went wrong?',
-    ...SAY_MORE_NEGATIVE,
-    support: CALL_BACK,
-    submit: 'Submit rating',
-  },
-};
+    magic: {
+      headline: 'Off the charts!',
+      body: `We’ll make sure ${cookName} hears this. What made it magic?`,
+      chipsLabel: 'What made it magic?',
+      ...SAY_MORE_POSITIVE,
+      submit: `Send 5+ to ${cookName}`,
+    },
+    belowPar: {
+      headline: 'Not quite there',
+      body: 'Sorry it wasn’t great. What fell short?',
+      chipsLabel: 'What fell short?',
+      ...SAY_MORE_NEGATIVE,
+      support: {
+        kind: 'differentCook',
+        title: 'Prefer a different cook next time?',
+        body: 'We’ll match you with someone new',
+        initiallyOn: false,
+      },
+      submit: 'Submit rating',
+    },
+    disappointing: {
+      headline: 'That’s disappointing',
+      body: 'We’re sorry. Tell us what went wrong, we’ll act on it immediately.',
+      chipsLabel: 'What went wrong?',
+      ...SAY_MORE_NEGATIVE,
+      support: CALL_BACK,
+      submit: 'Submit rating',
+    },
+    veryPoor: {
+      headline: 'That’s not okay',
+      body: 'We’re really sorry. Someone from Spoon will look into this personally.',
+      chipsLabel: 'What went wrong?',
+      ...SAY_MORE_NEGATIVE,
+      support: CALL_BACK,
+      submit: 'Submit rating',
+    },
+  };
+}
+
+export const RATING_TIER_COPY = ratingTierCopy('Rekha');
 
 export interface RatingChip {
   readonly key: string;

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import type { LayoutChangeEvent, LayoutRectangle } from 'react-native';
@@ -59,6 +60,8 @@ export interface RecurringLiveScreenProps {
   readonly onOpenVisit?: ((visit: VisitRef) => void) | undefined;
   /** The Up-next banner — the existing live booking page. */
   readonly onOpenUpNext?: (() => void) | undefined;
+  /** Above the Up-next banner: e.g. the Autopay notice while visits can't be charged. */
+  readonly notice?: ReactNode;
   /** Opens with this date's pop-up showing, e.g. `CALENDAR_DEMO_DATES.past`. */
   readonly initialSelectedDate?: string;
   readonly testID?: string;
@@ -78,6 +81,7 @@ export function RecurringLiveScreen({
   onTabChange,
   onOpenVisit,
   onOpenUpNext,
+  notice,
   initialSelectedDate,
   testID = 'recurring-live-screen',
 }: RecurringLiveScreenProps) {
@@ -152,6 +156,10 @@ export function RecurringLiveScreen({
 
   return (
     <Screen
+      // Scrolls: the frame's blocks fit one phone exactly, so anything added above them (the
+      // Autopay notice) or a shorter screen would crop the calendar and hint with no way to reach
+      // them. The content still fills the screen when it is short.
+      scroll
       tone="plain"
       padded={false}
       testID={testID}
@@ -176,6 +184,8 @@ export function RecurringLiveScreen({
           style={[styles.thread, { bottom: THREAD.bottom + insets.bottom }]}
           resizeMode="stretch"
         />
+
+        {notice}
 
         {fixture.upNext === null ? null : (
           <UpNextBanner
@@ -238,7 +248,7 @@ export function RecurringLiveScreen({
 const styles = StyleSheet.create({
   /** `1005:148` — p 16, 24 between blocks, clipped (the swoosh overruns it). */
   content: {
-    flex: 1,
+    flexGrow: 1,
     gap: lightTheme.space.xl,
     paddingTop: lightTheme.space.lg,
     paddingHorizontal: lightTheme.space.lg,

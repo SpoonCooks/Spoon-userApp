@@ -8,18 +8,23 @@ import type { DataState } from '@core/data';
 import { getUserMessage, isAppError } from '@core/errors';
 import { formatPaise } from '@core/format';
 import { useSafeBack } from '@core/navigation';
+import { ratingScopeFor, useBookingDetail, useRateBooking } from '@features/booking';
 import { CancelBookingSheet, useCancellationData } from '@features/cancellation';
 import type { CancellationStep } from '@features/cancellation';
 import { cookProfileFrom, useCookPoolList, useCookPoolProfile } from '@features/cookPool';
 import {
   ModifyBookingSheet,
   PaymentDetailsSheet,
+  RateVisitCard,
+  TellUsMoreSheet,
   VisitDetailsScreen,
+  rateVisitInfo,
+  ratingRequestFor,
   todayInKolkata,
   visitDetailsFrom,
   visitWhatsAppLink,
 } from '@features/recurringLive';
-import type { VisitDetailsModel, VisitPrepKey } from '@features/recurringLive';
+import type { RateVisitSubmission, VisitDetailsModel, VisitPrepKey } from '@features/recurringLive';
 import {
   useCancelRecurringVisit,
   useRecurringBooking,
@@ -40,6 +45,9 @@ import { QueryBoundary } from '@ui';
  *   Payment       the price, GST and Autopay mandate
  *   Help, Share   WhatsApp with Spoon (`1434:2205`), when the backend gives the link
  *   Cook Pool     the pool landing; the next-visit row that visit's own details
+ *   Rate          a completed visit's own booking, while the server still allows it
+ *                 (`allowedActions.canRate`): stars, 5+ and a written note go to
+ *                 `PUT /v1/bookings/:id/rating`; the card's chips ride in the note
  */
 export default function RecurringVisitRoute() {
   const router = useRouter();
@@ -169,6 +177,54 @@ export default function RecurringVisitRoute() {
     );
   };
 
+  // ─── Rating ────────────────────────────────────────────────────────────────────────────────
+  const completedBookingId =
+    detail !== null && detail.displayState === 'completed'
+      ? (detail.payment?.bookingId ?? detail.bookingId)
+      : null;
+  const ratedBooking = useBookingDetail(completedBookingId);
+  const canRate =
+    ratedBooking.state.status === 'ready' && ratedBooking.state.data.allowedActions.canRate;
+  const rateInfo = detail === null ? null : rateVisitInfo(detail);
+  const rate = useRateBooking();
+  const [note, setNote] = useState('');
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [rateHidden, setRateHidden] = useState(false);
+
+  const submitRating = (submission: RateVisitSubmission) => {
+    if (completedBookingId === null) return;
+    const request = ratingRequestFor(submission, note);
+    const scope = ratingScopeFor(completedBookingId, request.feedback);
+    rate.mutate(
+      { bookingId: completedBookingId, ...request, scope },
+      {
+        onSuccess: () => {
+          setRateHidden(true);
+          Alert.alert('Thanks for rating', 'It helps us send you the right cooks.');
+        },
+        onError: (error) => {
+          idempotency.release(scope);
+          Alert.alert(
+            'Couldn’t send your rating',
+            isAppError(error) ? getUserMessage(error) : 'Please try again.',
+          );
+        },
+      },
+    );
+  };
+  const ratingSlot =
+    canRate && rateInfo !== null && !rateHidden ? (
+      <RateVisitCard
+        live
+        visit={rateInfo}
+        submitting={rate.isPending}
+        noteAdded={note !== ''}
+        onTellUsMore={() => setNoteOpen(true)}
+        onLater={() => setRateHidden(true)}
+        onSubmit={submitRating}
+      />
+    ) : undefined;
+
   const nextVisitId =
     booking.state.status === 'ready' ? (booking.state.data.upNext?.visitId ?? null) : null;
 
@@ -194,6 +250,17 @@ export default function RecurringVisitRoute() {
                     }),
                 })}
             onPrepChange={savePrep}
+            ratingSlot={ratingSlot}
+          />
+          <TellUsMoreSheet
+            visible={noteOpen}
+            writtenOnly
+            initialText={note}
+            onClose={() => setNoteOpen(false)}
+            onSend={({ text }) => {
+              setNote(text.trim());
+              setNoteOpen(false);
+            }}
           />
           <PaymentDetailsSheet
             visible={paymentOpen}

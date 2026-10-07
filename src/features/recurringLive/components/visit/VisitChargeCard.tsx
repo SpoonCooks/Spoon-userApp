@@ -36,7 +36,13 @@ export function VisitChargeCard({
               {charge.was}
             </Text>
           )}
-          <Text variant="spoonDisplay" color="textPrimary" align="center" style={styles.now}>
+          <Text
+            variant="spoonDisplay"
+            color="textPrimary"
+            align="center"
+            numberOfLines={1}
+            style={styles.now}
+          >
             {charge.amount}
           </Text>
         </View>
@@ -74,11 +80,14 @@ const styles = StyleSheet.create({
     backgroundColor: lightTheme.colors.surface,
   },
   amount: { alignItems: 'stretch' },
-  /** `1474:2499` — 8 apart, bottom-aligned. */
-  price: { flexDirection: 'row', alignItems: 'flex-end', gap: lightTheme.space.sm },
+  /** `1665:3423` — the struck price and the price, 8 apart, centred on one line. */
+  price: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.sm },
   struck: { textDecorationLine: 'line-through' },
-  /** `1474:2499` — the ₹299 sits in a 58pt box. */
-  now: { width: 58 },
+  /**
+   * `1665:3425` — the frame's ₹299 fills a 58pt box. A real price carries paise (₹135.45), which
+   * a fixed 58 wraps onto two lines, so the box is a minimum and grows to the price on one line.
+   */
+  now: { minWidth: 58 },
   stitch: { width: 2, height: 56 },
   pay: { flex: 1, gap: lightTheme.space.xs },
   payTitle: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.xs },

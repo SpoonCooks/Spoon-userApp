@@ -21,7 +21,7 @@ export interface RecurringTabsHeaderProps {
   readonly onBack: () => void;
   readonly onTabChange?: (tab: RecurringTab) => void;
   /** Manage plans only. */
-  readonly onDelete?: () => void;
+  readonly onDelete?: (() => void) | undefined;
   readonly testID?: string;
 }
 
@@ -37,7 +37,9 @@ export function RecurringTabsHeader({
   onDelete,
   testID = 'recurring-tabs-header',
 }: RecurringTabsHeaderProps) {
-  const showDelete = tab === 'plans';
+  // Only on Manage plans, and only with something to do: a booking that can't be cancelled
+  // keeps the space but draws no trash.
+  const showDelete = tab === 'plans' && onDelete !== undefined;
 
   return (
     <View style={styles.bar} testID={testID}>

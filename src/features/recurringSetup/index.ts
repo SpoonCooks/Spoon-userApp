@@ -48,5 +48,12 @@ export {
 } from './planning';
 export type { RecurringPlanning } from './planning';
 export * from './api';
-export { draftFromPlans, unavailableVisitKeys, useBookRecurring } from './booking';
+export {
+  draftFromPlans,
+  unavailableVisitKeys,
+  useApproveRecurringMandate,
+  useBookRecurring,
+} from './booking';
 export type { BookRecurringOutcome } from './booking';
+/** The per-band, per-duration photos the live Manage plans tab shows for a real visit. */
+export { DURATION_PHOTOS, START_TIME_PHOTOS, TIME_OF_DAY_PHOTOS } from './art';

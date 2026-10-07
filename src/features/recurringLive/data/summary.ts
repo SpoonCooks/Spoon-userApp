@@ -1,7 +1,10 @@
+import type { ImageSourcePropType } from 'react-native';
+
 /**
- * Fixture data for the recurring live booking "Manage plans" tab (Summary), read verbatim off
- * Figma `cCQlzTeiObQkpVBzwI8mZi` page `1005:131`: `1017:433` (1st Visit), `1017:5997` (2nd Visit)
- * and `1017:6054` (edited, unsaved). STATIC ONLY — nothing here comes from a backend.
+ * The recurring live booking "Manage plans" tab (Summary): its model, and the frames' own copy
+ * read verbatim off Figma `cCQlzTeiObQkpVBzwI8mZi` page `1005:131` — `1017:433` (1st Visit),
+ * `1017:5997` (2nd Visit) and `1017:6054` (edited, unsaved) — which the dev preview draws. A real
+ * booking's model comes from `plansSummaryFrom`.
  */
 
 /** How a date is marked on the summary calendar (`1067:2171`). */
@@ -25,12 +28,14 @@ export interface SummaryCalendar {
   readonly rows: readonly SummaryCalendarRow[];
 }
 
-export type SummaryTileKey = 'morning' | 'evening' | 'duration' | 'startTime';
+export type SummaryTileKey = 'morning' | 'afternoon' | 'evening' | 'duration' | 'startTime';
 
 /** One captioned photo tile in "Booking details" (`1017:439`). */
 export interface SummaryDetailTile {
   readonly key: SummaryTileKey;
   readonly caption: string;
+  /** The tile's photo when it isn't the frames' own (e.g. a real visit's 90-minute timer). */
+  readonly source?: ImageSourcePropType;
 }
 
 export type SummaryHistoryStatus = 'done' | 'cancelled';
@@ -53,6 +58,17 @@ export interface SummaryVisit {
 export interface SummaryPlan {
   readonly id: string;
   readonly label: string;
+}
+
+/** One plan as the tab draws it: its tab, its dates and its visits. */
+export interface SummaryPlanModel extends SummaryPlan {
+  readonly calendar: SummaryCalendar;
+  readonly visits: readonly SummaryVisit[];
+}
+
+export interface PlansSummaryModel {
+  readonly plans: readonly SummaryPlanModel[];
+  readonly activePlanId: string;
 }
 
 const COMPLETED_BY_SANCHITA = 'Completed · Cook Sanchita';
@@ -158,3 +174,16 @@ export const SUMMARY_EDITED_FIRST_VISIT: SummaryVisit = {
     { key: 'startTime', caption: '10:00 AM' },
   ],
 };
+
+/** The frames as drawn: two plan tabs over Plan 2's dates and visits. */
+export function plansDemoModel(edited = false): PlansSummaryModel {
+  const visits = edited
+    ? SUMMARY_VISITS.map((visit) =>
+        visit.id === SUMMARY_EDITED_FIRST_VISIT.id ? SUMMARY_EDITED_FIRST_VISIT : visit,
+      )
+    : SUMMARY_VISITS;
+  return {
+    plans: SUMMARY_PLANS.map((plan) => ({ ...plan, calendar: SUMMARY_CALENDAR, visits })),
+    activePlanId: SUMMARY_ACTIVE_PLAN_ID,
+  };
+}

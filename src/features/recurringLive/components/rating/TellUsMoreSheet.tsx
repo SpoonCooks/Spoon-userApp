@@ -62,6 +62,13 @@ export interface TellUsMoreSheetProps {
   readonly visible: boolean;
   readonly onClose: () => void;
   readonly onSend?: (feedback: { readonly text: string }) => void;
+  /**
+   * Only the written field: on a real visit nothing records or uploads yet, so the recorder and
+   * the "Added so far" media are left out rather than drawn as if they worked.
+   */
+  readonly writtenOnly?: boolean;
+  /** What the field opens with, e.g. a note already added. */
+  readonly initialText?: string;
   readonly testID?: string;
 }
 
@@ -75,16 +82,19 @@ export function TellUsMoreSheet({
   visible,
   onClose,
   onSend,
+  writtenOnly = false,
+  initialText = '',
   testID = 'tell-us-more-sheet',
 }: TellUsMoreSheetProps) {
   const insets = useSafeAreaInsets();
   const [translateY] = useState(() => new Animated.Value(SHEET_OFFSET));
   const [mounted, setMounted] = useState(visible);
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText);
   const [media, setMedia] = useState<readonly FeedbackMedia[]>(FEEDBACK_FIXTURE.media);
 
   if (visible && !mounted) {
     setMounted(true);
+    setText(initialText);
   }
 
   useEffect(() => {
@@ -138,7 +148,9 @@ export function TellUsMoreSheet({
                   Tell us more
                 </Text>
                 <Text variant="spoonCaption" color="textRatingSubtle">
-                  Just talk — we’ll take care of the rest
+                  {writtenOnly
+                    ? 'It goes to the Spoon team with your rating'
+                    : 'Just talk — we’ll take care of the rest'}
                 </Text>
               </View>
               <Pressable
@@ -153,60 +165,64 @@ export function TellUsMoreSheet({
               </Pressable>
             </View>
 
-            {/* `1501:7212` — recorder. */}
-            <View style={styles.recorder} testID={`${testID}-recorder`}>
-              <View style={styles.timer}>
-                <Image source={RATING_ART.liveDot} style={styles.liveDot} />
-                <Text variant="spoonDisplay">{FEEDBACK_FIXTURE.recordingTime}</Text>
-                <Text variant="spoonCaption" color="textRatingSubtle">
-                  Listening…
-                </Text>
-              </View>
-              <View style={styles.waveform}>
-                {RECORDER_BARS.map((height, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.recorderBar,
-                      { height },
-                      index >= RECORDER_BARS_RECORDED ? styles.recorderBarPending : null,
-                    ]}
-                  />
-                ))}
-              </View>
-              <Text variant="spoonCaption" color="textSecondarySoft" align="center">
-                {FEEDBACK_PROMPT}
-              </Text>
-              <View style={styles.controls}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Discard recording"
-                  style={styles.controlDisc}
-                  testID={`${testID}-discard`}
-                >
-                  <Image source={RATING_ART.close} style={styles.icon} />
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Stop recording"
-                  style={styles.stop}
-                  testID={`${testID}-stop`}
-                >
-                  <View style={styles.stopRing} />
-                  <View style={styles.stopFill}>
-                    <View style={styles.stopSquare} />
+            {writtenOnly ? null : (
+              <>
+                {/* `1501:7212` — recorder. */}
+                <View style={styles.recorder} testID={`${testID}-recorder`}>
+                  <View style={styles.timer}>
+                    <Image source={RATING_ART.liveDot} style={styles.liveDot} />
+                    <Text variant="spoonDisplay">{FEEDBACK_FIXTURE.recordingTime}</Text>
+                    <Text variant="spoonCaption" color="textRatingSubtle">
+                      Listening…
+                    </Text>
                   </View>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Save recording"
-                  style={styles.controlDisc}
-                  testID={`${testID}-save`}
-                >
-                  <Image source={RATING_ART.saveCheck} style={styles.icon} />
-                </Pressable>
-              </View>
-            </View>
+                  <View style={styles.waveform}>
+                    {RECORDER_BARS.map((height, index) => (
+                      <View
+                        key={index}
+                        style={[
+                          styles.recorderBar,
+                          { height },
+                          index >= RECORDER_BARS_RECORDED ? styles.recorderBarPending : null,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text variant="spoonCaption" color="textSecondarySoft" align="center">
+                    {FEEDBACK_PROMPT}
+                  </Text>
+                  <View style={styles.controls}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Discard recording"
+                      style={styles.controlDisc}
+                      testID={`${testID}-discard`}
+                    >
+                      <Image source={RATING_ART.close} style={styles.icon} />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Stop recording"
+                      style={styles.stop}
+                      testID={`${testID}-stop`}
+                    >
+                      <View style={styles.stopRing} />
+                      <View style={styles.stopFill}>
+                        <View style={styles.stopSquare} />
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Save recording"
+                      style={styles.controlDisc}
+                      testID={`${testID}-save`}
+                    >
+                      <Image source={RATING_ART.saveCheck} style={styles.icon} />
+                    </Pressable>
+                  </View>
+                </View>
+              </>
+            )}
 
             {/* `1517:9325` — written feedback. */}
             <View style={styles.block}>
@@ -226,94 +242,98 @@ export function TellUsMoreSheet({
               </View>
             </View>
 
-            {/* `1501:7267` — added so far. */}
-            <View style={styles.block}>
-              <View style={styles.addedHead}>
-                <Text variant="spoonCaptionStrong" color="textSecondary">
-                  Added so far
-                </Text>
-                <Text variant="spoonMicro" color="textRatingMeta">
-                  {addedSummary(1, media)}
-                </Text>
-              </View>
-
-              <View style={styles.voiceNote} testID={`${testID}-voice-note`}>
-                <View style={styles.voicePlayDisc}>
-                  <Image source={RATING_ART.voicePlay} style={styles.icon} />
-                </View>
-                <View style={styles.voiceWave}>
-                  {VOICE_NOTE_BARS.map((height, index) => (
-                    <View key={index} style={[styles.voiceBar, { height }]} />
-                  ))}
-                </View>
-                <Text variant="spoonCaptionStrong">{FEEDBACK_FIXTURE.voiceNote.duration}</Text>
-              </View>
-
-              <View style={styles.media}>
-                {media.map((item) => {
-                  const [top, bottom] = WASHES[item.wash];
-                  return (
-                    <View key={item.id} style={styles.thumb} testID={`${testID}-${item.id}`}>
-                      <LinearGradient
-                        colors={[lightTheme.colors[top], lightTheme.colors[bottom]]}
-                        locations={[0, 0.83333]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={StyleSheet.absoluteFill}
-                      />
-                      {item.kind === 'photo' ? (
-                        <Image source={RATING_ART.dish} style={styles.thumbDish} />
-                      ) : (
-                        <>
-                          <View style={styles.thumbPlayDisc}>
-                            <Image source={RATING_ART.videoPlay} style={styles.thumbPlay} />
-                          </View>
-                          <Text
-                            variant="spoonMicroStrong"
-                            color="textInverse"
-                            style={styles.thumbDuration}
-                          >
-                            {item.duration}
-                          </Text>
-                        </>
-                      )}
-                      <Pressable
-                        onPress={() =>
-                          setMedia((current) => current.filter((entry) => entry.id !== item.id))
-                        }
-                        accessibilityRole="button"
-                        accessibilityLabel={`Remove ${item.kind}`}
-                        hitSlop={lightTheme.space.xs}
-                        style={styles.thumbRemove}
-                        testID={`${testID}-${item.id}-remove`}
-                      >
-                        <Image source={RATING_ART.removeClose} style={styles.removeGlyph} />
-                      </Pressable>
-                    </View>
-                  );
-                })}
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Add photo or video"
-                  style={styles.addTile}
-                  testID={`${testID}-add`}
-                >
-                  {/* `167:25` — `Icon/Add` is two 2pt bars, drawn as rectangles in the file. */}
-                  <View style={styles.addIcon}>
-                    <View style={styles.addBarH} />
-                    <View style={styles.addBarV} />
+            {writtenOnly ? null : (
+              <>
+                {/* `1501:7267` — added so far. */}
+                <View style={styles.block}>
+                  <View style={styles.addedHead}>
+                    <Text variant="spoonCaptionStrong" color="textSecondary">
+                      Added so far
+                    </Text>
+                    <Text variant="spoonMicro" color="textRatingMeta">
+                      {addedSummary(1, media)}
+                    </Text>
                   </View>
-                  <Text
-                    variant="spoonMicro"
-                    color="textSecondarySoft"
-                    align="center"
-                    style={styles.addLabel}
-                  >
-                    Photo/Video
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
+
+                  <View style={styles.voiceNote} testID={`${testID}-voice-note`}>
+                    <View style={styles.voicePlayDisc}>
+                      <Image source={RATING_ART.voicePlay} style={styles.icon} />
+                    </View>
+                    <View style={styles.voiceWave}>
+                      {VOICE_NOTE_BARS.map((height, index) => (
+                        <View key={index} style={[styles.voiceBar, { height }]} />
+                      ))}
+                    </View>
+                    <Text variant="spoonCaptionStrong">{FEEDBACK_FIXTURE.voiceNote.duration}</Text>
+                  </View>
+
+                  <View style={styles.media}>
+                    {media.map((item) => {
+                      const [top, bottom] = WASHES[item.wash];
+                      return (
+                        <View key={item.id} style={styles.thumb} testID={`${testID}-${item.id}`}>
+                          <LinearGradient
+                            colors={[lightTheme.colors[top], lightTheme.colors[bottom]]}
+                            locations={[0, 0.83333]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={StyleSheet.absoluteFill}
+                          />
+                          {item.kind === 'photo' ? (
+                            <Image source={RATING_ART.dish} style={styles.thumbDish} />
+                          ) : (
+                            <>
+                              <View style={styles.thumbPlayDisc}>
+                                <Image source={RATING_ART.videoPlay} style={styles.thumbPlay} />
+                              </View>
+                              <Text
+                                variant="spoonMicroStrong"
+                                color="textInverse"
+                                style={styles.thumbDuration}
+                              >
+                                {item.duration}
+                              </Text>
+                            </>
+                          )}
+                          <Pressable
+                            onPress={() =>
+                              setMedia((current) => current.filter((entry) => entry.id !== item.id))
+                            }
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove ${item.kind}`}
+                            hitSlop={lightTheme.space.xs}
+                            style={styles.thumbRemove}
+                            testID={`${testID}-${item.id}-remove`}
+                          >
+                            <Image source={RATING_ART.removeClose} style={styles.removeGlyph} />
+                          </Pressable>
+                        </View>
+                      );
+                    })}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Add photo or video"
+                      style={styles.addTile}
+                      testID={`${testID}-add`}
+                    >
+                      {/* `167:25` — `Icon/Add` is two 2pt bars, drawn as rectangles in the file. */}
+                      <View style={styles.addIcon}>
+                        <View style={styles.addBarH} />
+                        <View style={styles.addBarV} />
+                      </View>
+                      <Text
+                        variant="spoonMicro"
+                        color="textSecondarySoft"
+                        align="center"
+                        style={styles.addLabel}
+                      >
+                        Photo/Video
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </>
+            )}
 
             {/* `1501:7333` — CTA. */}
             <Pressable
@@ -322,7 +342,7 @@ export function TellUsMoreSheet({
               style={styles.send}
               testID={`${testID}-send`}
             >
-              <Text variant="spoonButton">Send feedback</Text>
+              <Text variant="spoonButton">{writtenOnly ? 'Add note' : 'Send feedback'}</Text>
             </Pressable>
           </ScrollView>
         </Animated.View>
