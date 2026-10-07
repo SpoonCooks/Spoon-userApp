@@ -6,8 +6,8 @@ import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import type { ColorToken } from '@ui/tokens/semantic';
 
-import { VISIT_FIXTURE } from '../../data/visit';
-import type { VisitPrepItem, VisitPrepKey, VisitPrepReady } from '../../data/visit';
+import { visitDemoModel } from '../../data/visit';
+import type { VisitPrepData, VisitPrepItem, VisitPrepKey, VisitPrepReady } from '../../data/visit';
 import {
   VISIT_DISH_GLYPH,
   VISIT_PREP_CHECK_OFF,
@@ -43,13 +43,24 @@ import {
  * the app has no haptics module. Tick state is local UI state; nothing persists it.
  */
 export interface BeforeArrivalCardProps {
-  /** How many checks start ticked, first to last. */
+  readonly prep?: VisitPrepData;
+  /** How many checks start ticked, first to last (the frames' 0 / 1 / 3). */
   readonly initialReady?: VisitPrepReady | undefined;
+  /** The checks already saved, by key; wins over `initialReady`. */
+  readonly initialChecked?: readonly VisitPrepKey[] | undefined;
   readonly onChange?: ((checked: readonly VisitPrepKey[]) => void) | undefined;
   readonly testID?: string | undefined;
 }
 
-const { prep } = VISIT_FIXTURE;
+const DEMO = visitDemoModel('assigned');
+const DEMO_PREP_FALLBACK: VisitPrepData = {
+  title: '',
+  items: [],
+  idleHint: '',
+  doneHint: '',
+  why: '',
+  allSet: '',
+};
 
 const GLYPHS: Record<VisitPrepKey, ImageSourcePropType> = {
   entry: VISIT_PREP_LOCK,
@@ -68,12 +79,14 @@ const BURST = [0, 1, 2, 3, 4, 5].map((index) => {
 });
 
 export function BeforeArrivalCard({
+  prep = DEMO.prep ?? DEMO_PREP_FALLBACK,
   initialReady = 0,
+  initialChecked,
   onChange,
   testID = 'visit-before-arrival',
 }: BeforeArrivalCardProps) {
   const [checked, setChecked] = useState<ReadonlySet<VisitPrepKey>>(
-    () => new Set(prep.items.slice(0, initialReady).map((item) => item.key)),
+    () => new Set(initialChecked ?? prep.items.slice(0, initialReady).map((item) => item.key)),
   );
   const ready = checked.size;
   const allSet = ready === prep.items.length;
@@ -112,6 +125,7 @@ export function BeforeArrivalCard({
         {prep.items.map((item) => (
           <PrepTile
             key={item.key}
+            prep={prep}
             item={item}
             checked={checked.has(item.key)}
             allSet={allSet}
@@ -122,7 +136,7 @@ export function BeforeArrivalCard({
       </View>
 
       {allSet ? (
-        <AllSetBanner testID={testID} />
+        <AllSetBanner prep={prep} testID={testID} />
       ) : (
         <Text variant="spoonCaption" color="textSecondarySoft">
           {prep.why}
@@ -239,12 +253,14 @@ function Segment({
 }
 
 function PrepTile({
+  prep,
   item,
   checked,
   allSet,
   onPress,
   testID,
 }: {
+  readonly prep: VisitPrepData;
   readonly item: VisitPrepItem;
   readonly checked: boolean;
   readonly allSet: boolean;
@@ -333,7 +349,7 @@ function PrepTile({
   );
 }
 
-function AllSetBanner({ testID }: { readonly testID: string }) {
+function AllSetBanner({ prep, testID }: { readonly prep: VisitPrepData; readonly testID: string }) {
   const [enter] = useState(() => new Animated.Value(0));
 
   useEffect(() => {

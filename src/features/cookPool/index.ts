@@ -15,6 +15,8 @@ export type { CookPoolFlowProps } from './screens/CookPoolFlow';
 export { API_COOK_POOL_SOURCE, CookPoolSourceProvider } from './data';
 export type { CookPoolActions, CookPoolSource } from './data';
 export { createDemoCookPoolSource } from './demoSource';
+/** A pooled cook's profile as the app draws it (lines, stats and the menu with dish pictures). */
+export { cookProfileFrom } from './adapters';
 export * from './api';
 export type { CookPoolState, ServedCook } from './pool';
 export type {

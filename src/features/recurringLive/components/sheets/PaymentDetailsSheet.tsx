@@ -4,6 +4,7 @@ import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { PAYMENT_DETAILS_SHEET } from '../../data/sheets';
+import type { PaymentDetailsSheetData } from '../../data/sheets';
 import { SHEET_BELL_GLYPH, SHEET_CHEVRON_GLYPH, SHEET_MONEY_GLYPH, SHEET_STITCH } from './assets';
 import { RecurringSheet } from './RecurringSheet';
 
@@ -30,6 +31,9 @@ import { RecurringSheet } from './RecurringSheet';
 export interface PaymentDetailsSheetProps {
   readonly visible: boolean;
   readonly onClose: () => void;
+  /** Defaults to the frame's. */
+  readonly data?: PaymentDetailsSheetData;
+  /** Absent: no "Manage" link (there is nowhere to manage Autopay yet). */
   readonly onManageAutopay?: () => void;
   readonly testID?: string;
 }
@@ -37,11 +41,10 @@ export interface PaymentDetailsSheetProps {
 export function PaymentDetailsSheet({
   visible,
   onClose,
+  data = PAYMENT_DETAILS_SHEET,
   onManageAutopay,
   testID = 'payment-details-sheet',
 }: PaymentDetailsSheetProps) {
-  const data = PAYMENT_DETAILS_SHEET;
-
   return (
     <RecurringSheet
       visible={visible}
@@ -82,9 +85,11 @@ export function PaymentDetailsSheet({
           </View>
           {/* `1474:2505` — bottom-aligned, 8pt apart. */}
           <View style={styles.price}>
-            <Text variant="spoonBody" color="textSecondarySoft" style={styles.struck}>
-              {data.totalOriginal}
-            </Text>
+            {data.totalOriginal === undefined ? null : (
+              <Text variant="spoonBody" color="textSecondarySoft" style={styles.struck}>
+                {data.totalOriginal}
+              </Text>
+            )}
             <Text variant="spoonDisplay" testID={`${testID}-total`}>
               {data.total}
             </Text>
@@ -106,16 +111,18 @@ export function PaymentDetailsSheet({
               {data.methodDetail}
             </Text>
           </View>
-          <Pressable
-            onPress={onManageAutopay}
-            accessibilityRole="link"
-            hitSlop={lightTheme.space.md}
-            style={({ pressed }) => [styles.manage, pressed ? styles.pressed : null]}
-            testID={`${testID}-manage`}
-          >
-            <Text variant="spoonCaptionStrong">{data.manageLabel}</Text>
-            <Image source={SHEET_CHEVRON_GLYPH} style={styles.glyph16} />
-          </Pressable>
+          {onManageAutopay === undefined ? null : (
+            <Pressable
+              onPress={onManageAutopay}
+              accessibilityRole="link"
+              hitSlop={lightTheme.space.md}
+              style={({ pressed }) => [styles.manage, pressed ? styles.pressed : null]}
+              testID={`${testID}-manage`}
+            >
+              <Text variant="spoonCaptionStrong">{data.manageLabel}</Text>
+              <Image source={SHEET_CHEVRON_GLYPH} style={styles.glyph16} />
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.status}>

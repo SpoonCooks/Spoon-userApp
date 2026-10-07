@@ -1,3 +1,15 @@
+import type { ImageSourcePropType } from 'react-native';
+
+import {
+  VISIT_COOK_PHOTO,
+  VISIT_DISH_PHOTO,
+  VISIT_POOL_JYOTI,
+  VISIT_POOL_REKHA,
+  VISIT_POOL_SANCHITA,
+} from '../components/visit/assets';
+import { MODIFY_BOOKING_SHEET, PAYMENT_DETAILS_SHEET } from './sheets';
+import type { ModifyBookingSheetData, PaymentDetailsSheetData } from './sheets';
+
 /**
  * Fixture data for the recurring live booking "Visit details" screen, read verbatim off Figma
  * `cCQlzTeiObQkpVBzwI8mZi` page `1005:131`: `1008:5398` (Cook assigned), `1466:8275` (Cook
@@ -33,7 +45,8 @@ export interface VisitRefundLine {
 
 export interface VisitRefundStep {
   readonly title: string;
-  readonly when: string;
+  /** Absent when the backend gives no time for the step. */
+  readonly when?: string | undefined;
 }
 
 export const VISIT_FIXTURE = {
@@ -151,3 +164,177 @@ export const VISIT_FIXTURE = {
     ] as readonly VisitRefundStep[],
   },
 } as const;
+
+/*
+ * ─── The screen's model ──────────────────────────────────────────────────────────────────────
+ *
+ * Everything Visit details draws, section by section. The dev preview renders `VISIT_DEMO_MODEL`
+ * (the frames' own copy, above); the real route builds one from the visit (`visitDetailsFrom`).
+ * A field the backend has no value for is optional, and its line is left out rather than filled
+ * with sample copy.
+ */
+
+export interface VisitBannerData {
+  readonly date: string;
+  readonly slot: string;
+  /** Upcoming (cook pending) only. */
+  readonly daysToGo?: string | undefined;
+}
+
+export interface VisitCookData {
+  readonly eyebrow: string;
+  readonly name: string;
+  readonly origin?: string | undefined;
+  readonly visits?: string | undefined;
+  readonly rating?: string | undefined;
+  readonly note: string;
+  readonly photo?: ImageSourcePropType | undefined;
+}
+
+export interface VisitDish {
+  readonly id: string;
+  readonly name: string;
+  readonly image?: ImageSourcePropType | undefined;
+}
+
+export interface VisitMenuSection {
+  readonly id: string;
+  readonly title: string;
+  readonly dishes: readonly VisitDish[];
+}
+
+export interface VisitPendingCook {
+  readonly id: string;
+  readonly name: string;
+  readonly match?: string | undefined;
+  readonly photo?: ImageSourcePropType | undefined;
+}
+
+export interface VisitPendingData {
+  readonly note: string;
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly body: string;
+  readonly pool: readonly VisitPendingCook[];
+  readonly cta: string;
+}
+
+export interface VisitCancelledData {
+  readonly title: string;
+  readonly byline: string;
+  readonly eyebrow: string;
+  /** "Next visit · Fri, 16 Oct, 9:00 AM"; `null` when nothing is left to run. */
+  readonly nextVisit: string | null;
+}
+
+export interface VisitRecipeData {
+  readonly title: string;
+  readonly body: string;
+  readonly cta: string;
+}
+
+export interface VisitPrepData {
+  readonly title: string;
+  readonly items: readonly VisitPrepItem[];
+  readonly idleHint: string;
+  readonly doneHint: string;
+  readonly why: string;
+  readonly allSet: string;
+}
+
+export interface VisitChargeData {
+  readonly eyebrow: string;
+  readonly was?: string | undefined;
+  readonly amount: string;
+  readonly taxNote: string;
+  readonly title: string;
+  readonly body: string;
+}
+
+export interface VisitRefundData {
+  readonly title: string;
+  readonly booking?: string | undefined;
+  readonly badge: string;
+  readonly lines: readonly VisitRefundLine[];
+  readonly total: VisitRefundLine;
+  readonly modeEyebrow: string;
+  readonly mode?: string | undefined;
+  readonly idEyebrow: string;
+  readonly refundId?: string | undefined;
+  readonly steps: readonly VisitRefundStep[];
+}
+
+export interface VisitDetailsModel {
+  readonly variant: VisitVariant;
+  readonly banner: VisitBannerData;
+  /** Assigned. */
+  readonly cook: VisitCookData;
+  readonly menu: readonly VisitMenuSection[];
+  /** Pending. */
+  readonly pending: VisitPendingData;
+  /** Cancelled. */
+  readonly cancelled: VisitCancelledData;
+  /** Upcoming; `null` hides the recipe row. */
+  readonly recipe: VisitRecipeData | null;
+  /** Upcoming; `null` hides the checklist (nothing to save it against yet). */
+  readonly prep: VisitPrepData | null;
+  readonly prepChecked: readonly VisitPrepKey[];
+  readonly charge: VisitChargeData;
+  /** Cancelled with something charged; `null` shows the charge card instead. */
+  readonly refund: VisitRefundData | null;
+  readonly paymentSheet: PaymentDetailsSheetData;
+  /** Upcoming and cancellable; `null` leaves "Modify booking" out of the dock. */
+  readonly modifySheet: ModifyBookingSheetData | null;
+}
+
+const DEMO_POOL_PHOTOS: Record<VisitPoolCook['key'], ImageSourcePropType> = {
+  sanchita: VISIT_POOL_SANCHITA,
+  jyoti: VISIT_POOL_JYOTI,
+  rekha: VISIT_POOL_REKHA,
+};
+
+/** The frames' own content, per variant (`prepReady` ticks the first N checks, as the frames do). */
+export function visitDemoModel(
+  variant: VisitVariant,
+  prepReady: VisitPrepReady = 0,
+): VisitDetailsModel {
+  const f = VISIT_FIXTURE;
+  return {
+    variant,
+    banner: { date: f.date, slot: f.slot, daysToGo: f.daysToGo },
+    cook: { ...f.cook, photo: VISIT_COOK_PHOTO },
+    menu: f.menu.sections.map((id) => ({
+      id,
+      title: f.menu.sectionTitle,
+      dishes: Array.from({ length: f.menu.dishesPerSection }, (_, i) => ({
+        id: `${id}-${i}`,
+        name: f.menu.dishName,
+        image: VISIT_DISH_PHOTO,
+      })),
+    })),
+    pending: {
+      ...f.pending,
+      pool: f.pending.pool.map((cook) => ({
+        id: cook.key,
+        name: cook.name,
+        match: cook.match,
+        photo: DEMO_POOL_PHOTOS[cook.key],
+      })),
+    },
+    cancelled: { ...f.cancelled },
+    recipe: { ...f.recipe },
+    prep: { ...f.prep },
+    prepChecked: f.prep.items.slice(0, prepReady).map((item) => item.key),
+    charge: {
+      eyebrow: f.charge.eyebrow,
+      was: f.charge.was,
+      amount: f.charge.amount,
+      taxNote: f.charge.taxNote,
+      title: f.charge.title,
+      body: variant === 'assigned' ? f.charge.bodyAssigned : f.charge.bodyNotice,
+    },
+    refund: variant === 'cancelled' ? { ...f.refund } : null,
+    paymentSheet: PAYMENT_DETAILS_SHEET,
+    modifySheet: variant === 'assigned' || variant === 'pending' ? MODIFY_BOOKING_SHEET : null,
+  };
+}

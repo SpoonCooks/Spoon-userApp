@@ -5,7 +5,7 @@ import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { MODIFY_BOOKING_SHEET } from '../../data/sheets';
-import type { ModifyBookingStepKind } from '../../data/sheets';
+import type { ModifyBookingSheetData, ModifyBookingStepKind } from '../../data/sheets';
 import {
   SHEET_NODE_FEE,
   SHEET_NODE_NOW,
@@ -35,6 +35,8 @@ import { RecurringSheet } from './RecurringSheet';
 export interface ModifyBookingSheetProps {
   readonly visible: boolean;
   readonly onClose: () => void;
+  /** Defaults to the frame's. */
+  readonly data?: ModifyBookingSheetData;
   readonly onCancelVisit?: () => void;
   readonly testID?: string;
 }
@@ -52,11 +54,10 @@ const pct = (pt: number) => `${(pt / THREAD_ROW_WIDTH) * 100}%` as const;
 export function ModifyBookingSheet({
   visible,
   onClose,
+  data = MODIFY_BOOKING_SHEET,
   onCancelVisit,
   testID = 'modify-booking-sheet',
 }: ModifyBookingSheetProps) {
-  const data = MODIFY_BOOKING_SHEET;
-
   return (
     <RecurringSheet
       visible={visible}

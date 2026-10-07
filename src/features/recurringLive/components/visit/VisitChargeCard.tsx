@@ -3,7 +3,8 @@ import { Image, StyleSheet, View } from 'react-native';
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { VISIT_FIXTURE } from '../../data/visit';
+import { visitDemoModel } from '../../data/visit';
+import type { VisitChargeData } from '../../data/visit';
 import { VISIT_MONEY_20, VISIT_STITCH_VERTICAL } from './assets';
 
 /**
@@ -12,13 +13,17 @@ import { VISIT_MONEY_20, VISIT_STITCH_VERTICAL } from './assets';
  * stitch, then "Pay per visit" and how it's charged. Only that last line differs between frames.
  */
 export interface VisitChargeCardProps {
-  readonly body: string;
+  /** Defaults to the frame's (Cook assigned). No list price leaves the struck line out. */
+  readonly charge?: VisitChargeData;
   readonly testID?: string | undefined;
 }
 
-const { charge } = VISIT_FIXTURE;
+const DEMO = visitDemoModel('assigned');
 
-export function VisitChargeCard({ body, testID = 'visit-charge' }: VisitChargeCardProps) {
+export function VisitChargeCard({
+  charge = DEMO.charge,
+  testID = 'visit-charge',
+}: VisitChargeCardProps) {
   return (
     <View style={styles.card} testID={testID}>
       <View style={styles.amount}>
@@ -26,9 +31,11 @@ export function VisitChargeCard({ body, testID = 'visit-charge' }: VisitChargeCa
           {charge.eyebrow}
         </Text>
         <View style={styles.price}>
-          <Text variant="spoonBody" color="textSecondarySoft" style={styles.struck}>
-            {charge.was}
-          </Text>
+          {charge.was === undefined ? null : (
+            <Text variant="spoonBody" color="textSecondarySoft" style={styles.struck}>
+              {charge.was}
+            </Text>
+          )}
           <Text variant="spoonDisplay" color="textPrimary" align="center" style={styles.now}>
             {charge.amount}
           </Text>
@@ -48,7 +55,7 @@ export function VisitChargeCard({ body, testID = 'visit-charge' }: VisitChargeCa
           </Text>
         </View>
         <Text variant="spoonCaption" color="textSecondarySoft">
-          {body}
+          {charge.body}
         </Text>
       </View>
     </View>

@@ -1,19 +1,11 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
-import type { ImageSourcePropType } from 'react-native';
 
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import { VISIT_FIXTURE } from '../../data/visit';
-import type { VisitPoolCook } from '../../data/visit';
-import {
-  VISIT_BELL_PENDING,
-  VISIT_CHEVRON_18,
-  VISIT_POOL_JYOTI,
-  VISIT_POOL_REKHA,
-  VISIT_POOL_SANCHITA,
-  VISIT_POOL_THREAD,
-} from './assets';
+import { visitDemoModel } from '../../data/visit';
+import type { VisitPendingData } from '../../data/visit';
+import { VISIT_BELL_PENDING, VISIT_CHEVRON_18, VISIT_POOL_THREAD } from './assets';
 
 /**
  * `Cook details` · Cook pending — Figma `1466:8280` (component `1466:797`).
@@ -23,19 +15,16 @@ import {
  * strung on a yellow thread across a `#FFF7CC` panel) and the full-width "View Cook Pool" pill.
  */
 export interface CookPendingCardProps {
+  /** Defaults to the frame's. Pool cooks without a photo or match line leave them out. */
+  readonly pending?: VisitPendingData;
   readonly onViewPool?: (() => void) | undefined;
   readonly testID?: string | undefined;
 }
 
-const PHOTOS: Record<VisitPoolCook['key'], ImageSourcePropType> = {
-  sanchita: VISIT_POOL_SANCHITA,
-  jyoti: VISIT_POOL_JYOTI,
-  rekha: VISIT_POOL_REKHA,
-};
-
-const { pending } = VISIT_FIXTURE;
+const DEMO = visitDemoModel('pending');
 
 export function CookPendingCard({
+  pending = DEMO.pending,
   onViewPool,
   testID = 'visit-cook-pending',
 }: CookPendingCardProps) {
@@ -64,16 +53,18 @@ export function CookPendingCard({
       <View style={styles.pool}>
         <Image source={VISIT_POOL_THREAD} style={styles.thread} />
         {pending.pool.map((cook) => (
-          <View key={cook.key} style={styles.cook} testID={`${testID}-${cook.key}`}>
+          <View key={cook.id} style={styles.cook} testID={`${testID}-${cook.id}`}>
             <View style={styles.photoClip}>
-              <Image source={PHOTOS[cook.key]} style={styles.photo} />
+              {cook.photo === undefined ? null : <Image source={cook.photo} style={styles.photo} />}
             </View>
             <Text variant="spoonCaptionStrong" color="textPrimary" align="center">
               {cook.name}
             </Text>
-            <Text variant="spoonMicro" color="textSecondarySoft" align="center">
-              {cook.match}
-            </Text>
+            {cook.match === undefined ? null : (
+              <Text variant="spoonMicro" color="textSecondarySoft" align="center">
+                {cook.match}
+              </Text>
+            )}
           </View>
         ))}
       </View>

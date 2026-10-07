@@ -44,12 +44,16 @@ export function useCookPoolCandidates(
   });
 }
 
-export function useCookPoolProfile(cookId: string): ScreenQuery<PoolCookProfileDto> {
+export function useCookPoolProfile(
+  cookId: string,
+  options: { enabled?: boolean } = {},
+): ScreenQuery<PoolCookProfileDto> {
   const { api } = useRuntime();
   const pool = createCookPoolApi(api);
   return useApiQuery<PoolCookProfileDto>({
     queryKey: cookPoolKeys.profile(cookId),
     queryFn: ({ signal }) => pool.profile(cookId, signal),
+    enabled: options.enabled !== false,
   });
 }
 
