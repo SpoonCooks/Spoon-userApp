@@ -359,6 +359,16 @@ describe('visitWhatsAppLink', () => {
     );
   });
 
+  it('names the booking once the visit has one', () => {
+    const link = visitWhatsAppLink(
+      visit({ cook: COOK, bookingId: 'bk-42', support: { whatsappUrl: 'https://wa.me/91' } }),
+      'help',
+    );
+    expect(text(link)).toBe(
+      'Hi Spoon, I need help with booking bk-42 · Wed, 14 Oct, 9:00 AM · Cook Meera.',
+    );
+  });
+
   it('leaves out a cook not yet assigned, and words Share for the recipe', () => {
     expect(text(visitWhatsAppLink(visit(), 'recipe'))).toBe(
       'Hi Spoon, I have a recipe/dish in mind for my visit · Wed, 14 Oct, 9:00 AM.',

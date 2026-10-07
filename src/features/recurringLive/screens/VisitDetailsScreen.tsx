@@ -14,6 +14,8 @@ import { RefundSummaryCard } from '../components/visit/RefundSummaryCard';
 import { VisitCancelledCard } from '../components/visit/VisitCancelledCard';
 import { VisitChargeCard } from '../components/visit/VisitChargeCard';
 import { VisitHeader } from '../components/visit/VisitHeader';
+import { VisitCookActions } from '../components/visit/VisitCookActions';
+import { VisitRebook } from '../components/visit/VisitRebook';
 import { VisitStatusBanner } from '../components/visit/VisitStatusBanner';
 import { VisitToast } from '../components/visit/VisitToast';
 import type { VisitToastHandle } from '../components/visit/VisitToast';
@@ -63,6 +65,15 @@ export interface VisitDetailsScreenProps {
   /** How many prep checks start ticked: 0 (`1441:1808`), 1 (`1441:1853`) or 3 (`1441:1898`). */
   readonly prepState?: VisitPrepReady | undefined;
   readonly onPrepChange?: ((checked: readonly VisitPrepKey[]) => void) | undefined;
+  /** A past visit (completed or cancelled): start a new Recurring plan. */
+  readonly onBookAgain?: (() => void) | undefined;
+  /** Shown only when the visit's debit failed: a one-time visit for the same slot. */
+  readonly onBookOneTime?: (() => void) | undefined;
+  /** Completed only: add this visit's cook to the Pool (only while not in it). */
+  readonly onAddCookToPool?: (() => void) | undefined;
+  readonly addingCookToPool?: boolean;
+  /** Completed only: tip the cook (only while the server allows it). */
+  readonly onTipCook?: (() => void) | undefined;
   readonly testID?: string | undefined;
 }
 
@@ -80,6 +91,11 @@ export function VisitDetailsScreen({
   ratingSlot,
   prepState = 0,
   onPrepChange,
+  onBookAgain,
+  onBookOneTime,
+  onAddCookToPool,
+  addingCookToPool = false,
+  onTipCook,
   testID = 'visit-details-screen',
 }: VisitDetailsScreenProps) {
   const model = given ?? visitDemoModel(demoVariant, prepState);
@@ -147,6 +163,15 @@ export function VisitDetailsScreen({
           />
         ) : null}
         {variant === 'completed' ? (ratingSlot ?? null) : null}
+        {variant === 'completed' ? (
+          <VisitCookActions
+            cookName={model.cook.name.replace(/^Cook\s+/u, '')}
+            onAddToPool={onAddCookToPool}
+            adding={addingCookToPool}
+            onTip={onTipCook}
+            testID={`${testID}-cook-actions`}
+          />
+        ) : null}
 
         {upcoming ? (
           <>
@@ -172,6 +197,14 @@ export function VisitDetailsScreen({
           <RefundSummaryCard refund={model.refund} testID={`${testID}-refund`} />
         ) : (
           <VisitChargeCard charge={model.charge} testID={`${testID}-charge`} />
+        )}
+
+        {upcoming ? null : (
+          <VisitRebook
+            onBookOneTime={model.paymentFailed ? onBookOneTime : undefined}
+            onBookAgain={onBookAgain}
+            testID={`${testID}-rebook`}
+          />
         )}
       </Screen>
       <VisitToast ref={toast} testID={`${testID}-toast`} />

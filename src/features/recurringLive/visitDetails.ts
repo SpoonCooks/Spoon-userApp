@@ -349,6 +349,9 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
       reminder:
         'Mandate is shared 27 hrs before & payment is auto-debited 3 hrs before the service time.',
     },
+    paymentFailed:
+      variant === 'cancelled' &&
+      (cancellation?.cancelledBy ?? visit.cancelledBy) === 'payment_failed',
     modifySheet:
       upcoming && quote !== null && quote.cancellable
         ? {
@@ -379,11 +382,12 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
 }
 
 /**
- * `Note · Help deep link` — Help (and Share on the recipe row) go straight to WhatsApp with Spoon,
- * prefilled: "Hi Spoon, I need help with booking #SP24817 · Wed, 14 Oct, 9:00 AM · Cook Sanchita."
- * The number is the backend's (`support.whatsappUrl`, null when none is configured); the message is
- * written here in the note's shape. There is no customer-facing booking reference, so "my visit"
- * stands in for "booking #…", and a visit with no cook yet leaves the cook out.
+ * `Note · Help deep link` and the spec's Help rule: Help (and Share on the recipe row) go straight
+ * to WhatsApp with Spoon, prefilled with the booking number, date and cook — "Hi Spoon, I need help
+ * with booking 1f3c… · Wed, 14 Oct, 9:00 AM · Cook Sanchita." The number is the backend's
+ * (`support.whatsappUrl`, null when none is configured). A visit has a booking only once it is
+ * charged at T−3h; before that "my visit" stands in, and a visit with no cook yet leaves the cook
+ * out.
  */
 export function visitWhatsAppLink(
   visit: VisitDetailDto,
@@ -391,10 +395,12 @@ export function visitWhatsAppLink(
 ): string | null {
   const url = visit.support.whatsappUrl;
   if (url === null) return null;
+  const bookingId = visit.payment?.bookingId ?? visit.bookingId;
+  const subject = bookingId === null ? 'my visit' : `booking ${bookingId}`;
   const opening =
     purpose === 'help'
-      ? 'Hi Spoon, I need help with my visit'
-      : 'Hi Spoon, I have a recipe/dish in mind for my visit';
+      ? `Hi Spoon, I need help with ${subject}`
+      : `Hi Spoon, I have a recipe/dish in mind for ${subject}`;
   const parts = [opening, `${dayLabel(visit.date)}, ${clockText(visit.startTime)}`];
   if (visit.cook !== null) parts.push(visit.cook.displayName);
   return `${url.split('?')[0] ?? url}?text=${encodeURIComponent(`${parts.join(' · ')}.`)}`;

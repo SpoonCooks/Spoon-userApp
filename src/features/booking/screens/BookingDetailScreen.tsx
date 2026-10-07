@@ -30,6 +30,11 @@ import type { BookingDetailViewModel } from '../types';
 
 export interface BookingDetailActions {
   readonly onBack: () => void;
+  /**
+   * Open on the tip sheet. A Recurring visit is an ordinary booking once charged, and its Visit
+   * details offers "Tip" by landing here — the spec reuses the V0 tip flow rather than a copy.
+   */
+  readonly initialTipOpen?: boolean;
   readonly onHelp?: () => void;
   readonly onCallCook?: () => void;
   /**
@@ -126,7 +131,7 @@ export function BookingDetailView({
   const [rating, setRating] = useState<RatingSelection | null>(null);
   const [extensionOpen, setExtensionOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [tipOpen, setTipOpen] = useState(false);
+  const [tipOpen, setTipOpen] = useState(actions.initialTipOpen === true);
   const [extensionOptionId, setExtensionOptionId] = useState<string | null>(null);
   const [tipOptionId, setTipOptionId] = useState<string | null>(null);
   // The chosen option is what the CTA's amount is ABOUT, so it is an input to the read rather

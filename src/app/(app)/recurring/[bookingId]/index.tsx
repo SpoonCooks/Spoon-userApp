@@ -2,17 +2,14 @@ import { useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { idempotency } from '@core/api';
 import { ready } from '@core/data';
 import type { DataState } from '@core/data';
 import { getUserMessage, isAppError } from '@core/errors';
-import { formatPaise } from '@core/format';
 import { useSafeBack } from '@core/navigation';
-import { CancelBookingSheet, useCancellationData } from '@features/cancellation';
-import type { CancellationStep } from '@features/cancellation';
 import {
   AutopayNotice,
   RecurringLiveScreen,
+  useCancelWholeBooking,
   RecurringPlansScreen,
   liveCalendarFrom,
   plansSummaryFrom,
@@ -24,12 +21,7 @@ import type {
   RecurringTab,
   VisitRef,
 } from '@features/recurringLive';
-import {
-  useApproveRecurringMandate,
-  useCancelRecurringBooking,
-  useRecurringBooking,
-  useRecurringBookingCancellationQuote,
-} from '@features/recurringSetup';
+import { useApproveRecurringMandate, useRecurringBooking } from '@features/recurringSetup';
 import type { VisitSummaryDto } from '@features/recurringSetup';
 import { QueryBoundary } from '@ui';
 
@@ -137,105 +129,14 @@ export default function RecurringBookingRoute() {
     );
 
   // ─── Cancelling the whole booking ──────────────────────────────────────────────────────────
-  const quote = useRecurringBookingCancellationQuote(tab === 'plans' ? (bookingId ?? null) : null);
-  const quoteData = quote.state.status === 'ready' ? quote.state.data : null;
-  const reasons = useCancellationData(null);
-  const cancelBooking = useCancelRecurringBooking();
-  const [cancelStep, setCancelStep] = useState<CancellationStep | null>(null);
-  const [cancelError, setCancelError] = useState<string | null>(null);
-
-  const cancellation = useMemo(() => {
-    if (reasons.state.status !== 'ready') return null;
-    return {
-      ...reasons.state.data,
-      refundRows:
-        quoteData === null
-          ? []
-          : [
-              {
-                label: 'Cancellation Processing Fee',
-                value: formatPaise(quoteData.totals.feePaise),
-              },
-              {
-                label: 'Refund Amount',
-                value: formatPaise(quoteData.totals.refundPaise),
-                emphasis: 'total' as const,
-              },
-            ],
-      refundPending: quoteData === null,
-      rescheduleAllowed: false,
-    };
-  }, [reasons.state, quoteData]);
-
-  const askToCancel = () => {
-    if (quoteData === null) {
-      Alert.alert('One moment', 'We’re still checking what cancelling would cost.');
-      return;
-    }
-    if (!quoteData.cancellable) {
-      Alert.alert('Can’t cancel right now', 'This booking can’t be cancelled at the moment.');
-      return;
-    }
-    const fee = quoteData.totals.feePaise;
-    Alert.alert(
-      'Cancel this booking?',
-      fee === 0
-        ? 'Every visit still to come will be cancelled. There’s no cancellation fee.'
-        : `Every visit still to come will be cancelled. The cancellation fee is ${formatPaise(fee)}.`,
-      [
-        { text: 'Keep booking', style: 'cancel' },
-        { text: 'Cancel booking', style: 'destructive', onPress: () => setCancelStep('reason') },
-      ],
-    );
-  };
-
-  const confirmCancel = (reasonCode: string, reasonDetail: string) => {
-    if (bookingId === undefined) return;
-    setCancelError(null);
-    const scope = `recurring.booking.cancel:${bookingId}`;
-    cancelBooking.mutate(
-      {
-        id: bookingId,
-        reason: reasonDetail.trim() === '' ? { reasonCode } : { reasonCode, reasonDetail },
-        scope,
-      },
-      {
-        onSuccess: (result) => {
-          setCancelStep(null);
-          setTab('live');
-          booking.refetch();
-          Alert.alert(
-            'Booking cancelled',
-            result.visitsCancelled === 1
-              ? '1 visit was cancelled.'
-              : `${result.visitsCancelled} visits were cancelled.`,
-          );
-        },
-        onError: (error) => {
-          idempotency.release(scope);
-          setCancelError(
-            isAppError(error) ? getUserMessage(error) : 'The booking could not be cancelled.',
-          );
-        },
-      },
-    );
-  };
-
-  const cancelSheet =
-    cancellation === null ? null : (
-      <CancelBookingSheet
-        visible={cancelStep !== null}
-        cancellation={cancellation}
-        step={cancelStep ?? 'reason'}
-        // Back from the reason step closes: the policy step is the one-time booking's table.
-        onStepChange={(step) => setCancelStep(step === 'policy' ? null : step)}
-        onClose={() => setCancelStep(null)}
-        onConfirmCancel={confirmCancel}
-        onBookAgain={() => setCancelStep(null)}
-        cancelling={cancelBooking.isPending}
-        cancelErrorMessage={cancelError}
-      />
-    );
+  const { askToCancel, sheet: cancelSheet } = useCancelWholeBooking({
+    bookingId: bookingId ?? null,
+    enabled: tab === 'plans',
+    onCancelled: () => {
+      setTab('live');
+      booking.refetch();
+    },
+  });
 
   return (
     <QueryBoundary state={state} onRetry={booking.refetch}>

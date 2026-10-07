@@ -55,3 +55,5 @@ export type {
 export { TellUsMoreSheet } from './components/rating/TellUsMoreSheet';
 export type { TellUsMoreSheetProps } from './components/rating/TellUsMoreSheet';
 export type { VisitRatingValue } from './data/rating';
+
+export { useCancelWholeBooking } from './cancelWholeBooking';

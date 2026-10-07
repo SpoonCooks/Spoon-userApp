@@ -25,17 +25,29 @@ import type { ScheduleSelection } from '@features/scheduled';
  */
 export default function ScheduledRoute() {
   const router = useRouter();
-  const { step, durationId: presetDuration } = useLocalSearchParams<{
+  const {
+    step,
+    durationId: presetDuration,
+    date: presetDate,
+  } = useLocalSearchParams<{
     step?: string;
     durationId?: string;
+    date?: string;
   }>();
   /**
    * Home's Schedule CTA passes the duration the customer already chose (`?durationId=dur-90`),
    * so it stays pre-selected here and only a slot and payment remain.
    */
   const preset = presetDuration?.startsWith('dur-') === true ? presetDuration : null;
+  /**
+   * A Recurring visit whose Autopay debit failed books "a one-time visit for the same slot"
+   * (`?date=2026-10-14&durationId=dur-60`): its day is chosen too. A date outside the strip is
+   * the server's to refuse, which the grid already draws as its own message.
+   */
+  const presetDay =
+    typeof presetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(presetDate) ? presetDate : null;
   const [selection, setSelection] = useState<ScheduleSelection>({
-    dayId: null,
+    dayId: presetDay,
     periodId: null,
     durationId: preset,
     slotId: null,
@@ -53,7 +65,14 @@ export default function ScheduledRoute() {
   });
 
   const devSeed = __DEV__ ? devScheduleSelection(state, step) : undefined;
-  const seed = devSeed ?? (preset === null ? undefined : { durationId: preset });
+  const seed =
+    devSeed ??
+    (preset === null && presetDay === null
+      ? undefined
+      : {
+          ...(preset === null ? {} : { durationId: preset }),
+          ...(presetDay === null ? {} : { dayId: presetDay }),
+        });
 
   /**
    * Home. Reached from the Home tile and from the Instant sheet's "Schedule instead", both of

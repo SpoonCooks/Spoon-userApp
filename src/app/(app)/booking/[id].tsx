@@ -58,7 +58,11 @@ function payNoticeFor(outcome: PaymentOutcome): string | null {
 
 export default function BookingRoute() {
   const router = useRouter();
-  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  const {
+    id,
+    from,
+    tip: openOnTip,
+  } = useLocalSearchParams<{ id: string; from?: string; tip?: string }>();
   const bookingId = id ?? '';
 
   const callCook = useCallCook(bookingId === '' ? null : bookingId);
@@ -139,6 +143,7 @@ export default function BookingRoute() {
     <ErrorBoundary scope="booking-host">
       <BookingDetailScreen
         bookingId={bookingId}
+        initialTipOpen={openOnTip === '1'}
         onBack={goBack}
         onReschedule={() => router.push(`/reschedule/${bookingId}`)}
         onHelp={() => {
