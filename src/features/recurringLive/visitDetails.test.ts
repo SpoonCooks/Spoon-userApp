@@ -5,7 +5,7 @@ import type {
   VisitDetailDto,
 } from '@features/recurringSetup';
 
-import { dayLabel, visitDetailsFrom } from './visitDetails';
+import { dayLabel, visitDetailsFrom, visitWhatsAppLink } from './visitDetails';
 import type { VisitDetailsSources } from './visitDetails';
 
 /**
@@ -203,11 +203,11 @@ describe('visitDetailsFrom', () => {
       visitLine: {
         label: 'Cook visit · 1 hr',
         caption: 'Recurring · Plan 1, Visit 1',
+        was: '₹338.14',
         amount: '₹253.39',
       },
       taxLine: { label: 'GST', amount: '₹45.61' },
       total: '₹299',
-      totalOriginal: '₹399',
       methodDetail: 'ra••••@okhdfc · Mandate active',
     });
   });
@@ -269,12 +269,17 @@ describe('visitDetailsFrom', () => {
       badge: 'Refunded',
       lines: [
         { label: 'Amount paid', amount: '₹299', was: '₹399' },
-        { label: 'Cancellation fee', amount: '– ₹149.50' },
+        { label: 'Cancellation fee (50%)', amount: '– ₹149.50', minor: true },
       ],
       total: { label: 'Refund amount', amount: '₹149.50' },
       mode: 'UPI · ra••••@okhdfc',
+      steps: [
+        { title: 'Refund initiated', when: 'Wed, 14 Oct' },
+        { title: 'It takes 5-7 working days for the amount to get credited to source', note: true },
+      ],
     });
     expect(model.refund?.refundId).toBeUndefined();
+    expect(model.refund?.booking).toBeUndefined();
   });
 
   it('says nothing was charged for a visit cancelled before its charge', () => {
@@ -317,11 +322,45 @@ describe('visitDetailsFrom', () => {
     expect(visitDetailsFrom(sources({ visit: cancelled })).cancelled.nextVisit).toBeNull();
   });
 
+  it('notes GST at the rate priced in', () => {
+    // ₹45.61 on ₹253.39 is 18%; the frames' "+ 5% GST" is sample copy.
+    expect(visitDetailsFrom(sources()).charge.taxNote).toBe('+ 18% GST');
+  });
+
   it('hides the recipe row without a WhatsApp link to share on', () => {
     expect(visitDetailsFrom(sources()).recipe).not.toBeNull();
     expect(
       visitDetailsFrom(sources({ visit: visit({ support: { whatsappUrl: null } }) })).recipe,
     ).toBeNull();
+  });
+});
+
+describe('visitWhatsAppLink', () => {
+  const text = (link: string | null) =>
+    link === null ? null : decodeURIComponent(link.split('?text=')[1] ?? '');
+
+  it('prefills Help the way the note writes it, on the backend’s number', () => {
+    const link = visitWhatsAppLink(
+      visit({
+        cook: COOK,
+        support: { whatsappUrl: 'https://wa.me/910000000000?text=Hi%20Spoon' },
+      }),
+      'help',
+    );
+    expect(link?.startsWith('https://wa.me/910000000000?text=')).toBe(true);
+    expect(text(link)).toBe(
+      'Hi Spoon, I need help with my visit · Wed, 14 Oct, 9:00 AM · Cook Meera.',
+    );
+  });
+
+  it('leaves out a cook not yet assigned, and words Share for the recipe', () => {
+    expect(text(visitWhatsAppLink(visit(), 'recipe'))).toBe(
+      'Hi Spoon, I have a recipe/dish in mind for my visit · Wed, 14 Oct, 9:00 AM.',
+    );
+  });
+
+  it('gives no link when no support number is configured', () => {
+    expect(visitWhatsAppLink(visit({ support: { whatsappUrl: null } }), 'help')).toBeNull();
   });
 });
 

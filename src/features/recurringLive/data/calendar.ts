@@ -164,7 +164,7 @@ export const CALENDAR_FIXTURE: CalendarFixture = {
       [18, 'none'],
     ]),
   ],
-  hint: 'Tap a date to check details. Tap the blank area to deselect.',
+  hint: 'Tap a date to check its details',
 };
 
 const POOL = {

@@ -24,6 +24,8 @@ export interface ModifyBookingSheetData {
 export interface PaymentLine {
   readonly label: string;
   readonly caption?: string;
+  /** `1434:1784` — the struck-through pre-discount price; absent when there is no discount. */
+  readonly was?: string | undefined;
   readonly amount: string;
 }
 
@@ -61,16 +63,16 @@ export const MODIFY_BOOKING_SHEET: ModifyBookingSheetData = {
 
 export const PAYMENT_DETAILS_SHEET: PaymentDetailsSheetData = {
   title: 'Payment details',
-  subtitle: 'Wed, 14 Oct · 9:00 AM · Booking #SP24817',
+  subtitle: 'Wed, 14 Oct · 9:00 AM',
   visitLine: {
     label: 'Cook visit · 1 hr',
     caption: 'Recurring · Plan 1, Visit 1 of 3',
+    was: '₹253.39',
     amount: '₹253.39',
   },
   taxLine: { label: 'GST', amount: '₹22.81' },
   totalLabel: 'Total',
   totalCaption: 'Inclusive of all taxes',
-  totalOriginal: '₹399',
   total: '₹299',
   methodEyebrow: 'MODE OF PAYMENT',
   methodName: 'UPI Autopay',

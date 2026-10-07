@@ -29,7 +29,7 @@ export { VisitDetailsScreen } from './screens/VisitDetailsScreen';
 export type { VisitDetailsScreenProps } from './screens/VisitDetailsScreen';
 export type { VisitDetailsModel, VisitPrepKey, VisitPrepReady, VisitVariant } from './data/visit';
 export { visitDemoModel } from './data/visit';
-export { visitDetailsFrom } from './visitDetails';
+export { visitDetailsFrom, visitWhatsAppLink } from './visitDetails';
 export type { VisitDetailsSources } from './visitDetails';
 
 export { ModifyBookingSheet } from './components/sheets/ModifyBookingSheet';

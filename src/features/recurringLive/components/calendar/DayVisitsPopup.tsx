@@ -20,7 +20,7 @@ import {
  * A 310pt white card: 1pt `#FFD600` edge, 20pt radius, pt 16 / px 16 / pb 12, 4 between blocks,
  * and a `0 8 24 rgba(153,128,0,0.18)` drop. A header (date · plan line, pb 4), then one row per
  * visit. PAST days divide their rows with a 1pt `#FFEF99` rule and have no action; TODAY and
- * UPCOMING days list without rules and end on a pale-yellow "Cancel" pill (`1006:749`).
+ * UPCOMING days list without rules and end on a pale-yellow "Close" pill (`1006:542`).
  */
 export interface DayVisitsPopupProps {
   readonly heading: string;
@@ -28,7 +28,7 @@ export interface DayVisitsPopupProps {
   readonly kind: Exclude<CalendarDayKind, 'none'>;
   readonly visits: readonly DayVisit[];
   readonly onOpenVisit?: ((visit: DayVisit) => void) | undefined;
-  readonly onCancel?: (() => void) | undefined;
+  readonly onClose?: (() => void) | undefined;
   readonly onLayout?: ((event: LayoutChangeEvent) => void) | undefined;
   readonly style?: StyleProp<ViewStyle>;
   readonly testID?: string;
@@ -40,7 +40,7 @@ export function DayVisitsPopup({
   kind,
   visits,
   onOpenVisit,
-  onCancel,
+  onClose,
   onLayout,
   style,
   testID = 'day-visits-popup',
@@ -78,13 +78,13 @@ export function DayVisitsPopup({
       {isPast ? null : (
         <View style={styles.actions}>
           <Pressable
-            onPress={onCancel}
+            onPress={onClose}
             accessibilityRole="button"
-            style={styles.cancel}
-            testID={`${testID}-cancel`}
+            style={styles.close}
+            testID={`${testID}-close`}
           >
             <Text variant="spoonButton" color="textPrimary">
-              Cancel
+              Close
             </Text>
           </Pressable>
         </View>
@@ -240,8 +240,8 @@ const styles = StyleSheet.create({
   poolPhoto: { width: 24, height: 24, borderRadius: 12 },
   poolPhotoOverlap: { marginLeft: -12 },
   actions: { paddingTop: lightTheme.space.sm },
-  /** `1006:749` — a `#FFEF99` pill, min 48 tall, px 16 / py 12. */
-  cancel: {
+  /** `1006:542` — a `#FFEF99` pill, min 48 tall, px 16 / py 12. */
+  close: {
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',

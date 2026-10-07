@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 import {
   DEFAULT_API_STUBS,
@@ -98,12 +98,12 @@ const QUOTE = {
   nothingCharged: true,
 };
 
-function render(onCancel = jest.fn()) {
+function render(onCancel = jest.fn(), visit: typeof VISIT = VISIT) {
   renderWithRuntime(<RecurringVisitRoute />, {
     runtime: createTestRuntime({
       api: createStubApi({
         ...DEFAULT_API_STUBS,
-        'GET /v1/me/recurring-bookings/rb-1/visits/visit-1': () => VISIT,
+        'GET /v1/me/recurring-bookings/rb-1/visits/visit-1': () => visit,
         'GET /v1/me/recurring-bookings/rb-1': () => BOOKING,
         'GET /v1/me/recurring-bookings/rb-1/visits/visit-1/cancellation-quote': () => QUOTE,
         'GET /v1/me/cooks': () => ({ cooks: [], count: 0 }),
@@ -154,5 +154,24 @@ describe('Recurring Visit details route', () => {
       expect(alert).toHaveBeenCalledWith('Visit cancelled', 'Your other visits stay as they are.'),
     );
     alert.mockRestore();
+  });
+
+  it('opens Help on WhatsApp, prefilled, with a toast while it opens', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    render(jest.fn(), {
+      ...VISIT,
+      support: { whatsappUrl: 'https://wa.me/910000000000?text=Hi' },
+    } as unknown as typeof VISIT);
+    await screen.findByTestId('visit-details-screen');
+
+    fireEvent.press(await screen.findByTestId('visit-details-screen-dock-help'));
+
+    expect(open).toHaveBeenCalledWith(
+      `https://wa.me/910000000000?text=${encodeURIComponent(
+        'Hi Spoon, I need help with my visit · Wed, 14 Oct, 9:00 AM.',
+      )}`,
+    );
+    expect(screen.getByText('Opening WhatsApp…')).toBeTruthy();
+    open.mockRestore();
   });
 });

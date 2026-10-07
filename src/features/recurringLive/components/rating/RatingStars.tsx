@@ -1,13 +1,15 @@
 import { useRef } from 'react';
 import type { MutableRefObject } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@ui';
+import { keyframedStyle } from '@ui/motion/keyframes';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { VISIT_RATING_PLUS, ratingTier } from '../../data/rating';
 import type { VisitRatingValue } from '../../data/rating';
 import { RATING_ART } from './assets';
+import { PLUS_IDLE, PLUS_PICKED, starPops } from './ratingMotion';
 
 /**
  * The rate card's input row — `1501:6661` (idle) / `1501:6759` (rated): five 42pt stars at a 6pt
@@ -20,6 +22,9 @@ import { RATING_ART } from './assets';
  * The `5+` burst has three looks: idle `1501:6683` (solid lime, black label), a numeric score
  * picked `1501:6805` (lime at 55 %, label at 60 %), 5+ picked `1501:7160` (outlined). At 1–3.5 the
  * whole button also drops to 35 % (`1501:7426`).
+ *
+ * Motion (`ratingMotion.ts`), on the card's `clock`: on the first look the 5+ button wiggles
+ * every loop; once rated the five stars pop in turn, and picking 5+ jolts the button.
  *
  * Input, per the idle caption "Single tap for 0.5. Fast double tap for full star": a tap on star
  * N picks N − 0.5, a second tap on the same star within `DOUBLE_TAP_MS` upgrades it to N.
@@ -54,6 +59,8 @@ export interface RatingStarsProps {
    * which remounts this row, and the double-tap window has to survive that.
    */
   readonly tapRef?: MutableRefObject<StarTap | null>;
+  /** The first look's loop while idle, the entrance once rated. */
+  readonly clock?: Animated.Value | undefined;
   readonly testID: string;
 }
 
@@ -62,7 +69,7 @@ export interface StarTap {
   readonly at: number;
 }
 
-export function RatingStars({ value, onChange, tapRef, testID }: RatingStarsProps) {
+export function RatingStars({ value, onChange, tapRef, clock, testID }: RatingStarsProps) {
   const ownTap = useRef<StarTap | null>(null);
   const lastTap = tapRef ?? ownTap;
   const tier = ratingTier(value);
@@ -87,6 +94,8 @@ export function RatingStars({ value, onChange, tapRef, testID }: RatingStarsProp
         ? RATING_ART.plusBurstActive
         : RATING_ART.plusBurstMuted;
   const plusInk = tier === 'idle' || tier === 'magic' ? 'textPrimary' : 'textSecondarySoft';
+  const pops = tier === 'idle' ? null : starPops(tier);
+  const plusMotion = tier === 'idle' ? PLUS_IDLE : tier === 'magic' ? PLUS_PICKED : null;
 
   return (
     <View style={styles.row} accessibilityRole="radiogroup" testID={testID}>
@@ -104,14 +113,21 @@ export function RatingStars({ value, onChange, tapRef, testID }: RatingStarsProp
             style={styles.star}
             testID={`${testID}-star-${index}`}
           >
-            {fill === 'half' ? (
-              <Image source={half} style={styles.starHalf} />
-            ) : (
-              <Image
-                source={fill === 'full' ? RATING_ART.starFull : empty}
-                style={styles.starGlyph}
-              />
-            )}
+            <Animated.View
+              style={[
+                styles.starFrame,
+                clock && pops?.[index - 1] ? keyframedStyle(clock, pops[index - 1]!) : null,
+              ]}
+            >
+              {fill === 'half' ? (
+                <Image source={half} style={styles.starHalf} />
+              ) : (
+                <Image
+                  source={fill === 'full' ? RATING_ART.starFull : empty}
+                  style={styles.starGlyph}
+                />
+              )}
+            </Animated.View>
           </Pressable>
         );
       })}
@@ -124,13 +140,17 @@ export function RatingStars({ value, onChange, tapRef, testID }: RatingStarsProp
         style={[styles.plus, low ? styles.plusDimmed : null]}
         testID={`${testID}-plus`}
       >
-        <Image
-          source={burst}
-          style={tier === 'magic' ? styles.plusBurstActive : styles.plusBurst}
-        />
-        <Text variant="spoonButton" color={plusInk} align="center">
-          5+
-        </Text>
+        <Animated.View
+          style={[styles.plusFace, clock && plusMotion ? keyframedStyle(clock, plusMotion) : null]}
+        >
+          <Image
+            source={burst}
+            style={tier === 'magic' ? styles.plusBurstActive : styles.plusBurst}
+          />
+          <Text variant="spoonButton" color={plusInk} align="center">
+            5+
+          </Text>
+        </Animated.View>
       </Pressable>
     </View>
   );
@@ -140,6 +160,8 @@ const styles = StyleSheet.create({
   /** `1501:6661` — 6pt gap, centred. */
   row: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.s6 },
   star: { width: STAR_SIZE, height: STAR_SIZE },
+  /** The star's 42pt frame, scaled about its centre as it pops. */
+  starFrame: { width: STAR_SIZE, height: STAR_SIZE },
   /** The 31 × 30 export of the star vector, at its inset inside the 42pt frame. */
   starGlyph: {
     position: 'absolute',
@@ -156,7 +178,9 @@ const styles = StyleSheet.create({
     backgroundColor: lightTheme.colors.surfaceRatingDivider,
   },
   /** `1501:6682` — 56pt; the label centred on it. */
-  plus: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
+  plus: { width: 56, height: 56 },
+  /** The burst and label together, turned and scaled about the button's centre. */
+  plusFace: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
   /** `1501:7426` — 35 % on a 1–3.5 score. */
   plusDimmed: { opacity: 0.35 },
   /** `1501:6683` — the burst box (54.6 × 56, exported 55 × 56) at the button's origin. */
