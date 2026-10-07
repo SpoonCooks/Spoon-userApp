@@ -30,12 +30,67 @@ describe('Duration carousel', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('opens with nothing selected and the CTA off', () => {
+  it('opens with the front tile selected and the CTA live', () => {
+    const a = actions();
+    render(<HomeRedesignView model={DEMO_HOME_FIRST_TIME} {...a} />);
+    // "1 hr" opens at the front, and the front tile is the selection.
+    expect(tile(/^1 hour/).props.accessibilityState).toMatchObject({ checked: true });
+    expect(a.onDurationSelected).toHaveBeenCalledWith(
+      expect.objectContaining({ durationMin: 60, source: 'focus' }),
+    );
+    expect(screen.getByRole('button', { name: /^Book Now · / })).toBeEnabled();
+    expect(screen.getByText('Check payment details')).toBeTruthy();
+  });
+
+  it('labels the CTA as Figma does: "Book Now  ·  1 hr · ₹total", "Book for later" on Later', () => {
     render(<HomeRedesignView model={DEMO_HOME_FIRST_TIME} {...actions()} />);
-    expect(tile(/^1 hour/).props.accessibilityState).toMatchObject({ checked: false });
-    // `1255:3181` — just "Book Now", greyed, with no payment link until a duration is chosen.
-    expect(screen.getByRole('button', { name: 'Book Now' })).toBeDisabled();
+    // `1222:23640` — the selected SKU, then the GST-inclusive total. (The accessible name collapses
+    // the label's double spaces; the drawn text keeps them.)
+    expect(screen.getByRole('button', { name: 'Book Now · 1 hr · ₹75' })).toBeEnabled();
+    expect(screen.getByText('Select a duration to book')).toBeTruthy();
+
+    fireEvent.press(screen.getByRole('radio', { name: 'Later' }));
+    // `1222:24666` — no SKU, no payment link.
+    expect(screen.getByRole('button', { name: 'Book for later' })).toBeEnabled();
     expect(screen.queryByText('Check payment details')).toBeNull();
+  });
+
+  it('moves to Later when Instant turns out to be unavailable, until the customer picks a tab', () => {
+    const { rerender } = render(<HomeRedesignView model={DEMO_HOME_FIRST_TIME} {...actions()} />);
+    expect(screen.getByRole('radio', { name: 'Now' }).props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+
+    // Instant's read lands after Home opened, and says no.
+    const unavailable = {
+      ...DEMO_HOME_FIRST_TIME,
+      instant: { available: false, etaMins: null },
+    };
+    rerender(<HomeRedesignView model={unavailable} {...actions()} />);
+    expect(screen.getByRole('radio', { name: 'Later' }).props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+
+    // `1303:1333` — choosing Now anyway: Instant · Unavailable, same SKUs, "Book for later".
+    fireEvent.press(screen.getByRole('radio', { name: 'Now' }));
+    expect(screen.getByRole('radio', { name: 'Now' }).props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+    expect(screen.getByText('Instant · Unavailable')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Book for later' })).toBeEnabled();
+  });
+
+  it('selects whichever tile comes to the front', () => {
+    const a = actions();
+    render(<HomeRedesignView model={DEMO_HOME_FIRST_TIME} {...a} />);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Show 1.5 hours' }));
+
+    expect(tile(/^1.5 hours/).props.accessibilityState).toMatchObject({ checked: true });
+    expect(tile(/^1 hour/).props.accessibilityState).toMatchObject({ checked: false });
+    expect(a.onDurationSelected).toHaveBeenLastCalledWith(
+      expect.objectContaining({ durationMin: 90, source: 'focus' }),
+    );
   });
 
   it('selects on tap, raises duration_selected and books the payable total', () => {
@@ -47,7 +102,7 @@ describe('Duration carousel', () => {
       pricePaise: 6900,
       source: 'tile',
     });
-    fireEvent.press(screen.getByRole('button', { name: /Book now/ }));
+    fireEvent.press(screen.getByRole('button', { name: /^Book Now · / }));
     expect(a.onBookNow).toHaveBeenCalledWith(
       expect.objectContaining({ duration: expect.objectContaining({ minutes: 90 }) }),
     );
@@ -58,18 +113,22 @@ describe('Duration carousel', () => {
     render(<HomeRedesignView model={DEMO_HOME_SOME_UNAVAILABLE} {...a} />);
     const twoHours = tile(/^2 hours/);
     expect(twoHours.props.accessibilityLabel).toMatch(/unavailable$/);
+    // Opening selected the front tile; only the tap on the unavailable one is under test.
+    (a.onDurationSelected as jest.Mock).mockClear();
     fireEvent.press(twoHours);
     expect(a.onDurationSelected).not.toHaveBeenCalled();
     expect(screen.getByText('2 hrs isn’t available right now.')).toBeTruthy();
     act(() => jest.advanceTimersByTime(3000));
   });
 
-  it('clears a selection that Later cannot book, with a toast', () => {
+  it('moves the selection to the nearest bookable tile when Later cannot book it', () => {
     render(<HomeRedesignView model={DEMO_HOME_SOME_UNAVAILABLE} {...actions()} />);
     fireEvent.press(tile(/^30 minutes/));
     fireEvent.press(screen.getByRole('radio', { name: 'Later' }));
-    expect(screen.getByText('30 mins is no longer available. Pick another duration.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Schedule' })).toBeDisabled();
+    expect(screen.getByText('30 mins is no longer available.')).toBeTruthy();
+    expect(tile(/^30 minutes/).props.accessibilityState).toMatchObject({ checked: false });
+    // The front moved to the nearest bookable tile, which is now the selection.
+    expect(screen.getByRole('button', { name: 'Book for later' })).toBeEnabled();
     act(() => jest.advanceTimersByTime(3000));
   });
 
@@ -87,7 +146,7 @@ describe('Duration carousel', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Select duration' }));
 
     expect(a.onDurationSelected).toHaveBeenCalledWith(expect.objectContaining({ source: 'dial' }));
-    expect(screen.getByRole('button', { name: /^Book now/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Book Now · / })).toBeEnabled();
     expect(screen.getByText('Check payment details')).toBeTruthy();
   });
 
