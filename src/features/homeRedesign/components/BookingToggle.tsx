@@ -19,14 +19,19 @@ export interface BookingToggleProps {
   readonly muted?: boolean;
 }
 
-/** Figma draws children from the frame's outer edge; React Native from inside the 1pt border. */
+const WIDTH = 274;
+const HEIGHT = 48;
 const BORDER = 1;
-const CELL = 88;
+/** The active fill's inset from the border, the same on every side. */
+const INSET = 3;
+const PILL_HEIGHT = HEIGHT - 2 * BORDER - 2 * INSET;
+const CELL = (WIDTH - 2 * BORDER - 2 * INSET) / 3;
 
 /**
  * `1297:1415` "Toggle/ booking" — 274 × 48 pill with a state per tab (Now / Later / Recurring).
- * Labels sit in 88pt cells from x 4, y 11; the active 88 × 40 fill sits at x 4 + 88·i (4, 92,
- * 180), y 3.
+ * The frame puts the 88 × 40 fill at y 3 and x 4, which leaves 5pt under it and 6pt right of the
+ * last tab; here the fill is inset an even 3pt inside the 1pt border on every side (40 tall, three
+ * equal cells), and each label is centred in its cell.
  *
  * Per the component's dev note, no tab is ever unclickable or deactivated — what a mode can do is
  * decided by the content below it — and the group is a radio group for accessibility. Switching
@@ -40,7 +45,7 @@ export function BookingToggle({ value, onChange, muted = false }: BookingToggleP
   return (
     <View style={styles.track} accessibilityRole="radiogroup" accessibilityLabel="Booking type">
       <View
-        style={[styles.pill, muted ? styles.pillMuted : null, { left: 4 - BORDER + index * CELL }]}
+        style={[styles.pill, muted ? styles.pillMuted : null, { left: INSET + index * CELL }]}
       />
       <View style={styles.cells}>
         {TABS.map((tab) => {
@@ -65,8 +70,8 @@ export function BookingToggle({ value, onChange, muted = false }: BookingToggleP
 
 const styles = StyleSheet.create({
   track: {
-    width: 274,
-    height: 48,
+    width: WIDTH,
+    height: HEIGHT,
     borderRadius: 9999,
     borderWidth: BORDER,
     borderColor: C.brand,
@@ -74,15 +79,21 @@ const styles = StyleSheet.create({
   },
   pill: {
     position: 'absolute',
-    top: 3 - BORDER,
+    top: INSET,
     width: CELL,
-    height: 40,
+    height: PILL_HEIGHT,
     borderRadius: 9999,
     backgroundColor: C.brand,
   },
   pillMuted: { backgroundColor: C.textDisabled },
-  cells: { position: 'absolute', left: 4 - BORDER, top: 0, bottom: 0, flexDirection: 'row' },
-  cell: { width: CELL, paddingTop: 11 - BORDER, alignItems: 'center' },
+  cells: {
+    position: 'absolute',
+    left: INSET,
+    top: INSET,
+    height: PILL_HEIGHT,
+    flexDirection: 'row',
+  },
+  cell: { width: CELL, height: PILL_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   label: {
     width: CELL,
     textAlign: 'center',
