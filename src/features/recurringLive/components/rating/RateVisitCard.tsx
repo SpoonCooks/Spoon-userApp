@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { Text } from '@ui';
+import { keyframedStyle, useTimeline } from '@ui/motion/keyframes';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import {
@@ -17,7 +18,15 @@ import {
   ratingTier,
 } from '../../data/rating';
 import type { RatingSupportKind, RatingTier, VisitRatingValue } from '../../data/rating';
-import { RATING_ART } from './assets';
+import { CONFETTI_ART, RATING_ART } from './assets';
+import {
+  CONFETTI,
+  IDLE_RING_TURN_MS,
+  MIC_PULSE,
+  NUDGE_SPARKLE,
+  RATING_TIMELINE_MS,
+  STICKER_MOTION,
+} from './ratingMotion';
 import { RatingStars } from './RatingStars';
 import type { StarTap } from './RatingStars';
 import { IdleSticker, ScoreSticker } from './ScoreSticker';
@@ -54,6 +63,9 @@ import { IdleSticker, ScoreSticker } from './ScoreSticker';
  * Frame 6 (`1501:7575`) draws BOTH "What went wrong?" and, nested under it, a second "What fell
  * short?" label — a leftover from copying frame 5's block. Frame 7 draws only the first, so the
  * card draws only "What went wrong?" on 1–2.5.
+ *
+ * Motion follows Figma's 2 s timelines (`ratingMotion.ts`): the first look loops; a picked score
+ * plays its entrance once, again on every new pick. Reduce Motion rests each on its final frame.
  *
  * STATIC: no submission or recording. Chips and toggles flip locally; `onSubmit` hands the
  * current picks up, `onTellUsMore` opens the "Tell us more" sheet.
@@ -97,6 +109,7 @@ export function RateVisitCard({
 
   const tier = ratingTier(rating);
   const low = LOW_TIERS.includes(tier);
+  const entrance = useTimeline({ durationMs: RATING_TIMELINE_MS, replayKey: rating });
 
   return (
     <View style={styles.shadow} testID={testID}>
@@ -125,7 +138,28 @@ export function RateVisitCard({
         ) : null}
         {tier === 'magic' ? (
           <View style={styles.confetti} pointerEvents="none">
-            <Image source={RATING_ART.confetti} style={styles.confettiImage} />
+            {CONFETTI.map((piece) => (
+              <Animated.View
+                key={piece.key}
+                style={[
+                  styles.confettiPiece,
+                  { left: piece.x, top: piece.y, width: piece.width, height: piece.height },
+                  keyframedStyle(entrance, piece.motion),
+                ]}
+              >
+                {piece.art === 'image' ? (
+                  <Image
+                    source={CONFETTI_ART[piece.key]!}
+                    style={[
+                      styles.confettiArt,
+                      { width: piece.width + 8, height: piece.height + 8 },
+                    ]}
+                  />
+                ) : (
+                  <View style={[styles.streamer, { backgroundColor: piece.art }]} />
+                )}
+              </Animated.View>
+            ))}
           </View>
         ) : null}
 
@@ -155,51 +189,7 @@ export function RateVisitCard({
         </View>
 
         {rating === null || tier === 'idle' ? (
-          <>
-            {/* `1501:6637` — idle hero. */}
-            <View style={styles.idleHero}>
-              <IdleSticker testID={`${testID}-sticker`} />
-              <Text variant="spoonTitle" align="center">
-                How was the food today?
-              </Text>
-              <Text variant="spoonCaption" color="textRatingSubtle" align="center">
-                One tap! Your rating helps us assign you better cooks
-              </Text>
-            </View>
-
-            {/* `1501:6660` — stars over the scale captions, 10pt apart. */}
-            <View style={styles.idleInput}>
-              <RatingStars
-                value={rating}
-                onChange={setRating}
-                tapRef={tapRef}
-                testID={`${testID}-stars`}
-              />
-              <View style={styles.scaleLabels}>
-                <Text variant="spoonMicro" color="textSecondarySoft">
-                  Not great
-                </Text>
-                <Text variant="spoonMicro" color="textSecondarySoft">
-                  Single tap for 0.5. Fast double tap for full star
-                </Text>
-                <Text variant="spoonMicroStrong" color="textSecondarySoft">
-                  Amazing!
-                </Text>
-              </View>
-            </View>
-
-            {/* `1501:6689` — the 5+ nudge. */}
-            <View style={styles.nudge}>
-              <View style={styles.nudgeDisc}>
-                <Image source={RATING_ART.nudgeSparkle} style={styles.nudgeSparkle} />
-              </View>
-              <Text variant="spoonCaption" style={styles.flex}>
-                {'Blown away? Give a '}
-                <Text variant="ratingCaptionBold">5+</Text>
-                {`, it tells ${RATING_VISIT_FIXTURE.cookName} she went above & beyond to deliver that extra delight!`}
-              </Text>
-            </View>
-          </>
+          <FirstLook rating={rating} onRate={setRating} tapRef={tapRef} testID={testID} />
         ) : (
           <RatedBody
             tier={tier}
@@ -219,11 +209,82 @@ export function RateVisitCard({
             }
             onTellUsMore={onTellUsMore}
             onSubmit={onSubmit}
+            clock={entrance}
             testID={testID}
           />
         )}
       </View>
     </View>
+  );
+}
+
+/**
+ * `1501:6628` — the first look, with its own clocks: the 2 s loop (the "?" bob, the nudge
+ * sparkle, the 5+ wiggle) and the ring's endless turn. Both rest at their start under Reduce Motion.
+ */
+function FirstLook({
+  rating,
+  onRate,
+  tapRef,
+  testID,
+}: {
+  readonly rating: VisitRatingValue | null;
+  readonly onRate: (value: VisitRatingValue) => void;
+  readonly tapRef: MutableRefObject<StarTap | null>;
+  readonly testID: string;
+}) {
+  const loop = useTimeline({ durationMs: RATING_TIMELINE_MS, loop: true, restAt: 0 });
+  const spin = useTimeline({ durationMs: IDLE_RING_TURN_MS, loop: true, restAt: 0 });
+  return (
+    <>
+      {/* `1501:6637` — idle hero. */}
+      <View style={styles.idleHero}>
+        <IdleSticker clock={loop} spin={spin} testID={`${testID}-sticker`} />
+        <Text variant="spoonTitle" align="center">
+          How was the food today?
+        </Text>
+        <Text variant="spoonCaption" color="textRatingSubtle" align="center">
+          One tap! Your rating helps us assign you better cooks
+        </Text>
+      </View>
+
+      {/* `1501:6660` — stars over the scale captions, 10pt apart. */}
+      <View style={styles.idleInput}>
+        <RatingStars
+          value={rating}
+          onChange={onRate}
+          tapRef={tapRef}
+          clock={loop}
+          testID={`${testID}-stars`}
+        />
+        <View style={styles.scaleLabels}>
+          <Text variant="spoonMicro" color="textSecondarySoft">
+            Not great
+          </Text>
+          <Text variant="spoonMicro" color="textSecondarySoft">
+            Single tap for 0.5. Fast double tap for full star
+          </Text>
+          <Text variant="spoonMicroStrong" color="textSecondarySoft">
+            Amazing!
+          </Text>
+        </View>
+      </View>
+
+      {/* `1501:6689` — the 5+ nudge. */}
+      <View style={styles.nudge}>
+        <View style={styles.nudgeDisc}>
+          <Animated.Image
+            source={RATING_ART.nudgeSparkle}
+            style={[styles.nudgeSparkle, keyframedStyle(loop, { rotate: NUDGE_SPARKLE })]}
+          />
+        </View>
+        <Text variant="spoonCaption" style={styles.flex}>
+          {'Blown away? Give a '}
+          <Text variant="ratingCaptionBold">5+</Text>
+          {`, it tells ${RATING_VISIT_FIXTURE.cookName} she went above & beyond to deliver that extra delight!`}
+        </Text>
+      </View>
+    </>
   );
 }
 
@@ -238,6 +299,8 @@ interface RatedBodyProps {
   readonly onToggleSupport: (kind: RatingSupportKind, initial: boolean) => void;
   readonly onTellUsMore?: (() => void) | undefined;
   readonly onSubmit?: ((submission: RateVisitSubmission) => void) | undefined;
+  /** The entrance, played on each new score. */
+  readonly clock: Animated.Value;
   readonly testID: string;
 }
 
@@ -252,8 +315,10 @@ function RatedBody({
   onToggleSupport,
   onTellUsMore,
   onSubmit,
+  clock,
   testID,
 }: RatedBodyProps) {
+  const motion = STICKER_MOTION[tier];
   const copy = RATING_TIER_COPY[tier];
   const low = LOW_TIERS.includes(tier);
   const chips = low ? RATING_CHIPS_NEGATIVE : RATING_CHIPS_POSITIVE;
@@ -266,17 +331,27 @@ function RatedBody({
     <>
       {/* `1501:6704` — sticker + mood. */}
       <View style={styles.hero}>
-        <ScoreSticker tier={tier} value={rating} testID={`${testID}-sticker`} />
+        <ScoreSticker tier={tier} value={rating} clock={clock} testID={`${testID}-sticker`} />
         <View style={styles.mood}>
-          <Text variant="spoonDisplay">{copy.headline}</Text>
-          <Text variant="spoonCaption" color="textRatingSubtle">
-            {copy.body}
-          </Text>
+          <Animated.View style={keyframedStyle(clock, motion.headline)}>
+            <Text variant="spoonDisplay">{copy.headline}</Text>
+          </Animated.View>
+          <Animated.View style={keyframedStyle(clock, motion.body)}>
+            <Text variant="spoonCaption" color="textRatingSubtle">
+              {copy.body}
+            </Text>
+          </Animated.View>
         </View>
       </View>
 
       {/* `1501:6758` — stars, no captions once rated. */}
-      <RatingStars value={rating} onChange={onRate} tapRef={tapRef} testID={`${testID}-stars`} />
+      <RatingStars
+        value={rating}
+        onChange={onRate}
+        tapRef={tapRef}
+        clock={clock}
+        testID={`${testID}-stars`}
+      />
 
       {/* `1501:6807` — chips. */}
       <View style={styles.chipsBlock}>
@@ -319,9 +394,11 @@ function RatedBody({
         ]}
         testID={`${testID}-say-more`}
       >
-        <View style={styles.micDisc}>
+        <Animated.View
+          style={[styles.micDisc, low ? keyframedStyle(clock, { scale: MIC_PULSE }) : null]}
+        >
           <Image source={RATING_ART.mic} style={styles.icon} />
-        </View>
+        </Animated.View>
         <View style={styles.sayMoreText}>
           <Text variant="spoonBodyStrong" numberOfLines={1}>
             {copy.sayMoreTitle}
@@ -413,7 +490,11 @@ const styles = StyleSheet.create({
   cardIdle: { paddingBottom: lightTheme.space.xl },
   /** `1501:6849` — 370 × 226 from the card's corner. */
   confetti: { position: 'absolute', left: 0, top: 0, width: 370, height: 226 },
-  confettiImage: { width: 370, height: 226 },
+  /** A piece at its box; a sparkle's art carries 4pt of margin round it. */
+  confettiPiece: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  confettiArt: { position: 'absolute', left: -4, top: -4 },
+  /** `1501:6961` — a 10 × 4 streamer, r2, centred in its turned box. */
+  streamer: { width: 10, height: 4, borderRadius: 2 },
   cook: {
     alignSelf: 'stretch',
     flexDirection: 'row',

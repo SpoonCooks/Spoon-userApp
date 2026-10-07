@@ -35,8 +35,6 @@ const art = {
   sparkleTopLarge: require('../../../../../assets/figma/recurring/rating/sparkle-top-large.webp'),
   /** `1501:7092` — 8pt sparkle on the 5+ burst. */
   sparkleTopSmall: require('../../../../../assets/figma/recurring/rating/sparkle-top-small.webp'),
-  /** `1501:6849` — the 370 × 226 confetti layer over the 5+ card. */
-  confetti: require('../../../../../assets/figma/recurring/rating/confetti.webp'),
   /** `1501:7362` — the 3–3.5 blob, 87 × 72 export box. */
   blobBelowPar: require('../../../../../assets/figma/recurring/rating/blob-below-par.webp'),
   /** `1501:7508` — the 2–2.5 blob, 88 × 68. */
@@ -100,3 +98,30 @@ const art = {
 };
 
 export const RATING_ART = art as Record<keyof typeof art, ImageSourcePropType>;
+
+/**
+ * `1501:6849` — the 5+ card's confetti, one image per sparkle and dot so each can fly in on its
+ * own (the two streamers are drawn); keyed by node, 4pt of margin round each box.
+ */
+export const CONFETTI_ART: Record<string, ImageSourcePropType> = {
+  '6865':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-6865.webp') as ImageSourcePropType,
+  '6881':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-6881.webp') as ImageSourcePropType,
+  '6897':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-6897.webp') as ImageSourcePropType,
+  '6913':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-6913.webp') as ImageSourcePropType,
+  '6929':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-6929.webp') as ImageSourcePropType,
+  '6945':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-6945.webp') as ImageSourcePropType,
+  '6993':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-6993.webp') as ImageSourcePropType,
+  '7009':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-7009.webp') as ImageSourcePropType,
+  '7025':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-7025.webp') as ImageSourcePropType,
+  '7041':
+    require('../../../../../assets/figma/recurring/rating/confetti/piece-7041.webp') as ImageSourcePropType,
+};

@@ -1,5 +1,6 @@
+import { useRef } from 'react';
 import type { ReactNode } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Screen } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
@@ -14,6 +15,8 @@ import { VisitCancelledCard } from '../components/visit/VisitCancelledCard';
 import { VisitChargeCard } from '../components/visit/VisitChargeCard';
 import { VisitHeader } from '../components/visit/VisitHeader';
 import { VisitStatusBanner } from '../components/visit/VisitStatusBanner';
+import { VisitToast } from '../components/visit/VisitToast';
+import type { VisitToastHandle } from '../components/visit/VisitToast';
 import { visitDemoModel } from '../data/visit';
 import type { VisitDetailsModel, VisitPrepKey, VisitPrepReady, VisitVariant } from '../data/visit';
 
@@ -83,87 +86,101 @@ export function VisitDetailsScreen({
   const { variant } = model;
   const upcoming = variant === 'assigned' || variant === 'pending';
 
+  // `Note · Help deep link` — a short toast while WhatsApp opens; the caller opens it.
+  const toast = useRef<VisitToastHandle>(null);
+  const viaWhatsApp = (open: (() => void) | undefined) =>
+    open === undefined
+      ? undefined
+      : () => {
+          toast.current?.show('Opening WhatsApp…');
+          open();
+        };
+
   return (
-    <Screen
-      scroll
-      tone="plain"
-      testID={testID}
-      contentStyle={styles.body}
-      header={<VisitHeader title="Visit details" onBack={onBack} testID={`${testID}-header`} />}
-      footer={
-        <ActionDock
-          showModify={upcoming && model.modifySheet !== null}
-          onPaymentDetails={onPaymentDetails}
-          onModifyBooking={onModifyBooking}
-          onHelp={onHelp}
-          testID={`${testID}-dock`}
-        />
-      }
-    >
-      <VisitStatusBanner
-        state={
-          variant === 'pending' ? 'upcoming' : variant === 'cancelled' ? 'cancelled' : 'confirmed'
+    <View style={styles.root}>
+      <Screen
+        scroll
+        tone="plain"
+        testID={testID}
+        contentStyle={styles.body}
+        header={<VisitHeader title="Visit details" onBack={onBack} testID={`${testID}-header`} />}
+        footer={
+          <ActionDock
+            showModify={upcoming && model.modifySheet !== null}
+            onPaymentDetails={onPaymentDetails}
+            onModifyBooking={onModifyBooking}
+            onHelp={viaWhatsApp(onHelp)}
+            testID={`${testID}-dock`}
+          />
         }
-        date={model.banner.date}
-        slot={model.banner.slot}
-        daysToGo={model.banner.daysToGo}
-        testID={`${testID}-banner`}
-      />
-
-      {variant === 'assigned' ? (
-        <CookAssignedCard
-          cook={model.cook}
-          menu={model.menu}
-          onCall={onCall}
-          testID={`${testID}-cook`}
+      >
+        <VisitStatusBanner
+          state={
+            variant === 'pending' ? 'upcoming' : variant === 'cancelled' ? 'cancelled' : 'confirmed'
+          }
+          date={model.banner.date}
+          slot={model.banner.slot}
+          daysToGo={model.banner.daysToGo}
+          testID={`${testID}-banner`}
         />
-      ) : null}
-      {variant === 'pending' ? (
-        <CookPendingCard
-          pending={model.pending}
-          onViewPool={onViewCookPool}
-          testID={`${testID}-cook`}
-        />
-      ) : null}
-      {variant === 'cancelled' ? (
-        <VisitCancelledCard
-          cancelled={model.cancelled}
-          onNextVisit={onNextVisit}
-          testID={`${testID}-cook`}
-        />
-      ) : null}
-      {variant === 'completed' ? (ratingSlot ?? null) : null}
 
-      {upcoming ? (
-        <>
-          {model.recipe === null ? null : (
-            <RecipeShareRow
-              recipe={model.recipe}
-              onShare={onShareRecipe}
-              testID={`${testID}-recipe`}
-            />
-          )}
-          {model.prep === null ? null : (
-            <BeforeArrivalCard
-              prep={model.prep}
-              initialChecked={model.prepChecked}
-              onChange={onPrepChange}
-              testID={`${testID}-prep`}
-            />
-          )}
-        </>
-      ) : null}
+        {variant === 'assigned' ? (
+          <CookAssignedCard
+            cook={model.cook}
+            menu={model.menu}
+            onCall={onCall}
+            testID={`${testID}-cook`}
+          />
+        ) : null}
+        {variant === 'pending' ? (
+          <CookPendingCard
+            pending={model.pending}
+            onViewPool={onViewCookPool}
+            testID={`${testID}-cook`}
+          />
+        ) : null}
+        {variant === 'cancelled' ? (
+          <VisitCancelledCard
+            cancelled={model.cancelled}
+            onNextVisit={onNextVisit}
+            testID={`${testID}-cook`}
+          />
+        ) : null}
+        {variant === 'completed' ? (ratingSlot ?? null) : null}
 
-      {model.refund !== null ? (
-        <RefundSummaryCard refund={model.refund} testID={`${testID}-refund`} />
-      ) : (
-        <VisitChargeCard charge={model.charge} testID={`${testID}-charge`} />
-      )}
-    </Screen>
+        {upcoming ? (
+          <>
+            {model.recipe === null ? null : (
+              <RecipeShareRow
+                recipe={model.recipe}
+                onShare={viaWhatsApp(onShareRecipe)}
+                testID={`${testID}-recipe`}
+              />
+            )}
+            {model.prep === null ? null : (
+              <BeforeArrivalCard
+                prep={model.prep}
+                initialChecked={model.prepChecked}
+                onChange={onPrepChange}
+                testID={`${testID}-prep`}
+              />
+            )}
+          </>
+        ) : null}
+
+        {model.refund !== null ? (
+          <RefundSummaryCard refund={model.refund} testID={`${testID}-refund`} />
+        ) : (
+          <VisitChargeCard charge={model.charge} testID={`${testID}-charge`} />
+        )}
+      </Screen>
+      <VisitToast ref={toast} testID={`${testID}-toast`} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   /** `1008:5414` — px 16 (Screen's own), pt 8, pb 24, 24 between blocks. */
   body: {
     paddingTop: lightTheme.space.sm,

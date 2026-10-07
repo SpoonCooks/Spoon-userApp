@@ -63,7 +63,15 @@ export function PaymentDetailsSheet({
               </Text>
             )}
           </View>
-          <Text variant="spoonBodyStrong">{data.visitLine.amount}</Text>
+          {/* `1665:3414` — the struck list price and the price, 4pt apart. */}
+          <View style={styles.visitPrice}>
+            {data.visitLine.was === undefined ? null : (
+              <Text variant="spoonBody" style={styles.struck}>
+                {data.visitLine.was}
+              </Text>
+            )}
+            <Text variant="spoonBodyStrong">{data.visitLine.amount}</Text>
+          </View>
         </View>
 
         <View style={styles.line}>
@@ -150,6 +158,7 @@ const styles = StyleSheet.create({
   label: { flex: 1 },
   stitch: { width: '100%', height: 2 },
   price: { flexDirection: 'row', alignItems: 'flex-end', gap: lightTheme.space.sm },
+  visitPrice: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.xs },
   struck: { textDecorationLine: 'line-through' },
   /** `1434:1800` — white, 1pt `color/border/default` (#FFEF99), p 16 inside the edge, r16. */
   payment: {

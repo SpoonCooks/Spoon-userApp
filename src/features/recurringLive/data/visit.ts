@@ -38,16 +38,24 @@ export interface VisitPoolCook {
 
 export interface VisitRefundLine {
   readonly label: string;
-  readonly detail: string;
+  readonly detail?: string | undefined;
   readonly was?: string;
   readonly amount: string;
+  /** `1670:3514` / `1670:3477` — a Caption line (GST, cancellation fee): no detail, 12pt ink. */
+  readonly minor?: boolean | undefined;
 }
 
 export interface VisitRefundStep {
   readonly title: string;
   /** Absent when the backend gives no time for the step. */
   readonly when?: string | undefined;
+  /** `1670:3506` — a closing line in `Spoon/Body` rather than a titled step. */
+  readonly note?: boolean | undefined;
 }
+
+/** `1670:3510` — how long a refund takes to land. */
+export const REFUND_CREDIT_NOTE =
+  'It takes 5-7 working days for the amount to get credited to source';
 
 export const VISIT_FIXTURE = {
   /** `1461:6164` / `1461:6166` — the banner's date and slot. */
@@ -121,19 +129,16 @@ export const VISIT_FIXTURE = {
     eyebrow: 'VISIT CHARGE',
     was: '₹399',
     amount: '₹299',
-    taxNote: 'incl. taxes',
+    taxNote: '+ 5% GST',
     title: 'Pay per visit',
-    /** `1374:1421` — Cook assigned. */
-    bodyAssigned: 'Auto-charged via UPI AutoPay once cooking is done. Nothing is charged today.',
-    /** `1466:8294` — Cook pending and Completed. */
+    /** `1008:5398`, `1466:8294` — every state with the visit still to be charged. */
     bodyNotice:
       'You’d be notified 27 hrs before & payment is auto-debited 3 hrs before the service time.',
   },
 
-  /** `1468:807` — Payment summary · Cancelled · Refunded. */
+  /** `1670:3461` — Payment summary · Cancelled · Refunded. */
   refund: {
     title: 'Payment & refund',
-    booking: 'Booking #SP24817',
     badge: 'Refunded',
     lines: [
       {
@@ -142,11 +147,8 @@ export const VISIT_FIXTURE = {
         was: '₹399',
         amount: '₹299',
       },
-      {
-        label: 'Cancellation fee',
-        detail: 'Cancelled more than 3 hrs before the visit',
-        amount: '– ₹0',
-      },
+      { label: 'GST', amount: '₹22.81', minor: true },
+      { label: 'Cancellation fee', amount: '– ₹0', minor: true },
     ] as readonly VisitRefundLine[],
     total: {
       label: 'Refund amount',
@@ -157,10 +159,9 @@ export const VISIT_FIXTURE = {
     modeEyebrow: 'REFUND TO',
     mode: 'UPI · ••••@okhdfcbank',
     idEyebrow: 'REFUND ID',
-    refundId: 'RFD24817',
     steps: [
-      { title: 'Refund initiated', when: 'Thu, 1 Oct · 6:41 PM' },
-      { title: 'Credited to ••••@okhdfcbank', when: 'Sat, 3 Oct · 11:20 AM' },
+      { title: 'Refund initiated', when: 'Thu, 1 Oct' },
+      { title: REFUND_CREDIT_NOTE, note: true },
     ] as readonly VisitRefundStep[],
   },
 } as const;
@@ -331,7 +332,7 @@ export function visitDemoModel(
       amount: f.charge.amount,
       taxNote: f.charge.taxNote,
       title: f.charge.title,
-      body: variant === 'assigned' ? f.charge.bodyAssigned : f.charge.bodyNotice,
+      body: f.charge.bodyNotice,
     },
     refund: variant === 'cancelled' ? { ...f.refund } : null,
     paymentSheet: PAYMENT_DETAILS_SHEET,

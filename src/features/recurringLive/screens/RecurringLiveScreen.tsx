@@ -59,8 +59,6 @@ export interface RecurringLiveScreenProps {
   readonly onOpenVisit?: ((visit: VisitRef) => void) | undefined;
   /** The Up-next banner — the existing live booking page. */
   readonly onOpenUpNext?: (() => void) | undefined;
-  /** The pop-up's "Cancel" on a today / upcoming date. */
-  readonly onCancelDay?: ((dateId: string) => void) | undefined;
   /** Opens with this date's pop-up showing, e.g. `CALENDAR_DEMO_DATES.past`. */
   readonly initialSelectedDate?: string;
   readonly testID?: string;
@@ -80,7 +78,6 @@ export function RecurringLiveScreen({
   onTabChange,
   onOpenVisit,
   onOpenUpNext,
-  onCancelDay,
   initialSelectedDate,
   testID = 'recurring-live-screen',
 }: RecurringLiveScreenProps) {
@@ -223,7 +220,7 @@ export function RecurringLiveScreen({
             kind={selectedDay.kind}
             visits={dayVisits.visits}
             onOpenVisit={openVisit}
-            onCancel={() => onCancelDay?.(selectedDay.id)}
+            onClose={clearSelection}
             onLayout={onPopupLayout}
             style={[
               styles.popup,

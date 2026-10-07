@@ -17,6 +17,7 @@ import {
   VisitDetailsScreen,
   todayInKolkata,
   visitDetailsFrom,
+  visitWhatsAppLink,
 } from '@features/recurringLive';
 import type { VisitDetailsModel, VisitPrepKey } from '@features/recurringLive';
 import {
@@ -70,13 +71,20 @@ export default function RecurringVisitRoute() {
   }, [visit.state, booking.state, pool.state, quote.state, profile.state, cookId]);
 
   const detail = visit.state.status === 'ready' ? visit.state.data : null;
-  const whatsappUrl = detail?.support.whatsappUrl ?? null;
-  const openWhatsApp =
-    whatsappUrl === null
+  // `Note · Help deep link`: one tap to WhatsApp, prefilled. `wa.me` is a universal link, so it
+  // opens WhatsApp where it is installed and the same page in the browser where it is not.
+  const whatsApp = (purpose: 'help' | 'recipe') => {
+    const link = detail === null ? null : visitWhatsAppLink(detail, purpose);
+    return link === null
       ? undefined
       : () => {
-          void Linking.openURL(whatsappUrl);
+          Linking.openURL(link).catch(() =>
+            Alert.alert('Couldn’t open WhatsApp', 'Please try again in a moment.'),
+          );
         };
+  };
+  const openHelp = whatsApp('help');
+  const openRecipe = whatsApp('recipe');
 
   // ─── Checklist ─────────────────────────────────────────────────────────────────────────────
   const prepBookingId = detail?.payment?.bookingId ?? detail?.bookingId ?? null;
@@ -173,8 +181,8 @@ export default function RecurringVisitRoute() {
             onBack={goBack}
             onPaymentDetails={() => setPaymentOpen(true)}
             {...(model.modifySheet === null ? {} : { onModifyBooking: () => setModifyOpen(true) })}
-            onHelp={openWhatsApp}
-            onShareRecipe={openWhatsApp}
+            onHelp={openHelp}
+            onShareRecipe={openRecipe}
             onViewCookPool={() => router.push('/cook-pool')}
             {...(nextVisitId === null || nextVisitId === visitId
               ? {}
@@ -213,7 +221,7 @@ export default function RecurringVisitRoute() {
               onClose={() => setCancelStep(null)}
               onConfirmCancel={confirmCancel}
               onBookAgain={() => setCancelStep(null)}
-              {...(openWhatsApp === undefined ? {} : { onHelp: openWhatsApp })}
+              {...(openHelp === undefined ? {} : { onHelp: openHelp })}
               cancelling={cancelVisit.isPending}
               cancelErrorMessage={cancelError}
             />

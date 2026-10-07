@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Screen } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
@@ -67,6 +68,7 @@ export function RecurringPlansScreen({
         visit.id === SUMMARY_EDITED_FIRST_VISIT.id ? SUMMARY_EDITED_FIRST_VISIT : visit,
       )
     : SUMMARY_VISITS;
+  const insets = useSafeAreaInsets();
   const [planId, setPlanId] = useState(SUMMARY_ACTIVE_PLAN_ID);
   const [visitId, setVisitId] = useState(() => (visits[initialVisit - 1] ?? visits[0])?.id ?? '');
   const visit = visits.find((candidate) => candidate.id === visitId) ?? visits[0];
@@ -77,7 +79,15 @@ export function RecurringPlansScreen({
       padded={false}
       tone="plain"
       testID={testID}
-      contentStyle={styles.body}
+      // Without the Save footer the list runs to the home indicator: keep `1017:437`'s 16 above it.
+      contentStyle={
+        edited
+          ? styles.body
+          : StyleSheet.flatten([
+              styles.body,
+              { paddingBottom: lightTheme.space.lg + insets.bottom },
+            ])
+      }
       header={
         <View>
           <RecurringTabsHeader
