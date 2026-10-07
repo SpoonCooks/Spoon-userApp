@@ -538,6 +538,46 @@ describe('Home is a root', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/profile');
   });
 
+  /**
+   * "Recurring · Live" opens the household's live booking — the backend's `chip: 'live'` with its
+   * `liveBookings` — rather than the "coming soon" it answered before the tab existed.
+   */
+  it('opens the live Recurring booking from the Live chip', async () => {
+    const api = createStubApi({
+      ...NAV_STUBS,
+      'GET /v1/recurring/eligibility': () => ({
+        policyVersion: 'recurring-v2-spec-1',
+        unlocked: true,
+        poolCount: 2,
+        unlockThreshold: 2,
+        chip: 'live',
+        liveBookings: [
+          {
+            recurringBookingId: 'rb-1',
+            status: 'active',
+            windowStart: '2026-10-10',
+            windowEnd: '2026-10-30',
+          },
+        ],
+        window: { startDate: '2026-10-10', endDate: '2026-10-30' },
+        limits: { minDays: 5, maxDays: 14 },
+        timesOfDay: [],
+        durations: [],
+        charging: { notifyLeadHours: 27, debitLeadHours: 3, mandateMaxChargePaise: 100000 },
+      }),
+    });
+    renderWithRuntime(<HomeRoute />, { runtime: createTestRuntime({ api }) });
+
+    // A customer with no past booking sees the pool block on the Recurring tab.
+    fireEvent.press(await screen.findByRole('radio', { name: 'Recurring' }));
+    fireEvent.press(await screen.findByText('Recurring · Live'));
+
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      pathname: '/recurring/[bookingId]',
+      params: { bookingId: 'rb-1' },
+    });
+  });
+
   it('hands the chosen duration to Schedule on Later', async () => {
     render(<HomeRoute />);
 

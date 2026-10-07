@@ -46,6 +46,48 @@ export const palette = {
   slate400: '#8A94A6',
   slate200: '#CAD5E2',
 
+  // Recurring live booking (`cCQlzTeiObQkpVBzwI8mZi` page `1005:131`)
+  /** Black / white alphas the recurring live booking file draws. */
+  black3: 'rgba(0,0,0,0.03)',
+  black6: 'rgba(0,0,0,0.06)',
+  black12: 'rgba(0,0,0,0.12)',
+  black15: 'rgba(0,0,0,0.15)',
+  black20: 'rgba(0,0,0,0.2)',
+  black45: 'rgba(0,0,0,0.45)',
+  black55: 'rgba(0,0,0,0.55)',
+  black75: 'rgba(0,0,0,0.75)',
+  white90: 'rgba(255,255,255,0.9)',
+  /** `#FFF7CC` at 0 % / 90 % — the Visit details scroll cue's wash (`1463:7967`). */
+  yellow200Clear: 'rgba(255,247,204,0)',
+  yellow200Veil: 'rgba(255,247,204,0.9)',
+  /** `#FFD600` at 35 % — the recorder Stop button's outer ring (`1501:7261`). */
+  yellow500Ring: 'rgba(255,214,0,0.35)',
+  /** `1005:183` — the flat legend / meta grey. */
+  grey42: '#6B6B6B',
+  /** `848:7802` — a dish card's name. */
+  grey20: '#333333',
+  /** `1461:6324` — the Up-next "Late evening" sky, top → bottom. */
+  nightIndigo: '#2E2766',
+  nightInk: '#0D0A22',
+  /** `1461:6149` — the morning visit-banner sky, top → bottom. */
+  dawnCream: '#FFF9DB',
+  dawnPeach: '#FFD9A8',
+  /** `1444:8837` — the afternoon sky's lead stop. */
+  yellowNoon: '#FFF3A6',
+  /** `1461:6230` — the cancelled banner's mute veil. */
+  ashVeil: 'rgba(244,243,239,0.8)',
+  /** `1517:9299` — the low-score rate card's wash. */
+  linen: '#F3F0E8',
+  /** `1006:323` — the date pop-up's warm shadow, `#998000` at 18 %. */
+  ochreShadow: 'rgba(153,128,0,0.18)',
+  /** `1501:7308` / `1501:7313` / `1501:7318` — the feedback sheet's placeholder thumbnail washes. */
+  thumbAmberTop: '#F7C873',
+  thumbAmberBottom: '#D9822B',
+  thumbGreenTop: '#BFE38A',
+  thumbGreenBottom: '#5E9C3A',
+  thumbVideoTop: '#5A4632',
+  thumbVideoBottom: '#1E1710',
+
   // Neutrals — color/grey/*
   grey100: '#F3F4F6',
   /** `color/grey/96-2` — the Scheduled header hairline and secondary-button surface. */

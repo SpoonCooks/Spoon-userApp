@@ -136,6 +136,81 @@ export const DEV_ROUTES: readonly DevRoute[] = [
     label: 'Recurring setup · Pick days only (preview)',
     note: 'IN PROGRESS · dev preview, no session needed',
   },
+  {
+    path: '/recurring-live',
+    label: 'Recurring live · Live booking calendar',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?date=past',
+    label: 'Recurring live · Date pop-up · past',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?date=today',
+    label: 'Recurring live · Date pop-up · today',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?date=upcoming',
+    label: 'Recurring live · Date pop-up · upcoming',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=plans',
+    label: 'Recurring live · Manage plans · 1st visit',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=plans&visit=2',
+    label: 'Recurring live · Manage plans · 2nd visit',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=plans&edited=1',
+    label: 'Recurring live · Manage plans · edited, unsaved',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=visit&variant=assigned',
+    label: 'Recurring live · Visit details · cook assigned',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=visit&variant=pending',
+    label: 'Recurring live · Visit details · cook pending',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=visit&variant=completed',
+    label: 'Recurring live · Visit details · completed',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=visit&variant=cancelled',
+    label: 'Recurring live · Visit details · cancelled',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=visit&variant=assigned&sheet=modify',
+    label: 'Recurring live · Modify booking sheet',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=visit&variant=assigned&sheet=payment',
+    label: 'Recurring live · Payment details sheet',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=rating',
+    label: 'Recurring live · Rate visit · first look',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
+  {
+    path: '/recurring-live?screen=rating&sheet=more',
+    label: 'Recurring live · Tell us more sheet',
+    note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',
+  },
 ];
 
 export interface DevRouteMenuProps {
