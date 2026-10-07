@@ -256,6 +256,96 @@ export const lightColors = {
   borderClash: palette.amber44,
   textClash: palette.amber27,
 
+  /**
+   * Recurring live booking (Figma `cCQlzTeiObQkpVBzwI8mZi` page `1005:131`) — that file's
+   * `color/text/secondary` is black at **60 %** and `color/text/disabled` black at 25 %, both lighter
+   * than the app's older `textSecondary` (70 %). New names so the older screens don't shift.
+   */
+  textSecondarySoft: palette.black60,
+  /** `1354:1550` — a SELECTED date on the Live booking calendar: "Canary" `#E2FF68`. */
+  surfaceCalendarSelected: palette.canary,
+  /**
+   * `1005:183` / `1006:326` / `1017:560` — the calendar legend, the date pop-up's and Summary's meta
+   * lines: a flat `#6B6B6B` the recurring file draws instead of a black alpha.
+   */
+  textRecurringMeta: palette.grey42,
+  /** `1006:323` — the date pop-up's warm drop shadow: `#998000` at 18 %. */
+  shadowCalendarPopup: palette.ochreShadow,
+  /** `1461:6324` — the Up-next "Late evening" card's sky: `#2E2766` → `#0D0A22`, top to bottom. */
+  surfaceUpNextNightTop: palette.nightIndigo,
+  surfaceUpNextNightBottom: palette.nightInk,
+  /**
+   * `1017:436` — the ACTIVE plan tab's lead stop: `#FFDE33` into `surfaceCta` by 60 %, so the tab
+   * melts into the visits panel beneath it.
+   */
+  surfaceSummaryTabLead: palette.yellow33,
+  /** `1017:6047` — the cancelled visit's glyph disc: black at 3 %. */
+  surfaceSummaryCancelled: palette.black3,
+  /** `1433:1624` / `1434:1769` — the recurring sheets' scrim: black at 40 % (measured #989898 on white). */
+  scrimRecurringSheet: palette.black40,
+  /** `90:176` — the 1.5pt BLACK edge on the recurring file's Destructive outline button. */
+  borderRecurringStrong: palette.black,
+  /** `1461:6149` — the morning sky on a past/confirmed visit banner: `#FFF9DB` top… */
+  surfaceVisitSkyMorningTop: palette.dawnCream,
+  /** …into `#FFD9A8` at the bottom (`to bottom`). */
+  surfaceVisitSkyMorningBottom: palette.dawnPeach,
+  /** `1444:8837` — the afternoon sky's lead stop, `#FFF3A6`, into `surfaceCta` at 157.14°. */
+  surfaceVisitSkyAfternoonLead: palette.yellowNoon,
+  /** `1461:6230` — the cancelled banner's mute veil: `rgba(244,243,239,0.8)`. */
+  surfaceVisitMute: palette.ashVeil,
+  /** `1461:6233` / `1461:6235` / `1461:6239` — the cancelled banner's ink: black at 45 %. */
+  textVisitMuted: palette.black45,
+  /** `color/status/positive-pressed` `#E2FF68` — a filled prep-progress segment (`1444:552`). */
+  surfaceVisitPrepDone: palette.canary,
+  /** `848:7802` — a dish card's name, a flat `#333`. */
+  textVisitDish: palette.grey20,
+  /** `1463:7967` — the scroll cue's wash: `#FFF7CC` at 0 % → 90 % (55 %) → solid. */
+  surfaceVisitCueClear: palette.yellow200Clear,
+  surfaceVisitCueMid: palette.yellow200Veil,
+  /**
+   * Rate card (`1517:9293` … `1517:9303`) and Tell us more (`1501:7203`) — the black alphas and
+   * fills this file draws that no earlier token carries.
+   */
+  /** Secondary lines on the rate card and its sheet: black at 55 %. */
+  textRatingSubtle: palette.black55,
+  /** `1501:6636` — "Later": black at 40 %. */
+  textRatingQuiet: palette.black40,
+  /** `1501:6655` — the idle "?": black at 35 %. */
+  textRatingPlaceholder: palette.black35,
+  /** `1501:7270` — "1 voice · 2 photos · 1 video": black at 50 %. */
+  textRatingMeta: palette.black50,
+  /** `1501:6667` — the 1.5pt rule between the stars and the 5+ burst: black at 12 %. */
+  surfaceRatingDivider: palette.black12,
+  /** `1501:6689` — the "Blown away?" nudge, `#ECFF9B`. */
+  surfaceRatingNudge: palette.lime300,
+  /** `1501:6690` / `1501:7199` — the nudge disc and the 5+ CTA, `#CFFF04`. */
+  surfaceRatingLime: palette.lime500,
+  /** `1501:7448` / `1501:7331` — the low-score "Say more" row and the text field: black at 3 %. */
+  surfaceRatingQuiet: palette.black3,
+  /** `1517:9299` — the low-score card wash's lead stop. */
+  surfaceRatingPoorTop: palette.linen,
+  /** `1501:7209` — the sheet's close well: black at 6 %. */
+  surfaceRatingCloseWell: palette.black6,
+  /** `1501:7204` / `1501:7244` — the grabber and the not-yet-recorded bars: black at 15 %. */
+  surfaceRatingGrabber: palette.black15,
+  /** `1501:7276` — the saved voice note's bars: black at 75 %. */
+  surfaceRatingWave: palette.black75,
+  /** `1501:7310` — a thumbnail's remove disc: black at 55 %. */
+  surfaceRatingRemove: palette.black55,
+  /** `1501:7323` — the video thumbnail's play disc: white at 90 %. */
+  surfaceRatingPlayDisc: palette.white90,
+  /** `1501:7327` — the dashed "Photo/Video" tile edge: black at 20 %. */
+  borderRatingAdd: palette.black20,
+  /** `1501:7261` — the Stop button's 8pt outer ring: `#FFD600` at 35 %. */
+  surfaceRatingStopRing: palette.yellow500Ring,
+  /** `1501:7308` / `1501:7313` / `1501:7318` — the fixture thumbnails' 135° washes. */
+  surfaceRatingThumbAmberTop: palette.thumbAmberTop,
+  surfaceRatingThumbAmberBottom: palette.thumbAmberBottom,
+  surfaceRatingThumbGreenTop: palette.thumbGreenTop,
+  surfaceRatingThumbGreenBottom: palette.thumbGreenBottom,
+  surfaceRatingThumbVideoTop: palette.thumbVideoTop,
+  surfaceRatingThumbVideoBottom: palette.thumbVideoBottom,
+
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */
   scrimSheet: palette.black65,
@@ -1368,6 +1458,174 @@ export const typography = {
     lineHeight: lineHeight.xxxl,
     fontFamily: fontFamily.black,
     letterSpacing: letterSpacing.tight,
+  },
+  /**
+   * The "Spoon/*" text styles of the recurring live booking file (`cCQlzTeiObQkpVBzwI8mZi`,
+   * page `1005:131`). That file names its styles, so they're transcribed as one ramp rather than
+   * matched to the older per-node tokens above.
+   */
+  /** `Spoon/Micro` — Livvic Regular 10/14. */
+  spoonMicro: {
+    fontSize: fontSize.xs,
+    lineHeight: 14,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Caption` — Livvic Regular 12/16. */
+  spoonCaption: {
+    fontSize: fontSize.md,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Body` — Livvic Regular 14/20. */
+  spoonBody: {
+    fontSize: fontSize.lg,
+    lineHeight: lineHeight.lg,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Body Strong` — Livvic SemiBold 14/20. */
+  spoonBodyStrong: {
+    fontSize: fontSize.lg,
+    lineHeight: lineHeight.lg,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Emphasis` — Livvic SemiBold 16/24. */
+  spoonEmphasis: {
+    fontSize: fontSize.xl,
+    lineHeight: lineHeight.xl,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Button` — Livvic Bold 16/24. */
+  spoonButton: {
+    fontSize: fontSize.xl,
+    lineHeight: lineHeight.xl,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Heading` — Livvic SemiBold 18/26. */
+  spoonHeading: {
+    fontSize: fontSize.xxl,
+    lineHeight: 26,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Title` — Livvic Bold 20/28. Sheet titles, the Visit details header, the rate card's question. */
+  spoonTitle: {
+    fontSize: fontSize.xxl20,
+    lineHeight: lineHeight.xxl,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Display` — Livvic Bold 24/32. Totals, the visit charge, the rate card's mood headline. */
+  spoonDisplay: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Display Large` — Livvic Bold 28/32 at −2 % (−0.56). The visit banner's date, the score. */
+  spoonDisplayLarge: {
+    fontSize: 28,
+    lineHeight: 32,
+    fontFamily: fontFamily.bold,
+    letterSpacing: -0.56,
+  },
+  /** `Spoon/Caption Strong` — Livvic SemiBold 12/16. */
+  spoonCaptionStrong: {
+    fontSize: fontSize.md,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `Spoon/Micro Strong` — Livvic SemiBold 10/14. */
+  spoonMicroStrong: {
+    fontSize: fontSize.xs,
+    lineHeight: 14,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /**
+   * The date pop-up (`1006:323` / `1006:527` / `1006:727`) sets its text at Figma's "normal"
+   * leading rather than a Spoon/* style. Livvic's normal leading is 1.25×, read off the nodes:
+   * the 16pt header measures 20 tall and the 12pt meta 15.
+   */
+  /** `1006:325` — the pop-up's date heading: Livvic Bold 16/20. */
+  calendarPopupTitle: {
+    fontSize: fontSize.xl,
+    lineHeight: 20,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1354:1710` — a visit row's title: Livvic SemiBold 14/17.5. */
+  calendarVisitTitle: {
+    fontSize: fontSize.lg,
+    lineHeight: 17.5,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /**
+   * `1354:1711` / `1006:326` (pop-up) and `1017:560` / `1017:568` (Summary history) — the meta lines:
+   * Regular 12/15.
+   */
+  recurringMeta: {
+    fontSize: fontSize.md,
+    lineHeight: 15,
+    fontFamily: fontFamily.regular,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1006:746` — "Cook confirmed by 5 PM": Livvic SemiBold 12/15. */
+  calendarPoolTitle: {
+    fontSize: fontSize.md,
+    lineHeight: 15,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /**
+   * Summary's visit-history lines (`1017:557`) are set at line-height NORMAL rather than a Spoon
+   * ramp step; Figma measures Livvic's normal leading as 23 / 18 / 15 at 18 / 14 / 12.
+   */
+  /** `1017:559` — "Visit history": SemiBold 18 / normal (23). */
+  summaryHistoryTitle: {
+    fontSize: fontSize.xxl,
+    lineHeight: 23,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1017:567` — a history row's date line: SemiBold 14 / normal (18). */
+  summaryRowTitle: {
+    fontSize: fontSize.lg,
+    lineHeight: 18,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1461:6170` — "CONFIRMED" / "CANCELLED": Livvic Bold 10 / normal (13) at +0.6. */
+  visitBannerBadge: {
+    fontSize: fontSize.xs,
+    lineHeight: 13,
+    fontFamily: fontFamily.bold,
+    letterSpacing: 0.6,
+  },
+  /**
+   * `Title emphasis` — Livvic Bold 40/28. The idle sticker's "?". Figma lets the glyph spill out
+   * of its 28pt line; iOS clips it there, so the line box is opened to 48 — the mark sits centred
+   * in the sticker, so it lands in the same place.
+   */
+  ratingPlaceholder: {
+    fontSize: 40,
+    lineHeight: 48,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
+  },
+  /** `1501:6695` — the bold "5+" run inside the nudge: Livvic Bold 12/16. */
+  ratingCaptionBold: {
+    fontSize: fontSize.md,
+    lineHeight: lineHeight.sm,
+    fontFamily: fontFamily.bold,
+    letterSpacing: letterSpacing.none,
   },
 } as const satisfies Record<string, TextTokenStyle>;
 
