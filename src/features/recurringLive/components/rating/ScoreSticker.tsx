@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
+import { Animated, Image, StyleSheet, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import { Text } from '@ui';
+import { keyframedStyle } from '@ui/motion/keyframes';
 
 import { formatRating } from '../../data/rating';
 import type { RatingTier, VisitRatingValue } from '../../data/rating';
 import { RATING_ART } from './assets';
+import { FULL_TURN, IDLE_MARK, STICKER_MOTION } from './ratingMotion';
 
 /**
  * The score sticker beside the mood headline — 96pt (`1501:6705` / `1501:7048` / `1501:7344` …),
@@ -18,13 +19,9 @@ import { RATING_ART } from './assets';
  *   disappointing  `1501:7508` blob at 0,4; centred 50.24 down
  *   very poor      `1501:7657` blob at 0,4; centred 51.36 down
  *
- * The idle sticker carries the file's only looping motion that reads cleanly in Figma's own
- * timeline (`1501:6628`, a 2 s cohort): the "?" bobs up 5pt and tilts 8° at 40 %, settles at 80 %
- * and ends 2.5pt up at −4°. The ring's slow turn and the sparkle's spin end on a visible jump in
- * the Figma loop, so they're left still.
+ * Motion (`ratingMotion.ts`): a rated sticker plays its entrance on the card's `clock`; the idle
+ * sticker's "?" bobs on the first look's loop while its ring turns on `spin`.
  */
-
-const LOOP_MS = 2000;
 
 interface BlobSpec {
   readonly source: ImageSourcePropType;
@@ -48,73 +45,85 @@ const BLOBS: Partial<Record<RatingTier, BlobSpec>> = {
 export interface ScoreStickerProps {
   readonly tier: Exclude<RatingTier, 'idle'>;
   readonly value: VisitRatingValue;
+  /** The card's entrance clock, 0 → 1; the sticker rests drawn without one. */
+  readonly clock?: Animated.Value | undefined;
   readonly testID: string;
 }
 
-export function ScoreSticker({ tier, value, testID }: ScoreStickerProps) {
+export function ScoreSticker({ tier, value, clock, testID }: ScoreStickerProps) {
   const blob = BLOBS[tier];
   const centreY = blob?.centreY ?? 48;
+  const motion = STICKER_MOTION[tier];
+  const animate = (part: Parameters<typeof keyframedStyle>[1] | undefined) =>
+    clock === undefined || part === undefined ? null : keyframedStyle(clock, part);
 
   return (
     <View style={styles.sticker} testID={testID}>
-      {tier === 'loved' ? <Image source={RATING_ART.scallopHigh} style={styles.scallop} /> : null}
-      {tier === 'magic' ? <Image source={RATING_ART.burstTop} style={styles.burst} /> : null}
-      {blob ? (
-        <Image
-          source={blob.source}
-          style={[styles.blob, { width: blob.width, height: blob.height }]}
+      {tier === 'loved' ? (
+        <Animated.Image
+          source={RATING_ART.scallopHigh}
+          style={[styles.scallop, animate(motion.shape)]}
         />
       ) : null}
-      <View style={[styles.numeral, { top: centreY - 48 }]}>
+      {tier === 'magic' ? (
+        <Animated.Image
+          source={RATING_ART.burstTop}
+          style={[styles.burst, animate(motion.shape)]}
+        />
+      ) : null}
+      {blob ? (
+        <Animated.Image
+          source={blob.source}
+          style={[styles.blob, { width: blob.width, height: blob.height }, animate(motion.shape)]}
+        />
+      ) : null}
+      <Animated.View style={[styles.numeral, { top: centreY - 48 }, animate(motion.numeral)]}>
         <Text variant="spoonDisplayLarge" align="center">
           {formatRating(value)}
         </Text>
-      </View>
+      </Animated.View>
       {tier === 'loved' ? (
-        <Image source={RATING_ART.sparkleHigh} style={styles.sparkleTopRight} />
+        <Animated.Image
+          source={RATING_ART.sparkleHigh}
+          style={[styles.sparkleTopRight, animate(motion.sparkles[0])]}
+        />
       ) : null}
       {tier === 'magic' ? (
         <>
-          <Image source={RATING_ART.sparkleTopLarge} style={styles.sparkleTopRight} />
-          <Image source={RATING_ART.sparkleTopSmall} style={styles.sparkleBottomLeft} />
+          <Animated.Image
+            source={RATING_ART.sparkleTopLarge}
+            style={[styles.sparkleTopRight, animate(motion.sparkles[0])]}
+          />
+          <Animated.Image
+            source={RATING_ART.sparkleTopSmall}
+            style={[styles.sparkleBottomLeft, animate(motion.sparkles[1])]}
+          />
         </>
       ) : null}
     </View>
   );
 }
 
-/** `1501:6638` — the idle 112pt sticker: dashed ring, bobbing "?", two sparkles. */
-export function IdleSticker({ testID }: { readonly testID: string }) {
-  const [progress] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: LOOP_MS,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [progress]);
-
-  const translateY = progress.interpolate({
-    inputRange: [0, 0.4, 0.8, 1],
-    outputRange: [0, -5, 0, -2.5],
-    easing: Easing.inOut(Easing.ease),
-  });
-  const rotate = progress.interpolate({
-    inputRange: [0, 0.4, 0.8, 1],
-    outputRange: ['0rad', '0.14rad', '0rad', '-0.07rad'],
-    easing: Easing.inOut(Easing.ease),
-  });
-
+/**
+ * `1501:6638` — the idle 112pt sticker: dashed ring, bobbing "?", two sparkles. `clock` is the
+ * first look's 2 s loop, `spin` the ring's endless turn.
+ */
+export function IdleSticker({
+  clock,
+  spin,
+  testID,
+}: {
+  readonly clock?: Animated.Value | undefined;
+  readonly spin?: Animated.Value | undefined;
+  readonly testID: string;
+}) {
   return (
     <View style={styles.idle} testID={testID}>
-      <Image source={RATING_ART.idleRing} style={styles.idleRing} />
-      <Animated.View style={[styles.idleMark, { transform: [{ translateY }, { rotate }] }]}>
+      <Animated.Image
+        source={RATING_ART.idleRing}
+        style={[styles.idleRing, spin ? keyframedStyle(spin, { rotate: FULL_TURN }) : null]}
+      />
+      <Animated.View style={[styles.idleMark, clock ? keyframedStyle(clock, IDLE_MARK) : null]}>
         <Text variant="ratingPlaceholder" color="textRatingPlaceholder" align="center">
           ?
         </Text>

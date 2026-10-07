@@ -19,8 +19,9 @@ import { QueryBoundary } from '@ui';
  *
  * Per the page note (`1008:5909`): a visit in a date's pop-up opens its Visit details; today's
  * visit and the Up-next card go to the existing live booking page (`/booking/[id]`) once the visit
- * has a booking — until its charge it has none, and they open Visit details too. A date's "Cancel"
- * opens that date's visit, whose "Modify booking" cancels it. Manage plans is not on real data
+ * has a booking — until its charge it has none, and they open Visit details too. The pop-up's
+ * "Close" (`1006:542`) only dismisses it; a visit is cancelled from its own "Modify booking". Manage
+ * plans is not on real data
  * yet, so it says so rather than opening the static fixture screen.
  */
 export default function RecurringBookingRoute() {
@@ -75,12 +76,6 @@ export default function RecurringBookingRoute() {
           onOpenVisit={onOpenVisit}
           onOpenUpNext={() => {
             if (data?.upNext) openVisit(data.upNext, true);
-          }}
-          onCancelDay={(dateId) => {
-            const visit = visitsOn(dateId).find(
-              (v) => v.status !== 'cancelled' && v.status !== 'completed',
-            );
-            if (visit !== undefined) openDetails(visit.visitId);
           }}
         />
       )}

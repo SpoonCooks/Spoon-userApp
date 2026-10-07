@@ -8,12 +8,12 @@ import type { VisitRefundData, VisitRefundLine } from '../../data/visit';
 import { VISIT_MONEY_24, VISIT_REFUND_NODE, VISIT_STITCH_HORIZONTAL } from './assets';
 
 /**
- * `Payment summary · Cancelled` — Figma `1468:807`, Status = Refunded (component `1468:856`).
+ * `Payment summary · Cancelled` — Figma `1670:3461` (in `1466:8446`), Status = Refunded.
  *
  * White, 1pt `#FFEF99` edge, 16pt corners, p 16 / 16 gap: the header (40pt `#FFE666` money well,
- * "Payment & refund", booking id, the lime `Refunded` badge `90:182`); the `#FFF7CC` breakdown
- * (amount paid, cancellation fee, a yellow stitch, the refund total in `Spoon/Display`); then where
- * the refund went and its two-step timeline.
+ * "Payment & refund", the lime `Refunded` badge `90:182`); the `#FFF7CC` breakdown (amount paid,
+ * the Caption GST and cancellation-fee lines, a yellow stitch, the refund total in
+ * `Spoon/Display`); then where the refund went and its timeline, ending on the 5–7 days note.
  */
 export interface RefundSummaryCardProps {
   /** Defaults to the frame's. A value the backend does not give (refund id, mode) is left out. */
@@ -106,7 +106,7 @@ export function RefundSummaryCard({
             <View key={step.title} style={styles.step}>
               <Image source={VISIT_REFUND_NODE} style={styles.node} />
               <View style={styles.stepText}>
-                <Text variant="spoonBodyStrong" color="textPrimary">
+                <Text variant={step.note ? 'spoonBody' : 'spoonBodyStrong'} color="textPrimary">
                   {step.title}
                 </Text>
                 {step.when === undefined ? null : (
@@ -123,17 +123,34 @@ export function RefundSummaryCard({
   );
 }
 
-/** `1468:818` / `1468:823` — a breakdown line: label over detail, the amount at the right. */
+/**
+ * `1670:3470` — a breakdown line: label over detail, the amount at the right. A minor line
+ * (`1670:3514` GST, `1670:3477` cancellation fee) is one Caption row, label and amount in ink.
+ */
 function Line({ line }: { readonly line: VisitRefundLine }) {
+  if (line.minor) {
+    return (
+      <View style={styles.line}>
+        <Text variant="spoonCaption" color="textPrimary" style={styles.label}>
+          {line.label}
+        </Text>
+        <Text variant="spoonCaption" color="textPrimary">
+          {line.amount}
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.line}>
       <View style={styles.label}>
         <Text variant="spoonBody" color="textPrimary">
           {line.label}
         </Text>
-        <Text variant="spoonCaption" color="textSecondarySoft">
-          {line.detail}
-        </Text>
+        {line.detail === undefined ? null : (
+          <Text variant="spoonCaption" color="textSecondarySoft">
+            {line.detail}
+          </Text>
+        )}
       </View>
       <View style={styles.price}>
         {line.was === undefined ? null : (

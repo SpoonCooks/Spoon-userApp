@@ -38,7 +38,7 @@ import {
  *
  * Motion, per `1441:1981` "Note · Prep check motion" (all under 0.5s): a tapped tile squishes to
  * 96 % and springs back; the tick pops 0 → 120 % → 100 %; the matching segment fills left to
- * right; the counter rolls up; at 3/3 six yellow/lime dots burst from the pill (once per mount)
+ * right; the tick's well washes to lime; the counter rolls up; at 3/3 six yellow/lime dots burst from the pill (once per mount)
  * and the banner slides in; un-ticking is a gentle 300ms. The note's haptic tick is left out —
  * the app has no haptics module. Tick state is local UI state; nothing persists it.
  */
@@ -269,6 +269,8 @@ function PrepTile({
 }) {
   const [squish] = useState(() => new Animated.Value(1));
   const [tick] = useState(() => new Animated.Value(1));
+  // `1441:1984` — the well's fill washes to lime on a tick (a colour, so not on the native driver).
+  const [wash] = useState(() => new Animated.Value(checked ? 1 : 0));
   const first = useRef(true);
 
   useEffect(() => {
@@ -276,6 +278,12 @@ function PrepTile({
       first.current = false;
       return;
     }
+    Animated.timing(wash, {
+      toValue: checked ? 1 : 0,
+      duration: checked ? 280 : 300,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    }).start();
     if (checked) {
       // `1441:1984` — the tick pops 0 → 120 % → 100 %.
       tick.setValue(0);
@@ -297,7 +305,7 @@ function PrepTile({
         useNativeDriver: true,
       }).start();
     }
-  }, [checked, tick]);
+  }, [checked, tick, wash]);
 
   const press = () => {
     // `1441:1983` — squish to 96 % and spring back (bouncy, ~400ms).
@@ -311,11 +319,13 @@ function PrepTile({
     onPress();
   };
 
-  const wellColor: ColorToken = checked
-    ? allSet
-      ? 'surface'
-      : 'surfacePositive'
-    : 'surfaceAccent';
+  const wellColor = wash.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      lightTheme.colors.surfaceAccent,
+      lightTheme.colors[allSet ? 'surface' : 'surfacePositive'],
+    ],
+  });
 
   return (
     <Animated.View style={[styles.tileWrap, { transform: [{ scale: squish }] }]}>
@@ -328,9 +338,9 @@ function PrepTile({
         testID={testID}
       >
         <View style={styles.tileTop}>
-          <View style={[styles.well, { backgroundColor: lightTheme.colors[wellColor] }]}>
+          <Animated.View style={[styles.well, { backgroundColor: wellColor }]}>
             <Image source={GLYPHS[item.key]} style={styles.glyph24} />
-          </View>
+          </Animated.View>
           <Animated.Image
             source={checked ? VISIT_PREP_CHECK_ON : VISIT_PREP_CHECK_OFF}
             style={[styles.glyph24, { transform: [{ scale: tick }] }]}

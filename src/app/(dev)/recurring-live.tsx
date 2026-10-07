@@ -113,6 +113,10 @@ function RecurringLivePreview({ params }: { readonly params: PreviewParams }) {
             prepState={parsePrep(params.prep)}
             onModifyBooking={() => setSheet('modify')}
             onPaymentDetails={() => setSheet('payment')}
+            // Nothing to dial or open in the preview; these draw Call and the WhatsApp toast.
+            onCall={() => undefined}
+            onHelp={() => undefined}
+            onShareRecipe={() => undefined}
             ratingSlot={
               variant === 'completed' ? (
                 <RateVisitCard initialRating={parseRating(params.rating) ?? 4.5} />
@@ -120,7 +124,11 @@ function RecurringLivePreview({ params }: { readonly params: PreviewParams }) {
             }
           />
           <ModifyBookingSheet visible={sheet === 'modify'} onClose={closeSheet} />
-          <PaymentDetailsSheet visible={sheet === 'payment'} onClose={closeSheet} />
+          <PaymentDetailsSheet
+            visible={sheet === 'payment'}
+            onClose={closeSheet}
+            onManageAutopay={() => undefined}
+          />
         </>
       );
     }

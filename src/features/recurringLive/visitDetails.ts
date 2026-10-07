@@ -9,7 +9,7 @@ import type {
 } from '@features/recurringSetup';
 
 import { clockText, durationText } from './adapters';
-import { VISIT_FIXTURE } from './data/visit';
+import { REFUND_CREDIT_NOTE, VISIT_FIXTURE } from './data/visit';
 import type {
   VisitDetailsModel,
   VisitMenuSection,
@@ -216,12 +216,12 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
               amount: formatPaise(total),
             },
             {
-              label: 'Cancellation fee',
-              detail:
+              label:
                 cancellation.feePaise === 0
-                  ? 'Cancelled more than 3 hrs before the visit'
-                  : `${cancellation.feePercent}% — cancelled after the charge`,
+                  ? 'Cancellation fee'
+                  : `Cancellation fee (${cancellation.feePercent}%)`,
               amount: `– ${formatPaise(cancellation.feePaise)}`,
+              minor: true,
             },
           ],
           total: {
@@ -240,20 +240,11 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
           steps: [
             {
               title: 'Refund initiated',
-              ...(cancelledAt === null
-                ? {}
-                : { when: `${dayLabel(cancelledAt.dateId)} · ${clockText(cancelledAt.hhmm)}` }),
+              ...(cancelledAt === null ? {} : { when: dayLabel(cancelledAt.dateId) }),
             },
-            ...(cancellation.refundStatus === 'refunded'
-              ? [
-                  {
-                    title:
-                      mandate?.handleMasked === null || mandate === null
-                        ? 'Credited to your UPI account'
-                        : `Credited to ${mandate.handleMasked}`,
-                  },
-                ]
-              : []),
+            ...(cancellation.refundStatus === 'failed'
+              ? []
+              : [{ title: REFUND_CREDIT_NOTE, note: true }]),
           ],
         }
       : null;
@@ -316,7 +307,11 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
       eyebrow: fixture.charge.eyebrow,
       ...(was === undefined || variant === 'cancelled' ? {} : { was }),
       amount: variant === 'cancelled' && !charged ? formatPaise(0) : formatPaise(total),
-      taxNote: fixture.charge.taxNote,
+      // The frames' "+ 5% GST", at the rate actually priced in.
+      taxNote:
+        visit.price.pricePaise > 0
+          ? `+ ${Math.round((visit.price.gstPaise / visit.price.pricePaise) * 100)}% GST`
+          : fixture.charge.taxNote,
       title: fixture.charge.title,
       body: chargeBody,
     },
@@ -327,12 +322,14 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
       visitLine: {
         label: `Cook visit · ${duration}`,
         caption: `Recurring · Plan ${visit.planNumber}, Visit ${visit.visitNumber}`,
+        ...(visit.price.basePricePaise > visit.price.pricePaise
+          ? { was: formatPaise(visit.price.basePricePaise) }
+          : {}),
         amount: formatPaise(payment?.pricePaise ?? visit.price.pricePaise),
       },
       taxLine: { label: 'GST', amount: formatPaise(payment?.gstPaise ?? visit.price.gstPaise) },
       totalLabel: 'Total',
       totalCaption: 'Inclusive of all taxes',
-      ...(was === undefined ? {} : { totalOriginal: was }),
       total: formatPaise(total),
       methodEyebrow: 'MODE OF PAYMENT',
       methodName: 'UPI Autopay',
@@ -371,4 +368,26 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
           }
         : null,
   };
+}
+
+/**
+ * `Note · Help deep link` — Help (and Share on the recipe row) go straight to WhatsApp with Spoon,
+ * prefilled: "Hi Spoon, I need help with booking #SP24817 · Wed, 14 Oct, 9:00 AM · Cook Sanchita."
+ * The number is the backend's (`support.whatsappUrl`, null when none is configured); the message is
+ * written here in the note's shape. There is no customer-facing booking reference, so "my visit"
+ * stands in for "booking #…", and a visit with no cook yet leaves the cook out.
+ */
+export function visitWhatsAppLink(
+  visit: VisitDetailDto,
+  purpose: 'help' | 'recipe',
+): string | null {
+  const url = visit.support.whatsappUrl;
+  if (url === null) return null;
+  const opening =
+    purpose === 'help'
+      ? 'Hi Spoon, I need help with my visit'
+      : 'Hi Spoon, I have a recipe/dish in mind for my visit';
+  const parts = [opening, `${dayLabel(visit.date)}, ${clockText(visit.startTime)}`];
+  if (visit.cook !== null) parts.push(visit.cook.displayName);
+  return `${url.split('?')[0] ?? url}?text=${encodeURIComponent(`${parts.join(' · ')}.`)}`;
 }

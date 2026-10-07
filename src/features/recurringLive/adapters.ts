@@ -47,7 +47,7 @@ export function liveCalendarFrom(booking: RecurringBookingDto, todayId: string):
       const group = groupByDate.get(id);
       return group === undefined || (visitsByDate.get(id)?.length ?? 0) === 0 ? 'none' : group;
     }),
-    hint: 'Tap a date to check details. Tap the blank area to deselect.',
+    hint: 'Tap a date to check its details',
     visitsByDay: Object.fromEntries(
       booking.days
         .filter((day) => day.visits.length > 0)
