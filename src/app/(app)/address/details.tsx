@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
 import {
+  googleReverseGeocode,
   AddressDetailsView,
   addressCreateScope,
   resolveAddressSavePoint,
@@ -51,6 +52,30 @@ export default function AddressDetailsRoute() {
   const create = useCreateAddress();
   const update = useUpdateAddress();
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * An address saved without a pincode gets one back the next time it is edited. Its point is
+   * known, so Google is asked for the postcode in the background while the form is open; the save
+   * sends it if it arrived, and the address simply keeps none if it did not (the backend accepts
+   * that). A new address never needs this: the map step resolves its pincode before it gets here.
+   */
+  const [recoveredPincode, setRecoveredPincode] = useState<string | null>(null);
+  const needsPincode = editingId !== null && savedArea?.pincode === '';
+  // Primitives, so a re-render that rebuilds the point object does not ask Google again.
+  const pointLat = savedPoint?.latitude ?? null;
+  const pointLng = savedPoint?.longitude ?? null;
+  useEffect(() => {
+    if (!needsPincode || pointLat === null || pointLng === null) return undefined;
+    let live = true;
+    void googleReverseGeocode({ latitude: pointLat, longitude: pointLng }).then((result) => {
+      if (live && result.ok && result.value.pincode !== null) {
+        setRecoveredPincode(result.value.pincode);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [needsPincode, pointLat, pointLng]);
 
   /**
    * BACK and "Change area" are NO LONGER the same action (product decision reversed — see
@@ -171,7 +196,10 @@ export default function AddressDetailsRoute() {
              * draft, an edit resends what the address already holds rather than blanking it.
              */
             street: draft.street ?? savedArea?.street ?? form.building.trim(),
-            pincode: draft.pincode ?? savedArea?.pincode ?? '',
+            pincode:
+              draft.pincode ??
+              (savedArea?.pincode === '' ? recoveredPincode : savedArea?.pincode) ??
+              '',
             ...(() => {
               const city = draft.city ?? savedArea?.city ?? null;
               return city === null ? {} : { city };

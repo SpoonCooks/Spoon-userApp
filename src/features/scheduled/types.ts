@@ -31,7 +31,15 @@ export interface SchedulePeriodOption {
   readonly id: string;
   readonly label: string;
   readonly icon: 'sunrise' | 'sun' | 'moon';
+  /** The window has entirely passed today (the clock). */
   readonly disabled?: boolean;
+  /**
+   * The server answered for this day and offers no bookable start in this window — every card
+   * would be grey. Separate from `disabled` because the screen keeps a chip the customer ALREADY
+   * chose pressable: picking a longer duration can empty it, and taking it away under them would
+   * hide the duration they are choosing.
+   */
+  readonly noSlots?: boolean;
 }
 
 export interface ScheduleSlotOption {

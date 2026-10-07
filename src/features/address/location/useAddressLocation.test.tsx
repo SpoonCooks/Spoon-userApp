@@ -576,6 +576,33 @@ describe('settling on a point', () => {
   });
 
   /**
+   * A pinned point the OS geocoder names but cannot give a postcode for used to be saved with no
+   * pincode at all. Google is asked for the postcode; the OS description stays.
+   */
+  it('borrows Google’s postcode when the OS geocoder has none', async () => {
+    const places = jest.requireMock('./googlePlaces') as { googleReverseGeocode: jest.Mock };
+    mocked.reverseGeocodeAsync.mockResolvedValue([
+      { name: 'Haralur Main Road', city: 'Bengaluru', postalCode: null },
+    ] as never);
+    // Not `Once`: the mount's own device fix geocodes too, and would take it.
+    places.googleReverseGeocode.mockResolvedValue({
+      ok: true,
+      value: { title: 'Elsewhere', line: 'Elsewhere', pincode: '560102' },
+    });
+
+    const { result } = renderHook(() => useAddressLocation(), { wrapper });
+    await flush();
+    act(() => result.current.selectPoint(USER_POINT));
+    await flush();
+    await flush();
+    await flush();
+
+    expect(result.current.geocoded?.pincode).toBe('560102');
+    expect(result.current.geocoded?.title).toBe('Haralur Main Road');
+    places.googleReverseGeocode.mockResolvedValue({ ok: false, reason: 'error' });
+  });
+
+  /**
    * Confirm hands back the point it CHECKED. The route writes the address draft from that, not
    * from its own closure over render state, which the map can be a settle ahead of.
    */
@@ -717,6 +744,7 @@ describe('a chosen place missing its postcode', () => {
 
     expect(result.current.geocoded?.pincode).toBe('560102');
     expect(result.current.geocoded?.title).toBe('Haralur Main Road');
+    places.googleReverseGeocode.mockResolvedValue({ ok: false, reason: 'error' });
   });
 
   it('leaves the chosen place untouched when neither geocoder knows one', async () => {

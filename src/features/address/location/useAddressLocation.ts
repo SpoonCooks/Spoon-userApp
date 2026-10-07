@@ -338,18 +338,32 @@ export function useAddressLocation(): AddressLocationState {
         return;
       }
 
-      if (os !== null) {
+      if (os !== null && os.pincode !== null) {
         if (!current()) return;
         latestGeocoded.current = os;
         setGeocoded(os);
         setResolving(false);
         return;
       }
+      /*
+       * An OS answer WITHOUT a postcode is not finished either — the same rule the chosen-suggestion
+       * path above already applies. Accepting it saved the address with no pincode at all, which is
+       * how pin-dropped and current-location addresses ended up without one. Google is asked for
+       * the pincode; the OS description of the place stays.
+       */
       // The OS geocoder is empty on plenty of Android builds. Google is the backstop, so the
       // resolved row does not read "Selected location" forever.
       const google = await googleReverseGeocode(point);
       if (!current()) return;
-      if (google.ok) {
+      if (os !== null) {
+        // Keep the OS description; take only Google's pincode, when it has one.
+        const merged =
+          google.ok && google.value.pincode !== null
+            ? { ...os, pincode: google.value.pincode }
+            : os;
+        latestGeocoded.current = merged;
+        setGeocoded(merged);
+      } else if (google.ok) {
         latestGeocoded.current = google.value;
         setGeocoded(google.value);
       }
