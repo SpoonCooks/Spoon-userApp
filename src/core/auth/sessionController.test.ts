@@ -116,18 +116,51 @@ describe('sessionController tokens', () => {
     expect(onSessionCleared).toHaveBeenCalled();
   });
 
-  it('clears the session when the gateway throws', async () => {
-    const { controller, onSessionCleared } = setup({
+  it('keeps the session when the refresh gets no answer, and rethrows', async () => {
+    const { controller, tokenStore, onSessionCleared, events } = setup({
       tokens: STALE,
       gateway: {
         refreshSession: jest.fn(async () => {
-          throw new Error('network down');
+          throw new Error('Request timed out after 15000ms');
         }),
       },
     });
 
-    await expect(controller.refreshAccessToken()).resolves.toBeNull();
-    expect(onSessionCleared).toHaveBeenCalled();
+    await expect(controller.refreshAccessToken()).rejects.toThrow('timed out');
+    expect(tokenStore.clear).not.toHaveBeenCalled();
+    expect(onSessionCleared).not.toHaveBeenCalled();
+    expect(events.map((event) => event.type)).toEqual(['REFRESH_STARTED', 'REFRESH_INTERRUPTED']);
+  });
+
+  it('refreshes again on the next call after a refresh with no answer', async () => {
+    const refreshSession = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce(REFRESHED);
+    const { controller } = setup({ tokens: STALE, gateway: { refreshSession } });
+
+    await expect(controller.refreshAccessToken()).rejects.toThrow('network down');
+    await expect(controller.refreshAccessToken()).resolves.toBe(REFRESHED.accessToken);
+    expect(refreshSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens signed in when the bootstrap refresh gets no answer', async () => {
+    const { controller, tokenStore, events } = setup({
+      tokens: STALE,
+      gateway: {
+        refreshSession: jest.fn(async () => {
+          throw new Error('Request timed out after 15000ms');
+        }),
+      },
+    });
+
+    await expect(controller.bootstrap()).resolves.toBeUndefined();
+    expect(tokenStore.clear).not.toHaveBeenCalled();
+    expect(events.map((event) => event.type)).toEqual([
+      'BOOTSTRAP_FOUND_SESSION',
+      'REFRESH_STARTED',
+      'REFRESH_INTERRUPTED',
+    ]);
   });
 
   it('does not call the gateway when there is nothing to refresh', async () => {

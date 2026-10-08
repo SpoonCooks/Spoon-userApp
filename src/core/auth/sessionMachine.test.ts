@@ -31,6 +31,10 @@ describe('sessionReducer', () => {
     expect(sessionReducer('refreshing', { type: 'REFRESH_FAILED' })).toBe('expired');
   });
 
+  it('stays signed in when a refresh gets no answer', () => {
+    expect(sessionReducer('refreshing', { type: 'REFRESH_INTERRUPTED' })).toBe('authenticated');
+  });
+
   it('returns to unauthenticated only after teardown', () => {
     expect(sessionReducer('expired', { type: 'SIGNED_OUT' })).toBe('unauthenticated');
     expect(sessionReducer('expired', { type: 'REFRESH_SUCCEEDED' })).toBe('expired');

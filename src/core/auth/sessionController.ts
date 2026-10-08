@@ -64,10 +64,21 @@ export function createSessionController(options: SessionControllerOptions): Sess
       dispatch({ type: 'REFRESH_SUCCEEDED' });
       return next.accessToken;
     } catch (cause) {
-      logger.error('Refresh threw', { cause });
-      dispatch({ type: 'REFRESH_FAILED' });
-      await clearSession();
-      return null;
+      /*
+       * The gateway answers `null` for a refresh the server REJECTED, and throws only when there
+       * was no answer — a timeout, the network, a 5xx (`features/auth/api/sessionGateway.ts`).
+       * No answer says nothing about the session, so it is kept. Clearing it here used to sign
+       * the customer out whenever a refresh was slow: on staging, the first call after 15 idle
+       * minutes is a refresh (the access token's lifetime) that lands on a server still waking
+       * up (~40s against a 15s timeout).
+       *
+       * Rethrown, not `null`: the API client reads a `null` refresh as "session expired" and
+       * tears the session down itself. A rethrow fails just this request as a network error the
+       * screen can retry, and the next request refreshes again.
+       */
+      logger.warn('Refresh got no answer; keeping the session', { cause });
+      dispatch({ type: 'REFRESH_INTERRUPTED' });
+      throw cause;
     }
   });
 
@@ -83,7 +94,9 @@ export function createSessionController(options: SessionControllerOptions): Sess
       dispatch({ type: 'BOOTSTRAP_FOUND_SESSION' });
 
       if (isExpired(stored, now())) {
-        await refresh();
+        // A refresh with no answer keeps the session (see `refresh`); the app opens signed in
+        // and its first request refreshes again.
+        await refresh().catch(() => undefined);
       }
     },
 
