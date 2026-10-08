@@ -1,17 +1,17 @@
-import { Linking, Modal, Platform, StyleSheet, View } from 'react-native';
+import { Linking, Platform, StyleSheet, View } from 'react-native';
 import type { PropsWithChildren } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getConfig } from '@core/config';
 import { getLogger } from '@core/logging';
-import { Button, Text } from '@ui';
+import { Button, Icon, Text } from '@ui';
+import { Dialog } from '@ui/overlays/Dialog';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { storeUrlsFor } from './storeUrl';
 import { useAppUpdate } from './useAppUpdate';
 
 /**
- * Wraps the app and puts the update screen over it when one is needed.
+ * Wraps the app and puts the update popup over it when one is needed.
  *
  * ## Why an overlay and not a replacement
  *
@@ -21,10 +21,15 @@ import { useAppUpdate } from './useAppUpdate';
  * updates and returns, or whose requirement is later relaxed in the console, is exactly where they
  * were.
  *
- * ## The mandatory screen cannot be closed
+ * ## A popup, like every other dialog in the app
  *
- * It is a native modal whose `onRequestClose` does nothing, which is what stops Android's back
- * button; it has no close control and no backdrop to tap. The only way off it is the store.
+ * It is the shared `Dialog`: a card centred over the app, which is dimmed by the same scrim the
+ * other popups use. Nothing about it is bespoke except what makes it mandatory.
+ *
+ * ## The mandatory popup cannot be closed
+ *
+ * `onRequestClose` does nothing, which is what stops Android's back button; backdrop taps are
+ * ignored; and the card has no close control. The only way off it is the store.
  */
 
 const logger = getLogger('appUpdate');
@@ -39,7 +44,6 @@ async function openStore(): Promise<void> {
   const config = getConfig();
   const urls = storeUrlsFor({
     platform: Platform.OS,
-    androidPackage: config.androidPackage,
     iosAppStoreId: config.iosAppStoreId,
   });
 
@@ -61,55 +65,32 @@ export function AppUpdateGate({ children }: PropsWithChildren) {
   return (
     <>
       {children}
-      <Modal
+      <Dialog
         visible={requirement !== 'none'}
-        transparent={!required}
-        animationType="fade"
-        statusBarTranslucent
-        // Deliberately inert for the mandatory screen: this IS the Android back-button trap.
-        onRequestClose={required ? () => undefined : dismiss}
-        testID="app-update-modal"
+        // Deliberately inert for the mandatory popup: this IS the Android back-button trap.
+        onClose={required ? () => undefined : dismiss}
+        dismissOnBackdropPress={!required}
+        testID={required ? 'app-update-required' : 'app-update-optional'}
       >
-        {required ? (
-          <SafeAreaView
-            style={styles.required}
-            accessibilityViewIsModal
-            testID="app-update-required"
-          >
-            <View style={styles.requiredBody}>
-              <Text variant="title" color="textPrimary" align="center" accessibilityRole="header">
-                {REQUIRED_TITLE}
-              </Text>
-              <Text variant="body" color="textSecondary" align="center">
-                {message ?? REQUIRED_BODY}
-              </Text>
-            </View>
-            <View style={styles.requiredFooter}>
-              <Button
-                label="Update"
-                onPress={() => void openStore()}
-                variant="primary"
-                size="lg"
-                testID="app-update-required-action"
-              />
-            </View>
-          </SafeAreaView>
-        ) : (
-          <View style={styles.optionalScrim} accessibilityViewIsModal testID="app-update-optional">
-            <View style={styles.optionalCard}>
-              <Text variant="title" color="textPrimary" align="center" accessibilityRole="header">
-                {OPTIONAL_TITLE}
-              </Text>
-              <Text variant="body" color="textSecondary" align="center">
-                {OPTIONAL_BODY}
-              </Text>
-              <Button
-                label="Update"
-                onPress={() => void openStore()}
-                variant="primary"
-                size="md"
-                testID="app-update-optional-action"
-              />
+        <View style={styles.card} accessibilityRole="alert">
+          <View style={styles.badge}>
+            <Icon name="refresh" size={26} color="textPrimary" />
+          </View>
+          <Text variant="title" color="textPrimary" align="center" accessibilityRole="header">
+            {required ? REQUIRED_TITLE : OPTIONAL_TITLE}
+          </Text>
+          <Text variant="body" color="textSecondary" align="center">
+            {required ? (message ?? REQUIRED_BODY) : OPTIONAL_BODY}
+          </Text>
+          <View style={styles.actions}>
+            <Button
+              label="Update"
+              onPress={() => void openStore()}
+              variant="primary"
+              size="md"
+              testID={required ? 'app-update-required-action' : 'app-update-optional-action'}
+            />
+            {required ? null : (
               <Button
                 label="Not now"
                 onPress={dismiss}
@@ -117,37 +98,35 @@ export function AppUpdateGate({ children }: PropsWithChildren) {
                 size="md"
                 testID="app-update-optional-dismiss"
               />
-            </View>
+            )}
           </View>
-        )}
-      </Modal>
+        </View>
+      </Dialog>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  required: {
-    flex: 1,
-    backgroundColor: lightTheme.colors.background,
-    padding: lightTheme.space.lg,
-  },
-  requiredBody: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  /** Held near square on purpose: a narrow card, with the icon lending it height. */
+  card: {
+    width: '100%',
+    maxWidth: 280,
+    alignSelf: 'center',
+    alignItems: 'stretch',
     gap: lightTheme.space.sm,
-  },
-  requiredFooter: { paddingBottom: lightTheme.space.md },
-  optionalScrim: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: lightTheme.colors.scrim,
-    paddingHorizontal: lightTheme.space.xl,
-  },
-  optionalCard: {
-    gap: lightTheme.space.sm,
-    padding: lightTheme.space.lg,
-    borderRadius: lightTheme.radius.lg,
+    padding: lightTheme.space.xl,
+    borderRadius: lightTheme.radius.r24,
     backgroundColor: lightTheme.colors.surface,
   },
+  badge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: lightTheme.space.xs,
+    backgroundColor: lightTheme.colors.surfaceAccentBold,
+  },
+  actions: { gap: lightTheme.space.xs, paddingTop: lightTheme.space.sm },
 });
