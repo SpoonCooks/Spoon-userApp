@@ -209,6 +209,22 @@ describe('api client', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the session when the refresh after a 401 gets no answer', async () => {
+    const fetchImpl = createFetchMock(async () => jsonResponse(401, { error: 'expired' }));
+    const timeout = Object.assign(new Error('Request timed out after 15000ms'), {
+      kind: 'timeout',
+    });
+    const auth = createAuth({
+      refreshAccessToken: jest.fn(async () => {
+        throw timeout;
+      }),
+    });
+    const { client } = build(fetchImpl, auth);
+
+    await expect(client.request('ping', { parse: parseEcho })).rejects.toBe(timeout);
+    expect(auth.onSessionExpired).not.toHaveBeenCalled();
+  });
+
   it('gives up after a single retry still returns 401', async () => {
     const fetchImpl = createFetchMock(async () => jsonResponse(401, { error: 'expired' }));
     const { client, auth } = build(fetchImpl);
