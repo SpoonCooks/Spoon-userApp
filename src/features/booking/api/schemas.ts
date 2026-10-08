@@ -527,6 +527,9 @@ export const bookingHistoryPageSchema = z.object({
   nextCursor: z.string().nullish(),
 });
 
+/** One page of `GET /v1/me/bookings/active` — the same shape, and the same opaque `nextCursor`. */
+export const bookingActivePageSchema = bookingHistoryPageSchema;
+
 /** `GET /v1/bookings/:id/cancellation-preview`. Every number is the server's. */
 export const cancellationPreviewSchema = z.object({
   bookingId: z.string(),

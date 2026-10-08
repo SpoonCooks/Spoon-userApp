@@ -9,7 +9,12 @@ import type { PagedScreenQuery, ScreenQuery } from '@core/data';
 import { useRuntime } from '@core/runtimeContext';
 
 import { createBookingApi, createServiceApi } from './bookingApi';
-import type { BookingHistoryPage, BookingRequestInput, RefundHistoryPage } from './bookingApi';
+import type {
+  BookingActivePage,
+  BookingHistoryPage,
+  BookingRequestInput,
+  RefundHistoryPage,
+} from './bookingApi';
 import type { CheckoutLauncher } from '@features/payment';
 import { unavailableCheckoutLauncher } from '@features/payment';
 import { bookingKeys } from './keys';
@@ -150,10 +155,37 @@ export function useActiveBookings(
 
   return useApiQuery<readonly BookingSummaryDto[]>({
     queryKey: bookingKeys.active(),
-    queryFn: ({ signal }) => bookings.active(signal),
+    // Home reads only the first page: the carousel and banner are drawn from the leading rows,
+    // which is where the server's ordering puts what is happening now.
+    queryFn: async ({ signal }) => (await bookings.active(null, signal)).bookings,
     enabled: options.enabled ?? true,
     staleTime: 10_000,
     refetchInterval: options.poll === false ? false : LIVE_POLL_MS,
+  });
+}
+
+const activeBookingsOf = (page: BookingActivePage) => page.bookings;
+const nextActiveCursor = (page: BookingActivePage) => page.nextCursor;
+
+/**
+ * The in-flight list a page at a time — `GET /v1/me/bookings/active`, the Upcoming tab.
+ *
+ * Its own cache entry, not `useActiveBookings`': that one is the first page alone, flat, for Home,
+ * and the two must not share a key because one holds pages and the other holds rows. Every booking
+ * mutation invalidates `bookingKeys.all()`, which covers both. It polls like its sibling, which
+ * re-reads only the pages the customer has scrolled through.
+ */
+export function useActiveBookingPages(): PagedScreenQuery<readonly BookingSummaryDto[]> {
+  const { api } = useRuntime();
+  const bookings = createBookingApi(api);
+
+  return useApiInfiniteQuery<BookingActivePage, BookingSummaryDto>({
+    queryKey: bookingKeys.activePages(),
+    fetchPage: ({ cursor, signal }) => bookings.active(cursor, signal),
+    getNextCursor: nextActiveCursor,
+    getItems: activeBookingsOf,
+    staleTime: 10_000,
+    refetchInterval: LIVE_POLL_MS,
   });
 }
 

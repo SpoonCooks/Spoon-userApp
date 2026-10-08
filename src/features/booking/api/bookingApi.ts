@@ -4,8 +4,8 @@ import { idempotencyHeader } from '@core/api';
 import {
   bookingCreateResponseSchema,
   bookingDetailResponseSchema,
+  bookingActivePageSchema,
   bookingHistoryPageSchema,
-  bookingListResponseSchema,
   cancellationPreviewSchema,
   extensionOptionsResponseSchema,
   extensionQuoteSchema,
@@ -65,6 +65,9 @@ export interface BookingHistoryPage {
   /** Opaque; `null` on the last page. */
   readonly nextCursor: string | null;
 }
+
+/** One page of the in-flight list; the same shape as a history page. */
+export type BookingActivePage = BookingHistoryPage;
 
 export interface RefundHistoryPage {
   readonly refunds: readonly RefundDto[];
@@ -158,15 +161,25 @@ export function createBookingApi(api: ApiClient) {
     },
 
     /**
-     * `GET /v1/me/bookings/active`. Drives Home's carousel and the Upcoming tab.
+     * `GET /v1/me/bookings/active` — one page of what the customer has in flight. Drives Home's
+     * carousel and the Upcoming tab.
      *
-     * Takes NO query parameters — its schema is an empty object, so `?limit=` is a 400 rather
-     * than an ignored hint. Its own page size is hardcoded to 20 server-side and there is no way
-     * to page it, which is a ceiling this app cannot lift.
+     * The FIRST page is requested with NO query parameters, exactly as before: a backend that
+     * predates paging answers 400 to any parameter on this route, and without one it returns the
+     * same 20 rows it always did. `?cursor=` is only ever sent back when the server handed one out,
+     * so it is only ever sent to a backend that understands it. `nextCursor` is OPAQUE, as in
+     * `history`; an older backend sends none, which reads as "the list ends here".
      */
-    async active(signal?: AbortSignal): Promise<readonly BookingSummaryDto[]> {
-      return api.request(BOOKING_PATHS.active, {
-        parse: (data) => bookingListResponseSchema.parse(data).bookings,
+    async active(cursor?: string | null, signal?: AbortSignal): Promise<BookingActivePage> {
+      const path =
+        cursor === undefined || cursor === null
+          ? BOOKING_PATHS.active
+          : `${BOOKING_PATHS.active}?${query({ cursor })}`;
+      return api.request(path, {
+        parse: (data) => {
+          const page = bookingActivePageSchema.parse(data);
+          return { bookings: page.bookings, nextCursor: page.nextCursor ?? null };
+        },
         ...(signal === undefined ? {} : { signal }),
       });
     },

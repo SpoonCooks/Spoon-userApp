@@ -245,12 +245,26 @@ back as **`?cursor=`**. The app pages with it:
   at its first 50 until V0 is deployed. Nothing breaks in the meantime.
 - Old builds keep working: V0 still accepts the legacy `cursorCreatedAt` + `cursorId` pair.
 
-### `GET /v1/me/bookings/active` cannot be paged at all
+### `GET /v1/me/bookings/active` — paged, `BACKEND_GAP_ACTIVE_CURSOR` closed client-side
 
-It takes **no query parameters** — the schema is an empty object, so `?limit=` is a 400 rather
-than an ignored hint — and its page size is hardcoded to 20 server-side. Home's carousel and the
-Upcoming tab are therefore capped at 20 rows with no client-side remedy. Pinned by
-`bookingApi.test.ts`, because sending a parameter here breaks the screen rather than limiting it.
+The endpoint used to take **no query parameters** (any one was a 400) and returned a hardcoded 20
+rows, so the Upcoming tab was capped at 20 with no remedy. V0 now returns an opaque `nextCursor`
+beside the same 20-row first page and accepts it back as **`?cursor=`**; `limit` (up to 50) is
+accepted too, though the app does not send it.
+
+- `useActiveBookingPages` is a `useApiInfiniteQuery` on its own cache key (`bookingKeys.activePages`)
+  and feeds the Upcoming tab; it polls like the Home read does. Home's `useActiveBookings` is
+  unchanged — the first page alone, flat, under `bookingKeys.active`.
+- **The FIRST request still carries no parameters.** A backend that predates paging answers 400 to
+  any parameter on this route, so `?cursor=` is only ever sent back after a server has handed one
+  out. Pinned by `bookingApi.test.ts`.
+- A backend without `nextCursor` reads as "last page": Upcoming stays at its first 20 until V0 is
+  deployed, and nothing breaks in the meantime.
+- Upcoming filters out finished bookings whose slot has passed. When a page is made only of those,
+  the hook requests the next one itself, since an empty list has nothing to scroll.
+- Bookings stuck in a non-final status stay in Upcoming by design (Upcoming and Past are
+  complements by status, with no clock in either). They are now always reachable there instead of
+  being pushed past the 20-row cap.
 
 ### ⚠️ Two OpenAPI descriptions are stale — trust the code, not the spec
 

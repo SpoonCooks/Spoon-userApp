@@ -59,18 +59,14 @@ export default function HistoryRoute() {
         active: activeTab,
         onChange: (id) => setActiveTab(id === 'past' ? 'past' : 'upcoming'),
       }}
-      // Past pages through the backend's `nextCursor`; Upcoming is a single 20-row read.
-      {...(activeTab === 'past'
-        ? {
-            paging: {
-              hasMore: past.hasMore,
-              loadingMore: past.loadingMore,
-              error: past.loadMoreError !== null,
-              onLoadMore: past.loadMore,
-              onRetry: past.retryLoadMore,
-            },
-          }
-        : {})}
+      // Both tabs page through the backend's `nextCursor`.
+      paging={{
+        hasMore: active.hasMore,
+        loadingMore: active.loadingMore,
+        error: active.loadMoreError !== null,
+        onLoadMore: active.loadMore,
+        onRetry: active.retryLoadMore,
+      }}
       testID="history-screen"
     />
   );

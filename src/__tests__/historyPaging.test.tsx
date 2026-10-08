@@ -144,6 +144,84 @@ describe('My bookings → Past', () => {
   });
 });
 
+/** The in-flight list: three pages [a, b] → [c, d] → [e], every row an unpaid future booking. */
+const upcoming = (id: string, day: number) => ({
+  ...booking(id, day),
+  status: 'created',
+  scheduledStart: `2099-01-${String(day).padStart(2, '0')}T08:00:00.000Z`,
+});
+
+function upcomingApi(pages: Record<string, { rows: object[]; nextCursor: string | null }>) {
+  const paths: string[] = [];
+  const api: ApiClient = {
+    async request(path, requestOptions) {
+      paths.push(path);
+      const [route, search = ''] = path.split('?');
+      if (route === '/v1/me/bookings') return requestOptions.parse({ bookings: [] });
+      if (route !== '/v1/me/bookings/active') throw new Error(`No stub for GET ${path}`);
+      const page = pages[new URLSearchParams(search).get('cursor') ?? ''];
+      if (page === undefined) throw new Error(`No page for ${path}`);
+      return requestOptions.parse({ bookings: page.rows, nextCursor: page.nextCursor });
+    },
+  };
+  return { api, paths };
+}
+
+describe('My bookings → Upcoming', () => {
+  it('loads the next pages as the end is reached, sending only the cursor', async () => {
+    const { api, paths } = upcomingApi({
+      '': { rows: [upcoming('a', 9), upcoming('b', 8)], nextCursor: 'cursor-2' },
+      'cursor-2': { rows: [upcoming('c', 7), upcoming('d', 6)], nextCursor: 'cursor-3' },
+      'cursor-3': { rows: [upcoming('e', 5)], nextCursor: null },
+    });
+    renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
+    await screen.findByTestId('history-screen-card-a');
+    expect(screen.queryByTestId('history-screen-card-c')).toBeNull();
+
+    reachEnd('history-screen-list');
+    await screen.findByTestId('history-screen-card-c');
+
+    reachEnd('history-screen-list');
+    await screen.findByTestId('history-screen-card-e');
+
+    // The first request has no parameters (an older backend would 400 on any); the rest carry
+    // the cursor alone.
+    expect(paths.filter((path) => path.startsWith('/v1/me/bookings/active'))).toEqual([
+      '/v1/me/bookings/active',
+      '/v1/me/bookings/active?cursor=cursor-2',
+      '/v1/me/bookings/active?cursor=cursor-3',
+    ]);
+
+    reachEnd('history-screen-list');
+    expect(paths.filter((path) => path.startsWith('/v1/me/bookings/active'))).toHaveLength(3);
+  });
+
+  it('keeps asking when every row so far is one the tab filters out', async () => {
+    // Finished bookings whose slot has passed belong under Past, not Upcoming. A first page made
+    // only of those leaves nothing to draw — no list, so nothing to scroll to the end of — and the
+    // next page, which holds the live booking, has to be requested without the customer's help.
+    const { api } = upcomingApi({
+      '': { rows: [booking('old-1', 2), booking('old-2', 1)], nextCursor: 'cursor-2' },
+      'cursor-2': { rows: [upcoming('live', 9)], nextCursor: null },
+    });
+    renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
+
+    await screen.findByTestId('history-screen-card-live');
+    expect(screen.queryByTestId('history-screen-card-old-1')).toBeNull();
+  });
+
+  it('degrades to one page against a backend that sends no cursor', async () => {
+    const { api, paths } = upcomingApi({ '': { rows: [upcoming('a', 9)], nextCursor: null } });
+    renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
+    await screen.findByTestId('history-screen-card-a');
+
+    reachEnd('history-screen-list');
+    expect(paths.filter((path) => path.startsWith('/v1/me/bookings/active'))).toEqual([
+      '/v1/me/bookings/active',
+    ]);
+  });
+});
+
 describe('Refunds', () => {
   it('pages the same way', async () => {
     const { api, paths } = pagedApi('refunds');

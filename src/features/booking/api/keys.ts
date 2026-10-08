@@ -13,6 +13,8 @@ export const bookingKeys = {
   all: factory.all,
   detail: factory.detail,
   active: () => factory.collection('active'),
+  /** The in-flight list read a page at a time (the Upcoming tab); `active` is its first page alone. */
+  activePages: () => factory.collection('activePages'),
   history: () => factory.collection('history'),
   refunds: () => factory.collection('refunds'),
   bookingRefunds: (id: string) => factory.collection('bookingRefunds', { id }),
