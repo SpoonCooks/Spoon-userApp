@@ -39,7 +39,20 @@ describe('AppUpdateGate', () => {
     expect(screen.getByText('Update required')).toBeTruthy();
     expect(screen.queryByText('Not now')).toBeNull();
     // Android back must do nothing: the modal's close handler is inert.
-    expect(screen.getByTestId('app-update-modal').props.onRequestClose()).toBeUndefined();
+    expect(screen.getByTestId('app-update-required-modal').props.onRequestClose()).toBeUndefined();
+  });
+
+  it('ignores a tap on the backdrop when the update is mandatory', () => {
+    const dismiss = show('required');
+    fireEvent.press(screen.getByTestId('app-update-required-backdrop'));
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(screen.getByText('Update required')).toBeTruthy();
+  });
+
+  it('dismisses an optional update from the backdrop', () => {
+    const dismiss = show('optional');
+    fireEvent.press(screen.getByTestId('app-update-optional-backdrop'));
+    expect(dismiss).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the app mounted underneath the mandatory screen', () => {
