@@ -89,6 +89,7 @@ const PROFILE = {
 const CARD = {
   cookId: 'cook-1',
   name: 'Cook Meera',
+  badges: [],
   details: [],
   stats: [],
   inPool: true,

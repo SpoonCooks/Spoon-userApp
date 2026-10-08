@@ -73,15 +73,31 @@ export function cookPoolSummaryFrom(pool: CookPoolListDto, minimumSize: number):
   };
 }
 
-/** `867:1670` — Region under the name; the visits and the rating as the emphasised stats. */
+/**
+ * `1380:3196` — the trust marks over the name, the region and languages under it, and the visits
+ * and the rating as the emphasised stats.
+ *
+ * The rating is the cook's OVERALL average: the card carries no rating of this household's own,
+ * so it reads "Rating", not the design's "Your rating", until the backend sends one.
+ */
 function linesFor(card: PoolCookCardDto): {
+  readonly badges: readonly string[];
   readonly details: readonly CookProfileLine[];
   readonly stats: readonly CookProfileLine[];
 } {
   return {
-    details: card.region === null ? [] : [{ id: 'region', label: 'Region', value: card.region }],
+    badges: [
+      ...(card.spoonTrained ? ['Spoon trained'] : []),
+      ...(card.backgroundVerified ? ['Verified'] : []),
+    ],
+    details: [
+      ...(card.region === null ? [] : [{ id: 'region', value: card.region }]),
+      ...(card.languages.length === 0
+        ? []
+        : [{ id: 'languages', value: `Speaks ${card.languages.join(', ')}` }]),
+    ],
     stats: [
-      { id: 'visits', label: 'No. of visits', value: String(card.visitsWithYou) },
+      { id: 'visits', label: 'Visits with you', value: String(card.visitsWithYou) },
       // An unrated cook's `average` is 0 — no rating yet, which is not "Rating: 0".
       ...(card.rating.count === 0
         ? []

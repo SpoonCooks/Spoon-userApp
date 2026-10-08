@@ -55,8 +55,9 @@ describe('Cook profile (demo source)', () => {
   it('draws the lines and menu', () => {
     renderDemo(<CookProfileScreen cookId={SANCHITA} onBack={jest.fn()} onRemoved={jest.fn()} />);
     expect(screen.getByText('Cook Sanchita')).toBeTruthy();
-    expect(screen.getByText('Region: West Bengal')).toBeTruthy();
-    expect(screen.getByText('No. of visits: 45')).toBeTruthy();
+    expect(screen.getByText('SPOON TRAINED · VERIFIED')).toBeTruthy();
+    expect(screen.getByText('West Bengal · Speaks Hindi, Bengali')).toBeTruthy();
+    expect(screen.getByText('Visits with you: 45')).toBeTruthy();
     expect(screen.getByText('Curries/ sabzis- Non Veg')).toBeTruthy();
     // Not in the pool: nothing to remove.
     expect(screen.queryByTestId('cook-profile-screen-remove')).toBeNull();
@@ -165,7 +166,7 @@ describe('Cook Pool on the API (default source)', () => {
     );
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
-    await waitFor(() => expect(screen.getByText('No. of visits: 3')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Visits with you: 3')).toBeTruthy());
     expect(screen.getByText('Rating: 4.5')).toBeTruthy();
     fireEvent.press(screen.getByTestId('cook-profile-screen-remove'));
     fireEvent.press(screen.getByTestId('cook-profile-screen-dialog-remove'));

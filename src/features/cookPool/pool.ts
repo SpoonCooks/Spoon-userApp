@@ -23,6 +23,7 @@ export interface ServedCook {
   /** The pool grid's caption — "Sanchita". */
   readonly shortName: string;
   readonly photo?: CookPoolImage | undefined;
+  readonly badges: readonly string[];
   readonly details: readonly CookProfileLine[];
   readonly stats: readonly CookProfileLine[];
   readonly menu: readonly CookMenuSection[];
@@ -89,6 +90,7 @@ function toProfile(cook: ServedCook, inPool: boolean): CookProfile {
     cookId: cook.cookId,
     name: cook.name,
     photo: cook.photo,
+    badges: cook.badges,
     details: cook.details,
     stats: cook.stats,
     menu: cook.menu,

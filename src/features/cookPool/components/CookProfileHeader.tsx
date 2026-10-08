@@ -9,14 +9,16 @@ import { CookPortrait } from './CookPortrait';
 import type { CookProfile, CookProfileLine } from '../types';
 
 /**
- * `Cook profile header` — Figma `867:1670` (on the deck card) and `848:7911` (on the profile).
+ * `Cook profile header` — Figma `1380:3196`, on the deck card (`755:2347`) and the profile
+ * (`719:1568`).
  *
- * p 16. On the left, pr 8 and 8 between two groups: the name (SemiBold 18/26) over its caption
- * lines (Regular 12/16), 4 apart; then the stat lines (SemiBold 14/20), 4 apart, each with the
- * glyph it asks for at 12pt. On the right, the photo: 100×100 at a 16pt radius, on `#FFF7CC`, the
- * cook standing full height (`CookPortrait`), pinned 16 from the top and right OUTSIDE the flow — the header is as tall as its
- * text (130 for one caption and two stats), never less than the photo needs. Every line is the
- * backend's, in its order.
+ * p 16. On the left, pr 8 and 8 apart: the trust marks ("SPOON TRAINED · VERIFIED", SemiBold
+ * 10/14, 60 % ink); the name (SemiBold 18/26) over its caption lines joined with " · " (Regular
+ * 12/16, 60 % ink), 4 apart; then the stat lines (SemiBold 14/20), 4 apart, each with the glyph it
+ * asks for at 12pt. On the right, the photo: 120×120 at a 16pt radius, on `#FFF7CC`, the cook
+ * standing full height (`CookPortrait`), pinned 16 from the top and right OUTSIDE the flow — the
+ * header is as tall as its text (152 with every line), never less than the photo needs. Every line
+ * is the backend's, in its order.
  */
 export interface CookProfileHeaderProps {
   readonly profile: CookProfile;
@@ -32,13 +34,20 @@ export function CookProfileHeader({
   return (
     <View style={styles.header} onLayout={onLayout} testID={testID}>
       <View style={styles.description}>
+        {profile.badges.length === 0 ? null : (
+          <Text variant="spoonMicroStrong" color="textSecondarySoft">
+            {profile.badges.join(' · ').toUpperCase()}
+          </Text>
+        )}
         <View style={styles.group}>
           <Text variant="headingSection" color="textPrimary" accessibilityRole="header">
             {profile.name}
           </Text>
-          {profile.details.map((line) => (
-            <Line key={line.id} line={line} variant="body" />
-          ))}
+          {profile.details.length === 0 ? null : (
+            <Text variant="body" color="textSecondarySoft">
+              {profile.details.map(lineText).join(' · ')}
+            </Text>
+          )}
         </View>
         {profile.stats.length === 0 ? null : (
           <View style={styles.group}>
@@ -55,25 +64,29 @@ export function CookProfileHeader({
   );
 }
 
+function lineText(line: CookProfileLine): string {
+  return line.label === undefined ? line.value : `${line.label}: ${line.value}`;
+}
+
 function Line({
   line,
   variant,
 }: {
   readonly line: CookProfileLine;
-  readonly variant: 'body' | 'bodyLargeStrong';
+  readonly variant: 'bodyLargeStrong';
 }) {
   const icon = line.icon === undefined ? undefined : LINE_ICONS[line.icon];
   return (
     <View style={styles.line}>
       <Text variant={variant} color="textPrimary" style={styles.lineText}>
-        {line.label}: {line.value}
+        {lineText(line)}
       </Text>
       {icon === undefined ? null : <Image source={icon} style={styles.lineIcon} />}
     </View>
   );
 }
 
-const PHOTO = 100;
+const PHOTO = 120;
 
 const styles = StyleSheet.create({
   header: {
