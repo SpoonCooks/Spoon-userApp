@@ -1,6 +1,7 @@
 export { BOOKING_PATHS, createBookingApi, createServiceApi } from './bookingApi';
 export type { BookingApi, BookingRequestInput, ServiceApi } from './bookingApi';
 export {
+  useActiveBookingPages,
   useActiveBookings,
   useBookingConfirmation,
   useBookingDetail,

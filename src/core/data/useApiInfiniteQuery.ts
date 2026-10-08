@@ -48,6 +48,8 @@ export interface ApiInfiniteQueryOptions<TPage, TItem> {
   readonly getItems: (page: TPage) => readonly TItem[];
   readonly enabled?: boolean;
   readonly staleTime?: number;
+  /** Re-read every page held, this often. Off unless given. */
+  readonly refetchInterval?: number | false;
 }
 
 export function useApiInfiniteQuery<TPage, TItem>(
@@ -69,6 +71,7 @@ export function useApiInfiniteQuery<TPage, TItem>(
     getNextPageParam: (lastPage) => getNextCursor(lastPage),
     ...(options.enabled === undefined ? {} : { enabled: options.enabled }),
     ...(options.staleTime === undefined ? {} : { staleTime: options.staleTime }),
+    ...(options.refetchInterval === undefined ? {} : { refetchInterval: options.refetchInterval }),
   });
 
   const items = useMemo<readonly TItem[] | undefined>(

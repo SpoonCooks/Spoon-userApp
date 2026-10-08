@@ -11,8 +11,9 @@ import { createBookingApi } from './bookingApi';
  *  - `/me/bookings` clamps `limit` to 50 instead of rejecting it, so asking for more silently
  *    returns 50. Asking for exactly 50 is the most it will ever give.
  *  - `/me/refunds` has the identical trio and the identical gap.
- *  - `/me/bookings/active` takes NO parameters — its schema is an empty object, so a `limit`
- *    there is a 400, not an ignored hint.
+ *  - `/me/bookings/active` pages on `cursor` alone, and its FIRST page carries no parameters at
+ *    all: a backend that predates paging answers 400 to any parameter on this route, so the app
+ *    only ever sends `?cursor=` back once the server has handed one out.
  *
  * Pages after the first carry the server's opaque `nextCursor` — see the `paging` cases below.
  */
@@ -49,16 +50,27 @@ describe('how much history the app asks for', () => {
   });
 
   /**
-   * The one that would break the app rather than merely limit it: `?limit=` on this route is a
-   * 400, so Home's carousel and the Upcoming tab would both fail outright.
+   * The one that would break the app rather than merely limit it: against a backend that predates
+   * paging, ANY parameter on this route is a 400, so Home's carousel and the Upcoming tab would
+   * both fail outright.
    */
-  it('sends no parameters at all to the active list', async () => {
+  it('sends no parameters at all for the first page of the active list', async () => {
     const { paths, bookings } = capturePath();
 
     await bookings.active();
 
     expect(paths[0]).toBe('/v1/me/bookings/active');
     expect(paths[0]).not.toContain('?');
+  });
+
+  it('sends only the cursor, exactly as given, for later pages of the active list', async () => {
+    const { paths, bookings } = capturePath();
+    const cursor =
+      'eyJ2IjoxLCJrIjpbNSwiLTEiLCIwIiwiMCJdLCJ0IjoiMjAyNi0xMC0wN1QwOToxNTozMC4xMjM0NTZaIiwiaSI6IngifQ';
+
+    await bookings.active(cursor);
+
+    expect(paths[0]).toBe(`/v1/me/bookings/active?cursor=${cursor}`);
   });
 
   describe('paging', () => {

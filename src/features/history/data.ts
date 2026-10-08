@@ -1,15 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   isFinishedBooking,
-  useActiveBookings,
+  useActiveBookingPages,
   useBookingHistoryPages,
   useRefunds,
 } from '@features/booking';
 import type { BookingSummaryDto } from '@features/booking';
 import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
-import type { DataState, PagedScreenQuery, ScreenQuery } from '@core/data';
+import type { DataState, PagedScreenQuery } from '@core/data';
 import { currentSkewMs, slotHasEnded } from '@core/time';
 
 import { formatPaise } from '@core/format';
@@ -25,8 +25,8 @@ import {
 import type { BookingListViewModel } from './types';
 
 /**
- * My bookings — Upcoming tab. `GET /v1/me/bookings/active`, the SAME read Home's carousel uses,
- * shared via `useActiveBookings`.
+ * My bookings — Upcoming tab. `GET /v1/me/bookings/active`, a page at a time through
+ * `useActiveBookingPages`; Home's carousel reads the same endpoint's first page.
  *
  * ## Why this filters, when it used to take the endpoint's set verbatim
  *
@@ -43,14 +43,21 @@ import type { BookingListViewModel } from './types';
  * Nothing disappears. The Past tab reads `GET /v1/me/bookings`, which carries these rows already
  * — the two tabs have always overlapped for exactly this set, deliberately, so what changes here
  * is only where they stop being shown twice.
+ *
+ * ## Paging and that filter
+ *
+ * The server orders in-flight rows first, so the rows this tab drops come last and a page is
+ * rarely all dropped. When it is — every row loaded so far filtered out, with more behind them —
+ * the list is empty, draws no scroll area, and so could never ask for the next page itself; this
+ * hook asks instead, until something is visible or the list ends.
  */
 export function isStillUpcoming(booking: BookingSummaryDto, now: Date): boolean {
   if (!isFinishedBooking(booking.status)) return true;
   return !slotHasEnded(booking.scheduledStart, booking.durationMinutes, now);
 }
 
-export function useUpcomingBookingsData(): ScreenQuery<BookingListViewModel> {
-  const active = useActiveBookings();
+export function useUpcomingBookingsData(): PagedScreenQuery<BookingListViewModel> {
+  const active = useActiveBookingPages();
   const catalogue = useCatalogue();
   const timeZone =
     catalogue.state.status === 'ready' ? catalogue.state.data.operatingWindow.timeZone : undefined;
@@ -68,21 +75,28 @@ export function useUpcomingBookingsData(): ScreenQuery<BookingListViewModel> {
    */
   const [nowMs] = useState(() => Date.now() - currentSkewMs());
 
+  const visible = useMemo(
+    () =>
+      active.state.status === 'ready'
+        ? active.state.data.filter((booking) => isStillUpcoming(booking, new Date(nowMs)))
+        : undefined,
+    [active.state, nowMs],
+  );
+
   const state = useMemo(() => {
     if (active.state.status !== 'ready') return active.state;
-
-    const now = new Date(nowMs);
-
     return ready(
-      bookingListFrom({
-        base: DEMO_UPCOMING_BOOKINGS,
-        bookings: active.state.data.filter((booking) => isStillUpcoming(booking, now)),
-        timeZone,
-      }),
+      bookingListFrom({ base: DEMO_UPCOMING_BOOKINGS, bookings: visible ?? [], timeZone }),
     );
-  }, [active.state, timeZone, nowMs]);
+  }, [active.state, visible, timeZone]);
 
-  return { state, refetch: active.refetch };
+  const { hasMore, loadingMore, loadMore } = active;
+  const nothingVisibleYet = visible !== undefined && visible.length === 0;
+  useEffect(() => {
+    if (nothingVisibleYet && hasMore && !loadingMore) loadMore();
+  }, [nothingVisibleYet, hasMore, loadingMore, loadMore]);
+
+  return pagedWith(active, state);
 }
 
 /**
@@ -139,7 +153,7 @@ export function useBookingHistoryData(): PagedScreenQuery<BookingListViewModel> 
 }
 
 export interface MyBookingsData {
-  readonly upcoming: ScreenQuery<BookingListViewModel>;
+  readonly upcoming: PagedScreenQuery<BookingListViewModel>;
   readonly past: PagedScreenQuery<BookingListViewModel>;
 }
 
