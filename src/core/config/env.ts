@@ -38,6 +38,11 @@ const configSchema = z.object({
   /** Sent as the app-restriction headers on those requests. Public build facts, not secrets. */
   androidPackage: z.string().optional(),
   iosBundleIdentifier: z.string().optional(),
+  /**
+   * The numeric App Store id of the iOS listing — the `1234567890` in `apps.apple.com/app/id1234567890`.
+   * Public. The update screen's Update button cannot link to the store without it on iOS.
+   */
+  iosAppStoreId: z.string().optional(),
   /** Uppercase hex, no separators. Empty until the key is restricted; the header is then omitted. */
   androidSigningSha1: z.string().optional(),
 });
