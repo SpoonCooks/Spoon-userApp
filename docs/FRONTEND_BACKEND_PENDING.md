@@ -260,6 +260,8 @@ accepted too, though the app does not send it.
   out. Pinned by `bookingApi.test.ts`.
 - A backend without `nextCursor` reads as "last page": Upcoming stays at its first 20 until V0 is
   deployed, and nothing breaks in the meantime.
+- Upcoming reads **soonest first** (Past stays newest first). That is the order the backend pages
+  it in, so each page lands below the rows already on screen instead of above them.
 - Upcoming filters out finished bookings whose slot has passed. When a page is made only of those,
   the hook requests the next one itself, since an empty list has nothing to scroll.
 - Bookings stuck in a non-final status stay in Upcoming by design (Upcoming and Past are

@@ -173,37 +173,69 @@ export function bookingCardFrom(
 }
 
 /**
- * Most recent first, on BOTH tabs.
+ * The time a booking is ordered by, or `null` for one with no `scheduledStart` — there is no other
+ * timestamp on the summary, so an undated row sorts LAST in either direction rather than floating
+ * to the top of a list read as a chronology.
+ */
+function startOf(booking: BookingSummaryDto): number | null {
+  return booking.scheduledStart === null || booking.scheduledStart === undefined
+    ? null
+    : Date.parse(booking.scheduledStart);
+}
+
+/**
+ * Most recent first — the Past tab.
  *
  * Neither tab ordered its rows at all — each rendered whatever order its endpoint happened to
  * return, which on a real account interleaved dates (a Sep 13 row above a Sep 12 one above
  * another Sep 12 one). A list of bookings is read by date, so the order is the screen's to decide
  * rather than the endpoint's to leak.
  *
- * A booking with no `scheduledStart` sorts LAST rather than first. There is no other timestamp on
- * the summary to order it by, and floating an undated row to the top of a list read as a
- * chronology would be the more surprising answer. `id` breaks ties so the order is stable across
- * refetches rather than reshuffling under the customer.
+ * `id` breaks ties so the order is stable across refetches rather than reshuffling under the
+ * customer.
  */
 export function byMostRecentFirst(left: BookingSummaryDto, right: BookingSummaryDto): number {
-  const leftStart =
-    left.scheduledStart === null || left.scheduledStart === undefined
-      ? Number.NEGATIVE_INFINITY
-      : Date.parse(left.scheduledStart);
-  const rightStart =
-    right.scheduledStart === null || right.scheduledStart === undefined
-      ? Number.NEGATIVE_INFINITY
-      : Date.parse(right.scheduledStart);
+  const leftStart = startOf(left);
+  const rightStart = startOf(right);
 
-  if (leftStart !== rightStart) return rightStart - leftStart;
+  if (leftStart !== rightStart) {
+    if (leftStart === null) return 1;
+    if (rightStart === null) return -1;
+    return rightStart - leftStart;
+  }
   return left.id.localeCompare(right.id);
 }
+
+/**
+ * Soonest first — the Upcoming tab.
+ *
+ * Upcoming is read from "what is next" outward, and it is also the order the backend pages it in
+ * (`/me/bookings/active`, nearest slot first). Showing it the other way up would put every page
+ * after the first ABOVE the rows already on screen, which shifts the list under a customer who is
+ * scrolling. Sorted this way, each new page lands at the bottom, where the list is being read.
+ */
+export function bySoonestFirst(left: BookingSummaryDto, right: BookingSummaryDto): number {
+  const leftStart = startOf(left);
+  const rightStart = startOf(right);
+
+  if (leftStart !== rightStart) {
+    if (leftStart === null) return 1;
+    if (rightStart === null) return -1;
+    return leftStart - rightStart;
+  }
+  return left.id.localeCompare(right.id);
+}
+
+/** Which way a tab reads: Past newest first, Upcoming soonest first. */
+export type BookingListOrder = 'most-recent-first' | 'soonest-first';
 
 export function bookingListFrom(input: {
   readonly base: BookingListViewModel;
   readonly bookings: readonly BookingSummaryDto[];
   /** The catalogue's service timezone, so every card's date is read on the same clock. */
   readonly timeZone?: string | undefined;
+  /** Defaults to newest first, which is how Past reads. */
+  readonly order?: BookingListOrder | undefined;
 }): BookingListViewModel {
   return {
     ...input.base,
@@ -211,7 +243,7 @@ export function bookingListFrom(input: {
     // place would reorder the cached array every render.
     bookings: input.bookings
       .slice()
-      .sort(byMostRecentFirst)
+      .sort(input.order === 'soonest-first' ? bySoonestFirst : byMostRecentFirst)
       .map((dto) => bookingCardFrom(dto, input.timeZone)),
   };
 }

@@ -196,6 +196,26 @@ describe('My bookings → Upcoming', () => {
     expect(paths.filter((path) => path.startsWith('/v1/me/bookings/active'))).toHaveLength(3);
   });
 
+  it('lists the soonest booking first, with later pages added below', async () => {
+    // Days 5..9 of January 2099, served in the order the backend pages them: the NEAREST slot first.
+    const { api } = upcomingApi({
+      '': { rows: [upcoming('a', 5), upcoming('b', 6)], nextCursor: 'cursor-2' },
+      'cursor-2': { rows: [upcoming('c', 7), upcoming('d', 8)], nextCursor: 'cursor-3' },
+      'cursor-3': { rows: [upcoming('e', 9)], nextCursor: null },
+    });
+    renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
+    await screen.findByTestId('history-screen-card-a');
+    reachEnd('history-screen-list');
+    await screen.findByTestId('history-screen-card-c');
+    reachEnd('history-screen-list');
+    await screen.findByTestId('history-screen-card-e');
+
+    const order = screen
+      .getAllByTestId(/^history-screen-card-[a-e]$/)
+      .map((node) => String(node.props.testID).replace('history-screen-card-', ''));
+    expect(order).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
   it('keeps asking when every row so far is one the tab filters out', async () => {
     // Finished bookings whose slot has passed belong under Past, not Upcoming. A first page made
     // only of those leaves nothing to draw — no list, so nothing to scroll to the end of — and the
