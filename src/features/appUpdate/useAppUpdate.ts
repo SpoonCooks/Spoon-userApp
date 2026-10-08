@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
+import { getConfig } from '@core/config';
 import { getLogger } from '@core/logging';
 
 import { fetchUpdatePolicy } from './remoteConfig';
@@ -37,7 +38,7 @@ export function useAppUpdate(): AppUpdateState {
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
     inFlight.current = true;
     try {
-      const next = await fetchUpdatePolicy(Platform.OS);
+      const next = await fetchUpdatePolicy(Platform.OS, getConfig().appEnv);
       if (next === null) {
         logger.warn('Update policy unavailable; keeping the last answer');
         return;
