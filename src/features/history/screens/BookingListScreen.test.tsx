@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import type { BookingListPaging } from './BookingListScreen';
 
 import { ready } from '@core/data';
 
@@ -112,5 +113,68 @@ describe('Refunds (71:615)', () => {
     expect(screen.getByText('Refund expected by 15th Apr')).toBeTruthy();
     expect(screen.getByText('Processing')).toBeTruthy();
     expect(screen.queryByTestId('refunds-card-demo-refund-1-rating')).toBeNull();
+  });
+});
+
+describe('Paging the list', () => {
+  const paging = (over: Partial<BookingListPaging> = {}): BookingListPaging => ({
+    hasMore: true,
+    loadingMore: false,
+    error: false,
+    onLoadMore: jest.fn(),
+    onRetry: jest.fn(),
+    ...over,
+  });
+
+  const list = () => screen.getByTestId('booking-list-screen-list');
+  const reachEnd = () => fireEvent(list(), 'endReached', { distanceFromEnd: 0 });
+
+  it('asks for the next page when the end is reached', () => {
+    const p = paging();
+    render(<BookingListView state={ready(DEMO_BOOKING_HISTORY)} {...props} paging={p} />);
+
+    reachEnd();
+
+    expect(p.onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask once the last page has been read', () => {
+    const p = paging({ hasMore: false });
+    render(<BookingListView state={ready(DEMO_BOOKING_HISTORY)} {...props} paging={p} />);
+
+    reachEnd();
+
+    expect(p.onLoadMore).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('booking-list-screen-loading-more')).toBeNull();
+  });
+
+  it('shows a spinner under the last card while the next page loads', () => {
+    render(
+      <BookingListView
+        state={ready(DEMO_BOOKING_HISTORY)}
+        {...props}
+        paging={paging({ loadingMore: true })}
+      />,
+    );
+
+    expect(screen.getByTestId('booking-list-screen-loading-more')).toBeTruthy();
+  });
+
+  it('keeps the cards and offers a retry when the next page failed', () => {
+    const p = paging({ error: true, hasMore: false });
+    render(<BookingListView state={ready(DEMO_BOOKING_HISTORY)} {...props} paging={p} />);
+
+    expect(screen.getByText('Unfulfilled')).toBeTruthy();
+    expect(screen.getByText('Couldn’t load more')).toBeTruthy();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Retry loading more' }));
+    expect(p.onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws nothing extra for a list that does not page', () => {
+    render(<BookingListView state={ready(DEMO_BOOKING_HISTORY)} {...props} />);
+
+    expect(screen.queryByTestId('booking-list-screen-loading-more')).toBeNull();
+    expect(screen.queryByTestId('booking-list-screen-load-more-error')).toBeNull();
   });
 });

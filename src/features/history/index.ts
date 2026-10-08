@@ -22,5 +22,5 @@ export { myBookingPresentationFor } from './adapters';
 export { BookingTabSwitcher } from './components/BookingTabSwitcher';
 export type { BookingTabOption, BookingTabSwitcherProps } from './components/BookingTabSwitcher';
 export { BookingListView } from './screens/BookingListScreen';
-export type { BookingListViewProps } from './screens/BookingListScreen';
+export type { BookingListPaging, BookingListViewProps } from './screens/BookingListScreen';
 export type * from './types';

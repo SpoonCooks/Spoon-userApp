@@ -225,36 +225,25 @@ follow-up worthwhile for every rate-limited surface in the app.
 
 ## 3. Still open
 
-### `BACKEND_GAP_LIST_CURSOR` — My bookings and Refunds are capped at 50 rows, permanently
+### `BACKEND_GAP_LIST_CURSOR` — My bookings and Refunds were capped at 50 rows — CLOSED client-side, awaiting the backend deploy
 
-Every fact below is from real captured responses against the running backend.
+`GET /v1/me/bookings` and `GET /v1/me/refunds` were keyset-paged on `(created_at, id)` but the
+response carried no cursor and `created_at` is deliberately unpublished, so a customer with more
+than 50 terminal bookings could never reach the older ones. (It accrued faster than "a year of
+weekly use": every abandoned checkout becomes a `cancelled` row in history.)
 
-`GET /v1/me/bookings` and `GET /v1/me/refunds` are cursor-paginated with `limit` /
-`cursorCreatedAt` / `cursorId`, but **the response carries no cursor** — the body is
-`{ bookings: [...] }` and nothing else (`BookingListOk` declares `additionalProperties: false`).
-Nothing is being dropped client-side; there is nothing to drop.
+V0 now returns an opaque **`nextCursor`** (`null` on the last page) on both endpoints and accepts it
+back as **`?cursor=`**. The app pages with it:
 
-So the app cannot reach row 51, and not for want of trying:
-
-- `limit` is **clamped, not rejected** — `Math.min(50, max(1, limit))`. `?limit=100` and
-  `?limit=500` both return 50. Only a non-numeric value 400s. We therefore ask for exactly 50
-  (`MAX_LIST_PAGE` in `bookingApi.ts`), which is the most these endpoints will ever give.
-- The cursor is `(created_at, id)`, and `created_at` is **deliberately unpublished** — the
-  summary projection emits no timestamp, and the backend reserves the column as an
-  implementation detail ("orders the page; it never decides membership").
-- `?cursorId=` without `cursorCreatedAt` is a 400, so there is no half-cursor way in.
-- The ids are v4 UUIDs, so no creation time can be recovered from them either.
-
-**Consequence, stated plainly: a customer with more than 50 terminal bookings can never see the
-older ones.** That is roughly a year of weekly use — and it accrues faster than that, because
-every abandoned checkout becomes a `cancelled` row in history. Accepted for this release,
-scheduled for the next.
-
-*Minimal change:* return an opaque `nextCursor` (null on the last page) on both endpoints. Opaque
-rather than publishing `created_at`: if the client has to compose `(createdAt, id)` itself, the
-cursor's shape becomes a published contract and changing the sort key would break every shipped
-app. `FlatList` is already in place on both screens, so consuming it is `useInfiniteQuery` plus
-`onEndReached` and little else.
+- `useBookingHistoryPages` / `useRefunds` are `useApiInfiniteQuery`s (`src/core/data`); the list
+  asks for the next page near its end, shows a spinner while it loads, and keeps the rows it has
+  with a "Couldn't load more · Retry" row if a later page fails.
+- The cursor is sent back exactly as received and never parsed. 50 is the page size (the server
+  clamps `limit` to 50).
+- `refetch` (pull to refresh, returning to the screen) restarts from the newest page.
+- A backend that predates `nextCursor` omits the key, which reads as "last page": the list stays
+  at its first 50 until V0 is deployed. Nothing breaks in the meantime.
+- Old builds keep working: V0 still accepts the legacy `cursorCreatedAt` + `cursorId` pair.
 
 ### `GET /v1/me/bookings/active` cannot be paged at all
 

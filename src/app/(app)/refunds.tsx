@@ -3,7 +3,8 @@ import { useSafeBack } from '@core/navigation';
 
 /** Refunds - Figma `71:615`. A top-level destination from Profile, not a filter of history. */
 export default function RefundsRoute() {
-  const { state, refetch } = useRefundHistoryData();
+  const refunds = useRefundHistoryData();
+  const { state, refetch } = refunds;
   /**
    * `71:615` back -> `6:663` Profile, never Home (V7 founder comment, task §14).
    *
@@ -19,6 +20,13 @@ export default function RefundsRoute() {
       onRetry={refetch}
       onBack={goBack}
       variant="refund"
+      paging={{
+        hasMore: refunds.hasMore,
+        loadingMore: refunds.loadingMore,
+        error: refunds.loadMoreError !== null,
+        onLoadMore: refunds.loadMore,
+        onRetry: refunds.retryLoadMore,
+      }}
       testID="refunds-screen"
     />
   );

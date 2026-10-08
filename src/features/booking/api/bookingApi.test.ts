@@ -14,9 +14,7 @@ import { createBookingApi } from './bookingApi';
  *  - `/me/bookings/active` takes NO parameters — its schema is an empty object, so a `limit`
  *    there is a 400, not an ignored hint.
  *
- * Row 51 is unreachable in all cases: the cursor is `(created_at, id)`, `created_at` is
- * deliberately unpublished, and `cursorId` alone is rejected. See
- * `docs/FRONTEND_BACKEND_PENDING.md`.
+ * Pages after the first carry the server's opaque `nextCursor` — see the `paging` cases below.
  */
 
 function capturePath() {
@@ -61,5 +59,46 @@ describe('how much history the app asks for', () => {
 
     expect(paths[0]).toBe('/v1/me/bookings/active');
     expect(paths[0]).not.toContain('?');
+  });
+
+  describe('paging', () => {
+    it('sends the cursor back exactly as the server gave it', async () => {
+      const { paths, bookings } = capturePath();
+      const cursor = 'eyJ2IjoxLCJ0IjoiMjAyNi0xMC0wN1QwOToxNTozMC4xMjM0NTZaIiwiaSI6IngifQ';
+
+      await bookings.history(cursor);
+      await bookings.refunds(cursor);
+
+      expect(paths).toEqual([
+        `/v1/me/bookings?limit=50&cursor=${cursor}`,
+        `/v1/me/refunds?limit=50&cursor=${cursor}`,
+      ]);
+    });
+
+    it('escapes a cursor that is not URL-safe rather than trusting its alphabet', async () => {
+      const { paths, bookings } = capturePath();
+
+      await bookings.history('a+b/c=');
+
+      expect(paths[0]).toBe('/v1/me/bookings?limit=50&cursor=a%2Bb%2Fc%3D');
+    });
+
+    it('reads nextCursor off a page, and treats an absent or null one as the last page', async () => {
+      const respond = (body: unknown): ApiClient => ({
+        request: (_path, options) => Promise.resolve(options.parse(body)),
+      });
+
+      await expect(
+        createBookingApi(respond({ bookings: [], nextCursor: 'abc' })).history(),
+      ).resolves.toEqual({ bookings: [], nextCursor: 'abc' });
+      // A backend that predates the cursor sends no key at all.
+      await expect(createBookingApi(respond({ bookings: [] })).history()).resolves.toEqual({
+        bookings: [],
+        nextCursor: null,
+      });
+      await expect(
+        createBookingApi(respond({ refunds: [], nextCursor: null })).refunds(),
+      ).resolves.toEqual({ refunds: [], nextCursor: null });
+    });
   });
 });

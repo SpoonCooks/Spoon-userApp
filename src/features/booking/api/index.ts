@@ -6,6 +6,7 @@ export {
   useBookingDetail,
   useBookingDetails,
   useBookingHistory,
+  useBookingHistoryPages,
   useBookingQuote,
   useCancelBooking,
   useCancellationPreview,

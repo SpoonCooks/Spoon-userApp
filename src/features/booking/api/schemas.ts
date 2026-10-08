@@ -517,6 +517,16 @@ export type BookingSummaryDto = z.infer<typeof bookingSummarySchema>;
 
 export const bookingListResponseSchema = z.object({ bookings: z.array(bookingSummarySchema) });
 
+/**
+ * One page of `GET /v1/me/bookings`. `nextCursor` is OPAQUE — handed back as `?cursor=` and never
+ * parsed — and `null` on the last page. A backend that predates it omits the key, which reads as
+ * "no more pages": the list degrades to its first page rather than failing to parse.
+ */
+export const bookingHistoryPageSchema = z.object({
+  bookings: z.array(bookingSummarySchema),
+  nextCursor: z.string().nullish(),
+});
+
 /** `GET /v1/bookings/:id/cancellation-preview`. Every number is the server's. */
 export const cancellationPreviewSchema = z.object({
   bookingId: z.string(),
@@ -593,6 +603,12 @@ export const refundSchema = z.object({
 export type RefundDto = z.infer<typeof refundSchema>;
 
 export const refundListResponseSchema = z.object({ refunds: z.array(refundSchema) });
+
+/** One page of `GET /v1/me/refunds` — see `bookingHistoryPageSchema` for `nextCursor`. */
+export const refundHistoryPageSchema = z.object({
+  refunds: z.array(refundSchema),
+  nextCursor: z.string().nullish(),
+});
 
 /**
  * `GET /v1/bookings/:id/extension-options`.

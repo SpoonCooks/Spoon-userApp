@@ -1,14 +1,15 @@
+import { useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { idempotency } from '@core/api';
-import { useApiQueries, useApiQuery } from '@core/data';
+import { useApiInfiniteQuery, useApiQueries, useApiQuery } from '@core/data';
 import { observeServerTime } from '@core/time';
 import { isAwaitingConfirmation } from '../state/bookingStatusView';
-import type { ScreenQuery } from '@core/data';
+import type { PagedScreenQuery, ScreenQuery } from '@core/data';
 import { useRuntime } from '@core/runtimeContext';
 
 import { createBookingApi, createServiceApi } from './bookingApi';
-import type { BookingRequestInput } from './bookingApi';
+import type { BookingHistoryPage, BookingRequestInput, RefundHistoryPage } from './bookingApi';
 import type { CheckoutLauncher } from '@features/payment';
 import { unavailableCheckoutLauncher } from '@features/payment';
 import { bookingKeys } from './keys';
@@ -156,14 +157,36 @@ export function useActiveBookings(
   });
 }
 
-export function useBookingHistory(): ScreenQuery<readonly BookingSummaryDto[]> {
+const bookingsOf = (page: BookingHistoryPage) => page.bookings;
+const nextHistoryCursor = (page: BookingHistoryPage) => page.nextCursor;
+
+/**
+ * Past bookings, a page at a time — `GET /v1/me/bookings`, newest first.
+ *
+ * `state` is the rows loaded so far; `loadMore` fetches the next page and `hasMore` says whether
+ * there is one. A customer with more than 50 past bookings reaches the rest by scrolling.
+ */
+export function useBookingHistoryPages(): PagedScreenQuery<readonly BookingSummaryDto[]> {
   const { api } = useRuntime();
   const bookings = createBookingApi(api);
 
-  return useApiQuery<readonly BookingSummaryDto[]>({
+  return useApiInfiniteQuery<BookingHistoryPage, BookingSummaryDto>({
     queryKey: bookingKeys.history(),
-    queryFn: ({ signal }) => bookings.history(signal),
+    fetchPage: ({ cursor, signal }) => bookings.history(cursor, signal),
+    getNextCursor: nextHistoryCursor,
+    getItems: bookingsOf,
   });
+}
+
+/**
+ * The past bookings loaded so far, as a flat list with no paging controls.
+ *
+ * For callers that only need to LOOK at history (Home asks whether any booking ever completed).
+ * It shares `useBookingHistoryPages`' query, so mounting both costs one request, not two.
+ */
+export function useBookingHistory(): ScreenQuery<readonly BookingSummaryDto[]> {
+  const { state, refetch } = useBookingHistoryPages();
+  return useMemo(() => ({ state, refetch }), [state, refetch]);
 }
 
 /**
@@ -188,14 +211,19 @@ export function useBookingRefunds(bookingId: string | null): ScreenQuery<readonl
   });
 }
 
-/** `GET /v1/me/refunds` — the customer-level list, so no N+1 over bookings. */
-export function useRefunds() {
+const refundsOf = (page: RefundHistoryPage) => page.refunds;
+const nextRefundCursor = (page: RefundHistoryPage) => page.nextCursor;
+
+/** `GET /v1/me/refunds` — the customer-level list, so no N+1 over bookings. Paged like history. */
+export function useRefunds(): PagedScreenQuery<readonly RefundDto[]> {
   const { api } = useRuntime();
   const bookings = createBookingApi(api);
 
-  return useApiQuery({
+  return useApiInfiniteQuery<RefundHistoryPage, RefundDto>({
     queryKey: bookingKeys.refunds(),
-    queryFn: ({ signal }) => bookings.refunds(signal),
+    fetchPage: ({ cursor, signal }) => bookings.refunds(cursor, signal),
+    getNextCursor: nextRefundCursor,
+    getItems: refundsOf,
   });
 }
 

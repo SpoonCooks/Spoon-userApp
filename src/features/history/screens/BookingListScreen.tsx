@@ -1,8 +1,8 @@
-import { FlatList, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { DataState } from '@core/data';
-import { BookingCard, EmptyState, QueryBoundary, ScreenHeader, lightTheme } from '@ui';
+import { BookingCard, EmptyState, QueryBoundary, ScreenHeader, Text, lightTheme } from '@ui';
 import type { BookingCardVariant } from '@ui';
 
 import { BookingTabSwitcher } from '../components/BookingTabSwitcher';
@@ -34,8 +34,26 @@ export interface BookingListViewProps {
   readonly variant?: BookingCardVariant;
   /** Present only for the My bookings screen — renders the Upcoming/Past switcher. */
   readonly tabs?: { readonly active: string; readonly onChange: (id: string) => void };
+  /**
+   * Present for a list that pages (Past bookings, Refunds). Reaching the end asks for the next
+   * page; a spinner shows while it loads, and a retry row if it failed. Absent for Upcoming,
+   * which the server does not page.
+   */
+  readonly paging?: BookingListPaging;
   readonly testID?: string;
 }
+
+export interface BookingListPaging {
+  readonly hasMore: boolean;
+  readonly loadingMore: boolean;
+  /** The next page failed; the rows already shown stay. */
+  readonly error: boolean;
+  readonly onLoadMore: () => void;
+  readonly onRetry: () => void;
+}
+
+/** How far from the end (in screens) the next page is asked for, so it is usually there already. */
+const LOAD_MORE_THRESHOLD = 1.5;
 
 export function BookingListView({
   state,
@@ -44,6 +62,7 @@ export function BookingListView({
   onSelect,
   variant = 'history',
   tabs,
+  paging,
   testID = 'booking-list-screen',
 }: BookingListViewProps) {
   return (
@@ -51,6 +70,7 @@ export function BookingListView({
       <QueryBoundary state={state} onRetry={onRetry} loadingVariant="card">
         {(list) => (
           <FlatList
+            testID={`${testID}-list`}
             data={list.bookings}
             keyExtractor={(booking) => booking.id}
             contentContainerStyle={styles.body}
@@ -102,8 +122,34 @@ export function BookingListView({
                 />
               </View>
             }
+            onEndReached={paging?.hasMore === true ? paging.onLoadMore : undefined}
+            onEndReachedThreshold={LOAD_MORE_THRESHOLD}
             /* `6:239` — the card block's own 6pt of ground below the last card. */
-            ListFooterComponent={<View style={styles.listFoot} />}
+            ListFooterComponent={
+              <View>
+                {paging?.loadingMore === true ? (
+                  <View style={styles.pagingRow} testID={`${testID}-loading-more`}>
+                    <ActivityIndicator color={lightTheme.colors.textPrimary} />
+                  </View>
+                ) : null}
+                {paging?.error === true ? (
+                  <View style={styles.pagingRow} testID={`${testID}-load-more-error`}>
+                    <Text variant="caption" color="textSecondary">
+                      Couldn’t load more
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry loading more"
+                      onPress={paging.onRetry}
+                      hitSlop={8}
+                    >
+                      <Text variant="captionStrong">Retry</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+                <View style={styles.listFoot} />
+              </View>
+            }
           />
         )}
       </QueryBoundary>
@@ -144,4 +190,13 @@ const styles = StyleSheet.create({
   /** `6:239` / `71:621` — the card block's 4pt gutter, now carried by each row. */
   row: { paddingHorizontal: lightTheme.space.xs },
   listFoot: { height: lightTheme.space.s6 },
+  /** The loading / retry row under the last card — not in the frames, so neutral and compact. */
+  pagingRow: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: lightTheme.space.md,
+    paddingVertical: lightTheme.space.md,
+  },
 });
