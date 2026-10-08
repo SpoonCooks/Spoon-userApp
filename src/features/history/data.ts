@@ -86,7 +86,12 @@ export function useUpcomingBookingsData(): PagedScreenQuery<BookingListViewModel
   const state = useMemo(() => {
     if (active.state.status !== 'ready') return active.state;
     return ready(
-      bookingListFrom({ base: DEMO_UPCOMING_BOOKINGS, bookings: visible ?? [], timeZone }),
+      bookingListFrom({
+        base: DEMO_UPCOMING_BOOKINGS,
+        bookings: visible ?? [],
+        timeZone,
+        order: 'soonest-first',
+      }),
     );
   }, [active.state, visible, timeZone]);
 
