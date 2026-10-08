@@ -551,6 +551,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
     appEnv: APP_ENV,
 
+    // Public. Only the iOS Update button needs it; see `src/features/appUpdate/storeUrl.ts`.
+    iosAppStoreId: process.env.EXPO_PUBLIC_IOS_APP_STORE_ID ?? '',
+
     // Production keeps failing fast at startup (`src/core/config/env.ts`) rather than letting an
     // unusable value reach a fetch URL; development falls back to the deployed API.
     apiBaseUrl:
