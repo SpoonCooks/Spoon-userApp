@@ -50,6 +50,11 @@ export interface LoginScreenProps {
   readonly onRequestOtp: (phone: string) => void;
   readonly onOpenTerms?: () => void;
   readonly onOpenPrivacy?: () => void;
+  /**
+   * "Skip" — browse as a guest. The control is drawn ONLY when this is supplied, so whether guest
+   * mode exists (iOS only) stays the host's decision and Android never sees it.
+   */
+  readonly onSkip?: () => void;
   readonly testID?: string;
 }
 
@@ -106,6 +111,7 @@ export function LoginScreen({
   onRequestOtp,
   onOpenTerms,
   onOpenPrivacy,
+  onSkip,
   testID = 'login-screen',
 }: LoginScreenProps) {
   const [phone, setPhone] = useState('');
@@ -324,6 +330,31 @@ export function LoginScreen({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/*
+        Guest mode. Not drawn in `250:2383`, so it takes the least-intrusive shape available: a
+        small white pill in the top-right corner, over the hero, outside the scroll so it never
+        moves the frame's measured layout. Outside the scroll also keeps it reachable while the
+        keyboard is up and the hero has collapsed.
+      */}
+      {onSkip === undefined ? null : (
+        <Pressable
+          onPress={onSkip}
+          accessibilityRole="button"
+          accessibilityLabel={login.skipLabel}
+          hitSlop={lightTheme.space.md}
+          style={({ pressed }) => [
+            styles.skip,
+            { top: insets.top + lightTheme.space.md },
+            pressed ? styles.pressed : null,
+          ]}
+          testID={`${testID}-skip`}
+        >
+          <Text variant="bodyStrong" color="textPrimary">
+            {login.skipLabel}
+          </Text>
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
@@ -439,6 +470,15 @@ const styles = StyleSheet.create({
    */
   ctaDisabled: { backgroundColor: lightTheme.colors.surfaceCtaDisabled },
   pressed: { opacity: 0.85 },
+  skip: {
+    position: 'absolute',
+    right: lightTheme.space.lg,
+    paddingHorizontal: lightTheme.space.md,
+    paddingVertical: lightTheme.space.xs,
+    borderRadius: lightTheme.radius.pill,
+    backgroundColor: lightTheme.colors.surface,
+    ...lightTheme.elevations.pill,
+  },
   /** `250:2423` — 39pt, 2pt between the two lines. */
   /** `250:2423` — 39pt, 2pt between the two lines, held at the END of the form block. */
   legal: {

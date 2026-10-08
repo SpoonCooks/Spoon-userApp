@@ -296,51 +296,7 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
 
     return ready(
       homeFrom({
-        /**
-         * The arrival PROMISE appears TWICE on this screen and both readings are the catalogue's.
-         *
-         * The header headline was already patched from `instant.arrivalPromiseMinutes`; the
-         * Instant tile's emphasised run was not, so it kept rendering the fixture's transcribed
-         * " 18 mins" while the Instant sheet — which reads the same policy value — said 30. One
-         * screen stated the promise two ways, and the tile's was simply a number from a Figma
-         * frame. Both now come from the one published figure, so re-tuning the promise moves
-         * every surface at once and none of them can drift again.
-         *
-         * The tile is matched by id rather than by position: `tiles` is ordered content, and a
-         * future payload that puts Schedule first must not rewrite Schedule's subtitle.
-         */
-        base:
-          promiseMinutes === null
-            ? {
-                ...base,
-                /**
-                 * `base` is the design fixture, and it carries "Spoon in 18 mins" and a " 18
-                 * mins" run transcribed off the frame. Falling through to it unchanged would
-                 * replace one unkeepable promise with an older one, so the minutes are removed
-                 * here rather than merely left un-patched.
-                 */
-                header: { ...base.header, etaHeadline: 'Spoon' },
-                tiles: base.tiles.map((tile) =>
-                  tile.id === 'instant' && tile.subtitleEmphasis !== undefined
-                    ? /*
-                       * BOTH runs. The subtitle is one sentence in two styles -- "Get a cook in"
-                       * and an emphasised " 30 mins" -- so clearing only the second leaves a
-                       * dangling "Get a cook in" with nothing after it. The sentence loses its
-                       * preposition with its number.
-                       */
-                      { ...tile, subtitle: 'Get a cook', subtitleEmphasis: '' }
-                    : tile,
-                ),
-              }
-            : {
-                ...base,
-                header: { ...base.header, etaHeadline: `Spoon in ${promiseMinutes} mins` },
-                tiles: base.tiles.map((tile) =>
-                  tile.id === 'instant' && tile.subtitleEmphasis !== undefined
-                    ? { ...tile, subtitleEmphasis: ` ${promiseMinutes} mins` }
-                    : tile,
-                ),
-              },
+        base: withArrivalPromise(base, promiseMinutes),
         addressLabel: defaultAddress?.label ?? null,
         addressLine:
           defaultAddress === undefined || defaultAddress === null
@@ -385,4 +341,73 @@ export function useHomeData(): ScreenQuery<HomeViewModel> {
     state,
     refetch,
   };
+}
+
+/**
+ * The arrival PROMISE appears TWICE on this screen and both readings are the catalogue's.
+ *
+ * The header headline was already patched from `instant.arrivalPromiseMinutes`; the
+ * Instant tile's emphasised run was not, so it kept rendering the fixture's transcribed
+ * " 18 mins" while the Instant sheet — which reads the same policy value — said 30. One
+ * screen stated the promise two ways, and the tile's was simply a number from a Figma
+ * frame. Both now come from the one published figure, so re-tuning the promise moves
+ * every surface at once and none of them can drift again.
+ *
+ * The tile is matched by id rather than by position: `tiles` is ordered content, and a
+ * future payload that puts Schedule first must not rewrite Schedule's subtitle.
+ */
+export function withArrivalPromise(
+  base: HomeViewModel,
+  promiseMinutes: number | null,
+): HomeViewModel {
+  return promiseMinutes === null
+    ? {
+        ...base,
+        /**
+         * `base` is the design fixture, and it carries "Spoon in 18 mins" and a " 18
+         * mins" run transcribed off the frame. Falling through to it unchanged would
+         * replace one unkeepable promise with an older one, so the minutes are removed
+         * here rather than merely left un-patched.
+         */
+        header: { ...base.header, etaHeadline: 'Spoon' },
+        tiles: base.tiles.map((tile) =>
+          tile.id === 'instant' && tile.subtitleEmphasis !== undefined
+            ? /*
+               * BOTH runs. The subtitle is one sentence in two styles -- "Get a cook in"
+               * and an emphasised " 30 mins" -- so clearing only the second leaves a
+               * dangling "Get a cook in" with nothing after it. The sentence loses its
+               * preposition with its number.
+               */
+              { ...tile, subtitle: 'Get a cook', subtitleEmphasis: '' }
+            : tile,
+        ),
+      }
+    : {
+        ...base,
+        header: { ...base.header, etaHeadline: `Spoon in ${promiseMinutes} mins` },
+        tiles: base.tiles.map((tile) =>
+          tile.id === 'instant' && tile.subtitleEmphasis !== undefined
+            ? { ...tile, subtitleEmphasis: ` ${promiseMinutes} mins` }
+            : tile,
+        ),
+      };
+}
+
+/**
+ * Guest Home — a customer who skipped Login (iOS only; see `@features/auth` `guestMode`).
+ *
+ * NO reads at all. Every live part of Home is per-account (`/v1/me/addresses`, active bookings)
+ * or needs an address to ask about (instant availability), and the catalogue is authenticated
+ * too — a guest's 401 would also fire `onSessionExpired`, which clears the query cache. So a
+ * guest gets the static screen definition with the arrival minutes removed (there is no address
+ * to estimate for), no address in the header (`HomeTopBanner` draws its "Add address" state) and
+ * no booking carousel. Every CTA asks the guest to sign in; the route owns that.
+ */
+export function useGuestHomeData(): ScreenQuery<HomeViewModel> {
+  const state = useMemo(
+    () => ready(homeFrom({ base: withArrivalPromise(DEMO_HOME_ACTIVE_BOOKING, null) })),
+    [],
+  );
+  const refetch = useCallback(() => undefined, []);
+  return { state, refetch };
 }

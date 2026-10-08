@@ -31,11 +31,11 @@ export type {
   HomeBannerVariant,
   HomeBannerViewModel,
 } from './state/homeBannerView';
-export { useHomeData } from './data';
+export { useGuestHomeData, useHomeData, withArrivalPromise } from './data';
 export { HomeBookingBanner } from './components/HomeBookingBanner';
 export type { HomeBookingBannerProps } from './components/HomeBookingBanner';
 export { HomeBookingCarousel } from './components/HomeBookingCarousel';
 export type { HomeBookingCarouselProps } from './components/HomeBookingCarousel';
-export { HomeScreen, HomeView } from './screens/HomeScreen';
+export { GuestHomeScreen, HomeScreen, HomeView } from './screens/HomeScreen';
 export type { HomeActions, HomeViewProps } from './screens/HomeScreen';
 export type * from './types';

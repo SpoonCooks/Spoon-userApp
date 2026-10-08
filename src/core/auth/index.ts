@@ -3,9 +3,13 @@ export type { SessionController, SessionControllerOptions } from './sessionContr
 export { getDeviceId, resetDeviceIdCache } from './deviceId';
 export { unimplementedSessionGateway } from './sessionGateway';
 export type { SessionGateway } from './sessionGateway';
+export { secureGuestFlagStore } from './guestFlagStore';
+export type { GuestFlagStore } from './guestFlagStore';
 export {
   canAccessApp,
+  canBrowseApp,
   INITIAL_SESSION_STATUS,
+  isGuest,
   isResolving,
   sessionReducer,
 } from './sessionMachine';

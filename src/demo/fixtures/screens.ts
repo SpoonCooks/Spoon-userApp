@@ -236,6 +236,7 @@ export const DEMO_LOGIN: LoginViewModel = {
   legalTerms: 'Terms of use',
   legalSeparator: ' & ',
   legalPrivacy: 'Privacy policy',
+  skipLabel: 'Skip',
 };
 
 /**

@@ -12,7 +12,7 @@ import { HomeBookingTiles } from '../components/HomeBookingTiles';
 import { HomeMarketing } from '../components/HomeMarketing';
 import { HomePromoCarousel } from '../components/HomePromoCarousel';
 import { HomeTopBanner } from '../components/HomeTopBanner';
-import { useHomeData } from '../data';
+import { useGuestHomeData, useHomeData } from '../data';
 import { HOME_DESIGN } from '../layout';
 import type { HomeBannerDestination, HomeBannerViewModel } from '../state/homeBannerView';
 import type { HomeViewModel } from '../types';
@@ -175,6 +175,35 @@ export function HomeScreen(actions: HomeActions) {
   );
 
   return <HomeView state={state} onRetry={refetch} focused={focused} {...actions} />;
+}
+
+/**
+ * Home for a GUEST (skipped Login, iOS only). The same `HomeView`, fed the static screen with no
+ * reads behind it (`useGuestHomeData`). Every control that would need an account — Instant,
+ * Schedule, the address, Profile — raises `onSignIn` instead; a guest has no booking carousel,
+ * so the two banner actions can never fire.
+ */
+export function GuestHomeScreen({ onSignIn }: { readonly onSignIn: () => void }) {
+  const { state } = useGuestHomeData();
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
+  );
+
+  return (
+    <HomeView
+      state={state}
+      focused={focused}
+      onPressInstant={onSignIn}
+      onPressSchedule={onSignIn}
+      onPressAddress={onSignIn}
+      onPressProfile={onSignIn}
+      onOpenActiveBooking={onSignIn}
+    />
+  );
 }
 
 const styles = StyleSheet.create({

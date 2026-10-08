@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router';
 import type { Href } from 'expo-router';
 
-import { canAccessApp, isResolving } from '@core/auth';
+import { canAccessApp, isGuest, isResolving } from '@core/auth';
 import { useSessionStore } from '@core/store';
 import { useAddressGate } from '@features/address';
 import { SplashLoading } from '@features/loading';
@@ -13,6 +13,7 @@ import { useProfileGate } from '@features/profile';
  * Holds on the DESIGNED splash (`73:1036`) until every question it asks has an answer, then
  * redirects once. No product rule is invented here; it reads three gates and orders them:
  *
+ *   GUEST (skipped Login, iOS only)       -> `/home`, with no profile or address gate
  *   NOT AUTHENTICATED                     -> `/login`
  *   PROFILE INCOMPLETE                    -> `338:4508` Profile details, first-run context
  *   PROFILE COMPLETE, NO ADDRESS          -> `53:31`   Select service location
@@ -60,6 +61,10 @@ export default function Index() {
 
   if (isResolving(status)) {
     return <SplashLoading />;
+  }
+
+  if (isGuest(status)) {
+    return <Redirect href="/home" />;
   }
 
   if (!authenticated) {
