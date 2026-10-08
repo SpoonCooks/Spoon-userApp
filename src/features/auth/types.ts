@@ -40,6 +40,8 @@ export interface LoginViewModel {
   readonly legalTerms: string;
   readonly legalSeparator: string;
   readonly legalPrivacy: string;
+  /** "Skip" — guest mode, iOS only. Not in the Figma frame; drawn only when the host offers it. */
+  readonly skipLabel: string;
   /** Supplied by the caller when the server rejects the number. Never authored client-side. */
   readonly errorMessage?: string;
   /** Drives the sending state on the CTA; the client never infers it. */

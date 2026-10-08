@@ -8,7 +8,9 @@ import {
   useInstantData,
   useRateBooking,
 } from '@features/booking';
-import { HomeScreen } from '@features/home';
+import { isGuest } from '@core/auth';
+import { useSessionStore } from '@core/store';
+import { GuestHomeScreen, HomeScreen } from '@features/home';
 import { useAddressGate } from '@features/address';
 import { isNumericRating } from '@ui';
 import { DEMO_INSTANT_NO_SLOTS, DEMO_INSTANT_OUT_OF_SHIFT } from '@/demo/fixtures/booking';
@@ -37,7 +39,27 @@ const DEV_INSTANT = {
   noSlots: DEMO_INSTANT_NO_SLOTS,
 } as const;
 
+/**
+ * A guest (Skip on Login, iOS only) gets a Home with no reads behind it, and every control asks
+ * them to sign in. Split into two components rather than branching inside one so neither path
+ * mounts the other's hooks — the signed-in route's reads would all 401 for a guest.
+ *
+ * "Sign in" REPLACES to Login rather than pushing: Login's own Skip replaces straight back here,
+ * so the stack never accumulates alternating Login/Home entries, and a successful OTP lands
+ * through the boot gate exactly as a first sign-in does (profile -> address -> Home).
+ */
 export default function HomeRoute() {
+  const status = useSessionStore((state) => state.status);
+  if (isGuest(status)) return <GuestHomeRoute />;
+  return <SignedInHomeRoute />;
+}
+
+function GuestHomeRoute() {
+  const router = useRouter();
+  return <GuestHomeScreen onSignIn={() => router.replace('/login')} />;
+}
+
+function SignedInHomeRoute() {
   const router = useRouter();
   const { instant: instantParam } = useLocalSearchParams<{
     instant?: keyof typeof DEV_INSTANT;

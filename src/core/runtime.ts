@@ -2,11 +2,11 @@ import type { QueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-import { createSessionGateway } from '@/features/auth';
+import { createSessionGateway, isGuestModeAvailable } from '@/features/auth';
 
 import { createApiClient } from './api';
 import type { ApiClient } from './api';
-import { createSessionController, secureTokenStore } from './auth';
+import { createSessionController, secureGuestFlagStore, secureTokenStore } from './auth';
 import type { SessionController } from './auth';
 import { getConfig } from './config';
 import type { AppConfig } from './config';
@@ -69,6 +69,8 @@ export function createAppRuntime(): AppRuntime {
       // user's bookings into the next session.
       queryClient.clear();
     },
+    guestFlag: secureGuestFlagStore,
+    isGuestModeAvailable,
   });
 
   const api = createApiClient({

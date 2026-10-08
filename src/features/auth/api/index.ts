@@ -21,7 +21,14 @@ export type {
   SessionTokensDto,
 } from './schemas';
 export { authKeys } from './keys';
-export { useMe, useSendOtp, useSignOut, useUpdateProfile, useVerifyOtp } from './hooks';
+export {
+  useContinueAsGuest,
+  useMe,
+  useSendOtp,
+  useSignOut,
+  useUpdateProfile,
+  useVerifyOtp,
+} from './hooks';
 export {
   loginWithError,
   otpViewModel,
