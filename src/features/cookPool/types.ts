@@ -32,12 +32,13 @@ export interface CookPoolSummary {
 }
 
 /**
- * One line of a cook's profile header (`867:1670`): "Region: West Bengal", "No. of visits: 45",
- * "Rating: 4.5 ★". Drawn as `label: value`.
+ * One line of a cook's profile header (`1380:3196`): "West Bengal", "Speaks Hindi, Bengali",
+ * "Visits with you: 45", "Rating: 4.5 ★". Drawn as `label: value`, or the value alone when the
+ * line carries no label.
  */
 export interface CookProfileLine {
   readonly id: string;
-  readonly label: string;
+  readonly label?: string | undefined;
   readonly value: string;
   /**
    * A glyph after the value. The app knows `star` (`855:129`); a key it does not know draws no
@@ -66,7 +67,12 @@ export interface CookProfile {
   /** The header's title — "Cook Sanchita". */
   readonly name: string;
   readonly photo?: CookPoolImage | undefined;
-  /** Caption lines under the name — Regular 12/16. */
+  /**
+   * The trust marks above the name (`1380:3194`) — "Spoon trained", "Verified" — drawn uppercased
+   * and joined with " · ". Empty draws no eyebrow.
+   */
+  readonly badges: readonly string[];
+  /** Caption lines under the name — Regular 12/16, 60 % ink, joined with " · " on one line. */
   readonly details: readonly CookProfileLine[];
   /** The emphasised lines below them — SemiBold 14/20. */
   readonly stats: readonly CookProfileLine[];

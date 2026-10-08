@@ -17,7 +17,7 @@ function card(overrides: Partial<PoolCookCardDto> = {}): PoolCookCardDto {
     displayName: 'Cook Sanchita',
     profileImageUrl: null,
     region: 'West Bengal',
-    languages: [],
+    languages: ['Hindi', 'Bengali'],
     cuisines: [],
     specialties: null,
     gender: null,
@@ -78,17 +78,30 @@ describe('Cook Pool adapters', () => {
     ).toEqual({ uri: 'https://cdn.test/sanchita.webp' });
   });
 
-  it('draws Region, visits and the rating as the header lines', () => {
+  it('draws the trust marks, region, languages, visits and the rating as the header lines', () => {
     const [profile] = deckCooksFrom([card()]);
-    expect(profile?.details).toEqual([{ id: 'region', label: 'Region', value: 'West Bengal' }]);
+    expect(profile?.badges).toEqual(['Spoon trained', 'Verified']);
+    expect(profile?.details).toEqual([
+      { id: 'region', value: 'West Bengal' },
+      { id: 'languages', value: 'Speaks Hindi, Bengali' },
+    ]);
     expect(profile?.stats).toEqual([
-      { id: 'visits', label: 'No. of visits', value: '45' },
+      { id: 'visits', label: 'Visits with you', value: '45' },
       { id: 'rating', label: 'Rating', value: '4.5', icon: 'star' },
     ]);
   });
 
-  it('leaves out a region it was not sent and a rating nobody has given', () => {
-    const [profile] = deckCooksFrom([card({ region: null, rating: { average: 0, count: 0 } })]);
+  it('leaves out a region, languages, marks and a rating it was not given', () => {
+    const [profile] = deckCooksFrom([
+      card({
+        region: null,
+        languages: [],
+        spoonTrained: false,
+        backgroundVerified: false,
+        rating: { average: 0, count: 0 },
+      }),
+    ]);
+    expect(profile?.badges).toEqual([]);
     expect(profile?.details).toEqual([]);
     expect(profile?.stats.map((line) => line.id)).toEqual(['visits']);
   });

@@ -30,11 +30,16 @@ function section(cook: string, id: string, title: string, dishes: readonly strin
   } satisfies CookMenuSection;
 }
 
-function lines(region: string, visits: number, rating: string) {
+/** `1380:3196` — as the adapter builds them from a cook card. */
+function lines(region: string, languages: string, visits: number, rating: string) {
   return {
-    details: [{ id: 'region', label: 'Region', value: region }],
+    badges: ['Spoon trained', 'Verified'],
+    details: [
+      { id: 'region', value: region },
+      { id: 'languages', value: `Speaks ${languages}` },
+    ],
     stats: [
-      { id: 'visits', label: 'No. of visits', value: String(visits) },
+      { id: 'visits', label: 'Visits with you', value: String(visits) },
       { id: 'rating', label: 'Rating', value: rating, icon: 'star' },
     ],
   };
@@ -45,7 +50,7 @@ const SANCHITA_COOK: ServedCook = {
   name: 'Cook Sanchita',
   shortName: 'Sanchita',
   photo: SANCHITA,
-  ...lines('West Bengal', 45, '4.5'),
+  ...lines('West Bengal', 'Hindi, Bengali', 45, '4.5'),
   menu: [
     section('sanchita', 'veg', 'Curries/ sabzis- Veg', [
       'Dahi bhindi',
@@ -73,7 +78,7 @@ const REKHA_COOK: ServedCook = {
   name: 'Cook Rekha',
   shortName: 'Rekha',
   photo: REKHA,
-  ...lines('West Bengal', 12, '4.8'),
+  ...lines('West Bengal', 'Hindi, Bengali', 12, '4.8'),
   menu: [
     section('rekha', 'veg', 'Curries/ sabzis- Veg', [
       'Palak paneer',
@@ -92,7 +97,7 @@ const JYOTI_COOK: ServedCook = {
   name: 'Cook Jyoti',
   shortName: 'Jyoti',
   photo: JYOTI,
-  ...lines('Odisha', 8, '4.6'),
+  ...lines('Odisha', 'Hindi, Odia', 8, '4.6'),
   menu: [
     section('jyoti', 'veg', 'Curries/ sabzis- Veg', ['Dalma', 'Santula', 'Aloo bharta']),
     section('jyoti', 'non-veg', 'Curries/ sabzis- Non Veg', ['Chicken curry', 'Fish fry']),
@@ -105,7 +110,7 @@ const BARSHA_COOK: ServedCook = {
   name: 'Cook Barsha',
   shortName: 'Barsha',
   photo: BARSHA,
-  ...lines('West Bengal', 3, '4.2'),
+  ...lines('West Bengal', 'Hindi, Bengali', 3, '4.2'),
   menu: [
     section('barsha', 'veg', 'Curries/ sabzis- Veg', ['Aloo dum', 'Cholar dal', 'Labra']),
     section('barsha', 'breakfast', 'Breakfast', ['Poha', 'Upma']),
