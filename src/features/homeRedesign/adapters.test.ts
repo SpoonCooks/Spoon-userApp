@@ -5,7 +5,13 @@ import type { Catalogue } from '@features/catalogue';
 import type { CookPoolListDto } from '@features/cookPool';
 import type { RecurringEligibilityDto } from '@features/recurringSetup';
 
-import { addressDetailOf, homeDurationLabel, homeModelFrom } from './adapters';
+import {
+  addressDetailOf,
+  GUEST_ADDRESS,
+  guestHomeModelFrom,
+  homeDurationLabel,
+  homeModelFrom,
+} from './adapters';
 import type { HomeSources } from './adapters';
 
 const address = (status: AddressDto['serviceability']['status']) =>
@@ -181,5 +187,30 @@ describe('labels', () => {
     expect(
       addressDetailOf({ ...base, society: null, street: '  ', flat: null } as AddressDto),
     ).toBeNull();
+  });
+});
+
+describe('guestHomeModelFrom', () => {
+  it('shows the real catalogue prices with nothing per-account', () => {
+    const model = guestHomeModelFrom({ catalogue, catalogueStatus: 'ready' });
+
+    expect(model.durations.length).toBe(catalogue.durations.length);
+    expect(model.durations.every((d) => d.available.now && d.available.later)).toBe(true);
+    expect(model.serviceability).toBe('live');
+    expect(model.address).toEqual(GUEST_ADDRESS);
+    expect(model.user.hasCompletedBooking).toBe(false);
+    expect(model.cookPool).toEqual([]);
+    expect(model.activeRecurringPlan).toBeNull();
+    expect(model.waitlist).toBeNull();
+    expect(model.focusedDurationId).not.toBe('');
+  });
+
+  it('carries the catalogue read state to the carousel', () => {
+    expect(
+      guestHomeModelFrom({ catalogue: undefined, catalogueStatus: 'loading' }).pricingStatus,
+    ).toBe('loading');
+    expect(
+      guestHomeModelFrom({ catalogue: undefined, catalogueStatus: 'error' }).durations,
+    ).toEqual([]);
   });
 });

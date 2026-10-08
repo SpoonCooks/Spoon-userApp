@@ -2,12 +2,15 @@ import { useCallback, useState } from 'react';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 
+import { isGuest } from '@core/auth';
 import { getLogger } from '@core/logging';
+import { useSessionStore } from '@core/store';
 import { useMe } from '@features/auth';
 import { destinationForPayment, durationIdFor, useBookingSubmission } from '@features/booking';
 import {
   HomeRedesignView,
   joinWaitlist,
+  useGuestHomeRedesignData,
   useHomeRedesignData,
   useJoinWaitlist,
 } from '@features/homeRedesign';
@@ -33,6 +36,51 @@ const logger = getLogger('home');
  * profile. "Recurring · Live" opens that booking's Live booking tab (`/recurring/[bookingId]`).
  */
 export default function HomeRoute() {
+  const status = useSessionStore((state) => state.status);
+  return isGuest(status) ? <GuestHomeRoute /> : <SignedInHomeRoute />;
+}
+
+/**
+ * Home for a GUEST — skipped Login (iOS only; App Store review requires browsing without an
+ * account). The same screen on the catalogue alone (`useGuestHomeRedesignData`): real durations
+ * and prices, nothing per-account. Every action that needs an account asks them to sign in.
+ *
+ * Split from the signed-in route rather than branched inside it so neither mounts the other's
+ * reads — the signed-in ones would all 401 for a guest. "Sign in" REPLACES to Login: Login's
+ * Skip replaces straight back here, so the stack never grows a Login/Home ping-pong, and a
+ * successful OTP runs the normal first-run path through the boot gate (profile → address → Home).
+ */
+function GuestHomeRoute() {
+  const router = useRouter();
+  const home = useGuestHomeRedesignData();
+  const signIn = () => router.replace('/login');
+
+  return (
+    <QueryBoundary state={home.state} onRetry={home.refetch}>
+      {(model) => (
+        <HomeRedesignView
+          model={model}
+          onPressAddress={signIn}
+          onPressProfile={signIn}
+          onDurationSelected={(event) => logger.info('duration_selected', event)}
+          onBookNow={signIn}
+          onPickSlot={signIn}
+          onPressRecurring={() => {
+            signIn();
+            return true;
+          }}
+          onPressCookPool={signIn}
+          onPressPoolCook={signIn}
+          onRefreshAvailability={home.refetch}
+          // Unreachable: a guest's Home is always the live variant, which has no waitlist.
+          onJoinWaitlist={async () => signIn()}
+        />
+      )}
+    </QueryBoundary>
+  );
+}
+
+function SignedInHomeRoute() {
   const router = useRouter();
   const [waitlistJoined, setWaitlistJoined] = useState(false);
   const home = useHomeRedesignData({ waitlistJoined });

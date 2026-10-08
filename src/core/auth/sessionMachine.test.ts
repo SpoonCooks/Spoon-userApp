@@ -1,6 +1,8 @@
 import {
   canAccessApp,
+  canBrowseApp,
   INITIAL_SESSION_STATUS,
+  isGuest,
   isResolving,
   sessionReducer,
 } from './sessionMachine';
@@ -76,5 +78,36 @@ describe('sessionReducer', () => {
 
     allowed.forEach((status) => expect(canAccessApp(status)).toBe(true));
     denied.forEach((status) => expect(canAccessApp(status)).toBe(false));
+  });
+});
+
+describe('guest mode', () => {
+  it('enters guest from a remembered skip at bootstrap, or from Skip on Login', () => {
+    expect(sessionReducer('bootstrapping', { type: 'BOOTSTRAP_GUEST' })).toBe('guest');
+    expect(sessionReducer('unauthenticated', { type: 'GUEST_STARTED' })).toBe('guest');
+    expect(sessionReducer('expired', { type: 'GUEST_STARTED' })).toBe('guest');
+  });
+
+  it('cannot be entered while signed in', () => {
+    expect(sessionReducer('authenticated', { type: 'GUEST_STARTED' })).toBe('authenticated');
+    expect(sessionReducer('refreshing', { type: 'GUEST_STARTED' })).toBe('refreshing');
+  });
+
+  it('leaves guest by signing in, or by being withdrawn', () => {
+    expect(sessionReducer('guest', { type: 'SIGNED_IN' })).toBe('authenticated');
+    expect(sessionReducer('guest', { type: 'SIGNED_OUT' })).toBe('unauthenticated');
+  });
+
+  it('ignores session expiry — a guest holds no session to expire', () => {
+    expect(sessionReducer('guest', { type: 'SESSION_EXPIRED' })).toBe('guest');
+  });
+
+  it('may browse the shell but never counts as holding credentials', () => {
+    expect(canBrowseApp('guest')).toBe(true);
+    expect(canAccessApp('guest')).toBe(false);
+    expect(isGuest('guest')).toBe(true);
+    expect(isGuest('authenticated')).toBe(false);
+    expect(canBrowseApp('unauthenticated')).toBe(false);
+    expect(canBrowseApp('expired')).toBe(false);
   });
 });

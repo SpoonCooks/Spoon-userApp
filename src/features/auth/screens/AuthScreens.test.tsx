@@ -22,6 +22,17 @@ import { OtpScreen } from './OtpScreen';
 describe('LoginScreen — 250:2383', () => {
   const noop = () => undefined;
 
+  it('draws Skip only when the host offers guest mode, and raises it on press', () => {
+    const { rerender } = render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} />);
+    expect(screen.queryByTestId('login-screen-skip')).toBeNull();
+
+    const onSkip = jest.fn();
+    rerender(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} onSkip={onSkip} />);
+    fireEvent.press(screen.getByTestId('login-screen-skip'));
+
+    expect(onSkip).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the CTA inert until the number is complete, and never validates locally', () => {
     const requested: string[] = [];
     render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={(phone) => requested.push(phone)} />);

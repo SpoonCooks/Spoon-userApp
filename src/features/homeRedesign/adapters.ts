@@ -82,9 +82,9 @@ export interface HomeSources {
   readonly recurring?: RecurringEligibilityDto | undefined;
 }
 
-export function homeModelFrom(sources: HomeSources): HomeModel {
-  const { address, catalogue } = sources;
-  const durations = (catalogue?.durations ?? [])
+/** The carousel's tiles, from the catalogue and whatever instant reads have landed. */
+function durationsFrom(catalogue: Catalogue | undefined, instant: InstantReads): DurationOption[] {
+  return (catalogue?.durations ?? [])
     .slice()
     .sort((a, b) => a.durationMinutes - b.durationMinutes)
     .map((d): DurationOption => ({
@@ -97,15 +97,23 @@ export function homeModelFrom(sources: HomeSources): HomeModel {
       available: {
         // Unknown (still loading, or the read failed) is treated as bookable: the booking
         // itself is the authoritative refusal, and greying every tile on a slow read is worse.
-        now: sources.instant.get(d.durationMinutes)?.available ?? true,
+        now: instant.get(d.durationMinutes)?.available ?? true,
         // Slot capacity is per date; the slot picker answers it. No per-duration roll-up exists.
         later: true,
       },
     }));
+}
 
+function focusIdOf(durations: readonly DurationOption[]): string {
   const focus =
     durations.find((d) => d.minutes === FOCUS_MINUTES) ??
     durations[Math.floor(durations.length / 2)];
+  return focus?.id ?? '';
+}
+
+export function homeModelFrom(sources: HomeSources): HomeModel {
+  const { address, catalogue } = sources;
+  const durations = durationsFrom(catalogue, sources.instant);
 
   // Instant is "available" when any duration can go now; the ETA is the shortest such one's.
   const instantNow = durations
@@ -139,7 +147,7 @@ export function homeModelFrom(sources: HomeSources): HomeModel {
     durations,
     pricingStatus: sources.catalogueStatus,
     tax: { gstPercent: (catalogue?.taxRateBps ?? 0) / 100 },
-    focusedDurationId: focus?.id ?? '',
+    focusedDurationId: focusIdOf(durations),
     cookPool: (sources.pool?.cooks ?? []).map(poolCookOf),
     activeRecurringPlan: liveBooking === undefined ? null : { id: liveBooking.recurringBookingId },
     ...(sources.recurring === undefined ? {} : { recurringChip: sources.recurring.chip }),
@@ -147,5 +155,45 @@ export function homeModelFrom(sources: HomeSources): HomeModel {
     waitlist: live
       ? null
       : { countForPincode: null, launchThreshold: null, joined: sources.waitlistJoined },
+  };
+}
+
+/**
+ * The header a guest sees: there is no account, so no saved address. Tapping it asks them to
+ * sign in, like every other action on guest Home.
+ */
+export const GUEST_ADDRESS: HomeModel['address'] = {
+  label: 'Add address',
+  detail: 'Set your delivery location',
+  pincode: '',
+};
+
+/**
+ * Home for a GUEST — a customer who skipped Login (iOS only, required by App Store review).
+ *
+ * Built from the catalogue alone, which `GET /v1/catalogue` serves without a token: the real
+ * durations and prices. Everything else is per-account and absent — no address, so no
+ * serviceability (treated as live: the guest has not said where they are yet) and no instant
+ * reads (unknown, which the carousel treats as bookable; the booking is the real refusal). No
+ * history, pool or plan, so the variant is always `default`.
+ */
+export function guestHomeModelFrom(sources: {
+  readonly catalogue: Catalogue | undefined;
+  readonly catalogueStatus: 'ready' | 'loading' | 'error';
+}): HomeModel {
+  const durations = durationsFrom(sources.catalogue, new Map());
+  return {
+    serviceability: 'live',
+    address: GUEST_ADDRESS,
+    user: { hasCompletedBooking: false },
+    instant: { available: true, etaMins: null },
+    durations,
+    pricingStatus: sources.catalogueStatus,
+    tax: { gstPercent: (sources.catalogue?.taxRateBps ?? 0) / 100 },
+    focusedDurationId: focusIdOf(durations),
+    cookPool: [],
+    activeRecurringPlan: null,
+    liveHubs: [],
+    waitlist: null,
   };
 }

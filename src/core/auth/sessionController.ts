@@ -1,5 +1,6 @@
 import type { Logger } from '@core/logging';
 
+import type { GuestFlagStore } from './guestFlagStore';
 import type { SessionGateway } from './sessionGateway';
 import { singleFlight } from './singleFlight';
 import type { SessionTokens, TokenStore } from './tokenStore';
@@ -23,6 +24,15 @@ export interface SessionControllerOptions {
   /** Clears the React Query cache. Injected so core/auth does not depend on core/query. */
   readonly onSessionCleared: () => void;
   readonly now?: () => number;
+  /**
+   * Guest mode ("Skip" on Login). Both are optional: without them guest mode simply does not
+   * exist, which is what every pre-existing caller and test gets.
+   *
+   * `isGuestModeAvailable` (iOS only) is asked at bootstrap as well as at Skip, so a remembered
+   * guest flag can never land a platform without guest mode on a guest Home.
+   */
+  readonly guestFlag?: GuestFlagStore;
+  readonly isGuestModeAvailable?: () => boolean;
 }
 
 export interface SessionController extends AuthTokenProvider {
@@ -31,11 +41,16 @@ export interface SessionController extends AuthTokenProvider {
   /** Called once a sign-in flow has produced tokens. DESIGN_PENDING: no OTP screen exists yet. */
   signIn(tokens: SessionTokens): Promise<void>;
   signOut(): Promise<void>;
+  /** "Skip" on Login. Remembered across launches; a no-op where guest mode is unavailable. */
+  continueAsGuest(): Promise<void>;
 }
 
 export function createSessionController(options: SessionControllerOptions): SessionController {
   const { tokenStore, gateway, logger, dispatch, onSessionCleared } = options;
   const now = options.now ?? (() => Date.now());
+  const { guestFlag } = options;
+  const guestModeAvailable = () =>
+    guestFlag !== undefined && (options.isGuestModeAvailable?.() ?? false);
 
   async function clearSession(): Promise<void> {
     await tokenStore.clear();
@@ -87,6 +102,10 @@ export function createSessionController(options: SessionControllerOptions): Sess
       const stored = await tokenStore.read();
 
       if (stored === null) {
+        if (guestModeAvailable() && (await guestFlag?.read()) === true) {
+          dispatch({ type: 'BOOTSTRAP_GUEST' });
+          return;
+        }
         dispatch({ type: 'BOOTSTRAP_NO_SESSION' });
         return;
       }
@@ -102,12 +121,20 @@ export function createSessionController(options: SessionControllerOptions): Sess
 
     async signIn(tokens) {
       await tokenStore.write(tokens);
+      await guestFlag?.clear();
       dispatch({ type: 'SIGNED_IN' });
     },
 
     async signOut() {
       await clearSession();
+      await guestFlag?.clear();
       dispatch({ type: 'SIGNED_OUT' });
+    },
+
+    async continueAsGuest() {
+      if (!guestModeAvailable()) return;
+      await guestFlag?.write();
+      dispatch({ type: 'GUEST_STARTED' });
     },
 
     async getAccessToken() {

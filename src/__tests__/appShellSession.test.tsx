@@ -22,6 +22,10 @@ import AppLayout from '@/app/(app)/_layout';
  * decision, not expo-router's stack.
  */
 
+// The route the shell is rendering for. Only guests read it; `mock` prefix so jest's hoisting
+// allows the factory below to close over it.
+let mockSegments: string[] = ['(app)', 'home'];
+
 jest.mock('expo-router', () => {
   // Required INSIDE the factory: jest hoists `jest.mock` above the imports, so a module-scope
   // binding would still be uninitialised when this runs.
@@ -37,6 +41,7 @@ jest.mock('expo-router', () => {
     Redirect: ({ href }: { href: string }) =>
       createElement(Text, { testID: 'redirect' }, String(href)),
     Stack: () => createElement(Text, { testID: 'app-stack' }, 'stack'),
+    useSegments: () => mockSegments,
   };
 });
 
@@ -49,6 +54,7 @@ jest.mock('@features/notifications', () => ({
 describe('authenticated shell — session gate', () => {
   afterEach(() => {
     useSessionStore.getState().reset();
+    mockSegments = ['(app)', 'home'];
   });
 
   it('renders the stack for an authenticated session', () => {
@@ -118,5 +124,48 @@ describe('authenticated shell — session gate', () => {
 
     expect(screen.getByTestId('app-stack')).toBeTruthy();
     expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+});
+
+/**
+ * Guests (Skip on Login, iOS only) may render Home and nothing else: every other route in the
+ * shell reads per-account data, so a deep link or stale push there goes to Login.
+ */
+describe('authenticated shell — guest', () => {
+  afterEach(() => {
+    useSessionStore.getState().reset();
+    mockSegments = ['(app)', 'home'];
+  });
+
+  it('renders the stack for a guest on Home', () => {
+    useSessionStore.setState({ status: 'guest' });
+    render(<AppLayout />);
+
+    expect(screen.getByTestId('app-stack')).toBeTruthy();
+    expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
+  it.each([
+    [['(app)', 'history']],
+    [['(app)', 'booking', '[id]']],
+    [['(app)', 'profile']],
+    [['(app)', 'address', 'location']],
+  ])('sends a guest on %j to login', (segments) => {
+    mockSegments = segments;
+    useSessionStore.setState({ status: 'guest' });
+    render(<AppLayout />);
+
+    expect(screen.getByTestId('redirect').props.children).toBe('/login');
+    expect(screen.queryByTestId('app-stack')).toBeNull();
+  });
+
+  it('lets a former guest anywhere once they sign in', () => {
+    mockSegments = ['(app)', 'history'];
+    useSessionStore.setState({ status: 'guest' });
+    render(<AppLayout />);
+
+    act(() => useSessionStore.getState().dispatch({ type: 'SIGNED_IN' }));
+
+    expect(screen.getByTestId('app-stack')).toBeTruthy();
   });
 });

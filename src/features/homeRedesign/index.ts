@@ -10,10 +10,10 @@ export type {
   HomeRedesignActions,
   HomeRedesignViewProps,
 } from './screens/HomeRedesignScreen';
-export { useHomeRedesignData } from './data';
+export { useGuestHomeRedesignData, useHomeRedesignData } from './data';
 export type { HomeRedesignData } from './data';
 export { useJoinWaitlist } from './api/waitlistApi';
-export { homeModelFrom } from './adapters';
+export { GUEST_ADDRESS, guestHomeModelFrom, homeModelFrom } from './adapters';
 export { resolveHomeVariant } from './state/variant';
 export { joinWaitlist } from './state/waitlist';
 export type { JoinWaitlistDeps, WaitlistChannel } from './state/waitlist';

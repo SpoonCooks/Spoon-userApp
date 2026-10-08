@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { LOADING, failed, ready, useApiQueries } from '@core/data';
-import type { DataState } from '@core/data';
+import type { DataState, ScreenQuery } from '@core/data';
 import { useRuntime } from '@core/runtimeContext';
 import { currentAddressOf, useAddresses } from '@features/address';
 import { availabilityKeys, createAvailabilityApi } from '@features/availability';
@@ -11,7 +11,7 @@ import { useCatalogue } from '@features/catalogue';
 import { useCookPoolList } from '@features/cookPool';
 import { useRecurringEligibility } from '@features/recurringSetup';
 
-import { homeModelFrom } from './adapters';
+import { guestHomeModelFrom, homeModelFrom } from './adapters';
 import type { InstantReads } from './adapters';
 import type { HomeModel } from './types';
 
@@ -125,4 +125,24 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
     addressId,
     refetch,
   };
+}
+
+/**
+ * Guest Home's read (see `guestHomeModelFrom`): the catalogue and nothing else. Every other read
+ * here is per-account and would 401 — and a 401 fires the session's expiry path, which clears
+ * the query cache. The catalogue goes out with no token (a guest has none), which V0 serves.
+ */
+export function useGuestHomeRedesignData(): ScreenQuery<HomeModel> {
+  const catalogue = useCatalogue();
+  const state = useMemo<DataState<HomeModel>>(
+    () =>
+      ready(
+        guestHomeModelFrom({
+          catalogue: catalogue.state.status === 'ready' ? catalogue.state.data : undefined,
+          catalogueStatus: catalogue.state.status,
+        }),
+      ),
+    [catalogue.state],
+  );
+  return { state, refetch: catalogue.refetch };
 }

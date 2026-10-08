@@ -73,6 +73,7 @@ export function createTestRuntime(overrides: Partial<AppRuntime> = {}): AppRunti
       bootstrap: async () => undefined,
       signIn: async () => undefined,
       signOut: async () => undefined,
+      continueAsGuest: async () => undefined,
     },
     ...overrides,
   };

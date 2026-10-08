@@ -1,6 +1,7 @@
 import { createLogger, noopSink } from '@core/logging';
 
 import { createSessionController } from './sessionController';
+import type { GuestFlagStore } from './guestFlagStore';
 import type { SessionGateway } from './sessionGateway';
 import type { SessionEvent } from './sessionMachine';
 import type { SessionTokens, TokenStore } from './tokenStore';
@@ -29,7 +30,26 @@ function createMemoryTokenStore(initial: SessionTokens | null = null): TokenStor
   };
 }
 
-function setup(options: { tokens?: SessionTokens | null; gateway?: SessionGateway }) {
+function createMemoryGuestFlag(initial = false): GuestFlagStore & { value: () => boolean } {
+  let flag = initial;
+  return {
+    value: () => flag,
+    read: jest.fn(async () => flag),
+    write: jest.fn(async () => {
+      flag = true;
+    }),
+    clear: jest.fn(async () => {
+      flag = false;
+    }),
+  };
+}
+
+function setup(options: {
+  tokens?: SessionTokens | null;
+  gateway?: SessionGateway;
+  guestFlag?: GuestFlagStore;
+  guestModeAvailable?: boolean;
+}) {
   const events: SessionEvent[] = [];
   const tokenStore = createMemoryTokenStore(options.tokens ?? null);
   const onSessionCleared = jest.fn();
@@ -41,6 +61,12 @@ function setup(options: { tokens?: SessionTokens | null; gateway?: SessionGatewa
     dispatch: (event) => events.push(event),
     onSessionCleared,
     now: () => NOW,
+    ...(options.guestFlag === undefined
+      ? {}
+      : {
+          guestFlag: options.guestFlag,
+          isGuestModeAvailable: () => options.guestModeAvailable ?? true,
+        }),
   });
 
   return { controller, tokenStore, events, onSessionCleared };
@@ -201,5 +227,60 @@ describe('sessionController teardown', () => {
 
     expect(tokenStore.write).toHaveBeenCalledWith(FRESH);
     expect(events).toContainEqual({ type: 'SIGNED_IN' });
+  });
+});
+
+describe('sessionController guest mode', () => {
+  it('lands a remembered guest back in guest mode at bootstrap', async () => {
+    const { controller, events } = setup({ guestFlag: createMemoryGuestFlag(true) });
+
+    await controller.bootstrap();
+
+    expect(events).toEqual([{ type: 'BOOTSTRAP_GUEST' }]);
+  });
+
+  it('ends a remembered guest session once guest mode is withdrawn', async () => {
+    const { controller, events } = setup({
+      guestFlag: createMemoryGuestFlag(true),
+      guestModeAvailable: false,
+    });
+
+    await controller.bootstrap();
+
+    expect(events).toEqual([{ type: 'BOOTSTRAP_NO_SESSION' }]);
+  });
+
+  it('prefers stored credentials over a stale guest flag', async () => {
+    const { controller, events } = setup({ tokens: FRESH, guestFlag: createMemoryGuestFlag(true) });
+
+    await controller.bootstrap();
+
+    expect(events).toEqual([{ type: 'BOOTSTRAP_FOUND_SESSION' }]);
+  });
+
+  it('remembers Skip, and forgets it on sign-in and on sign-out', async () => {
+    const guestFlag = createMemoryGuestFlag();
+    const { controller, events } = setup({ guestFlag });
+
+    await controller.continueAsGuest();
+    expect(guestFlag.value()).toBe(true);
+    expect(events).toEqual([{ type: 'GUEST_STARTED' }]);
+
+    await controller.signIn(FRESH);
+    expect(guestFlag.value()).toBe(false);
+
+    await guestFlag.write();
+    await controller.signOut();
+    expect(guestFlag.value()).toBe(false);
+  });
+
+  it('does nothing on Skip where guest mode is unavailable', async () => {
+    const guestFlag = createMemoryGuestFlag();
+    const { controller, events } = setup({ guestFlag, guestModeAvailable: false });
+
+    await controller.continueAsGuest();
+
+    expect(guestFlag.value()).toBe(false);
+    expect(events).toEqual([]);
   });
 });
