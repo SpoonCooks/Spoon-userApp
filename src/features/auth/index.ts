@@ -24,6 +24,7 @@ export type { LoginScreenProps } from './screens/LoginScreen';
 export { OtpScreen } from './screens/OtpScreen';
 export type { OtpNotice, OtpScreenProps } from './screens/OtpScreen';
 export type { LoginViewModel, OtpViewModel } from './types';
+export { isGuestModeAvailable } from './guestMode';
 
 export {
   AUTH_PATHS,
@@ -39,6 +40,7 @@ export {
   sentToLabelFor,
   toE164,
   updateProfileResponseSchema,
+  useContinueAsGuest,
   useMe,
   useSendOtp,
   useSignOut,

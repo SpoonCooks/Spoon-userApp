@@ -160,3 +160,17 @@ export function useSignOut() {
     },
   });
 }
+
+/**
+ * "Skip" on Login — enter guest mode (see `guestMode.ts`).
+ *
+ * Nothing touches the network: a guest holds no credentials, and the only effect is the
+ * remembered flag plus the `guest` session status the route guards read.
+ */
+export function useContinueAsGuest() {
+  const { session } = useRuntime();
+
+  return useMutation<void, Error, void>({
+    mutationFn: () => session.continueAsGuest(),
+  });
+}

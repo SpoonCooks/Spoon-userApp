@@ -6,7 +6,14 @@ import { Pressable, StyleSheet } from 'react-native';
 import { readLastPhone } from '@core/auth';
 import { isAppError } from '@core/errors';
 import type { AppError } from '@core/errors';
-import { LoginScreen, loginWithError, toE164, useSendOtp } from '@features/auth';
+import {
+  isGuestModeAvailable,
+  LoginScreen,
+  loginWithError,
+  toE164,
+  useContinueAsGuest,
+  useSendOtp,
+} from '@features/auth';
 import { DEMO_LOGIN } from '@/demo/fixtures/screens';
 
 /**
@@ -27,6 +34,8 @@ import { DEMO_LOGIN } from '@/demo/fixtures/screens';
 export default function LoginRoute() {
   const router = useRouter();
   const sendOtp = useSendOtp();
+  const continueAsGuest = useContinueAsGuest();
+  const guestModeAvailable = isGuestModeAvailable();
 
   const error: AppError | null = isAppError(sendOtp.error) ? sendOtp.error : null;
 
@@ -70,6 +79,21 @@ export default function LoginRoute() {
          */
         onOpenTerms={() => router.push('/legal/terms' as Href)}
         onOpenPrivacy={() => router.push('/legal/privacy' as Href)}
+        /**
+         * Guest mode (iOS only). Replacing rather than pushing: Home is the
+         * guest's root, and every "sign in to continue" there REPLACES back to this screen, so
+         * the stack never grows a Login/Home ping-pong.
+         */
+        {...(guestModeAvailable
+          ? {
+              onSkip: () => {
+                if (continueAsGuest.isPending) return;
+                continueAsGuest.mutate(undefined, {
+                  onSuccess: () => router.replace('/home'),
+                });
+              },
+            }
+          : {})}
         onRequestOtp={(digits) => {
           const phone = toE164(digits, DEMO_LOGIN.dialCode);
 
