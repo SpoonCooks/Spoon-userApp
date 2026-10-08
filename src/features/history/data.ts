@@ -3,13 +3,13 @@ import { useMemo, useState } from 'react';
 import {
   isFinishedBooking,
   useActiveBookings,
-  useBookingHistory,
+  useBookingHistoryPages,
   useRefunds,
 } from '@features/booking';
 import type { BookingSummaryDto } from '@features/booking';
 import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
-import type { ScreenQuery } from '@core/data';
+import type { DataState, PagedScreenQuery, ScreenQuery } from '@core/data';
 import { currentSkewMs, slotHasEnded } from '@core/time';
 
 import { formatPaise } from '@core/format';
@@ -86,17 +86,37 @@ export function useUpcomingBookingsData(): ScreenQuery<BookingListViewModel> {
 }
 
 /**
- * My bookings — Past tab. `GET /v1/me/bookings`, cursor-paginated
- * (`limit`/`cursorCreatedAt`/`cursorId`) but read here with no params, same as before this screen
- * grew a second tab — a long-history customer only sees the backend's first page. Known scope
- * limit, not a regression; infinite scroll is a follow-up, not part of this change.
+ * The paging half of a `PagedScreenQuery`, carried across when its rows are turned into cards.
+ * `state` is the only thing the adapter changes.
+ */
+function pagedWith<TFrom, TTo>(
+  source: PagedScreenQuery<TFrom>,
+  state: DataState<TTo>,
+): PagedScreenQuery<TTo> {
+  return {
+    state,
+    refetch: source.refetch,
+    hasMore: source.hasMore,
+    loadingMore: source.loadingMore,
+    loadMoreError: source.loadMoreError,
+    loadMore: source.loadMore,
+    retryLoadMore: source.retryLoadMore,
+  };
+}
+
+/**
+ * My bookings — Past tab. `GET /v1/me/bookings`, newest first, a page of 50 at a time.
+ *
+ * The backend returns an opaque `nextCursor` with each page; `loadMore` fetches the next one when
+ * the list reaches its end, so a customer with more than 50 past bookings can scroll to the rest.
+ * `refetch` (pull to refresh, returning to the screen) restarts from the newest page.
  *
  * The two fixtures below (`DEMO_BOOKING_HISTORY`, `DEMO_UPCOMING_BOOKINGS`) supply only the
  * screen's static copy — title and empty-state text. A real account with no bookings returns `[]`
  * and the designed empty state renders as drawn.
  */
-export function useBookingHistoryData(): ScreenQuery<BookingListViewModel> {
-  const history = useBookingHistory();
+export function useBookingHistoryData(): PagedScreenQuery<BookingListViewModel> {
+  const history = useBookingHistoryPages();
   // Only for the service timezone the card dates are written on. Home and Schedule already read
   // this catalogue, so it is warm in the cache and adds no request; the list still renders if it
   // has not loaded, with the dates falling back to the device clock.
@@ -104,7 +124,7 @@ export function useBookingHistoryData(): ScreenQuery<BookingListViewModel> {
   const timeZone =
     catalogue.state.status === 'ready' ? catalogue.state.data.operatingWindow.timeZone : undefined;
 
-  const state = useMemo(() => {
+  const state = useMemo<DataState<BookingListViewModel>>(() => {
     if (history.state.status !== 'ready') return history.state;
     return ready(
       bookingListFrom({
@@ -115,12 +135,12 @@ export function useBookingHistoryData(): ScreenQuery<BookingListViewModel> {
     );
   }, [history.state, timeZone]);
 
-  return { state, refetch: history.refetch };
+  return useMemo(() => pagedWith(history, state), [history, state]);
 }
 
 export interface MyBookingsData {
   readonly upcoming: ScreenQuery<BookingListViewModel>;
-  readonly past: ScreenQuery<BookingListViewModel>;
+  readonly past: PagedScreenQuery<BookingListViewModel>;
 }
 
 /**
@@ -171,7 +191,7 @@ const REFUND_PRESENTATION: Record<string, { readonly label: string; readonly ton
  * is the money, `state` chooses the pill. Nothing is summed and no refund is derived from a
  * booking total.
  */
-export function useRefundHistoryData(): ScreenQuery<BookingListViewModel> {
+export function useRefundHistoryData(): PagedScreenQuery<BookingListViewModel> {
   const refunds = useRefunds();
   // The service timezone, for the same reason the history list reads it: the booking date on a
   // refund row is calendar-day semantics on the service clock.
@@ -179,7 +199,7 @@ export function useRefundHistoryData(): ScreenQuery<BookingListViewModel> {
   const timeZone =
     catalogue.state.status === 'ready' ? catalogue.state.data.operatingWindow.timeZone : undefined;
 
-  const state = useMemo(() => {
+  const state = useMemo<DataState<BookingListViewModel>>(() => {
     if (refunds.state.status !== 'ready') return refunds.state;
 
     return ready<BookingListViewModel>({
@@ -224,5 +244,5 @@ export function useRefundHistoryData(): ScreenQuery<BookingListViewModel> {
     });
   }, [refunds.state, timeZone]);
 
-  return { state, refetch: refunds.refetch };
+  return useMemo(() => pagedWith(refunds, state), [refunds, state]);
 }

@@ -4,6 +4,7 @@ import { idempotencyHeader } from '@core/api';
 import {
   bookingCreateResponseSchema,
   bookingDetailResponseSchema,
+  bookingHistoryPageSchema,
   bookingListResponseSchema,
   cancellationPreviewSchema,
   extensionOptionsResponseSchema,
@@ -12,6 +13,7 @@ import {
   ratingResultSchema,
   tipOrderSchema,
   tipStatusSchema,
+  refundHistoryPageSchema,
   refundListResponseSchema,
   cookContactSchema,
   rescheduleOptionsSchema,
@@ -23,6 +25,7 @@ import type {
   BookingSummaryDto,
   CancellationPreviewDto,
   QuoteResponse,
+  RefundDto,
   RescheduleOptionsDto,
 } from './schemas';
 
@@ -44,19 +47,28 @@ import type {
  */
 
 /**
- * The most either customer-scoped list will return, per request AND in total.
+ * Rows per page for the two customer lists.
  *
- * The server clamps `limit` to `Math.min(50, Math.max(1, limit))` rather than rejecting it, so
- * this is the real ceiling and not a page size we picked: 100 and 500 both come back with 50.
- * Asking for it exactly is the most these endpoints can be made to give.
- *
- * It is a TOTAL because there is no way to ask for row 51. Shared by `/me/bookings` and
- * `/me/refunds`, which have the identical gap.
+ * The server clamps `limit` to 50 rather than rejecting a larger one (`?limit=100` returns 50),
+ * so 50 is its page ceiling and the most one request can give. It is a PAGE size, not a total:
+ * every page after the first is fetched with the `nextCursor` the previous response carried.
+ * Shared by `/me/bookings` and `/me/refunds`, which page identically.
  */
 const MAX_LIST_PAGE = 50;
 
 function query(params: Readonly<Record<string, string>>): string {
   return new URLSearchParams(params).toString();
+}
+
+export interface BookingHistoryPage {
+  readonly bookings: readonly BookingSummaryDto[];
+  /** Opaque; `null` on the last page. */
+  readonly nextCursor: string | null;
+}
+
+export interface RefundHistoryPage {
+  readonly refunds: readonly RefundDto[];
+  readonly nextCursor: string | null;
 }
 
 export const BOOKING_PATHS = {
@@ -160,39 +172,43 @@ export function createBookingApi(api: ApiClient) {
     },
 
     /**
-     * `GET /v1/me/bookings` — past bookings, asked for at the server's maximum page size.
+     * `GET /v1/me/bookings` — one page of past bookings, newest first.
      *
-     * `MAX_LIST_PAGE` is not a preference, it is the ceiling: the server clamps with
-     * `Math.min(50, max(1, limit))`, so 100 and 500 both return 50 rather than erroring. Asking
-     * for exactly 50 therefore gets everything the endpoint will ever give in one request, and
-     * cannot 400 — only a non-numeric value does that.
-     *
-     * PAGINATION IS NOT IMPLEMENTED, and cannot be from here: rows 51+ need a cursor, the cursor
-     * is `(created_at, id)`, and `created_at` is deliberately unpublished — the summary carries
-     * no timestamp to build it from, and `cursorId` alone is rejected. So a customer with more
-     * than 50 terminal bookings cannot reach the older ones at all. That is a hard ceiling on
-     * this screen until the backend returns an opaque `nextCursor`; see
-     * `docs/FRONTEND_BACKEND_PENDING.md`.
+     * Pass the previous page's `nextCursor` to get the next one. The cursor is OPAQUE: it is sent
+     * back exactly as received and never decoded, so the server stays free to change how it
+     * orders pages. `nextCursor` is `null` on the last page, and an older backend that sends none
+     * reads the same way — the list just ends at its first page.
      */
-    async history(signal?: AbortSignal): Promise<readonly BookingSummaryDto[]> {
-      const search = query({ limit: String(MAX_LIST_PAGE) });
+    async history(cursor?: string | null, signal?: AbortSignal): Promise<BookingHistoryPage> {
+      const search = query({
+        limit: String(MAX_LIST_PAGE),
+        ...(cursor === undefined || cursor === null ? {} : { cursor }),
+      });
       return api.request(`${BOOKING_PATHS.list}?${search}`, {
-        parse: (data) => bookingListResponseSchema.parse(data).bookings,
+        parse: (data) => {
+          const page = bookingHistoryPageSchema.parse(data);
+          return { bookings: page.bookings, nextCursor: page.nextCursor ?? null };
+        },
         ...(signal === undefined ? {} : { signal }),
       });
     },
 
     /**
-     * `GET /v1/me/refunds` — the CUSTOMER-level refund list.
+     * `GET /v1/me/refunds` — one page of the CUSTOMER-level refund list, newest first.
      *
-     * A dedicated endpoint exists, so the Refunds screen does not fan out over every booking.
+     * A dedicated endpoint exists, so the Refunds screen does not fan out over every booking. It
+     * pages exactly like `history`: send back the previous `nextCursor`, unchanged.
      */
-    async refunds(signal?: AbortSignal) {
-      // The same `limit`/cursor trio as `/me/bookings`, and the same missing cursor — so the same
-      // ceiling applies, and asking for the maximum is the most this can fetch.
-      const search = query({ limit: String(MAX_LIST_PAGE) });
+    async refunds(cursor?: string | null, signal?: AbortSignal): Promise<RefundHistoryPage> {
+      const search = query({
+        limit: String(MAX_LIST_PAGE),
+        ...(cursor === undefined || cursor === null ? {} : { cursor }),
+      });
       return api.request(`${BOOKING_PATHS.myRefunds}?${search}`, {
-        parse: (data) => refundListResponseSchema.parse(data).refunds,
+        parse: (data) => {
+          const page = refundHistoryPageSchema.parse(data);
+          return { refunds: page.refunds, nextCursor: page.nextCursor ?? null };
+        },
         ...(signal === undefined ? {} : { signal }),
       });
     },
