@@ -12,10 +12,17 @@ import { z } from 'zod';
  * here is a float and nothing is divided by 100 except at the moment of display.
  */
 
+/**
+ * The struck-through price the backend says to draw (backend DEC-088): a number to strike, null for
+ * no strike. Absent from a backend that predates it, which leaves the app's own ₹5/min anchor.
+ */
+const strikePriceSchema = z.number().int().positive().nullable().optional();
+
 const slotPriceSchema = z.object({
   serviceAmountPaise: z.number().int().nonnegative(),
   taxAmountPaise: z.number().int().nonnegative(),
   totalAmountPaise: z.number().int().nonnegative(),
+  strikePricePaise: strikePriceSchema,
 });
 
 export type CatalogueSlotPrice = z.infer<typeof slotPriceSchema>;
@@ -29,6 +36,7 @@ export const catalogueDurationSchema = z.object({
   serviceAmountPaise: z.number().int().nonnegative(),
   taxAmountPaise: z.number().int().nonnegative(),
   totalAmountPaise: z.number().int().nonnegative(),
+  strikePricePaise: strikePriceSchema,
   /**
    * The price per booking type (backend DEC-087). A customer can be priced differently for
    * Instant and Scheduled, and the two may later differ for everyone. Optional because a backend
@@ -55,6 +63,9 @@ export function priceForSlot(
       serviceAmountPaise: duration.serviceAmountPaise,
       taxAmountPaise: duration.taxAmountPaise,
       totalAmountPaise: duration.totalAmountPaise,
+      ...(duration.strikePricePaise === undefined
+        ? {}
+        : { strikePricePaise: duration.strikePricePaise }),
     }
   );
 }
