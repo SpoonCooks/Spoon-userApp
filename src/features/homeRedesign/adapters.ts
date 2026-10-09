@@ -95,6 +95,7 @@ function durationsFrom(catalogue: Catalogue | undefined, instant: InstantReads):
           mrpPaise: strikePaiseFor({
             durationMinutes: d.durationMinutes,
             serviceAmountPaise: price.serviceAmountPaise,
+            strikePricePaise: price.strikePricePaise,
           }),
           payablePaise: price.totalAmountPaise,
         };
