@@ -1,10 +1,12 @@
 export { CATALOGUE_PATH, createCatalogueApi } from './catalogueApi';
 export { useCatalogue } from './hooks';
 export { catalogueKeys } from './keys';
-export { catalogueSchema } from './schemas';
+export { catalogueSchema, priceForSlot } from './schemas';
 export type {
   Catalogue,
   CatalogueDuration,
+  CatalogueSlotPrice,
+  CatalogueSlotType,
   CatalogueExtensionOption,
   CancellationReasonOption,
   SchedulePeriod,

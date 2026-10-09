@@ -10,6 +10,13 @@ import type { ImageSourcePropType } from 'react-native';
 
 export type Serviceability = 'live' | 'not_live';
 
+/** What a tile shows for one booking type: the price, its struck anchor, and the GST total. */
+export interface DurationTilePrice {
+  readonly pricePaise: number;
+  readonly mrpPaise: number | null;
+  readonly payablePaise: number;
+}
+
 /** One carousel tile. Prices come from the API in paise and are never computed here. */
 export interface DurationOption {
   readonly id: string;
@@ -22,6 +29,14 @@ export interface DurationOption {
    * The client never adds tax (see `@core/format/money`).
    */
   readonly payablePaise: number;
+  /**
+   * The tile's prices per booking type. The top-level three are the Scheduled ones; `forCta`
+   * (`state/durations.ts`) swaps in Instant's while the CTA is "Book Now".
+   */
+  readonly bySlotType?: {
+    readonly instant: DurationTilePrice;
+    readonly scheduled: DurationTilePrice;
+  };
   /** Server flag; one tile only. */
   readonly mostBooked?: boolean;
   /**

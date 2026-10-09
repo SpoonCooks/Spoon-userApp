@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Image, LayoutAnimation, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,7 +22,7 @@ import { SHARE_MESSAGE } from '../content';
 import { shareSpoon } from '../share';
 import { canBook, ctaKind, draftReducer, initialDraft } from '../state/bookingDraft';
 import type { BookingDraft, BookingMode } from '../state/bookingDraft';
-import { isDurationAvailable, nearestAvailableId } from '../state/durations';
+import { forCta, isDurationAvailable, nearestAvailableId } from '../state/durations';
 import { recommendDuration } from '../state/recommendDuration';
 import type { DialInputs } from '../state/recommendDuration';
 import { poolBeads, recurringChipFor } from '../state/recurring';
@@ -148,18 +148,23 @@ export function HomeRedesignView({
   // what each can do — Now without instant simply leaves the CTA off.
   const mode = draft.mode;
   const cta = ctaKind(mode, model.instant.available);
+  // Tiles priced for the current CTA: Instant's for "Book Now", Scheduled's otherwise.
+  const durations = useMemo(
+    () => model.durations.map((d) => forCta(d, cta)),
+    [model.durations, cta],
+  );
   const [taxOpen, setTaxOpen] = useState(false);
   const toast = useRef<ToastHandle>(null);
   const available = (d: DurationOption) => isDurationAvailable(d, cta);
 
   // Focus never rests on an unbookable tile; a refreshed payload that drops it falls back too.
-  const durationIds = model.durations.map((d) => d.id);
+  const durationIds = durations.map((d) => d.id);
   const wantedFocus = durationIds.includes(draft.focusedDurationId)
     ? draft.focusedDurationId
     : model.focusedDurationId;
-  const focusedId = nearestAvailableId(model.durations, wantedFocus, cta);
+  const focusedId = nearestAvailableId(durations, wantedFocus, cta);
   // A selection that became unavailable (refresh, or a Now/Later switch) is cleared below.
-  const selectedOption = model.durations.find((d) => d.id === draft.selectedDurationId);
+  const selectedOption = durations.find((d) => d.id === draft.selectedDurationId);
   const selectedId =
     selectedOption !== undefined && available(selectedOption) ? selectedOption.id : null;
   const bookable = canBook({ ...draft, selectedDurationId: selectedId }) && !bookingBusy;
@@ -175,15 +180,15 @@ export function HomeRedesignView({
   const lostSelection = draft.selectedDurationId !== null && selectedId === null;
   useEffect(() => {
     if (!lostSelection) return;
-    const lost = model.durations.find((d) => d.id === draft.selectedDurationId);
+    const lost = durations.find((d) => d.id === draft.selectedDurationId);
     // Nothing takes its place: the customer picks again.
     toast.current?.show(`${lost?.label ?? 'That duration'} is no longer available.`);
     dispatch({ type: 'clearSelection' });
-  }, [lostSelection, draft.selectedDurationId, model.durations]);
+  }, [lostSelection, draft.selectedDurationId, durations]);
 
   /** Selecting a duration (a tap, or Help me pick) also brings it to the front. */
   const selectDuration = (id: string, source: 'tile' | 'dial') => {
-    const option = model.durations.find((d) => d.id === id);
+    const option = durations.find((d) => d.id === id);
     if (option === undefined || !available(option)) return;
     if (id !== draft.selectedDurationId) {
       actions.onDurationSelected?.({
@@ -206,7 +211,7 @@ export function HomeRedesignView({
     dishes: draft.dishes,
     people: draft.people,
   };
-  const recommended = recommendDuration(inputs, model.durations);
+  const recommended = recommendDuration(inputs, durations);
 
   const changeMode = (next: BookingMode) => {
     modeChosen.current = true;
@@ -226,7 +231,7 @@ export function HomeRedesignView({
     if (next.people !== draft.people) dispatch({ type: 'setPeople', value: next.people });
     const pick = recommendDuration(
       next,
-      model.durations.filter((d) => available(d)),
+      durations.filter((d) => available(d)),
     );
     if (pick !== null) selectDuration(pick.id, 'dial');
   };
@@ -238,7 +243,7 @@ export function HomeRedesignView({
   const selectRecommended = () => {
     const pick = recommendDuration(
       inputs,
-      model.durations.filter((d) => available(d)),
+      durations.filter((d) => available(d)),
     );
     if (pick === null) return;
     selectDuration(pick.id, 'dial');
@@ -246,7 +251,7 @@ export function HomeRedesignView({
   };
 
   const request = (): BookingRequest | null => {
-    const duration = model.durations.find((d) => d.id === selectedId);
+    const duration = durations.find((d) => d.id === selectedId);
     if (duration === undefined) return null;
     return { duration, dishes: draft.dishes, people: draft.people, complexity: draft.complexity };
   };
@@ -321,7 +326,7 @@ export function HomeRedesignView({
                 etaMins={model.instant.available ? model.instant.etaMins : null}
                 mode={mode}
                 onChangeMode={changeMode}
-                durations={model.durations}
+                durations={durations}
                 focusedDurationId={focusedId}
                 selectedDurationId={selectedId}
                 onFocusDuration={(id) => dispatch({ type: 'focusDuration', id })}
@@ -374,7 +379,7 @@ export function HomeRedesignView({
             }}
           >
             <DurationDial
-              durations={model.durations}
+              durations={durations}
               recommended={recommended}
               inputs={inputs}
               {...(variant === 'inactive'

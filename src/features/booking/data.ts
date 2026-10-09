@@ -13,7 +13,7 @@ import { useRuntime } from '@core/runtimeContext';
 import { currentAddressOf, useAddresses } from '@features/address';
 import { availabilityKeys, useInstantAvailability } from '@features/availability';
 import type { InstantAvailabilityDto } from '@features/availability';
-import { useCatalogue } from '@features/catalogue';
+import { priceForSlot, useCatalogue } from '@features/catalogue';
 import {
   CheckoutCancelledError,
   CheckoutFailedError,
@@ -409,12 +409,19 @@ export function useInstantData(
        * later, is a flicker and a claim with nothing behind it.
        */
       etaLabel: etaMinutesFor(live),
-      durations: data.durations.map((duration) => ({
-        id: durationIdFor(duration.durationMinutes),
-        label: durationLabelFor(duration.durationMinutes),
-        price: formatPaise(duration.serviceAmountPaise),
-        ...durationMerchandisingFor(duration),
-      })),
+      // The INSTANT price: a customer can be priced differently for Instant and Scheduled.
+      durations: data.durations.map((duration) => {
+        const price = priceForSlot(duration, 'instant');
+        return {
+          id: durationIdFor(duration.durationMinutes),
+          label: durationLabelFor(duration.durationMinutes),
+          price: formatPaise(price.serviceAmountPaise),
+          ...durationMerchandisingFor({
+            durationMinutes: duration.durationMinutes,
+            serviceAmountPaise: price.serviceAmountPaise,
+          }),
+        };
+      }),
       // `Book NOW • ₹198` — the amount is the quote's total, tax included, never assembled here.
       ...(priced === null
         ? {}
