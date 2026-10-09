@@ -1,7 +1,8 @@
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -11,7 +12,7 @@ import { QueryProvider, useAppStateFocus } from '@core/query';
 import { createAppRuntime } from '@core/runtime';
 import { RuntimeProvider } from '@core/runtimeContext';
 import { useSessionStore } from '@core/store';
-import { ErrorBoundary, ThemeProvider } from '@ui';
+import { ErrorBoundary, LaunchSplash, ThemeProvider } from '@ui';
 
 /**
  * Root layout: providers, session bootstrap, splash hold.
@@ -59,17 +60,37 @@ export default function RootLayout() {
     logBuildProvenance();
   }, []);
 
+  // A font failure must not strand the user on the splash — fall through to the system face.
+  const fontsPending = !fontsLoaded && fontError === null;
+  const appReady = !isResolving(status) && !fontsPending;
+
+  /**
+   * Android's OS splash is a flat colour (all Android 12+ allows), so the designed splash is drawn
+   * by `LaunchSplash` from inside the app and the OS splash is released as soon as that is on
+   * screen. iOS has no such limit -- its launch storyboard IS the designed splash -- and keeps
+   * holding it until the app is ready.
+   */
+  const [launchSplashDone, setLaunchSplashDone] = useState(Platform.OS !== 'android');
+  const releaseSystemSplash = useCallback(() => void SplashScreen.hideAsync(), []);
+  const finishLaunchSplash = useCallback(() => setLaunchSplashDone(true), []);
+
   useEffect(() => {
-    // A font failure must not strand the user on the splash — fall through to the system face.
-    if (!isResolving(status) && (fontsLoaded || fontError !== null)) {
+    if (appReady && Platform.OS !== 'android') {
       void SplashScreen.hideAsync();
     }
-  }, [status, fontsLoaded, fontError]);
+  }, [appReady]);
 
-  if (!fontsLoaded && fontError === null) {
-    return null;
-  }
+  return (
+    <>
+      {fontsPending ? null : <RootProviders runtime={runtime} />}
+      {launchSplashDone ? null : (
+        <LaunchSplash ready={appReady} onShown={releaseSystemSplash} onDone={finishLaunchSplash} />
+      )}
+    </>
+  );
+}
 
+function RootProviders({ runtime }: { readonly runtime: ReturnType<typeof createAppRuntime> }) {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

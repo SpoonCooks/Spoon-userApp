@@ -449,6 +449,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         imageWidth: 180,
 
         /**
+         * Android shows the SAME designed splash as iOS, in two steps. The OS-level splash (all
+         * the platform allows, per the note above) is a flat `#FFD600` -- the gradient's top
+         * stop -- with a fully transparent icon, so there is no wordmark to jump when the next
+         * step takes over. `LaunchSplash` (`src/ui/feedback/LaunchSplash.tsx`) then draws
+         * `splash-background-ios.png` full-bleed from inside the app and holds it until the app
+         * is ready, exactly as the iOS storyboard does.
+         */
+        android: {
+          backgroundColor: '#FFD600', // palette.yellow500 -- a literal, like SPLASH_BACKGROUND above
+          image: './assets/images/splash-transparent.png',
+        },
+
+        /**
          * iOS has no such ceiling -- `SplashScreen.storyboard` can hold any image full-bleed --
          * so it gets the actual designed splash: Figma `1:4272`'s yellow-to-lime ramp (the same
          * pair `android-icon-background.png` already renders) with the wordmark centred on it,
