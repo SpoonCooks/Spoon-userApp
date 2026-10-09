@@ -12,6 +12,7 @@ import { QueryProvider, useAppStateFocus } from '@core/query';
 import { createAppRuntime } from '@core/runtime';
 import { RuntimeProvider } from '@core/runtimeContext';
 import { useSessionStore } from '@core/store';
+import { AppUpdateGate } from '@features/appUpdate';
 import { ErrorBoundary, LaunchSplash, ThemeProvider } from '@ui';
 
 /**
@@ -98,13 +99,16 @@ function RootProviders({ runtime }: { readonly runtime: ReturnType<typeof create
           <RuntimeProvider runtime={runtime}>
             <ThemeProvider>
               <ErrorBoundary scope="root">
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="(auth)" />
-                  <Stack.Screen name="(app)" />
-                  {/* Legal sits OUTSIDE both groups on purpose — see `app/legal/[doc].tsx`. */}
-                  <Stack.Screen name="legal/[doc]" />
-                </Stack>
+                {/* Over EVERYTHING, signed in or not: an old build is blocked at the login screen too. */}
+                <AppUpdateGate>
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="(auth)" />
+                    <Stack.Screen name="(app)" />
+                    {/* Legal sits OUTSIDE both groups on purpose — see `app/legal/[doc].tsx`. */}
+                    <Stack.Screen name="legal/[doc]" />
+                  </Stack>
+                </AppUpdateGate>
               </ErrorBoundary>
             </ThemeProvider>
           </RuntimeProvider>
