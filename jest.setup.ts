@@ -189,6 +189,16 @@ jest.mock('@react-native-firebase/messaging', () => ({
   registerDeviceForRemoteMessages: jest.fn(async () => undefined),
 }));
 
+/**
+ * Firebase Remote Config — the app-update policy. Every parameter is unset by default, which is
+ * "no requirement", so a test that mounts the root layout is never blocked by an update screen.
+ */
+jest.mock('@react-native-firebase/remote-config', () => ({
+  getRemoteConfig: jest.fn(() => ({ settings: {} })),
+  fetchAndActivate: jest.fn(async () => true),
+  getString: jest.fn(() => ''),
+}));
+
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { DEFAULT: 3 },
   setNotificationHandler: jest.fn(),
