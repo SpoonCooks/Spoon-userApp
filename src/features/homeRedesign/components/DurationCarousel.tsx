@@ -238,7 +238,10 @@ export function DurationCarousel({
           const available = isAvailable(d);
           return (
             <Tile
-              key={`${Math.floor(v / n)}-${d.id}`}
+              // `focused` is in the key so a tile that changes size is mounted fresh. On Android
+              // (New Architecture) a tile shrinking from the centred size kept its box but lost its
+              // contents — label, price and liquid — leaving a blank white card beside the front.
+              key={`${Math.floor(v / n)}-${d.id}-${v === centre ? 'front' : 'side'}`}
               option={d}
               focused={v === centre}
               selected={d.id === selectedId}
