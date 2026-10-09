@@ -429,6 +429,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      */
     './plugins/withAppShortcuts',
 
+    /**
+     * Android only: draws the designed launch splash natively from the first frame, so the flat
+     * system splash is not held on screen while the JS bundle loads. See the plugin.
+     */
+    './plugins/withAndroidLaunchArtwork',
+
     [
       'expo-splash-screen',
       {
@@ -450,15 +456,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
         /**
          * Android shows the SAME designed splash as iOS, in two steps. The OS-level splash (all
-         * the platform allows, per the note above) is a flat `#FFD600` -- the gradient's top
-         * stop -- with a fully transparent icon, so there is no wordmark to jump when the next
-         * step takes over. `LaunchSplash` (`src/ui/feedback/LaunchSplash.tsx`) then draws
+         * the platform allows, per the note above) is a flat `#F1ED4D` -- the artwork's own
+         * colour at mid-height, sampled from `splash-background-ios.png` (top `#FEE24D`, bottom
+         * `#E3F94E`) -- with a fully transparent icon. A flat colour cannot match a gradient, but
+         * the middle is within ~14 levels per channel of every point on it, so the hand-over to the
+         * real artwork reads as the gradient appearing, not as a different screen. `LaunchSplash` (`src/ui/feedback/LaunchSplash.tsx`) then draws
          * `splash-background-ios.png` full-bleed from inside the app and holds it until the app
          * is ready, exactly as the iOS storyboard does.
          */
         android: {
-          backgroundColor: '#FFD600', // palette.yellow500 -- a literal, like SPLASH_BACKGROUND above
-          image: './assets/images/splash-transparent.png',
+          backgroundColor: '#F1ED4D', // mid-height of splash-background-ios.png; a literal, like SPLASH_BACKGROUND above
+          // The wordmark on its own, with the middle of its LETTERS on the canvas centre (the OS
+          // centres the canvas, not the ink, and the fork rises above the letters). `LaunchSplash` and the native artwork shift the artwork so ITS wordmark lands on
+          // the same centre. 190 keeps the fork tip inside Android 12+'s circular icon mask (192dp).
+          image: './assets/images/splash-wordmark-android.png',
+          imageWidth: 190,
         },
 
         /**

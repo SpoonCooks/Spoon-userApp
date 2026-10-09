@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Image, StyleSheet } from 'react-native';
-import type { ImageSourcePropType } from 'react-native';
+import type { ImageSourcePropType, LayoutChangeEvent } from 'react-native';
 
 /**
  * The designed launch splash, drawn from inside the app -- Android's half of it.
@@ -25,14 +25,32 @@ import type { ImageSourcePropType } from 'react-native';
  * flash the designed splash for a fraction of a second, which reads as a glitch rather than a
  * launch screen.
  *
+ * ## Where the wordmark sits
+ *
+ * The system splash centres its logo on the screen, but the letters in the artwork sit at 48% of
+ * its height, so a plain cover-fit would make it jump upward the moment the artwork takes
+ * over. The artwork is therefore shifted down so its wordmark is at the screen's centre, exactly
+ * where the system logo is. The strip this exposes at the top is the artwork's own top colour, so
+ * it reads as more gradient. `plugins/withAndroidLaunchArtwork.js` applies the same placement to
+ * the native copy of the artwork -- keep the two in step.
+ *
  * ## Why the fallback colour
  *
- * `#FFD600` is the same yellow the system splash already shows, so if the image is slow to decode
- * the screen simply stays yellow instead of flashing.
+ * `ART_TOP_COLOUR` is the artwork's top edge, which is what the shifted-down strip shows, and is
+ * within a few levels of the system splash's colour, so a slow decode does not flash.
  */
 
 const ARTWORK = require('../../../assets/images/splash-background-ios.png') as ImageSourcePropType;
-const FALLBACK_COLOUR = '#FFD600';
+/**
+ * The artwork's pixel size, and where its wordmark's centre sits (measured from the file): the
+ * middle of the LETTERS' band, not of the whole mark -- the fork handle rises well above the
+ * letters, so centring the bounding box leaves the word itself visibly low.
+ */
+const ART_WIDTH = 1110;
+const ART_HEIGHT = 2283;
+const WORDMARK_CENTRE_Y = 0.4785;
+/** The artwork's top edge colour; fills the strip exposed above the shifted-down artwork. */
+const ART_TOP_COLOUR = '#FEE24D';
 const FADE_MS = 250;
 const SHOWN_TIMEOUT_MS = 1500;
 /** Long enough to be seen. Without it, a launch with nothing to wait for shows the artwork for a blink. */
@@ -61,6 +79,16 @@ export function LaunchSplash({ ready, onShown, onDone }: LaunchSplashProps) {
   }, [onShown, onDone]);
 
   const [seenLongEnough, setSeenLongEnough] = useState(false);
+  const [shiftY, setShiftY] = useState(0);
+
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (width === 0 || height === 0) return;
+    // Cover-fit, centred -- what `resizeMode="cover"` does -- then where the wordmark lands.
+    const scale = Math.max(width / ART_WIDTH, height / ART_HEIGHT);
+    const wordmarkY = (height - ART_HEIGHT * scale) / 2 + WORDMARK_CENTRE_Y * ART_HEIGHT * scale;
+    setShiftY(height / 2 - wordmarkY);
+  }, []);
 
   const reportShown = useCallback(() => {
     if (shown.current) return;
@@ -91,12 +119,13 @@ export function LaunchSplash({ ready, onShown, onDone }: LaunchSplashProps) {
   return (
     <Animated.View
       style={[styles.fill, { opacity }]}
+      onLayout={onLayout}
       pointerEvents={ready ? 'none' : 'auto'}
       testID="launch-splash"
     >
       <Image
         source={ARTWORK}
-        style={styles.art}
+        style={[styles.art, { transform: [{ translateY: shiftY }] }]}
         resizeMode="cover"
         onLoadEnd={reportShown}
         accessibilityIgnoresInvertColors
@@ -119,6 +148,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: FALLBACK_COLOUR,
+    backgroundColor: ART_TOP_COLOUR,
   },
 });
