@@ -278,16 +278,25 @@ const ANCHOR_RATE_PAISE_PER_MINUTE = 500;
 export function durationMerchandisingFor(duration: {
   readonly durationMinutes: number;
   readonly serviceAmountPaise: number;
+  readonly strikePricePaise?: number | null | undefined;
 }): { readonly strikePrice?: string } {
   const strikePaise = strikePaiseFor(duration);
   return strikePaise === null ? {} : { strikePrice: formatPaise(strikePaise) };
 }
 
-/** The same anchor in paise, or `null` when it would not undercut the real price. */
+/**
+ * The struck price in paise, or `null` for no strike.
+ *
+ * The backend's `strikePricePaise` wins whenever it is sent, null included (backend DEC-088): it
+ * knows the published list price and that an Ops-set customer price is shown without a strike.
+ * The ₹5/min anchor below is only for a backend that predates the field.
+ */
 export function strikePaiseFor(duration: {
   readonly durationMinutes: number;
   readonly serviceAmountPaise: number;
+  readonly strikePricePaise?: number | null | undefined;
 }): number | null {
+  if (duration.strikePricePaise !== undefined) return duration.strikePricePaise;
   const anchorPaise = duration.durationMinutes * ANCHOR_RATE_PAISE_PER_MINUTE;
   if (anchorPaise <= duration.serviceAmountPaise || duration.serviceAmountPaise === 0) return null;
   return anchorPaise;
@@ -419,6 +428,7 @@ export function useInstantData(
           ...durationMerchandisingFor({
             durationMinutes: duration.durationMinutes,
             serviceAmountPaise: price.serviceAmountPaise,
+            strikePricePaise: price.strikePricePaise,
           }),
         };
       }),

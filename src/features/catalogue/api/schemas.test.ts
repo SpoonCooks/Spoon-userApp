@@ -34,3 +34,35 @@ describe('priceForSlot', () => {
     expect(priceForSlot(duration, 'scheduled').serviceAmountPaise).toBe(12_900);
   });
 });
+
+describe('strikePricePaise', () => {
+  it('passes the backend strike through per booking type, null included', () => {
+    const duration = catalogueDurationSchema.parse({
+      ...BASE,
+      strikePricePaise: 30_000,
+      bySlotType: {
+        instant: {
+          serviceAmountPaise: 14_900,
+          taxAmountPaise: 745,
+          totalAmountPaise: 15_645,
+          strikePricePaise: null,
+        },
+        scheduled: {
+          serviceAmountPaise: 12_900,
+          taxAmountPaise: 645,
+          totalAmountPaise: 13_545,
+          strikePricePaise: 30_000,
+        },
+      },
+    });
+
+    expect(priceForSlot(duration, 'instant').strikePricePaise).toBeNull();
+    expect(priceForSlot(duration, 'scheduled').strikePricePaise).toBe(30_000);
+  });
+
+  it('leaves it absent for a backend that predates it', () => {
+    expect(priceForSlot(catalogueDurationSchema.parse(BASE), 'instant')).not.toHaveProperty(
+      'strikePricePaise',
+    );
+  });
+});

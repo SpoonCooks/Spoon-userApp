@@ -90,6 +90,56 @@ describe('scheduled duration tiles', () => {
     expect(tile?.price).toBe('₹99');
   });
 
+  it('draws the struck price the backend sends instead of its own anchor', () => {
+    const [tile] = durationsFrom({
+      durations: [
+        {
+          durationMinutes: 30,
+          serviceAmountPaise: 6900,
+          taxAmountPaise: 345,
+          totalAmountPaise: 7245,
+          strikePricePaise: 12000,
+          latestStartLocalMinute: 1290,
+        },
+      ],
+    } as unknown as Catalogue);
+
+    expect(tile?.strikePrice).toBe('₹120');
+  });
+
+  it('draws no strike when the backend sends null, even below the ₹5/min anchor', () => {
+    // An Ops-set customer price: ₹49 for 30 min would have drawn a ₹150 anchor locally.
+    const [tile] = durationsFrom({
+      durations: [
+        {
+          durationMinutes: 30,
+          serviceAmountPaise: 4900,
+          taxAmountPaise: 245,
+          totalAmountPaise: 5145,
+          strikePricePaise: null,
+          bySlotType: {
+            instant: {
+              serviceAmountPaise: 4900,
+              taxAmountPaise: 245,
+              totalAmountPaise: 5145,
+              strikePricePaise: null,
+            },
+            scheduled: {
+              serviceAmountPaise: 4900,
+              taxAmountPaise: 245,
+              totalAmountPaise: 5145,
+              strikePricePaise: null,
+            },
+          },
+          latestStartLocalMinute: 1290,
+        },
+      ],
+    } as unknown as Catalogue);
+
+    expect(tile?.price).toBe('₹49');
+    expect(tile?.strikePrice).toBeUndefined();
+  });
+
   it('draws the ₹5/min anchor as the struck price', () => {
     // The pricing sheet's 30-min row: base 30 × ₹5 = ₹150, charged ₹69.
     const [tile] = durationsFrom({

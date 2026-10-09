@@ -217,6 +217,7 @@ export function durationsFrom(catalogue: Catalogue) {
       ...durationMerchandisingFor({
         durationMinutes: duration.durationMinutes,
         serviceAmountPaise: price.serviceAmountPaise,
+        strikePricePaise: price.strikePricePaise,
       }),
     };
   });

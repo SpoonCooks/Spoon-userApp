@@ -196,6 +196,40 @@ describe('per-booking-type tile prices', () => {
     expect(tile?.bySlotType?.scheduled.payablePaise).toBe(10_395);
   });
 
+  it('takes the struck price from the backend, and none where it says none', () => {
+    const withStrike = {
+      taxRateBps: 500,
+      durations: [
+        {
+          durationMinutes: 60,
+          serviceAmountPaise: 12_900,
+          taxAmountPaise: 645,
+          totalAmountPaise: 13_545,
+          strikePricePaise: 25_000,
+          bySlotType: {
+            instant: {
+              serviceAmountPaise: 9_900,
+              taxAmountPaise: 495,
+              totalAmountPaise: 10_395,
+              strikePricePaise: null,
+            },
+            scheduled: {
+              serviceAmountPaise: 12_900,
+              taxAmountPaise: 645,
+              totalAmountPaise: 13_545,
+              strikePricePaise: 25_000,
+            },
+          },
+          latestStartLocalMinute: 1200,
+        },
+      ],
+    } as unknown as Catalogue;
+    const [tile] = homeModelFrom(sources({ catalogue: withStrike })).durations;
+
+    expect(tile?.mrpPaise).toBe(25_000);
+    expect(tile?.bySlotType?.instant.mrpPaise).toBeNull();
+  });
+
   it('prices both types the same from a backend without per-type prices', () => {
     const [tile] = homeModelFrom(sources()).durations;
 
