@@ -2,11 +2,11 @@ import type { AddressDto } from '@features/address';
 import type { InstantAvailabilityDto } from '@features/availability';
 import { durationIdFor, strikePaiseFor } from '@features/booking';
 import type { BookingSummaryDto } from '@features/booking';
-import type { Catalogue } from '@features/catalogue';
+import { priceForSlot, type Catalogue } from '@features/catalogue';
 import type { CookPoolListDto } from '@features/cookPool';
 import type { RecurringEligibilityDto } from '@features/recurringSetup';
 
-import type { DurationOption, HomeModel, LiveHub, PoolCook } from './types';
+import type { DurationOption, HomeModel, LiveHub, PoolCook, DurationTilePrice } from './types';
 
 /**
  * Real responses → `HomeModel`. Pure, so every rule below is testable without a network.
@@ -87,21 +87,35 @@ function durationsFrom(catalogue: Catalogue | undefined, instant: InstantReads):
   return (catalogue?.durations ?? [])
     .slice()
     .sort((a, b) => a.durationMinutes - b.durationMinutes)
-    .map((d): DurationOption => ({
-      id: durationIdFor(d.durationMinutes),
-      minutes: d.durationMinutes,
-      label: homeDurationLabel(d.durationMinutes),
-      pricePaise: d.serviceAmountPaise,
-      mrpPaise: strikePaiseFor(d),
-      payablePaise: d.totalAmountPaise,
-      available: {
-        // Unknown (still loading, or the read failed) is treated as bookable: the booking
-        // itself is the authoritative refusal, and greying every tile on a slow read is worse.
-        now: instant.get(d.durationMinutes)?.available ?? true,
-        // Slot capacity is per date; the slot picker answers it. No per-duration roll-up exists.
-        later: true,
-      },
-    }));
+    .map((d): DurationOption => {
+      const tile = (slotType: 'instant' | 'scheduled'): DurationTilePrice => {
+        const price = priceForSlot(d, slotType);
+        return {
+          pricePaise: price.serviceAmountPaise,
+          mrpPaise: strikePaiseFor({
+            durationMinutes: d.durationMinutes,
+            serviceAmountPaise: price.serviceAmountPaise,
+          }),
+          payablePaise: price.totalAmountPaise,
+        };
+      };
+      const scheduled = tile('scheduled');
+      return {
+        id: durationIdFor(d.durationMinutes),
+        minutes: d.durationMinutes,
+        label: homeDurationLabel(d.durationMinutes),
+        // The Scheduled price by default; the screen swaps in `bySlotType.instant` for "Book Now".
+        ...scheduled,
+        bySlotType: { instant: tile('instant'), scheduled },
+        available: {
+          // Unknown (still loading, or the read failed) is treated as bookable: the booking
+          // itself is the authoritative refusal, and greying every tile on a slow read is worse.
+          now: instant.get(d.durationMinutes)?.available ?? true,
+          // Slot capacity is per date; the slot picker answers it. No per-duration roll-up exists.
+          later: true,
+        },
+      };
+    });
 }
 
 function focusIdOf(durations: readonly DurationOption[]): string {

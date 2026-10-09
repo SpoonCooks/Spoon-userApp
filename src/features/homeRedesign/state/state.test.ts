@@ -1,5 +1,11 @@
 import { canBook, ctaKind, draftReducer, initialDraft } from './bookingDraft';
-import { isDurationAvailable, liquidHeight, nearestAvailableId, showsMrp } from './durations';
+import {
+  forCta,
+  isDurationAvailable,
+  liquidHeight,
+  nearestAvailableId,
+  showsMrp,
+} from './durations';
 import { recommendDuration } from './recommendDuration';
 import { poolBeads, recurringChipFor } from './recurring';
 import { resolveHomeVariant } from './variant';
@@ -233,5 +239,35 @@ describe('durations', () => {
     expect(showsMrp({ pricePaise: 6900, mrpPaise: 15000 })).toBe(true);
     expect(showsMrp({ pricePaise: 6900, mrpPaise: 6900 })).toBe(false);
     expect(showsMrp({ pricePaise: 6900, mrpPaise: null })).toBe(false);
+  });
+});
+
+describe('forCta', () => {
+  const tile = {
+    id: 'dur-60',
+    minutes: 60,
+    label: '1 hr',
+    pricePaise: 9_900,
+    mrpPaise: 30_000,
+    payablePaise: 10_395,
+    bySlotType: {
+      instant: { pricePaise: 14_900, mrpPaise: 30_000, payablePaise: 15_645 },
+      scheduled: { pricePaise: 9_900, mrpPaise: 30_000, payablePaise: 10_395 },
+    },
+    available: { now: true, later: true },
+  } as DurationOption;
+
+  it('shows the Instant price while the CTA is Book Now', () => {
+    expect(forCta(tile, 'book')).toMatchObject({ pricePaise: 14_900, payablePaise: 15_645 });
+  });
+
+  it('shows the Scheduled price for Book for later and for Recurring', () => {
+    expect(forCta(tile, 'schedule').payablePaise).toBe(10_395);
+    expect(forCta(tile, 'none').pricePaise).toBe(9_900);
+  });
+
+  it('leaves a tile without per-type prices as it is', () => {
+    const { bySlotType: _ignored, ...plain } = tile;
+    expect(forCta(plain as DurationOption, 'book')).toEqual(plain);
   });
 });

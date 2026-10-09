@@ -45,3 +45,13 @@ export function spokenDuration(minutes: number): string {
 export function showsMrp(duration: Pick<DurationOption, 'pricePaise' | 'mrpPaise'>): boolean {
   return duration.mrpPaise !== null && duration.mrpPaise !== duration.pricePaise;
 }
+
+/**
+ * The tile as the current CTA prices it: Instant's price for "Book Now", Scheduled's otherwise.
+ * A customer can be priced differently for the two (backend DEC-087), and the tile, the "Book
+ * Now · ₹…" label and the booking itself must all agree on which one is meant.
+ */
+export function forCta(duration: DurationOption, cta: CtaKind): DurationOption {
+  const prices = duration.bySlotType?.[cta === 'book' ? 'instant' : 'scheduled'];
+  return prices === undefined ? duration : { ...duration, ...prices };
+}

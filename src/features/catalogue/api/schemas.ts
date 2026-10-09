@@ -12,16 +12,52 @@ import { z } from 'zod';
  * here is a float and nothing is divided by 100 except at the moment of display.
  */
 
-export const catalogueDurationSchema = z.object({
-  durationMinutes: z.number().int().positive(),
+const slotPriceSchema = z.object({
   serviceAmountPaise: z.number().int().nonnegative(),
   taxAmountPaise: z.number().int().nonnegative(),
   totalAmountPaise: z.number().int().nonnegative(),
+});
+
+export type CatalogueSlotPrice = z.infer<typeof slotPriceSchema>;
+
+/** The booking types the catalogue prices separately. */
+export type CatalogueSlotType = 'instant' | 'scheduled';
+
+export const catalogueDurationSchema = z.object({
+  durationMinutes: z.number().int().positive(),
+  /** The Scheduled price. Read through `priceForSlot`, never directly, on a booking screen. */
+  serviceAmountPaise: z.number().int().nonnegative(),
+  taxAmountPaise: z.number().int().nonnegative(),
+  totalAmountPaise: z.number().int().nonnegative(),
+  /**
+   * The price per booking type (backend DEC-087). A customer can be priced differently for
+   * Instant and Scheduled, and the two may later differ for everyone. Optional because a backend
+   * that predates it sends only the top-level amounts.
+   */
+  bySlotType: z.object({ instant: slotPriceSchema, scheduled: slotPriceSchema }).optional(),
   /** Latest local start minute this duration may still be booked at (the operating window). */
   latestStartLocalMinute: z.number().int().nonnegative(),
 });
 
 export type CatalogueDuration = z.infer<typeof catalogueDurationSchema>;
+
+/**
+ * What one duration costs for one booking type: the per-type price when the backend sends it,
+ * otherwise the top-level amounts it has always sent. Every tile reads its price through here, so
+ * the Instant and Scheduled screens can never show each other's price.
+ */
+export function priceForSlot(
+  duration: CatalogueDuration,
+  slotType: CatalogueSlotType,
+): CatalogueSlotPrice {
+  return (
+    duration.bySlotType?.[slotType] ?? {
+      serviceAmountPaise: duration.serviceAmountPaise,
+      taxAmountPaise: duration.taxAmountPaise,
+      totalAmountPaise: duration.totalAmountPaise,
+    }
+  );
+}
 
 export const schedulePeriodSchema = z.object({
   /** `MORNING` / `NOON` / `EVENING` at the time of writing — read, never assumed. */

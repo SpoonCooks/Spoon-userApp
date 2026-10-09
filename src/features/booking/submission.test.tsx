@@ -292,6 +292,61 @@ describe('useInstantData', () => {
     expect(getByTestId('eta')).toHaveTextContent('22 mins');
   });
 
+  it('prices the Instant tiles from the Instant price when the catalogue sends one', async () => {
+    function TileHarness() {
+      const instant = useInstantData({ durationId: null });
+      if (instant.state.status !== 'ready') return <Text testID="tiles">pending</Text>;
+      return (
+        <Text testID="tiles">
+          {instant.state.data.durations.map((tile) => `${tile.id}=${tile.price}`).join(',')}
+        </Text>
+      );
+    }
+    const { api } = recordingApi({
+      ...BASE_STUBS,
+      'GET /v1/catalogue': (request) => {
+        const published = DEFAULT_API_STUBS['GET /v1/catalogue']!(request) as {
+          durations: { durationMinutes: number }[];
+        };
+        return {
+          ...published,
+          durations: published.durations.map((duration) =>
+            duration.durationMinutes === 60
+              ? {
+                  ...duration,
+                  bySlotType: {
+                    instant: {
+                      serviceAmountPaise: 14900,
+                      taxAmountPaise: 745,
+                      totalAmountPaise: 15645,
+                    },
+                    scheduled: {
+                      serviceAmountPaise: 9900,
+                      taxAmountPaise: 495,
+                      totalAmountPaise: 10395,
+                    },
+                  },
+                }
+              : duration,
+          ),
+        };
+      },
+      'GET /v1/availability/instant': () => ({
+        available: true,
+        arrivalTargetMinutes: 22,
+        validUntil: '2026-08-18T12:00:00.000Z',
+      }),
+    });
+
+    const { getByTestId } = renderWithRuntime(<TileHarness />, {
+      runtime: createTestRuntime({ api }),
+    });
+
+    // 60 min is ₹149 for Instant (not the ₹99 Scheduled price); 30 min has no per-type price and
+    // keeps the published ₹69.
+    await waitFor(() => expect(getByTestId('tiles')).toHaveTextContent('dur-30=₹69,dur-60=₹149'));
+  });
+
   /**
    * The sheet states the REAL estimate, the same source Home reads.
    *

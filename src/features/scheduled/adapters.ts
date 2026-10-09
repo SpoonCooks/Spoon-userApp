@@ -1,6 +1,6 @@
 import type { ScheduledAvailabilityDto } from '@features/availability';
 import { durationLabelFor, durationMerchandisingFor } from '@features/booking';
-import type { Catalogue } from '@features/catalogue';
+import { priceForSlot, type Catalogue } from '@features/catalogue';
 import { formatPaise } from '@core/format';
 
 import {
@@ -206,13 +206,20 @@ export function slotsByPeriodFrom(input: {
  * assembled with a bare template rather than the shared formatter. One grid, one rule.
  */
 export function durationsFrom(catalogue: Catalogue) {
-  return catalogue.durations.map((duration) => ({
-    id: `dur-${duration.durationMinutes}`,
-    label: durationLabelFor(duration.durationMinutes),
-    price: formatPaise(duration.serviceAmountPaise),
-    // The strike / "% off" treatment, shared with Instant so the two grids can never disagree.
-    ...durationMerchandisingFor(duration),
-  }));
+  return catalogue.durations.map((duration) => {
+    // The SCHEDULED price: a customer can be priced differently for Instant and Scheduled.
+    const price = priceForSlot(duration, 'scheduled');
+    return {
+      id: `dur-${duration.durationMinutes}`,
+      label: durationLabelFor(duration.durationMinutes),
+      price: formatPaise(price.serviceAmountPaise),
+      // The strike / "% off" treatment, shared with Instant so the two grids can never disagree.
+      ...durationMerchandisingFor({
+        durationMinutes: duration.durationMinutes,
+        serviceAmountPaise: price.serviceAmountPaise,
+      }),
+    };
+  });
 }
 
 /**

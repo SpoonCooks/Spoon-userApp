@@ -70,6 +70,26 @@ describe('scheduled duration tiles', () => {
     expect(tile?.price).toBe('₹69');
   });
 
+  it('prices the tile from the Scheduled price, not the Instant one', () => {
+    const [tile] = durationsFrom({
+      durations: [
+        {
+          durationMinutes: 60,
+          serviceAmountPaise: 9_900,
+          taxAmountPaise: 495,
+          totalAmountPaise: 10_395,
+          bySlotType: {
+            instant: { serviceAmountPaise: 14_900, taxAmountPaise: 745, totalAmountPaise: 15_645 },
+            scheduled: { serviceAmountPaise: 9_900, taxAmountPaise: 495, totalAmountPaise: 10_395 },
+          },
+          latestStartLocalMinute: 1290,
+        },
+      ],
+    } as unknown as Catalogue);
+
+    expect(tile?.price).toBe('₹99');
+  });
+
   it('draws the ₹5/min anchor as the struck price', () => {
     // The pricing sheet's 30-min row: base 30 × ₹5 = ₹150, charged ₹69.
     const [tile] = durationsFrom({

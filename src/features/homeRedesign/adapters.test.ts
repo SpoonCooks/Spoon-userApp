@@ -166,6 +166,43 @@ describe('homeModelFrom', () => {
   });
 });
 
+describe('per-booking-type tile prices', () => {
+  const split = {
+    taxRateBps: 500,
+    durations: [
+      {
+        durationMinutes: 60,
+        serviceAmountPaise: 9_900,
+        taxAmountPaise: 495,
+        totalAmountPaise: 10_395,
+        bySlotType: {
+          instant: { serviceAmountPaise: 14_900, taxAmountPaise: 745, totalAmountPaise: 15_645 },
+          scheduled: { serviceAmountPaise: 9_900, taxAmountPaise: 495, totalAmountPaise: 10_395 },
+        },
+        latestStartLocalMinute: 1200,
+      },
+    ],
+  } as unknown as Catalogue;
+
+  it('carries both prices on the tile, Scheduled at the top level', () => {
+    const [tile] = homeModelFrom(sources({ catalogue: split })).durations;
+
+    expect(tile?.pricePaise).toBe(9_900);
+    expect(tile?.bySlotType?.instant).toEqual({
+      pricePaise: 14_900,
+      mrpPaise: 30_000,
+      payablePaise: 15_645,
+    });
+    expect(tile?.bySlotType?.scheduled.payablePaise).toBe(10_395);
+  });
+
+  it('prices both types the same from a backend without per-type prices', () => {
+    const [tile] = homeModelFrom(sources()).durations;
+
+    expect(tile?.bySlotType?.instant).toEqual(tile?.bySlotType?.scheduled);
+  });
+});
+
 describe('labels', () => {
   it('writes durations the way the redesign frames do', () => {
     expect([30, 45, 60, 90, 120, 150].map(homeDurationLabel)).toEqual([
