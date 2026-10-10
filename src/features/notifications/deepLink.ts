@@ -41,6 +41,14 @@ export const KNOWN_EVENT_TYPES = [
 
 export type KnownEventType = (typeof KNOWN_EVENT_TYPES)[number];
 
+/** Refund pushes, one-time and Recurring, that carry a `refundId` and open its tracker. */
+const REFUND_EVENT_TYPES: ReadonlySet<string> = new Set([
+  'refund.requested',
+  'refund.credited',
+  'recurring.visit.refund_started',
+  'recurring.visit.refund_credited',
+]);
+
 const BOOKING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A uuid — the shape of every booking and refund id Spoon issues. */
@@ -64,13 +72,11 @@ export function routeForNotification(data: unknown): string {
   const record = data as Record<string, unknown>;
   const bookingId = record['bookingId'];
 
-  // A refund push opens its tracker (DEC-090). Same shape check as the booking id: refund ids are
-  // uuids too, and nothing here builds a route out of an unvalidated string.
+  // A refund push, one-time or Recurring, opens its tracker (DEC-090). Same shape check as the
+  // booking id: refund ids are uuids too, and nothing here builds a route out of an unvalidated
+  // string.
   const refundId = record['refundId'];
-  if (
-    (record['eventType'] === 'refund.requested' || record['eventType'] === 'refund.credited') &&
-    isBookingId(refundId)
-  ) {
+  if (REFUND_EVENT_TYPES.has(String(record['eventType'])) && isBookingId(refundId)) {
     return `/refund/${refundId}`;
   }
 

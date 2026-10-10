@@ -53,10 +53,6 @@ export interface VisitRefundStep {
   readonly note?: boolean | undefined;
 }
 
-/** `1670:3510` — how long a refund takes to land. */
-export const REFUND_CREDIT_NOTE =
-  'It takes 5-7 working days for the amount to get credited to source';
-
 export const VISIT_FIXTURE = {
   /** `1461:6164` / `1461:6166` — the banner's date and slot. */
   date: 'Wed, 14 Oct',
@@ -139,7 +135,7 @@ export const VISIT_FIXTURE = {
   /** `1670:3461` — Payment summary · Cancelled · Refunded. */
   refund: {
     title: 'Payment & refund',
-    badge: 'Refunded',
+    badge: 'Refund completed',
     lines: [
       {
         label: 'Amount paid',
@@ -148,21 +144,17 @@ export const VISIT_FIXTURE = {
         amount: '₹299',
       },
       { label: 'GST', amount: '₹22.81', minor: true },
-      { label: 'Cancellation fee', amount: '– ₹0', minor: true },
     ] as readonly VisitRefundLine[],
     total: {
       label: 'Refund amount',
-      detail: 'Full refund, inclusive of taxes',
+      detail: 'Inclusive of taxes',
       was: '₹399',
       amount: '₹299',
     } as VisitRefundLine,
     modeEyebrow: 'REFUND TO',
     mode: 'UPI · ••••@okhdfcbank',
     idEyebrow: 'REFUND ID',
-    steps: [
-      { title: 'Refund initiated', when: 'Thu, 1 Oct' },
-      { title: REFUND_CREDIT_NOTE, note: true },
-    ] as readonly VisitRefundStep[],
+    steps: [{ title: 'Refund initiated', when: 'Thu, 1 Oct' }] as readonly VisitRefundStep[],
   },
 } as const;
 

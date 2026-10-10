@@ -28,6 +28,20 @@ describe('RefundTracker', () => {
     );
     expect(screen.getByText('ARN: 74332')).toBeTruthy();
     expect(screen.queryByTestId('refund-tracker-failed')).toBeNull();
+    // The reference sits under step 3 and goes with the stepper when the card collapses.
+    fireEvent.press(screen.getByTestId('refund-tracker-toggle'));
+    expect(screen.queryByText('ARN: 74332')).toBeNull();
+  });
+
+  it('says nothing more than the handoff on a failed refund', () => {
+    render(
+      <RefundTracker
+        refund={refundTrackerFrom(refundFixture({ tracker: { status: 'failed' } }))}
+        onContactSupport={jest.fn()}
+      />,
+    );
+    expect(screen.queryByText(/Our team/)).toBeNull();
+    expect(screen.getByTestId('refund-tracker-dashes')).toBeTruthy();
   });
 
   it('sends a failed refund to support with its references', () => {
