@@ -30,9 +30,13 @@ export {
   useVerifyOtp,
 } from './hooks';
 export {
+  loginSendErrorMessage,
+  loginVerifyFailure,
   loginWithError,
   otpViewModel,
   otpWithError,
+  resendCountdownLabel,
   resendLabelFor,
   sentToLabelFor,
 } from './adapters';
+export type { LoginVerifyFailure } from './adapters';

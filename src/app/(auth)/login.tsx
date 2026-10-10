@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { Pressable, StyleSheet } from 'react-native';
 
@@ -7,9 +7,10 @@ import { readLastPhone } from '@core/auth';
 import { isAppError } from '@core/errors';
 import type { AppError } from '@core/errors';
 import {
+  consumePhoneEdit,
   isGuestModeAvailable,
   LoginScreen,
-  loginWithError,
+  loginSendErrorMessage,
   toE164,
   useContinueAsGuest,
   useSendOtp,
@@ -17,10 +18,11 @@ import {
 import { DEMO_LOGIN } from '@/demo/fixtures/screens';
 
 /**
- * Login — Figma `53:174`, built as drawn and now wired to `POST /v1/auth/otp/send`.
+ * Login — Figma `cCQlzTeiObQkpVBzwI8mZi` page "Login" (`1923:1139`), wired to
+ * `POST /v1/auth/otp/send`.
  *
- * `DEMO_LOGIN` supplies the screen's STATIC COPY only — the title, tagline, placeholder and legal
- * footer, none of which the backend owns or serves. Everything the server does decide flows
+ * `DEMO_LOGIN` supplies the screen's STATIC COPY only — the headline, button and legal footer,
+ * none of which the backend owns or serves. Everything the server does decide flows
  * through the mutation: whether the number was accepted, how long the resend cooldown is, and
  * what to say when it refuses.
  *
@@ -38,6 +40,18 @@ export default function LoginRoute() {
   const guestModeAvailable = isGuestModeAvailable();
 
   const error: AppError | null = isAppError(sendOtp.error) ? sendOtp.error : null;
+
+  /*
+   * The OTP screen's Back / Edit return here "with the number prefilled and the keyboard open".
+   * The number never left (this screen stays mounted under the OTP screen); the keyboard is
+   * brought back only when the return came from there, not from the Terms page.
+   */
+  const [focusKey, setFocusKey] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      if (consumePhoneEdit()) setFocusKey((key) => key + 1);
+    }, []),
+  );
 
   /**
    * The number from this device's last sign-in, if `core/auth/lastPhoneStore` has one — read
@@ -60,19 +74,19 @@ export default function LoginRoute() {
     <>
       <LoginScreen
         login={{
-          ...loginWithError(DEMO_LOGIN, error),
+          ...DEMO_LOGIN,
+          ...(error === null ? {} : { errorMessage: loginSendErrorMessage(error) }),
           submitting: sendOtp.isPending,
         }}
         {...(initialPhone === undefined ? {} : { initialPhone })}
+        focusKey={focusKey}
+        // A stale send failure clears as soon as the number is edited.
+        onChangePhone={() => {
+          if (sendOtp.error !== null) sendOtp.reset();
+        }}
         /**
-         * `250:2423` — the two legal links under the CTA, which used to do NOTHING.
-         *
-         * `LoginScreen` has always accepted `onOpenTerms` / `onOpenPrivacy` as optional props and
-         * this route never supplied either, so both were drawn underlined, looked tappable, and
-         * absorbed the press silently. That is the dead control task §11 forbids, and it is worse
-         * here than anywhere else in the app: the line directly above them reads "By continuing, I
-         * accept the Terms of use & Privacy policy", so the customer was being asked to accept two
-         * documents they had no way to read.
+         * `1923:1330` — "By continuing, you agree to our Terms of use & Privacy policy". Tapping Get
+         * OTP is the acceptance; the links only open the documents, in-app.
          *
          * `/legal/:doc` sits outside the `(app)` group precisely so it is reachable from here,
          * with no session. Pushed, so Back returns to Login with the typed number intact.

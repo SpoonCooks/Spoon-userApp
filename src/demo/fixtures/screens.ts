@@ -5,7 +5,7 @@ import type {
   AddressLocationViewModel,
   AddressOutOfServiceViewModel,
 } from '@features/address';
-import type { LoginViewModel, OtpViewModel } from '@features/auth';
+import type { LoginOtpViewModel, LoginViewModel, OtpViewModel } from '@features/auth';
 import type { CancellationViewModel } from '@features/cancellation';
 import type { BookingListViewModel } from '@features/history';
 import type { MealBriefViewModel } from '@features/mealBrief';
@@ -216,27 +216,32 @@ export const DEMO_PROFILE: ProfileViewModel = {
 
 /* -------------------------------------------------------------------------- login */
 
-/**
- * NEW Figma `53:174` "Page 17a- Login No.". Copy transcribed from the frame.
- *
- * `phoneMaxLength` is fixture data, not a rule: the frame shows a ten-digit Indian number beside a
- * `+91` cell, so the sample is ten. A contract that says otherwise changes this value only.
- */
+/** Figma `cCQlzTeiObQkpVBzwI8mZi` page "Login" — `1923:1139`. Copy transcribed from the frame. */
 export const DEMO_LOGIN: LoginViewModel = {
-  title: 'Login',
-  subtitle: 'Enter your phone number to proceed',
-  taglineLead: 'Trained cooks in ',
-  taglineAccent: 'minutes',
-  taglineSub: 'Cooking dishes catered to your mood & taste',
+  headline: 'Home cooks for all your needs',
   dialCode: '+91',
-  phonePlaceholder: '9876543210',
-  phoneMaxLength: 10,
-  ctaLabel: 'Continue',
-  legalLead: 'By continuing, I accept the',
+  phonePlaceholder: '98765 43210',
+  phoneLabel: 'Mobile number',
+  ctaLabel: 'Get OTP',
+  invalidPhoneMessage: 'Please enter a valid phone number',
+  legalLead: 'By continuing, you agree to our ',
   legalTerms: 'Terms of use',
   legalSeparator: ' & ',
   legalPrivacy: 'Privacy policy',
   skipLabel: 'Skip',
+};
+
+/** `1934:1080` / `1934:1358` / `1934:1648` — the login OTP screens' copy. */
+export const DEMO_LOGIN_OTP: LoginOtpViewModel = {
+  titleLead: 'Enter your',
+  titleMarker: 'OTP',
+  sentToLead: 'Sent to ',
+  editLabel: 'Edit',
+  backLabel: 'Back',
+  resendPrompt: 'Didn’t get the code?',
+  resendLabel: 'Resend via SMS',
+  verifyLabel: 'Verify & continue',
+  digitCount: 6,
 };
 
 /**
@@ -291,7 +296,7 @@ export const DEMO_OTP_ERROR: OtpViewModel = {
 
 export const DEMO_LOGIN_ERROR: LoginViewModel = {
   ...DEMO_LOGIN,
-  errorMessage: 'We could not send an OTP to that number.',
+  errorMessage: 'Couldn’t send the OTP. Check your connection and try again.',
 };
 
 /* ---------------------------------------------------------- history and refunds */

@@ -20,34 +20,60 @@
  * rate-limit response exists. Every callback below is a seam.
  */
 
+/**
+ * Login — Figma `cCQlzTeiObQkpVBzwI8mZi` page "Login", `1923:1139`. Static copy only; whether the
+ * number is valid and whether the code was sent are decided elsewhere.
+ */
 export interface LoginViewModel {
-  /** `53:224` — "Login". */
-  readonly title: string;
-  /** `225:1598` — "Enter your phone number to proceed". */
-  readonly subtitle: string;
-  /** `225:1637` — split so "minutes" can carry its own `#FFD600` run, as the frame draws it. */
-  readonly taglineLead: string;
-  readonly taglineAccent: string;
-  /** `225:1636` — "Cooking dishes catered to your mood & taste". */
-  readonly taglineSub: string;
+  /** `1923:1316` — "Home cooks for all your needs". */
+  readonly headline: string;
   readonly dialCode: string;
   readonly phonePlaceholder: string;
-  readonly phoneMaxLength: number;
-  /** `53:244` — "Continue". */
+  /** Screen-reader name for the number field (the frame has no visible label). */
+  readonly phoneLabel: string;
+  /** `1923:1328` — "Get OTP". */
   readonly ctaLabel: string;
-  /** `53:256` / `225:1595` — the legal footer, with both links drawn underlined. */
+  /** `1940:7590` — shown when the customer leaves the field with an invalid number. */
+  readonly invalidPhoneMessage: string;
+  /** `1923:1330` — "By continuing, you agree to our Terms of use & Privacy policy". */
   readonly legalLead: string;
   readonly legalTerms: string;
   readonly legalSeparator: string;
   readonly legalPrivacy: string;
   /** "Skip" — guest mode, iOS only. Not in the Figma frame; drawn only when the host offers it. */
   readonly skipLabel: string;
-  /** Supplied by the caller when the server rejects the number. Never authored client-side. */
+  /** A send failure, already worded for the customer. Shares the invalid-number slot. */
   readonly errorMessage?: string;
-  /** Drives the sending state on the CTA; the client never infers it. */
+  /** Get OTP locks and shows a spinner while the send is in flight. */
   readonly submitting?: boolean;
 }
 
+/**
+ * Login OTP — `1934:1080` (2a), `1934:1358` (2b) and `1934:1648` (2c). Static copy only; the
+ * number, the countdown and every error arrive as screen props.
+ */
+export interface LoginOtpViewModel {
+  /** `1934:1325` / `1934:1327` — "Enter your" + the highlighted "OTP". */
+  readonly titleLead: string;
+  readonly titleMarker: string;
+  /** `1934:1330` — "Sent to " + the number in SemiBold. */
+  readonly sentToLead: string;
+  readonly editLabel: string;
+  readonly backLabel: string;
+  /** `1934:1351` — "Didn’t get the code?". */
+  readonly resendPrompt: string;
+  /** `1934:1645` — "Resend via SMS". */
+  readonly resendLabel: string;
+  /** `1945:1692` — "Verify & continue", drawn in the keyboard frames only. */
+  readonly verifyLabel: string;
+  /** `1934:1337` draws six cells; V0's `LOGIN_OTP_LENGTH` defaults to 6. */
+  readonly digitCount: number;
+}
+
+/**
+ * The PREVIOUS OTP design (`1kd1u3WEc00SENkToIPloW`), still used by account deletion
+ * (`/account/delete-otp`). Login has moved to `LoginOtpViewModel`.
+ */
 export interface OtpViewModel {
   /** `227:1678` — "OTP verification". */
   readonly title: string;

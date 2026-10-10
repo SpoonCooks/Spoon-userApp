@@ -1,595 +1,355 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
   Pressable,
-  ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text, lightTheme, useBottomGutter, useKeyboardHeight } from '@ui';
-
-import { AUTH_HERO, AUTH_LOGO_LOCKUP } from '../assets';
+import { LOGIN_ART } from '../login/art';
+import { LoginShell, useOverlayTop } from '../login/LoginShell';
+import {
+  displayDigits,
+  isValidMobile,
+  nextPhoneDigits,
+  normalizePhoneInput,
+  PHONE_DIGITS,
+} from '../login/phone';
+import { C, F, SHADOW_BUTTON, SHADOW_PILL, SHADOW_SOFT } from '../login/theme';
+import { useKeyboardLayout } from '../login/useKeyboardLayout';
 import type { LoginViewModel } from '../types';
 
 /**
- * Login — Figma `250:2383` "Page 1- Login No.", re-read on the FINAL file
- * (`8F7GqT4hEG2pEhtUGBYw7p`).
+ * Login — Figma `cCQlzTeiObQkpVBzwI8mZi`, page "Login": `1923:1139` "Page 1- Login No. — v2" and
+ * `1945:1353` "— keyboard", built to their dev notes (`1949:2203`, `1949:2258`).
  *
- * Read off the nodes, top to bottom inside the 370pt viewport:
- *   hero   `250:2434` — a **329**pt band, full-bleed and flush under the status bar. It carries
- *                       NO padding; the 6pt inset the superseded file drew came from an older
- *                       file's `225:1640` and was forcing a crop the design does not have.
- *   brand  `250:2400` — 167pt, `px 12 / py 6`, 6pt gap: a 134 × 93 logo lockup (`250:2401`) over
- *                       `250:2404` Livvic Bold **18/28** ("minutes" in `#FFD600`) and
- *                       `250:2405` SemiBold **14/16** at `rgba(0,0,0,0.7)`, on a 320pt measure
- *   form   `250:2406` — a 228pt `flex-1` block: `250:2407` carries `my-auto` (the form group is
- *                       CENTRED in the height left above the footer) and `250:2423` sits at its
- *                       end. 21pt between them at the reference size.
- *                       `250:2412` "Login"  Livvic Bold 14/20
- *                       `250:2414` subtitle Regular 12/15 at 70%
- *                       `250:2415` the field: 325 wide, h **43**, radius 15, 1pt `#FFD600`, a
- *                                  `+91` cell closed by a 1.778pt `#FFE666` rule
- *                       `250:2421` CTA: `#FFD600`, h **34**, radius 16, Livvic Black 16/24 at −0.4
- *   legal  `250:2423` — 39pt: Livvic Regular 9/13.5, the lead at 70% and both links underlined
+ * One flow for new and returning customers: a mobile number, then an SMS code. The hero (photo,
+ * logo, badges) is decorative; the shell plays its intro once and hides the badges while typing.
  *
- * See the body of the component for how those blocks behave when the viewport is not 370 × 830 —
- * the founder's "not screen adapted" report (task §8) is answered there, not here.
+ *   content `1923:1307` — 24pt gaps (16 with the keyboard up): the 138 × 100 logo (60 % with the
+ *                         keyboard up) over "Home cooks for all your needs", the form, the terms
+ *   field   `1923:1319` — 56pt pill, 1.5pt `#FFD600`, Elevation/1; "+91" in a 44pt cell
+ *   error   `1940:7592` — 16pt exclamation + Caption Strong, under the field
+ *   CTA     `1923:1328` — 48pt pill "Get OTP"; the disabled style until the number is valid
+ *   terms   `1923:1330` — Caption at 60 %, both links black and underlined
  *
- * BOUNDARY: the CTA raises intent. It performs no validation beyond limiting input to the supplied
- * `phoneMaxLength` digits, formats no message, and decides nothing about retries or rate limits.
- * `errorMessage` and `submitting` are rendered from the caller.
+ * Validation (dev note): a valid number is 10 digits starting 6–9. "Please enter a valid phone
+ * number" appears only when the customer LEAVES the field with an incomplete or invalid number,
+ * never while typing, and clears on the next edit. Server failures arrive pre-worded in
+ * `login.errorMessage` and share the same slot.
+ *
+ * Not in the frames: the iOS-only "Skip" (App Store review needs the app browsable without an
+ * account) and the remembered number from the last sign-in. Both are kept from the previous screen.
  */
 export interface LoginScreenProps {
   readonly login: LoginViewModel;
-  /** Raises "the user wants an OTP for this number". Sending it is the host's job. */
-  readonly onRequestOtp: (phone: string) => void;
+  /** Raised with the 10 national digits. Sending the code is the host's job. */
+  readonly onRequestOtp: (digits: string) => void;
+  /** Any edit — the host clears a stale server error with it. */
+  readonly onChangePhone?: () => void;
   readonly onOpenTerms?: () => void;
   readonly onOpenPrivacy?: () => void;
-  /**
-   * "Skip" — browse as a guest. The control is drawn ONLY when this is supplied, so whether guest
-   * mode exists (iOS only) stays the host's decision and Android never sees it.
-   */
+  /** Guest mode; the pill is drawn only when supplied (iOS). */
   readonly onSkip?: () => void;
-  /**
-   * The number last signed in on this device, if the host found one (`core/auth/lastPhoneStore`)
-   * — undefined while that read is still in flight, so this never has to gate the screen behind
-   * a second loading surface (task §13/§25: the boot splash is the only one). Accepted in
-   * whatever shape it arrives (E.164 or bare digits) and run through the same digit
-   * normalisation as typed, pasted or autofilled text; applied once, and only while the field is
-   * still empty, so it can never overwrite something the customer already typed.
-   */
+  /** The number from this device's last sign-in. Applied once, only into an empty field. */
   readonly initialPhone?: string;
+  /**
+   * Changing this focuses the field. The OTP screen's Back / Edit return here "with the number
+   * prefilled and the keyboard open" — the number is still in this screen's state (it stays mounted
+   * under the OTP screen); this brings the keyboard back.
+   */
+  readonly focusKey?: number;
   readonly testID?: string;
 }
 
-/** Strips everything but digits and keeps the LAST `maxLength` of them — see `onChangeText`. */
-function normalizePhoneDigits(raw: string, maxLength: number): string {
-  return raw.replace(/\D/g, '').slice(-maxLength);
+/** `1923:1307` starts 400pt above the bottom edge; the curve 34pt above that. */
+const CONTENT_FROM_BOTTOM = 400;
+const CURVE_LEAD = 34;
+const LOGO = { width: 138, height: 100 } as const;
+/** "Logo shrinks to about 60% on this screen only." */
+const LOGO_COMPACT = 0.6;
+
+/** 1 to 9 digits, or 10 that are not a mobile number. */
+function isIncomplete(digits: string): boolean {
+  return digits.length > 0 && !isValidMobile(digits);
 }
-
-/**
- * `250:2434` — the hero's designed height at the reference width.
- *
- * The frame's 362pt top band is a 33pt STATUS-BAR mockup (`250:2385`, holding "11:23" and the
- * signal glyphs) over a 329pt photograph. The status bar is the real system bar on device, so
- * only **329** belongs to the hero.
- */
-const HERO_REFERENCE_HEIGHT = 329;
-
-/** `250:2434` is drawn 370 wide — the full width of the design's viewport, edge to edge. */
-const HERO_REFERENCE_WIDTH = 370;
-
-/**
- * The photograph's own shape, and the reason it is no longer cropped from the top.
- *
- * `assets/figma/auth/login-hero.jpg` is now the `250:2434` NODE exported at 3× (1110 × 987), so
- * the frame's crop is baked into the file. The superseded asset was exported from an older file
- * at 1110 × 1092 — a 1.016 ratio against this node's 1.125 — so `resizeMode="cover"` inside a
- * 329pt box had to eat 35pt of it, and it ate them off the top of the cook's head. That is the
- * founder's "cropped from the top" (task §8), and it was an ASSET mismatch, not a layout bug.
- *
- * Held as a ratio rather than a fixed height so the band scales with the viewport's width instead
- * of cropping on any device that is not 370pt across.
- */
-const HERO_ASPECT_RATIO = HERO_REFERENCE_WIDTH / HERO_REFERENCE_HEIGHT;
-
-/** `250:2398` -> `250:2384` — the 10pt the frame leaves between the hero and the column. */
-const HERO_GAP = 10;
-
-/** `250:2400` and `250:2406` — the two blocks below the hero, at their designed heights. */
-const BRAND_BLOCK_HEIGHT = 167;
-const FORM_BLOCK_HEIGHT = 228;
-
-/** `250:2423` — the legal footer, which is pinned to the bottom of the form block. */
-const LEGAL_BLOCK_HEIGHT = 39;
-
-/** `250:2406` — 21pt between the centred form group and that footer. */
-const LEGAL_GAP = 21;
-
-/** `250:2384` — the content column's own 16pt padding, twice, plus its 16pt gap. */
-const COLUMN_CHROME = lightTheme.space.lg * 3;
-
-/**
- * The floor the hero may crop to. Below this the photograph stops reading as a scene, and the
- * ScrollView is left to carry whatever still does not fit.
- */
-const HERO_MIN_HEIGHT = 160;
 
 export function LoginScreen({
   login,
   onRequestOtp,
+  onChangePhone,
   onOpenTerms,
   onOpenPrivacy,
   onSkip,
   initialPhone,
+  focusKey,
   testID = 'login-screen',
 }: LoginScreenProps) {
   const [phone, setPhone] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
-  const focusedRef = useRef(false);
-  const ready = phone.length === login.phoneMaxLength && login.submitting !== true;
+  const [leftInvalid, setLeftInvalid] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
-  /**
-   * Applies the remembered number exactly once, the render `initialPhone` first resolves to a
-   * value — including a resolved "nothing stored", which arrives as `''` and simply never
-   * passes the length check below. Adjusted during render rather than in an effect (React's own
-   * guidance for "sync state from a prop that just changed"): `appliedInitialPhone` tracks the
-   * last `initialPhone` this already ran for, so the body below fires at most once per value and
-   * React folds the resulting state update into this same render instead of a second pass. Only
-   * applied while `phone` is still empty, so a customer who starts typing before the host's read
-   * resolves keeps what they typed.
-   */
-  const [appliedInitialPhone, setAppliedInitialPhone] = useState<string | undefined>(undefined);
-  if (initialPhone !== undefined && initialPhone !== appliedInitialPhone) {
-    setAppliedInitialPhone(initialPhone);
+  const keyboardHeight = useKeyboardLayout();
+  const keyboardOpen = keyboardHeight > 0;
+  const { height } = useWindowDimensions();
+  const { top } = useSafeAreaInsets();
+  const overlayTop = useOverlayTop();
+
+  // The remembered number, applied once and only while the field is empty (see `lastPhoneStore`).
+  const [appliedInitial, setAppliedInitial] = useState<string | undefined>(undefined);
+  if (initialPhone !== undefined && initialPhone !== appliedInitial) {
+    setAppliedInitial(initialPhone);
     if (phone === '') {
-      const normalized = normalizePhoneDigits(initialPhone, login.phoneMaxLength);
-      if (normalized.length === login.phoneMaxLength) {
-        setPhone(normalized);
-      }
+      const digits = normalizePhoneInput(initialPhone);
+      if (digits.length === PHONE_DIGITS) setPhone(digits);
     }
   }
 
-  /**
-   * SCREEN ADAPTATION (task §8). Three things the superseded layout got wrong, and the rule each
-   * one is replaced by.
-   *
-   * 1. CROPPED FROM THE TOP. The hero was pinned to the reference **329** at every width, so any
-   *    viewport wider than the design's 370 had to crop the photograph to fill it. It now scales
-   *    by its own aspect ratio, so a 392.7pt handset gets a 349pt band showing the SAME picture
-   *    rather than 329pt of the middle of it. Combined with the re-exported asset (see
-   *    `HERO_ASPECT_RATIO`) the reference case now crops nothing at all.
-   *
-   * 2. A GIANT WHITE GAP AT THE BOTTOM. The stack was top-aligned inside a `flexGrow` scroll, so
-   *    every point of leftover height piled up under the legal footer — ~50pt of blank white on
-   *    the test handset. `250:2406` does not work that way: it is a `flex-1` block whose form
-   *    group carries `my-auto` and whose footer sits at its end, so spare height goes BETWEEN
-   *    them. The footer is pinned to the bottom and the gap moves to where the design puts it.
-   *
-   * 3. THE CTA. It rides with the form group, which is what `250:2421` does — it is not a pinned
-   *    footer on this screen, and pinning it would have separated it from the field it submits.
-   *
-   * The hero is still the only block that YIELDS height, and only when there is not enough: it is
-   * clamped so that the brand block and the form always get their designed heights first, and the
-   * ScrollView carries anything a genuinely short viewport still cannot fit. At and above the
-   * reference height the clamp is inert, so the frame stays pixel-exact.
-   *
-   * Nothing else scales — typography, the field, the CTA, the footer and every gap keep their
-   * Figma values at every width.
-   */
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const availableHeight = windowHeight - insets.top - insets.bottom;
-  /**
-   * `250:2384` closes with 16pt of column padding. The legal footer is the last thing on the
-   * screen, so on a handset the gesture strip decides the real figure — see `useBottomGutter`.
-   */
-  const bottomGutter = useBottomGutter(lightTheme.space.lg);
-  /**
-   * The IME's own height while the field is focused, 0 otherwise (`useKeyboardHeight`, `Screen.tsx`).
-   *
-   * `windowHeight` above is `useWindowDimensions()`'s figure, which does not move when the
-   * keyboard opens — it reports the WINDOW, not the space the IME leaves under it. The clamp below
-   * this was computed only against that static figure, so a "genuinely short viewport" never
-   * looked short while the keyboard was up: the hero kept trying to draw its full un-keyboarded
-   * height, `revealField`'s `scrollToEnd` could only carry it partway off-screen, and what showed
-   * at the top was a stray sliver of the photograph rather than either the whole scene or none of
-   * it — reported live on device. The hero has no reason to hold any height once the phone field
-   * has focus: it is decoration ahead of a form the keyboard is there to fill in, not content the
-   * customer is still reading. Collapsing it to 0 the instant the IME reports itself open removes
-   * the sliver outright instead of shrinking toward `HERO_MIN_HEIGHT`, which would still have left
-   * a smaller version of the same artifact.
-   */
-  const keyboardHeight = useKeyboardHeight();
-  const heroHeight =
-    keyboardHeight > 0
-      ? 0
-      : Math.max(
-          HERO_MIN_HEIGHT,
-          Math.min(
-            windowWidth / HERO_ASPECT_RATIO,
-            availableHeight - HERO_GAP - COLUMN_CHROME - BRAND_BLOCK_HEIGHT - FORM_BLOCK_HEIGHT,
-          ),
-        );
+  useEffect(() => {
+    if (focusKey === undefined || focusKey === 0) return;
+    inputRef.current?.focus();
+  }, [focusKey]);
 
-  /**
-   * The field and the CTA are the LAST things in the scroll, and the 364pt hero above them is
-   * taller than what an Android keyboard leaves of the viewport. `adjustResize` shrinks the window
-   * but does not move the scroll offset, so the focused field ended up behind the keyboard with
-   * the CTA unreachable — measured on the handset, not inferred.
-   *
-   * The scroll is driven off the ScrollView's own `onLayout`, not off `keyboardDidShow`: on
-   * Android the keyboard event fires BEFORE the window resize reaches the view, so a scroll issued
-   * there is computed against the pre-resize height and does nothing. `onLayout` runs after the
-   * new height lands, which is the only point at which "the end" means anything.
+  const valid = isValidMobile(phone);
+  const submitting = login.submitting === true;
+  const ready = valid && !submitting;
+  const errorMessage = leftInvalid ? login.invalidPhoneMessage : login.errorMessage;
+
+  /*
+   * Small phones: "Everything must fit above the keyboard … hide the terms first, then the logo."
+   * The compact content's height is known from the frame (logo 60 + 8 + 20, form 116 + any error
+   * line, terms 16, 16pt gaps), so the decision is made up front instead of after a measuring pass.
    */
-  const revealField = () => {
-    if (focusedRef.current) {
-      scrollRef.current?.scrollToEnd({ animated: true });
-    }
-  };
+  const available = height - keyboardHeight - 16 - (top + 8);
+  const compactForm = 116 + (errorMessage === undefined ? 0 : 28);
+  const compactFull = LOGO.height * LOGO_COMPACT + 28 + 16 + compactForm + 16 + 16;
+  const hideTerms = keyboardOpen && available < compactFull;
+  const hideLogo = keyboardOpen && available < compactFull - 32;
+
+  const gap = keyboardOpen ? 16 : 24;
+  const logoScale = keyboardOpen ? LOGO_COMPACT : 1;
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']} testID={testID}>
-      {/*
-        `behavior="padding"` on BOTH platforms. Android's `windowSoftInputMode="adjustResize"` no
-        longer resizes the window under the edge-to-edge display this app runs in, so leaving the
-        behavior undefined on Android left the keyboard covering the field and the CTA outright —
-        measured on the handset. Padding the avoiding view shrinks the scroll viewport, which is
-        what makes `revealField` below have anywhere to scroll to.
-      */}
-      <KeyboardAvoidingView style={styles.fill} behavior="padding">
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={styles.body}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          onLayout={revealField}
-        >
-          {/* `250:2434` — full-bleed, at the node's own aspect ratio. Clipped, never
-              letterboxed, and the only block that yields height on a short viewport — and the
-              first thing gone once the keyboard is up, see `heroHeight` above. */}
-          {heroHeight === 0 ? null : (
-            <View style={[styles.hero, { height: heroHeight }]} testID={`${testID}-hero`}>
-              <Image
-                source={AUTH_HERO}
-                style={styles.heroImage}
-                resizeMode="cover"
-                accessibilityIgnoresInvertColors
-              />
+    <LoginShell
+      keyboardHeight={keyboardHeight}
+      contentFromBottom={CONTENT_FROM_BOTTOM}
+      curveLead={CURVE_LEAD}
+      intro
+      testID={testID}
+      overlay={
+        onSkip === undefined ? null : (
+          <Pressable
+            onPress={onSkip}
+            accessibilityRole="button"
+            accessibilityLabel={login.skipLabel}
+            hitSlop={8}
+            style={({ pressed }) => [styles.skip, { top: overlayTop }, pressed && styles.pressed]}
+            testID={`${testID}-skip`}
+          >
+            <Text style={styles.skipLabel}>{login.skipLabel}</Text>
+          </Pressable>
+        )
+      }
+    >
+      <View style={[styles.content, { gap }]}>
+        <View style={styles.brand}>
+          {hideLogo ? null : (
+            <Image
+              source={LOGIN_ART.logo}
+              style={{ width: LOGO.width * logoScale, height: LOGO.height * logoScale }}
+              accessibilityLabel="Spoon"
+              accessibilityIgnoresInvertColors
+            />
+          )}
+          <Text style={styles.headline}>{login.headline}</Text>
+        </View>
+
+        <View style={styles.form}>
+          <View style={[styles.field, SHADOW_SOFT]}>
+            <View style={styles.dial}>
+              <Text style={[styles.fieldText, styles.dialCode]}>{login.dialCode}</Text>
+            </View>
+            <TextInput
+              ref={inputRef}
+              value={displayDigits(phone)}
+              onChangeText={(text) => {
+                setPhone(nextPhoneDigits(phone, displayDigits(phone), text));
+                setLeftInvalid(false);
+                onChangePhone?.();
+              }}
+              // "Only if the user leaves the field with 1 to 9 digits" — never while typing.
+              onBlur={() => setLeftInvalid(isIncomplete(phone))}
+              placeholder={login.phonePlaceholder}
+              placeholderTextColor={C.textDisabled}
+              keyboardType="phone-pad"
+              textContentType="telephoneNumber"
+              autoComplete="tel"
+              editable={!submitting}
+              style={styles.input}
+              accessibilityLabel={login.phoneLabel}
+              testID={`${testID}-phone`}
+            />
+          </View>
+
+          {errorMessage === undefined ? null : (
+            <View style={styles.error} accessibilityLiveRegion="polite" testID={`${testID}-error`}>
+              <Image source={LOGIN_ART.exclamation} style={styles.errorIcon} />
+              <Text style={styles.errorText}>{errorMessage}</Text>
             </View>
           )}
 
-          {/* `250:2384` — the padded content column the brand block and the form sit in. */}
-          <View style={[styles.column, { paddingBottom: bottomGutter }]}>
-            <View style={styles.brand}>
-              <Image
-                source={AUTH_LOGO_LOCKUP}
-                style={styles.logo}
-                resizeMode="contain"
-                accessibilityIgnoresInvertColors
-              />
-              <View style={styles.tagline}>
-                <Text variant="titleLead" color="textPrimary" align="center">
-                  {login.taglineLead}
-                  <Text variant="titleLead" color="surfaceCta">
-                    {login.taglineAccent}
-                  </Text>
-                </Text>
-                <Text variant="loginTagline" color="textSecondary" align="center">
-                  {login.taglineSub}
-                </Text>
-              </View>
-            </View>
+          <Pressable
+            onPress={() => {
+              if (ready) {
+                onRequestOtp(phone);
+                return;
+              }
+              // A tap on the disabled button means the customer is done with the field: leaving it
+              // incomplete is exactly when the message is due.
+              if (isIncomplete(phone)) {
+                inputRef.current?.blur();
+                setLeftInvalid(true);
+              }
+            }}
+            // Not `disabled={false}`: Pressable copies `disabled` over accessibilityState, and a
+            // screen reader must still hear Get OTP as disabled until the number is valid.
+            disabled={submitting ? true : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={login.ctaLabel}
+            accessibilityState={{ disabled: !ready, busy: submitting }}
+            style={({ pressed }) => [
+              styles.cta,
+              SHADOW_BUTTON,
+              valid ? styles.ctaEnabled : styles.ctaDisabled,
+              pressed && ready && styles.pressed,
+            ]}
+            testID={`${testID}-cta`}
+          >
+            {submitting ? (
+              <ActivityIndicator color={C.text} testID={`${testID}-sending`} />
+            ) : (
+              <Text style={[styles.ctaLabel, !valid && styles.ctaLabelDisabled]}>
+                {login.ctaLabel}
+              </Text>
+            )}
+          </Pressable>
+        </View>
 
-            {/* `250:2406` — a flex block: the form group centred in whatever height is left
-                (`250:2407`'s `my-auto`), the legal footer at its end. */}
-            <View style={styles.form}>
-              <View style={styles.formCentre}>
-                <View style={styles.formInner}>
-                  <View style={styles.labels}>
-                    <Text variant="title" color="textPrimary">
-                      {login.title}
-                    </Text>
-                    <Text variant="bodyQuiet" color="textSecondary">
-                      {login.subtitle}
-                    </Text>
-                  </View>
-
-                  {/* `250:2415` — a 43pt bar at a **15pt** radius, outlined 1pt in `#FFD600`. */}
-                  <View style={styles.field}>
-                    <View style={styles.dial}>
-                      <Text variant="fieldValue" color="textPrimary" style={styles.dialCode}>
-                        {login.dialCode}
-                      </Text>
-                    </View>
-                    <TextInput
-                      value={phone}
-                      /**
-                       * The device's own-number autofill suggestion (`textContentType`
-                       * below) fills the FULL number it has on file, which usually still
-                       * carries the `+91` this field's `dial` chip already shows
-                       * separately. A native `maxLength` truncates before this handler
-                       * ever sees the text, so it would cut "+91 98765 43210" down to
-                       * "+91 987654" and strip that into the wrong ten digits.
-                       * `normalizePhoneDigits` keeping the LAST `phoneMaxLength` digits
-                       * takes the country code off the front instead, however the text
-                       * arrived — typed, pasted, autofilled, or (see `initialPhone` above)
-                       * remembered from the last sign-in.
-                       */
-                      onChangeText={(next) =>
-                        setPhone(normalizePhoneDigits(next, login.phoneMaxLength))
-                      }
-                      placeholder={login.phonePlaceholder}
-                      placeholderTextColor={lightTheme.colors.textPlaceholder}
-                      onFocus={() => {
-                        focusedRef.current = true;
-                        revealField();
-                      }}
-                      onBlur={() => {
-                        focusedRef.current = false;
-                      }}
-                      keyboardType="phone-pad"
-                      textContentType="telephoneNumber"
-                      autoComplete="tel"
-                      style={styles.input}
-                      accessibilityLabel={login.subtitle}
-                      testID={`${testID}-phone`}
-                    />
-                  </View>
-
-                  {login.errorMessage === undefined ? null : (
-                    <Text variant="bodyQuiet" color="textDestructive" testID={`${testID}-error`}>
-                      {login.errorMessage}
-                    </Text>
-                  )}
-
-                  <Pressable
-                    onPress={() => onRequestOtp(phone)}
-                    disabled={!ready}
-                    accessibilityRole="button"
-                    accessibilityLabel={login.ctaLabel}
-                    accessibilityState={{ disabled: !ready, busy: login.submitting === true }}
-                    style={({ pressed }) => [
-                      styles.cta,
-                      ready ? null : styles.ctaDisabled,
-                      pressed && ready ? styles.pressed : null,
-                    ]}
-                    testID={`${testID}-cta`}
-                  >
-                    <Text
-                      variant="headingCtaTight"
-                      color={ready ? 'textOnAccent' : 'textCtaDisabled'}
-                    >
-                      {login.ctaLabel}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* `250:2423` — Regular 9/13.5; both links underlined, as drawn. Pinned to the
-                  BOTTOM of the form block, which is what stops spare height collecting beneath
-                  it as blank white (task §8). */}
-              <View style={styles.legal}>
-                <Text variant="micro" color="textSecondary" align="center">
-                  {login.legalLead}
-                </Text>
-                <Text variant="micro" color="textPrimary" align="center">
-                  <Text
-                    variant="micro"
-                    color="textPrimary"
-                    style={styles.link}
-                    onPress={onOpenTerms}
-                  >
-                    {login.legalTerms}
-                  </Text>
-                  {login.legalSeparator}
-                  <Text
-                    variant="micro"
-                    color="textPrimary"
-                    style={styles.link}
-                    onPress={onOpenPrivacy}
-                  >
-                    {login.legalPrivacy}
-                  </Text>
-                </Text>
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/*
-        Guest mode. Not drawn in `250:2383`, so it takes the least-intrusive shape available: a
-        small white pill in the top-right corner, over the hero, outside the scroll so it never
-        moves the frame's measured layout. Outside the scroll also keeps it reachable while the
-        keyboard is up and the hero has collapsed.
-      */}
-      {onSkip === undefined ? null : (
-        <Pressable
-          onPress={onSkip}
-          accessibilityRole="button"
-          accessibilityLabel={login.skipLabel}
-          hitSlop={lightTheme.space.md}
-          style={({ pressed }) => [
-            styles.skip,
-            { top: insets.top + lightTheme.space.md },
-            pressed ? styles.pressed : null,
-          ]}
-          testID={`${testID}-skip`}
-        >
-          <Text variant="bodyStrong" color="textPrimary">
-            {login.skipLabel}
+        {hideTerms ? null : (
+          <Text style={styles.legal}>
+            {login.legalLead}
+            <Text style={styles.link} onPress={onOpenTerms} accessibilityRole="link">
+              {login.legalTerms}
+            </Text>
+            {login.legalSeparator}
+            <Text style={styles.link} onPress={onOpenPrivacy} accessibilityRole="link">
+              {login.legalPrivacy}
+            </Text>
           </Text>
-        </Pressable>
-      )}
-    </SafeAreaView>
+        )}
+      </View>
+    </LoginShell>
   );
 }
 
-/**
- * The `+91` cell's padding either side of the code. It used to sit 12 (the field's) + 16 from the
- * edge and 16 from the rule; splitting that 44 evenly centres the code without moving the rule.
- */
-const DIAL_PADDING = (12 + 16 + 16) / 2;
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: lightTheme.colors.surface },
-  fill: { flex: 1 },
-  body: { flexGrow: 1 },
-  /**
-   * `250:2434` — a FULL-BLEED band, edge to edge and flush under the status bar, with no padding
-   * of its own. The 6pt inset the superseded file carried came from `225:1640` in an older file
-   * and is not drawn here; it squeezed the box and forced a crop the design does not have.
-   *
-   * The height is supplied by the component — the node's aspect ratio wherever the viewport can
-   * afford it, clamped down on a short one.
-   */
-  hero: { overflow: 'hidden' },
-  heroImage: { width: '100%', height: '100%' },
-  /**
-   * `250:2384` — the content column: 16pt padding, 16pt between the brand block and the form,
-   * and `flex: 1` so the form block below it receives the viewport's spare height instead of
-   * leaving it stacked under the footer.
-   */
-  column: {
-    flex: 1,
-    marginTop: HERO_GAP,
-    padding: lightTheme.space.lg,
-    gap: lightTheme.space.lg,
+  content: { width: '100%', alignItems: 'center' },
+  /** `1940:5639` "Brand tag" — 8pt between the logo and the line. */
+  brand: { alignItems: 'center', gap: 8 },
+  /** Spoon/Body at 60 %. */
+  headline: {
+    fontFamily: F.regular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: C.textSecondary,
+    textAlign: 'center',
   },
-  /** `250:2400` — 167pt, px 12 / py 6. */
-  brand: {
-    height: BRAND_BLOCK_HEIGHT,
-    alignItems: 'center',
-    gap: lightTheme.space.s6,
-    paddingVertical: lightTheme.space.s6,
-    paddingHorizontal: lightTheme.space.md,
-  },
-  /** `225:1630` — 134 × 93. */
-  logo: { width: 134, height: 93 },
-  /** `225:1639` — a 320pt measure, 2pt between the two lines. */
-  tagline: { width: 320, gap: lightTheme.space.xxs, alignItems: 'center' },
-  /**
-   * `250:2406` — `div.flex-1`, 228 tall at the reference, px 4 / py 6.
-   *
-   * `minHeight` rather than `height`, plus `flex: 1`: at the reference it measures exactly 228,
-   * and on a taller viewport it ABSORBS the spare height rather than letting it fall through to
-   * the bottom of the scroll as blank white (task §8).
-   */
-  form: {
-    flex: 1,
-    minHeight: FORM_BLOCK_HEIGHT,
-    gap: LEGAL_GAP,
-    paddingHorizontal: lightTheme.space.xs,
-    paddingVertical: lightTheme.space.s6,
-  },
-  /**
-   * `250:2407` — `my-auto`: the form group is CENTRED in the height left above the footer.
-   *
-   * At the reference this box is exactly 156 tall and holds a 156pt group, so centring is a no-op
-   * and the frame measures as drawn. Every point of extra height a bigger handset brings is split
-   * evenly above and below the group, which is what the auto margins mean.
-   */
-  formCentre: { flex: 1, justifyContent: 'center' },
-  /** `250:2408` — 16pt between the labelled field group and the CTA. */
-  formInner: { gap: lightTheme.space.lg },
-  /** `250:2410` — 6pt between "Login" and its subtitle. */
-  labels: { gap: lightTheme.space.s6 },
-  /** `250:2415` — h 43, radius **15** (was 24 in the superseded file), 1pt `#FFD600`. */
+  /** `1923:1317` — 12pt between field, error and CTA, left-aligned. */
+  form: { width: '100%', gap: 12, alignItems: 'flex-start' },
   field: {
-    height: 43,
+    width: '100%',
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: lightTheme.space.md,
-    borderRadius: lightTheme.radius.r15,
-    borderWidth: lightTheme.stroke.thin,
-    borderColor: lightTheme.colors.surfaceCta,
-    backgroundColor: lightTheme.colors.surface,
+    gap: 12,
+    paddingLeft: 4,
+    paddingRight: 8,
+    borderRadius: 9999,
+    borderWidth: 1.5,
+    borderColor: C.brand,
+    backgroundColor: C.base,
   },
+  /** `1923:1320` — the 44pt "+91" cell. */
+  dial: { height: 44, justifyContent: 'center', paddingLeft: 16, paddingRight: 12 },
+  /** Spoon/Emphasis — SemiBold 16/24. */
+  fieldText: { fontFamily: F.semibold, fontSize: 16, lineHeight: 24, color: C.text },
   /**
-   * `250:2416` — the dial cell is closed by a 1.778pt `#FFE666` rule. `+91` is centred between
-   * the field's edge and the rule (it used to sit 29pt from the edge and 19pt from the rule); the
-   * cell keeps its width, so the rule and the number stay where they were.
-   */
-  dial: {
-    // The "1" the code ends on carries more empty side-bearing than the "+" it starts with; a
-    // point from the right padding into the left lands the INK in the middle of the cell.
-    paddingLeft: DIAL_PADDING + 1,
-    paddingRight: DIAL_PADDING - 1,
-    borderRightWidth: lightTheme.stroke.base,
-    borderRightColor: lightTheme.colors.surfaceAccentBold,
-  },
-  /**
-   * iOS sets a `Text` two-thirds of a point lower than a `TextInput` in the same font and box, so
-   * left alone the `+91` sat that much under the number beside it (measured on device). Lifting
-   * it by exactly that puts both on one line, centred on the bar.
-   */
-  dialCode: { transform: [{ translateY: -2 / 3 }] },
-  /**
-   * The number shares the `+91`'s type but NOT its line height. A single-line iOS `TextInput`
-   * given a `lineHeight` sets its text low in the box, so the digits sat under the `+91` beside
-   * them. Without one the input centres the glyphs in its own height; it fills the bar, so they
-   * centre on the bar, as the `+91` does. Android pads the font's ascent unless told not to.
+   * Carried over from `5eaf2c0` ("Centre the login phone field's +91 and number"). A single-line
+   * iOS `TextInput` given a `lineHeight` sets its text low in the box, so the number shares the
+   * `+91`'s type but NOT its line height: it fills the bar and centres its glyphs instead. Android
+   * pads the font's ascent unless told not to.
    */
   input: {
     flex: 1,
     minWidth: 0,
     alignSelf: 'stretch',
-    paddingHorizontal: lightTheme.space.lg,
+    paddingHorizontal: 0,
     paddingVertical: 0,
-    color: lightTheme.colors.textPrimary,
-    fontSize: lightTheme.typography.fieldValue.fontSize,
-    fontFamily: lightTheme.typography.fieldValue.fontFamily,
-    letterSpacing: lightTheme.typography.fieldValue.letterSpacing,
+    fontFamily: F.semibold,
+    fontSize: 16,
+    color: C.text,
     textAlignVertical: 'center',
     includeFontPadding: false,
   },
   /**
-   * `250:2421` — a fixed 34pt bar at a 16pt radius, carrying a `0 0 2 rgba(0,0,0,0.15)` drop
-   * shadow. The shadow is new in `fsgGIC4c6DJulb64TTt9yg`; iOS reads `shadow*`, Android
-   * `elevation`, so both are emitted.
+   * Also from `5eaf2c0`: iOS sets a `Text` two-thirds of a point lower than a `TextInput` in the
+   * same font and box (measured on device), so the `+91` is lifted by exactly that.
    */
+  dialCode: { transform: [{ translateY: -2 / 3 }] },
+  error: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  errorIcon: { width: 16, height: 16 },
+  /** Spoon/Caption Strong, black — there is no red in the customer app. */
+  errorText: { fontFamily: F.semibold, fontSize: 12, lineHeight: 16, color: C.text, flexShrink: 1 },
   cta: {
-    height: 34,
+    width: '100%',
+    minHeight: 48,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: lightTheme.radius.md,
-    backgroundColor: lightTheme.colors.surfaceCta,
-    shadowColor: lightTheme.colors.textPrimary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  /**
-   * `275:4690` — the file's one drawn disabled CTA. It keeps the active bar's lift and swaps only
-   * the fill, so this state no longer flattens the shadow or reaches for the slate ramp.
-   */
-  ctaDisabled: { backgroundColor: lightTheme.colors.surfaceCtaDisabled },
-  pressed: { opacity: 0.85 },
+  ctaEnabled: { backgroundColor: C.brand },
+  ctaDisabled: { backgroundColor: C.surfaceDisabled },
+  /** Spoon/Button — Bold 16/24. */
+  ctaLabel: { fontFamily: F.bold, fontSize: 16, lineHeight: 24, color: C.text },
+  ctaLabelDisabled: { color: C.textDisabled },
+  /** Spoon/Caption at 60 %; the two links black and underlined. */
+  legal: {
+    width: '100%',
+    fontFamily: F.regular,
+    fontSize: 12,
+    lineHeight: 16,
+    color: C.textSecondary,
+    textAlign: 'center',
+  },
+  link: { color: C.text, textDecorationLine: 'underline' },
+  /** Not in the frame — styled as the frames' floating Back button: white, Elevation/2, 40pt. */
   skip: {
     position: 'absolute',
-    right: lightTheme.space.lg,
-    paddingHorizontal: lightTheme.space.md,
-    paddingVertical: lightTheme.space.xs,
-    borderRadius: lightTheme.radius.pill,
-    backgroundColor: lightTheme.colors.surface,
-    ...lightTheme.elevations.pill,
-  },
-  /** `250:2423` — 39pt, 2pt between the two lines. */
-  /** `250:2423` — 39pt, 2pt between the two lines, held at the END of the form block. */
-  legal: {
-    minHeight: LEGAL_BLOCK_HEIGHT,
-    flexShrink: 0,
-    gap: lightTheme.space.xxs,
-    alignItems: 'center',
+    right: 16,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 9999,
     justifyContent: 'center',
+    backgroundColor: C.base,
+    ...SHADOW_PILL,
   },
-  link: { textDecorationLine: 'underline' },
+  skipLabel: { fontFamily: F.semibold, fontSize: 14, lineHeight: 20, color: C.text },
+  pressed: { opacity: 0.85 },
 });
