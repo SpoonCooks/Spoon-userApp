@@ -6,8 +6,8 @@ const IST = 'Asia/Kolkata';
 describe('refundTrackerFrom', () => {
   it('reads a late customer cancel as the partial breakdown, in progress', () => {
     const view = refundTrackerFrom(refundFixture(), { timeZone: IST });
-    expect(view.title).toBe('Booking refund');
-    expect(view.date).toBe('Sat, 10 Oct · 1 hr');
+    expect(view.title).toBe('Cook visit · 1 hr');
+    expect(view.date).toMatch(/^Sat,? 10 Oct,? 1:00\s?(PM|pm)$/);
     expect(view.cancelledBy).toBe('Cancelled by you');
     expect(view.breakdownKind).toBe('partial');
     expect(view.breakdown).toEqual([
@@ -16,11 +16,14 @@ describe('refundTrackerFrom', () => {
     ]);
     expect(view.total).toEqual({ label: 'Refund amount', amount: '₹54.34' });
     expect(view.statusLabel).toBe('Refund in progress');
-    expect(view.steps.map((step) => [step.key, step.done, step.when])).toEqual([
-      ['initiated', true, '8 Oct'],
-      ['processed', false, undefined],
-      ['completed', false, undefined],
+    expect(view.steps.map((step) => [step.key, step.title, step.done])).toEqual([
+      ['initiated', 'Refund initiated', true],
+      ['processed', 'Refund processed', false],
+      ['completed', 'Refund completed', false],
     ]);
+    // A done step carries its date and time (handoff A2).
+    expect(view.steps[0]?.when).toMatch(/^8 Oct,? 11:00\s?(AM|am)$/);
+    expect(view.steps[1]?.when).toBeUndefined();
     expect(view.reference).toBeUndefined();
   });
 
@@ -34,7 +37,7 @@ describe('refundTrackerFrom', () => {
     expect(view.breakdown).toHaveLength(1);
   });
 
-  it('reads a Spoon cancel as the full refund, tagged Cancelled by Spoon', () => {
+  it('reads a Spoon cancel as version (c): Cancelled by Spoon · No fee, then the refund', () => {
     const view = refundTrackerFrom(
       refundFixture({
         tracker: {
@@ -45,7 +48,11 @@ describe('refundTrackerFrom', () => {
     );
     expect(view.breakdownKind).toBe('spoon');
     expect(view.cancelledBy).toBe('Cancelled by Spoon');
-    expect(view.total).toEqual({ label: 'Full refund', amount: '₹72.45' });
+    expect(view.breakdown).toEqual([
+      { label: 'Amount paid', amount: '₹72.45' },
+      { label: 'Cancelled by Spoon · No fee', amount: '', note: true },
+    ]);
+    expect(view.total).toEqual({ label: 'Refund amount', amount: '₹72.45' });
   });
 
   it('shows the bank reference only once the refund is completed', () => {
@@ -77,9 +84,9 @@ describe('refundTrackerFrom', () => {
       }),
       { timeZone: IST },
     );
-    expect(view.title).toBe('Recurring visit refund');
-    expect(view.recurringLine).toBe('Plan 3 · Visit 4 of 12');
-    expect(view.date).toBe('Raised 8 Oct');
+    expect(view.title).toBe('Cook visit');
+    expect(view.recurringLine).toBe('Recurring · Plan 3, visit 4 of 12');
+    expect(view.date).toMatch(/^Refund raised 8 Oct,? 11:00\s?(AM|am)$/);
     expect(view.statusLabel).toBe('Refund failed');
     expect(view.supportMessage).toContain('refund rf_1');
     expect(view.supportMessage).not.toContain('booking');

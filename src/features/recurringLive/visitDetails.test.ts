@@ -273,17 +273,14 @@ describe('visitDetailsFrom', () => {
     );
     expect(model.cancelled.byline).toBe('By you · Wed, 14 Oct, 6:40 AM');
     expect(model.refund).toMatchObject({
-      badge: 'Refunded',
+      badge: 'Refund completed',
       lines: [
         { label: 'Amount paid', amount: '₹299', was: '₹399' },
         { label: 'Cancellation fee (50%)', amount: '– ₹149.50', minor: true },
       ],
       total: { label: 'Refund amount', amount: '₹149.50' },
       mode: 'UPI · ra••••@okhdfc',
-      steps: [
-        { title: 'Refund initiated', when: 'Wed, 14 Oct' },
-        { title: 'It takes 5-7 working days for the amount to get credited to source', note: true },
-      ],
+      steps: [{ title: 'Refund initiated', when: 'Wed, 14 Oct' }],
     });
     expect(model.refund?.refundId).toBeUndefined();
     expect(model.refund?.booking).toBeUndefined();

@@ -183,7 +183,7 @@ describe('Recurring Manage plans route', () => {
 
     await waitFor(() => expect(onCancel).toHaveBeenCalledWith({ reasonCode: 'URGENT_CHANGE' }));
     await waitFor(() =>
-      expect(alert).toHaveBeenCalledWith('Booking cancelled', '2 visits were cancelled.'),
+      expect(alert).toHaveBeenCalledWith('Booking cancelled', '2 visits cancelled.'),
     );
     alert.mockRestore();
   });

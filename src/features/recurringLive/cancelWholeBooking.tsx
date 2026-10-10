@@ -140,22 +140,16 @@ export function useCancelWholeBooking({
 }
 
 /**
- * The result in the server's own figures: how many visits were cancelled, the fee for any already
- * debited, and what is coming back. Nothing is summed here; `totals` is the server's.
+ * The result in the handoff's words (Part 1 A1): "1 visit cancelled with a fee, ₹x refunded". The
+ * figures are the server's `totals`; nothing is summed here. "View refunds" opens the tracker list.
  */
 export function cancelledSummary(result: BookingCancellationDto): string {
   const visits =
     result.visitsCancelled === 1
-      ? '1 visit was cancelled.'
-      : `${result.visitsCancelled} visits were cancelled.`;
+      ? '1 visit cancelled'
+      : `${result.visitsCancelled} visits cancelled`;
   const { feePaise, refundPaise } = result.totals;
-  if (refundPaise === 0) {
-    return feePaise === 0
-      ? visits
-      : `${visits} A cancellation fee of ${formatPaise(feePaise)} applies.`;
-  }
-  const refund = `${formatPaise(refundPaise)} is on its way back to your original payment method.`;
-  return feePaise === 0
-    ? `${visits} ${refund}`
-    : `${visits} After a ${formatPaise(feePaise)} cancellation fee, ${refund}`;
+  const withFee = feePaise > 0 ? ' with a fee' : '';
+  const refunded = refundPaise > 0 ? `, ${formatPaise(refundPaise)} refunded` : '';
+  return `${visits}${withFee}${refunded}.`;
 }
