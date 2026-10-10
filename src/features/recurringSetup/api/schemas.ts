@@ -309,6 +309,12 @@ export const visitDetailSchema = visitSummarySchema.extend({
       feePaise: paise,
       refundPaise: paise,
       refundStatus: z.enum(['processing', 'refunded', 'failed']).nullable(),
+      /**
+       * The visit's refund, for the refund tracker (`GET /v1/me/refunds/{id}`, DEC-090). Null when
+       * nothing is refunded or the refund pass has not picked it up yet; `.nullish()` for
+       * deployments that predate it.
+       */
+      refundId: z.string().nullish(),
       /** True when nothing was charged at all. */
       nothingCharged: z.boolean(),
     })

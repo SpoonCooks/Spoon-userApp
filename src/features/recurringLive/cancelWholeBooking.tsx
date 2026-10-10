@@ -27,10 +27,13 @@ export function useCancelWholeBooking({
   bookingId,
   enabled,
   onCancelled,
+  onViewRefunds,
 }: {
   readonly bookingId: string | null;
   readonly enabled: boolean;
   readonly onCancelled: (result: BookingCancellationDto) => void;
+  /** "View refunds" on the result, when the cancellation refunded anything (DEC-090). */
+  readonly onViewRefunds?: () => void;
 }): { readonly askToCancel: () => void; readonly sheet: ReactNode } {
   const quote = useRecurringBookingCancellationQuote(enabled ? bookingId : null);
   const quoteData = quote.state.status === 'ready' ? quote.state.data : null;
@@ -98,12 +101,14 @@ export function useCancelWholeBooking({
         onSuccess: (result) => {
           setStep(null);
           onCancelled(result);
-          Alert.alert(
-            'Booking cancelled',
-            result.visitsCancelled === 1
-              ? '1 visit was cancelled.'
-              : `${result.visitsCancelled} visits were cancelled.`,
-          );
+          if (result.totals.refundPaise > 0 && onViewRefunds !== undefined) {
+            Alert.alert('Booking cancelled', cancelledSummary(result), [
+              { text: 'OK' },
+              { text: 'View refunds', onPress: onViewRefunds },
+            ]);
+          } else {
+            Alert.alert('Booking cancelled', cancelledSummary(result));
+          }
         },
         onError: (failure) => {
           idempotency.release(scope);
@@ -132,4 +137,25 @@ export function useCancelWholeBooking({
     );
 
   return { askToCancel, sheet };
+}
+
+/**
+ * The result in the server's own figures: how many visits were cancelled, the fee for any already
+ * debited, and what is coming back. Nothing is summed here; `totals` is the server's.
+ */
+export function cancelledSummary(result: BookingCancellationDto): string {
+  const visits =
+    result.visitsCancelled === 1
+      ? '1 visit was cancelled.'
+      : `${result.visitsCancelled} visits were cancelled.`;
+  const { feePaise, refundPaise } = result.totals;
+  if (refundPaise === 0) {
+    return feePaise === 0
+      ? visits
+      : `${visits} A cancellation fee of ${formatPaise(feePaise)} applies.`;
+  }
+  const refund = `${formatPaise(refundPaise)} is on its way back to your original payment method.`;
+  return feePaise === 0
+    ? `${visits} ${refund}`
+    : `${visits} After a ${formatPaise(feePaise)} cancellation fee, ${refund}`;
 }

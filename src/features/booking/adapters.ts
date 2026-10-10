@@ -4,6 +4,8 @@ import type { CookViewModel, DetailRow, RatingSelection } from '@ui';
 import { cookCardContentFor } from '@ui/components/cookCardContent';
 
 import { currentSkewMs } from '@core/time';
+import { refundTrackerFrom } from '@features/refunds';
+import type { RefundTrackerView } from '@features/refunds';
 
 import type { BookingDetailDto, RefundDto, TrackingDto } from './api';
 import { viewForBooking } from './state/bookingStatusView';
@@ -403,6 +405,21 @@ function expectedEndMsFrom(expectedEnd: string | null): number | null {
  * Nothing is summed and nothing is subtracted from the total paid: a refund is a durable record,
  * not `paid − fee` (task §10).
  */
+/**
+ * The tracker for the booking's latest refund (DEC-090), or nothing from a deployment that
+ * predates it — the designed notice with the amount then stands, as before.
+ */
+function refundTrackerViewFrom(
+  refunds: readonly RefundDto[] | null,
+  timeZone: string | undefined,
+): RefundTrackerView | undefined {
+  const refund = refunds?.[0];
+  if (refund === undefined || refund.tracker === null || refund.tracker === undefined) {
+    return undefined;
+  }
+  return refundTrackerFrom({ ...refund, tracker: refund.tracker }, { timeZone });
+}
+
 function refundAmountLabelFrom(refunds: readonly RefundDto[] | null): string | null {
   if (refunds === null || refunds.length === 0) return null;
   const amountPaise = refunds[0]?.amountPaise;
@@ -435,6 +452,8 @@ export function bookingDetailFrom(input: {
   readonly base: BookingDetailViewModel;
   readonly dto: BookingDetailDto;
   readonly refunds?: readonly RefundDto[] | null;
+  /** The service timezone, for the refund tracker's dates. */
+  readonly timeZone?: string | undefined;
   readonly onUnknownStatus?: (status: string | null) => void;
 }): BookingDetailViewModel {
   const { base, dto } = input;
@@ -452,6 +471,7 @@ export function bookingDetailFrom(input: {
   const cookName = dto.cook?.name ?? null;
   const arrivedAtLabel = arrivedAtLabelFrom(dto.timing.arrivedAt);
   const refundAmount = refundAmountLabelFrom(input.refunds ?? null);
+  const refundTracker = refundTrackerViewFrom(input.refunds ?? null, input.timeZone);
 
   /**
    * The en-route / arrived / reassigned banner, with the real cook in it.
@@ -591,6 +611,7 @@ export function bookingDetailFrom(input: {
             ...base.autoCancelled,
             rows: bookingRowsFrom(dto),
             refundAmount: refundAmount ?? '—',
+            ...(refundTracker === undefined ? {} : { refundTracker }),
           },
         }),
     /**
@@ -605,6 +626,7 @@ export function bookingDetailFrom(input: {
             ...base.customerCancelled,
             rows: bookingRowsFrom(dto),
             refundAmount: refundAmount ?? '—',
+            ...(refundTracker === undefined ? {} : { refundTracker }),
           },
         }),
     // The same ruling for Call Cook. Pressing it fetches a cook's personal number from a

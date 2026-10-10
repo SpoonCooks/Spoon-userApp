@@ -204,6 +204,21 @@ const REFUND_PRESENTATION: Record<string, { readonly label: string; readonly ton
 };
 
 /**
+ * The refund tracker's own status (DEC-090), which supersedes the queue-state table above when the
+ * server sends it. "Refunded" now means the bank confirmed the credit, not just that Razorpay
+ * accepted it, and a refund that failed for good is finally said out loud — the tracker has a
+ * drawn failed state with a route to support, which the row opens.
+ */
+const TRACKER_PRESENTATION: Record<
+  'in_progress' | 'completed' | 'failed',
+  { readonly label: string; readonly tone: StatusTone; readonly subtitle: string }
+> = {
+  in_progress: { label: 'Processing', tone: 'info', subtitle: 'Refund processing' },
+  completed: { label: 'Refunded', tone: 'positive', subtitle: 'Refund complete' },
+  failed: { label: 'Failed', tone: 'danger', subtitle: 'Refund failed' },
+};
+
+/**
  * Refunds — `GET /v1/me/refunds`.
  *
  * Every field on the row is the backend's `RefundRecord`: `refundId` identifies it, `amountPaise`
@@ -224,7 +239,11 @@ export function useRefundHistoryData(): PagedScreenQuery<BookingListViewModel> {
     return ready<BookingListViewModel>({
       ...DEMO_REFUND_HISTORY,
       bookings: refunds.state.data.map((refund) => {
-        const presentation = REFUND_PRESENTATION[refund.state];
+        const tracker = refund.tracker ?? null;
+        const presentation =
+          tracker === null
+            ? REFUND_PRESENTATION[refund.state]
+            : TRACKER_PRESENTATION[tracker.status];
         // `71:615` heads the row with the BOOKING — "12th Apr • 1 hr" and the cook — and dates
         // the refund outcome underneath. A response from a deployment that predates the booking
         // context falls back to the amount-only headline the row always had.
@@ -233,7 +252,12 @@ export function useRefundHistoryData(): PagedScreenQuery<BookingListViewModel> {
           refund.serviceStart !== undefined &&
           refund.durationMinutes !== null &&
           refund.durationMinutes !== undefined;
-        const outcomeAt = refund.completedAt ?? refund.requestedAt;
+        const outcomeAt =
+          tracker === null
+            ? (refund.completedAt ?? refund.requestedAt)
+            : (tracker.failedAt ??
+              [...tracker.steps].reverse().find((step) => step.at !== null)?.at ??
+              refund.requestedAt);
         const outcomeDay = formatServiceDate(serviceDateIn(timeZone, new Date(outcomeAt)), {
           day: 'numeric',
           month: 'short',
@@ -252,9 +276,11 @@ export function useRefundHistoryData(): PagedScreenQuery<BookingListViewModel> {
           ...cookFieldsFrom(refund.cook),
           amount: formatPaise(refund.amountPaise),
           subtitle:
-            refund.completedAt !== null
-              ? `Refund complete - ${outcomeDay}`
-              : `Refund processing - ${outcomeDay}`,
+            tracker !== null
+              ? `${TRACKER_PRESENTATION[tracker.status].subtitle} - ${outcomeDay}`
+              : refund.completedAt !== null
+                ? `Refund complete - ${outcomeDay}`
+                : `Refund processing - ${outcomeDay}`,
           ...(presentation === undefined
             ? {}
             : { statusLabel: presentation.label, statusTone: presentation.tone }),

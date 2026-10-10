@@ -1,4 +1,5 @@
 import type { BookingDetailsViewModel } from './components/BookingDetailsSheet';
+import type { RefundTrackerView } from '@features/refunds';
 import type { BookingView } from './state/bookingStatusView';
 import type {
   CookViewModel,
@@ -169,6 +170,8 @@ export interface AutoCancelledViewModel {
   readonly refundAmount: string;
   readonly refundDestination: string;
   readonly refundTimeframe: string;
+  /** The refund tracker (DEC-090), drawn in place of the refund notice once the server sends it. */
+  readonly refundTracker?: RefundTrackerView;
   readonly rebookPrompt: string;
   readonly rebookAcceptLabel: string;
   readonly rebookDeclineLabel: string;
@@ -195,6 +198,8 @@ export interface CustomerCancelledViewModel {
   readonly refundAmount: string;
   readonly refundDestination: string;
   readonly refundTimeframe: string;
+  /** The refund tracker (DEC-090), drawn in place of the refund notice once the server sends it. */
+  readonly refundTracker?: RefundTrackerView;
 }
 
 export interface ArrivedViewModel extends TrackingViewModel {

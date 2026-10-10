@@ -223,14 +223,16 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
               ...(was === undefined ? {} : { was }),
               amount: formatPaise(total),
             },
-            {
-              label:
-                cancellation.feePaise === 0
-                  ? 'Cancellation fee'
-                  : `Cancellation fee (${cancellation.feePercent}%)`,
-              amount: `– ${formatPaise(cancellation.feePaise)}`,
-              minor: true,
-            },
+            // No fee line on a free cancellation: "– ₹0" says nothing the total does not.
+            ...(cancellation.feePaise === 0
+              ? []
+              : [
+                  {
+                    label: `Cancellation fee (${cancellation.feePercent}%)`,
+                    amount: `– ${formatPaise(cancellation.feePaise)}`,
+                    minor: true,
+                  },
+                ]),
           ],
           total: {
             label: 'Refund amount',

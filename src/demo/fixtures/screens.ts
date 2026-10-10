@@ -382,7 +382,7 @@ export const DEMO_CANCELLATION: CancellationViewModel = {
     { label: 'Refund Amount', value: '₹135', emphasis: 'total' },
   ],
   refundMethodTitle: 'Refund to original payment source',
-  refundMethodBody: 'Takes 5-6 business days',
+  refundMethodBody: 'Takes 5-7 business days',
   cancelCtaLabel: 'Cancel',
   confirmedTitle: 'Your booking has been cancelled',
   bookAgainTitle: 'Would you like to make another booking?',

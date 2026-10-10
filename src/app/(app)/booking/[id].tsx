@@ -149,6 +149,7 @@ export default function BookingRoute() {
         onHelp={() => {
           openHelp('Hi Spoon, I need help with my booking.');
         }}
+        onContactSupport={openHelp}
         onCallCook={() => {
           void callCook.call();
         }}

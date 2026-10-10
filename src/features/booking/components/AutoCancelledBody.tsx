@@ -13,6 +13,8 @@ import {
   lightTheme,
 } from '@ui';
 
+import { RefundTracker } from '@features/refunds';
+
 import type { AutoCancelledViewModel } from '../types';
 
 /**
@@ -40,12 +42,15 @@ export interface AutoCancelledBodyProps {
   readonly cancelled: AutoCancelledViewModel;
   readonly onRebook?: () => void;
   readonly onDeclineRebook?: () => void;
+  /** A failed refund's "Contact support" (DEC-090) — WhatsApp with the message prefilled. */
+  readonly onContactSupport?: (message: string) => void;
 }
 
 export function AutoCancelledBody({
   cancelled,
   onRebook,
   onDeclineRebook,
+  onContactSupport,
 }: AutoCancelledBodyProps) {
   return (
     <View style={styles.container} testID="auto-cancelled-body">
@@ -64,30 +69,39 @@ export function AutoCancelledBody({
           testID="auto-cancelled-apology"
         />
 
-        <NoticeCard
-          title={cancelled.refundTitle}
-          body={cancelled.refundBody}
-          art={BOOKING_NOTE_REFUND_ART}
-          testID="auto-cancelled-refund"
-        >
-          <View style={styles.refundFigures}>
-            <View style={styles.refundRow}>
-              <Text variant="bodyStrong" color="textPrimary">
-                {cancelled.refundAmountLabel}
-              </Text>
-              {/* Server-supplied and rendered verbatim. Never `paid − fee`. */}
-              <Text variant="headingCta" color="textPrimary" align="right">
-                {cancelled.refundAmount}
-              </Text>
-            </View>
+        {/* The tracker (DEC-090) once the server sends it; the designed notice before. */}
+        {cancelled.refundTracker === undefined ? (
+          <NoticeCard
+            title={cancelled.refundTitle}
+            body={cancelled.refundBody}
+            art={BOOKING_NOTE_REFUND_ART}
+            testID="auto-cancelled-refund"
+          >
+            <View style={styles.refundFigures}>
+              <View style={styles.refundRow}>
+                <Text variant="bodyStrong" color="textPrimary">
+                  {cancelled.refundAmountLabel}
+                </Text>
+                {/* Server-supplied and rendered verbatim. Never `paid − fee`. */}
+                <Text variant="headingCta" color="textPrimary" align="right">
+                  {cancelled.refundAmount}
+                </Text>
+              </View>
 
-            <RefundDestinationRow
-              destination={cancelled.refundDestination}
-              timeframe={cancelled.refundTimeframe}
-              testID="auto-cancelled-destination"
-            />
-          </View>
-        </NoticeCard>
+              <RefundDestinationRow
+                destination={cancelled.refundDestination}
+                timeframe={cancelled.refundTimeframe}
+                testID="auto-cancelled-destination"
+              />
+            </View>
+          </NoticeCard>
+        ) : (
+          <RefundTracker
+            refund={cancelled.refundTracker}
+            onContactSupport={onContactSupport ?? noop}
+            testID="auto-cancelled-refund-tracker"
+          />
+        )}
       </View>
 
       <View style={styles.rebook} testID="auto-cancelled-rebook">
@@ -126,7 +140,8 @@ export function AutoCancelledBody({
 }
 
 function noop() {
-  // Intentionally inert: neither rebook answer has a designed destination yet.
+  // Intentionally inert: neither rebook answer has a designed destination yet, and a host that
+  // wires no support handler gets an inert Contact support rather than an invented route.
 }
 
 const styles = StyleSheet.create({

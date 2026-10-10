@@ -132,6 +132,7 @@ export default function RecurringBookingRoute() {
   const { askToCancel, sheet: cancelSheet } = useCancelWholeBooking({
     bookingId: bookingId ?? null,
     enabled: tab === 'plans',
+    onViewRefunds: () => router.push('/refunds'),
     onCancelled: () => {
       setTab('live');
       booking.refetch();

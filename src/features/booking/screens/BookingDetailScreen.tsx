@@ -36,6 +36,8 @@ export interface BookingDetailActions {
    */
   readonly initialTipOpen?: boolean;
   readonly onHelp?: () => void;
+  /** A failed refund's "Contact support" on a cancelled booking (DEC-090). */
+  readonly onContactSupport?: (message: string) => void;
   readonly onCallCook?: () => void;
   /**
    * A Call Cook failure, already turned into customer copy by `useCallCook`.
@@ -459,6 +461,9 @@ export function BookingDetailView({
             {...(actions.onDeclineRebook === undefined
               ? {}
               : { onDeclineRebook: actions.onDeclineRebook })}
+            {...(actions.onContactSupport === undefined
+              ? {}
+              : { onContactSupport: actions.onContactSupport })}
           />
         );
 
@@ -468,7 +473,12 @@ export function BookingDetailView({
         return booking.customerCancelled === undefined ? (
           unknownView(booking.view)
         ) : (
-          <CustomerCancelledBody cancelled={booking.customerCancelled} />
+          <CustomerCancelledBody
+            cancelled={booking.customerCancelled}
+            {...(actions.onContactSupport === undefined
+              ? {}
+              : { onContactSupport: actions.onContactSupport })}
+          />
         );
 
       case 'cancelled':

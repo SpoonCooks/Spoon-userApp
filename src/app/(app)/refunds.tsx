@@ -1,8 +1,12 @@
+import { useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
+
 import { BookingListView, useRefundHistoryData } from '@features/history';
 import { useSafeBack } from '@core/navigation';
 
 /** Refunds - Figma `71:615`. A top-level destination from Profile, not a filter of history. */
 export default function RefundsRoute() {
+  const router = useRouter();
   const refunds = useRefundHistoryData();
   const { state, refetch } = refunds;
   /**
@@ -19,6 +23,8 @@ export default function RefundsRoute() {
       state={state}
       onRetry={refetch}
       onBack={goBack}
+      // A row opens that refund's tracker (DEC-090).
+      onSelect={(refundId) => router.push(`/refund/${refundId}` as Href)}
       variant="refund"
       paging={{
         hasMore: refunds.hasMore,

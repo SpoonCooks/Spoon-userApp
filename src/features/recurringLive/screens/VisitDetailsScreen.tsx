@@ -62,6 +62,11 @@ export interface VisitDetailsScreenProps {
   readonly onNextVisit?: (() => void) | undefined;
   /** Completed only — rendered where the rate card sits, 24 under the banner and above the charge. */
   readonly ratingSlot?: ReactNode | undefined;
+  /**
+   * Cancelled and charged only — the refund tracker (DEC-090), drawn in place of the payment
+   * summary once the host has the visit's refund. The summary stands until then.
+   */
+  readonly refundSlot?: ReactNode | undefined;
   /** How many prep checks start ticked: 0 (`1441:1808`), 1 (`1441:1853`) or 3 (`1441:1898`). */
   readonly prepState?: VisitPrepReady | undefined;
   readonly onPrepChange?: ((checked: readonly VisitPrepKey[]) => void) | undefined;
@@ -89,6 +94,7 @@ export function VisitDetailsScreen({
   onViewCookPool,
   onNextVisit,
   ratingSlot,
+  refundSlot,
   prepState = 0,
   onPrepChange,
   onBookAgain,
@@ -193,7 +199,9 @@ export function VisitDetailsScreen({
           </>
         ) : null}
 
-        {model.refund !== null ? (
+        {model.refund !== null && refundSlot !== undefined && refundSlot !== null ? (
+          refundSlot
+        ) : model.refund !== null ? (
           <RefundSummaryCard refund={model.refund} testID={`${testID}-refund`} />
         ) : (
           <VisitChargeCard charge={model.charge} testID={`${testID}-charge`} />
