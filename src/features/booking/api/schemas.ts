@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { refundTrackerSchema } from '@features/refunds';
+
 /**
  * Booking DTOs — quote, create, detail, active, history, and the lifecycle reads.
  *
@@ -583,7 +585,8 @@ export type RescheduleOptionsDto = z.infer<typeof rescheduleOptionsSchema>;
  */
 export const refundSchema = z.object({
   refundId: z.string(),
-  bookingId: z.string(),
+  /** Null for a Recurring debit's refund: a visit cancelled before it became a booking. */
+  bookingId: z.string().nullable(),
   /** Why Spoon owes this refund. A bounded, customer-safe category. */
   reason: z.string(),
   amountPaise: z.number().int().nonnegative(),
@@ -601,6 +604,8 @@ export const refundSchema = z.object({
   serviceStart: z.string().nullish(),
   durationMinutes: z.number().int().positive().nullish(),
   cook: bookingSummaryCookSchema.nullish(),
+  /** The refund tracker (DEC-090). `.nullish()` for deployments that predate it. */
+  tracker: refundTrackerSchema.nullish(),
 });
 
 export type RefundDto = z.infer<typeof refundSchema>;

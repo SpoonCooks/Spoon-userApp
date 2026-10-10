@@ -68,6 +68,42 @@ describe('razorpayCheckoutLauncher', () => {
     );
   });
 
+  it('themes the sheet to Spoon and leaves a one-time payment’s methods alone', async () => {
+    mockOpen.mockResolvedValue({ razorpay_payment_id: 'pay_1', razorpay_signature: 'sig' });
+
+    await razorpayCheckoutLauncher.open(ORDER);
+
+    const options = mockOpen.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(options['theme']).toEqual({ color: '#FFD600' });
+    expect(options['config']).toBeUndefined();
+    expect(options['recurring']).toBeUndefined();
+  });
+
+  it('offers Autopay only through UPI apps, never a typed UPI ID', async () => {
+    mockOpen.mockResolvedValue({ razorpay_payment_id: 'pay_1', razorpay_signature: 'sig' });
+
+    await razorpayCheckoutLauncher.open({ ...ORDER, recurring: { providerCustomerId: 'cust_1' } });
+
+    expect(mockOpen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer_id: 'cust_1',
+        recurring: '1',
+        config: {
+          display: {
+            blocks: {
+              upi_apps: {
+                name: 'Approve in your UPI app',
+                instruments: [{ method: 'upi', flows: ['intent'] }],
+              },
+            },
+            sequence: ['block.upi_apps'],
+            preferences: { show_default_blocks: false },
+          },
+        },
+      }),
+    );
+  });
+
   it('reports a dismissed sheet as a cancellation, not as a failure', async () => {
     // `0` is `Checkout.PAYMENT_CANCELED` in the bundled SDK — see the constant's own comment.
     mockOpen.mockRejectedValue({ code: 0, description: 'Payment processing cancelled by user' });

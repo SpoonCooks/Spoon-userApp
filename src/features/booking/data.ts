@@ -1318,6 +1318,10 @@ export function useBookingDetailData(bookingId: string): ScreenQuery<BookingDeta
       base,
       dto,
       refunds: refunds.state.status === 'ready' ? refunds.state.data : null,
+      timeZone:
+        catalogue.state.status === 'ready'
+          ? catalogue.state.data.operatingWindow.timeZone
+          : undefined,
       onUnknownStatus: (status) =>
         logger.warn('Unmapped booking status from server', { status: String(status) }),
     });

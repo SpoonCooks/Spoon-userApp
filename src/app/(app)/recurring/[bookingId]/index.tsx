@@ -107,10 +107,24 @@ export default function RecurringBookingRoute() {
     autopay.approve(data).then(
       (outcome) => {
         booking.refetch();
-        if (outcome.kind === 'approved') {
+        if (outcome.kind !== 'approved') return;
+        // Only the bank's confirmation is "approved". Checkout succeeding means the request
+        // reached the bank; it can still be pending there, or refused (handoff V2).
+        const { mandate } = outcome;
+        if (mandate.status === 'confirmed' || mandate.bookingStatus === 'active') {
           Alert.alert(
             'Autopay approved',
             'Your visits are set. We’ll confirm each cook 3 hours before.',
+          );
+        } else if (mandate.status === 'pending' || mandate.status === 'initiated') {
+          Alert.alert(
+            'Waiting for your bank',
+            'We’ll let you know as soon as your bank confirms Autopay. This usually takes a few minutes.',
+          );
+        } else {
+          Alert.alert(
+            'Autopay wasn’t approved',
+            'Your bank didn’t confirm Autopay. Please try again from this booking.',
           );
         }
       },
@@ -132,6 +146,7 @@ export default function RecurringBookingRoute() {
   const { askToCancel, sheet: cancelSheet } = useCancelWholeBooking({
     bookingId: bookingId ?? null,
     enabled: tab === 'plans',
+    onViewRefunds: () => router.push('/refunds'),
     onCancelled: () => {
       setTab('live');
       booking.refetch();

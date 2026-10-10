@@ -10,6 +10,8 @@ import {
   lightTheme,
 } from '@ui';
 
+import { RefundTracker } from '@features/refunds';
+
 import type { CustomerCancelledViewModel } from '../types';
 
 /**
@@ -40,38 +42,49 @@ import type { CustomerCancelledViewModel } from '../types';
  */
 export interface CustomerCancelledBodyProps {
   readonly cancelled: CustomerCancelledViewModel;
+  /** A failed refund's "Contact support" (DEC-090) — WhatsApp with the message prefilled. */
+  readonly onContactSupport?: (message: string) => void;
 }
 
-export function CustomerCancelledBody({ cancelled }: CustomerCancelledBodyProps) {
+export function CustomerCancelledBody({ cancelled, onContactSupport }: CustomerCancelledBodyProps) {
   return (
     <View style={styles.container} testID="customer-cancelled-body">
       {/* `606:4911` is byte-identical to `201:66` and `115:2716`. */}
       <CancelledHero title={cancelled.title} testID="customer-cancelled-hero" />
 
-      <NoticeCard
-        title={cancelled.refundTitle}
-        body={cancelled.refundBody}
-        art={BOOKING_NOTE_REFUND_ART}
-        testID="customer-cancelled-refund"
-      >
-        <View style={styles.refundFigures}>
-          <View style={styles.refundRow}>
-            <Text variant="bodyStrong" color="textPrimary">
-              {cancelled.refundAmountLabel}
-            </Text>
-            {/* Server-supplied and rendered verbatim. Never `paid − fee`. */}
-            <Text variant="headingCta" color="textPrimary" align="right">
-              {cancelled.refundAmount}
-            </Text>
-          </View>
+      {/* The tracker (DEC-090) once the server sends it; the designed notice before. */}
+      {cancelled.refundTracker === undefined ? (
+        <NoticeCard
+          title={cancelled.refundTitle}
+          body={cancelled.refundBody}
+          art={BOOKING_NOTE_REFUND_ART}
+          testID="customer-cancelled-refund"
+        >
+          <View style={styles.refundFigures}>
+            <View style={styles.refundRow}>
+              <Text variant="bodyStrong" color="textPrimary">
+                {cancelled.refundAmountLabel}
+              </Text>
+              {/* Server-supplied and rendered verbatim. Never `paid − fee`. */}
+              <Text variant="headingCta" color="textPrimary" align="right">
+                {cancelled.refundAmount}
+              </Text>
+            </View>
 
-          <RefundDestinationRow
-            destination={cancelled.refundDestination}
-            timeframe={cancelled.refundTimeframe}
-            testID="customer-cancelled-destination"
-          />
-        </View>
-      </NoticeCard>
+            <RefundDestinationRow
+              destination={cancelled.refundDestination}
+              timeframe={cancelled.refundTimeframe}
+              testID="customer-cancelled-destination"
+            />
+          </View>
+        </NoticeCard>
+      ) : (
+        <RefundTracker
+          refund={cancelled.refundTracker}
+          onContactSupport={onContactSupport ?? noop}
+          testID="customer-cancelled-refund-tracker"
+        />
+      )}
 
       <View style={styles.details} testID="customer-cancelled-details">
         <Text variant="title" color="textPrimary" accessibilityRole="header">
@@ -83,6 +96,10 @@ export function CustomerCancelledBody({ cancelled }: CustomerCancelledBodyProps)
       </View>
     </View>
   );
+}
+
+function noop() {
+  // A host that wires no support handler gets an inert Contact support, not an invented route.
 }
 
 const styles = StyleSheet.create({

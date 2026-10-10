@@ -38,6 +38,8 @@ import {
   useRecurringVisitCancellationQuote,
   useUpdateBookingPrep,
 } from '@features/recurringSetup';
+import { RefundTracker, refundTrackerFrom, useRefund } from '@features/refunds';
+import { useWhatsAppHelp } from '@features/support';
 import { QueryBoundary } from '@ui';
 
 /**
@@ -103,6 +105,18 @@ export default function RecurringVisitRoute() {
   };
   const openHelp = whatsApp('help');
   const openRecipe = whatsApp('recipe');
+
+  // ─── Refund tracker (DEC-090) ──────────────────────────────────────────────────────────────
+  const refund = useRefund(detail?.cancellation?.refundId ?? null);
+  const contactSupport = useWhatsAppHelp();
+  const refundSlot =
+    refund.state.status === 'ready' ? (
+      <RefundTracker
+        refund={refundTrackerFrom(refund.state.data, { timeZone: 'Asia/Kolkata' })}
+        onContactSupport={contactSupport}
+        testID="visit-refund-tracker"
+      />
+    ) : undefined;
 
   // ─── Checklist ─────────────────────────────────────────────────────────────────────────────
   const prepBookingId = detail?.payment?.bookingId ?? detail?.bookingId ?? null;
@@ -267,6 +281,7 @@ export default function RecurringVisitRoute() {
     bookingId: bookingId ?? null,
     // Not tied to the sheet being open: Manage closes it, and the quote must still be there.
     enabled: bookingActive,
+    onViewRefunds: () => router.push('/refunds'),
     onCancelled: () => {
       visit.refetch();
       booking.refetch();
@@ -319,6 +334,7 @@ export default function RecurringVisitRoute() {
                   })
             }
             ratingSlot={ratingSlot}
+            refundSlot={refundSlot}
           />
           <TellUsMoreSheet
             visible={noteOpen}
