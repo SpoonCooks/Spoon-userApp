@@ -33,12 +33,17 @@ export const KNOWN_EVENT_TYPES = [
   // since. Routing never depended on the list, so nothing broke -- which is exactly why an
   // audit list that has quietly stopped matching the backend is worth correcting.
   'booking.cancelled',
+  // "Refund started" / "Refund credited" (DEC-090). These carry a `refundId` too, and open that
+  // refund's tracker rather than the booking.
+  'refund.requested',
+  'refund.credited',
 ] as const;
 
 export type KnownEventType = (typeof KNOWN_EVENT_TYPES)[number];
 
 const BOOKING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** A uuid — the shape of every booking and refund id Spoon issues. */
 function isBookingId(value: unknown): value is string {
   return typeof value === 'string' && BOOKING_ID.test(value);
 }
@@ -56,7 +61,18 @@ export function isKnownEventType(value: unknown): value is KnownEventType {
 export function routeForNotification(data: unknown): string {
   if (typeof data !== 'object' || data === null) return '/home';
 
-  const bookingId = (data as Record<string, unknown>)['bookingId'];
+  const record = data as Record<string, unknown>;
+  const bookingId = record['bookingId'];
+
+  // A refund push opens its tracker (DEC-090). Same shape check as the booking id: refund ids are
+  // uuids too, and nothing here builds a route out of an unvalidated string.
+  const refundId = record['refundId'];
+  if (
+    (record['eventType'] === 'refund.requested' || record['eventType'] === 'refund.credited') &&
+    isBookingId(refundId)
+  ) {
+    return `/refund/${refundId}`;
+  }
 
   // A booking id is the only thing that can target a screen. Anything else — a malformed
   // payload, a campaign message, an event from a newer backend — lands on Home rather than on a

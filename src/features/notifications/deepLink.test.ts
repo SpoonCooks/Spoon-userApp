@@ -24,6 +24,21 @@ describe('routeForNotification', () => {
     }
   });
 
+  it('opens the refund tracker for a refund push', () => {
+    const refundId = '3f1c2a5e-0000-4000-8000-0000000000aa';
+    for (const eventType of ['refund.requested', 'refund.credited']) {
+      expect(routeForNotification({ bookingId: BOOKING, refundId, eventType })).toBe(
+        `/refund/${refundId}`,
+      );
+    }
+  });
+
+  it('opens the booking when a refund push carries no usable refund id', () => {
+    expect(
+      routeForNotification({ bookingId: BOOKING, refundId: '../x', eventType: 'refund.credited' }),
+    ).toBe(`/booking/${BOOKING}`);
+  });
+
   it('still opens the booking for an event type this build has never heard of', () => {
     // A newer backend emitting `booking.delayed` must not produce a dead tap. The customer
     // tapped a notification about a booking; the booking screen reads its real state.
