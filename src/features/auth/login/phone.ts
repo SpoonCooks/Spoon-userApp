@@ -19,26 +19,34 @@ export function normalizePhoneInput(raw: string): string {
   return raw.replace(/\D/g, '').slice(-PHONE_DIGITS);
 }
 
+/** The national number splits after its 5th digit: "98765 43210". */
+const GROUP_AT = 5;
+
 /**
  * The field's next value from what the TextInput reports, given what it was showing.
  *
  * - Typing past 10 digits is ignored ("digits only, max 10"); only a PASTE (more than one
  *   character arriving at once) keeps the last 10, which is what strips +91 or a leading 0.
- * - The field shows a complete number grouped as "98765 43210" (`1945:1526`). Backspacing over
- *   that space would leave the digits unchanged, so it deletes the digit before it instead.
+ * - The field shows the number grouped as it is typed. Backspacing over that space would leave
+ *   the digits unchanged, so it deletes the digit in front of the space instead.
  */
 export function nextPhoneDigits(previousDigits: string, previousDisplay: string, text: string) {
   const digits = text.replace(/\D/g, '');
   if (text.length - previousDisplay.length > 1) return digits.slice(-PHONE_DIGITS);
   if (digits === previousDigits && text.length < previousDisplay.length) {
-    return previousDigits.slice(0, -1);
+    return previousDigits.slice(0, GROUP_AT - 1) + previousDigits.slice(GROUP_AT);
   }
   return digits.slice(0, PHONE_DIGITS);
 }
 
-/** "98765 43210" once all 10 digits are in; a partial number is shown as typed (`1940:7590`). */
+/**
+ * The field's display: grouped as the customer types, so the space appears with the 6th digit
+ * ("98765" → "98765 4" → "98765 43210") rather than jumping in at the 10th (`1945:1526`).
+ */
 export function displayDigits(digits: string): string {
-  return formatNational(digits);
+  return digits.length > GROUP_AT
+    ? `${digits.slice(0, GROUP_AT)} ${digits.slice(GROUP_AT)}`
+    : digits;
 }
 
 export function isValidMobile(digits: string): boolean {

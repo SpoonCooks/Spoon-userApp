@@ -68,15 +68,27 @@ describe('LoginScreen — 1923:1139 (dev notes 1949:2203 / 1949:2258)', () => {
     expect(phone().props.value).toBe('98765 43210');
   });
 
-  it('ignores typing past 10 digits, and backspace over the space deletes a digit', () => {
+  it('groups the number as it is typed, from the 6th digit', () => {
+    render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} />);
+
+    fireEvent.changeText(phone(), '98765');
+    expect(phone().props.value).toBe('98765');
+    fireEvent.changeText(phone(), '987654');
+    expect(phone().props.value).toBe('98765 4');
+    fireEvent.changeText(phone(), '98765 43');
+    expect(phone().props.value).toBe('98765 43');
+  });
+
+  it('ignores typing past 10 digits, and backspace over the space deletes the digit before it', () => {
     render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} />);
 
     fireEvent.changeText(phone(), '9876543210');
     fireEvent.changeText(phone(), '98765 432101');
     expect(phone().props.value).toBe('98765 43210');
 
+    // The space removed: digits unchanged, so the 5th digit goes.
     fireEvent.changeText(phone(), '9876543210');
-    expect(phone().props.value).toBe('987654321');
+    expect(phone().props.value).toBe('98764 3210');
   });
 
   it('shows the invalid-number message when the disabled Get OTP is tapped', () => {
@@ -93,6 +105,7 @@ describe('LoginScreen — 1923:1139 (dev notes 1949:2203 / 1949:2258)', () => {
     render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} />);
 
     fireEvent.changeText(phone(), '2345687');
+    expect(phone().props.value).toBe('23456 87');
     expect(screen.queryByText(DEMO_LOGIN.invalidPhoneMessage)).toBeNull();
 
     fireEvent(phone(), 'blur');
@@ -119,7 +132,7 @@ describe('LoginScreen — 1923:1139 (dev notes 1949:2203 / 1949:2258)', () => {
     const { rerender } = render(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} />);
     fireEvent.changeText(phone(), '81112223');
     rerender(<LoginScreen login={DEMO_LOGIN} onRequestOtp={noop} initialPhone="+919876543210" />);
-    expect(phone().props.value).toBe('81112223');
+    expect(phone().props.value).toBe('81112 223');
   });
 
   it('prefills the field from initialPhone, dropping the country code', () => {
