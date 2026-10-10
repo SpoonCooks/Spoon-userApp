@@ -1,4 +1,5 @@
 import { getLogger } from '@core/logging';
+import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import type { CheckoutLauncher } from './paymentApi';
 import type { RazorpayCheckoutResult } from './schemas';
@@ -180,6 +181,30 @@ function loadCheckout(): RazorpayModule {
  * not open". Requiring it at the moment checkout is opened confines the failure to the payment
  * the customer just asked for, which is where it belongs and where it can be reported.
  */
+/**
+ * Razorpay's own sheet, themed to Spoon (handoff V2): the brand yellow on its header and pay
+ * button. The logo is the one set on the Razorpay dashboard, so it changes without a release.
+ */
+export const CHECKOUT_THEME = { color: lightTheme.colors.textBrand } as const;
+
+/**
+ * Autopay is approved in a UPI app only (handoff V2: no typed UPI ID). Checkout shows a single
+ * UPI block with the intent flow — the installed apps — and none of its default blocks, so there
+ * is no field to type a VPA into and no other method to pick.
+ */
+export const AUTOPAY_CHECKOUT_CONFIG = {
+  display: {
+    blocks: {
+      upi_apps: {
+        name: 'Approve in your UPI app',
+        instruments: [{ method: 'upi', flows: ['intent'] }],
+      },
+    },
+    sequence: ['block.upi_apps'],
+    preferences: { show_default_blocks: false },
+  },
+} as const;
+
 export const razorpayCheckoutLauncher: CheckoutLauncher = {
   async open(input): Promise<RazorpayCheckoutResult> {
     const checkout = loadCheckout();
@@ -197,9 +222,14 @@ export const razorpayCheckoutLauncher: CheckoutLauncher = {
         description: input.description,
         ...(input.prefill === undefined ? {} : { prefill: input.prefill }),
         // Razorpay's recurring checkout: the token is created on this Customer.
+        theme: CHECKOUT_THEME,
         ...(input.recurring === undefined
           ? {}
-          : { customer_id: input.recurring.providerCustomerId, recurring: '1' }),
+          : {
+              customer_id: input.recurring.providerCustomerId,
+              recurring: '1',
+              config: AUTOPAY_CHECKOUT_CONFIG,
+            }),
       });
     } catch (error) {
       const { code, description, reason } = readRejection(error);
