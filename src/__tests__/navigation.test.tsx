@@ -85,7 +85,7 @@ jest.mock('expo-router', () => ({
     mockRedirected.push(href);
     return null;
   },
-  Stack: () => null,
+  Stack: Object.assign(() => null, { Screen: () => null }),
 }));
 
 function makeRouter(canGoBack: boolean) {
@@ -197,7 +197,7 @@ const POPPING_BACK_ROUTES = [
   ['address/out-of-service', AddressOutOfServiceRoute, 'address-header-back', '/address/location'],
   ['scheduled', ScheduledRoute, 'schedule-header-back', '/home'],
   // `275:4321`'s "edit number" IS the back control on OTP — the frame draws no chevron.
-  ['otp', OtpRoute, 'otp-screen-edit', '/login'],
+  ['otp', OtpRoute, 'login-otp-screen-edit', '/login'],
   // `68:214` is always pushed directly on top of whichever entry sent it (Home or Profile — see
   // "Saved addresses back target follows its entry point" below), so popping both lands on the
   // right screen AND plays the platform's reverse-of-push closing animation, which a bare

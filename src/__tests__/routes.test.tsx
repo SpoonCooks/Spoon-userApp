@@ -84,7 +84,7 @@ jest.mock('expo-router', () => ({
     require('react').useEffect(effect, [effect]);
   },
   Redirect: () => null,
-  Stack: () => null,
+  Stack: Object.assign(() => null, { Screen: () => null }),
 }));
 
 /**
@@ -255,20 +255,16 @@ describe('routes render', () => {
     expect(screen.queryByTestId('legal-document-screen')).toBeNull();
   });
 
-  it('renders the NEW Login (53:174) — hero, tagline, pill field and legal footer', () => {
+  it('renders the redesigned Login (1923:1139) — badges, field, Get OTP and legal footer', () => {
     render(<LoginRoute />);
 
     expect(screen.getByTestId('login-screen')).toBeTruthy();
     expect(screen.getByTestId('login-screen-phone')).toBeTruthy();
     expect(screen.getByTestId('login-screen-cta')).toBeTruthy();
-    expect(screen.getByText('Login')).toBeTruthy();
-    expect(screen.getByText('Enter your phone number to proceed')).toBeTruthy();
-    // The new frame DOES carry a legal footer; ruling R-6 predated it.
+    expect(screen.getByText('Home cooks for all your needs')).toBeTruthy();
+    expect(screen.getByText('Get OTP')).toBeTruthy();
     expect(screen.getByText('Terms of use')).toBeTruthy();
     expect(screen.getByText('Privacy policy')).toBeTruthy();
-    // `53:235`'s prototype toggle is still absent (B-20).
-    expect(screen.queryByText('User Type:')).toBeNull();
-    expect(screen.queryByText('Returning User')).toBeNull();
   });
 
   it('does not embed the development menu inside Login', () => {
@@ -287,45 +283,38 @@ describe('routes render', () => {
     const cta = screen.getByTestId('login-screen-cta');
     expect(cta.props.accessibilityState.disabled).toBe(true);
 
+    // A number that is not a mobile (must start 6–9) keeps it inert too.
+    fireEvent.changeText(screen.getByTestId('login-screen-phone'), '5876543210');
+    expect(screen.getByTestId('login-screen-cta').props.accessibilityState.disabled).toBe(true);
+
     fireEvent.changeText(screen.getByTestId('login-screen-phone'), '9876543210');
     expect(screen.getByTestId('login-screen-cta').props.accessibilityState.disabled).toBe(false);
   });
 
-  it('renders the NEW OTP screen (275:4289) — B-7 is obsolete', () => {
+  it('renders the redesigned OTP screen (1934:1080) with no Verify button', () => {
+    mockSearchParams = { phone: '+919876543210', retryAfter: '30' };
     render(<OtpRoute />);
 
-    expect(screen.getByTestId('otp-screen')).toBeTruthy();
-    expect(screen.getByText('OTP verification')).toBeTruthy();
-    // `275:4321` draws SIX boxes, and the count is read from the payload, never assumed.
-    expect(screen.getAllByTestId(/^otp-screen-digit-\d+$/)).toHaveLength(6);
-    // Nothing is design-pending here any more.
-    expect(screen.queryByText('DESIGN PENDING')).toBeNull();
-  });
-
-  it('has no submit CTA — the finalized frames draw none (275:4289 / 250:2439 / 275:4349)', () => {
-    render(<OtpRoute />);
-
-    expect(screen.queryByTestId('otp-screen-cta')).toBeNull();
+    expect(screen.getByTestId('login-otp-screen')).toBeTruthy();
+    expect(screen.getByText('Enter your')).toBeTruthy();
+    expect(screen.getByText('+91 98765 43210')).toBeTruthy();
+    // The 6th digit submits; nothing in the frames is a submit control.
     expect(screen.queryByText('Verify & Proceed')).toBeNull();
   });
 
-  it('shows the resend link when no server cooldown was carried in (250:2439)', () => {
-    // `useLocalSearchParams` is mocked without `retryAfter`, which is the "cooldown already
-    // elapsed" case. The offered state is the single-run label the frame draws.
+  it('shows Resend via SMS when no server cooldown was carried in (1934:1358)', () => {
+    // `useLocalSearchParams` is mocked without `retryAfter` — the cooldown has already elapsed.
     render(<OtpRoute />);
 
-    expect(screen.getByText('Resend OTP via SMS')).toBeTruthy();
+    expect(screen.getByText('Resend via SMS')).toBeTruthy();
   });
 
-  it("counts down from the SERVER's cooldown, not a client constant (275:4289)", () => {
+  it("counts down from the SERVER's cooldown, not a client constant (1934:1352)", () => {
     mockSearchParams = { phone: '+919876543210', retryAfter: '26' };
     render(<OtpRoute />);
 
-    // 26 is `otp/send`'s `retryAfterSeconds`. The frame's own sample copy said 26s too, but the
-    // point is that this value arrived from the server rather than being authored here.
-    expect(screen.getByText(/Resend OTP in/)).toBeTruthy();
-    expect(screen.getByText('26s')).toBeTruthy();
-    expect(screen.getByText('OTP has been sent to +91 9876543210')).toBeTruthy();
+    // 26 is `otp/send`'s `retryAfterSeconds`; the pill formats it as m:ss.
+    expect(screen.getByText('Resend in 0:26')).toBeTruthy();
   });
 
   /**

@@ -21,9 +21,13 @@
 
 export { LoginScreen } from './screens/LoginScreen';
 export type { LoginScreenProps } from './screens/LoginScreen';
+export { LoginOtpScreen } from './screens/LoginOtpScreen';
+export type { LoginOtpScreenProps, ResendState } from './screens/LoginOtpScreen';
+export { displayPhone } from './login/phone';
+export { consumePhoneEdit, requestPhoneEdit } from './login/editRequest';
 export { OtpScreen } from './screens/OtpScreen';
 export type { OtpNotice, OtpScreenProps } from './screens/OtpScreen';
-export type { LoginViewModel, OtpViewModel } from './types';
+export type { LoginOtpViewModel, LoginViewModel, OtpViewModel } from './types';
 export { isGuestModeAvailable } from './guestMode';
 
 export {
@@ -31,10 +35,13 @@ export {
   authKeys,
   createAuthApi,
   createSessionGateway,
+  loginSendErrorMessage,
+  loginVerifyFailure,
   loginWithError,
   meResponseSchema,
   otpViewModel,
   otpWithError,
+  resendCountdownLabel,
   resendLabelFor,
   profileDataSchema,
   sentToLabelFor,
@@ -48,6 +55,7 @@ export {
   useVerifyOtp,
 } from './api';
 export type {
+  LoginVerifyFailure,
   AuthApi,
   AuthUser,
   MeResponse,

@@ -108,3 +108,43 @@ export function otpWithError(base: OtpViewModel, error: AppError | null): OtpVie
   if (error === null) return base;
   return { ...base, errorMessage: getUserMessage(error) };
 }
+
+/*
+ * Login redesign copy (`cCQlzTeiObQkpVBzwI8mZi` page "Login", dev notes `1949:2203`–`1949:2227`).
+ *
+ * V0 cannot tell a wrong code from an expired, superseded or over-attempted one: `otp/verify`
+ * answers all of them with the same INVALID_REQUEST, and no error carries a retry-after time. So
+ * the note's separate "This code has expired" and "Too many wrong attempts" lines, and the
+ * "{n} min" in the rate-limit copy, have nothing to be driven by yet; the generic lines below
+ * stand in for them.
+ */
+
+/** Get OTP failed. RATE_LIMITED is the send cooldown or the per-number limit. */
+export function loginSendErrorMessage(error: AppError): string {
+  if (error.code === 'RATE_LIMITED') return 'Too many attempts. Please try again in a few minutes.';
+  return 'Couldn’t send the OTP. Check your connection and try again.';
+}
+
+/** How a failed verify is shown: in the cells' error slot, or as a toast with the digits kept. */
+export type LoginVerifyFailure =
+  | { readonly kind: 'rejected'; readonly message: string }
+  | { readonly kind: 'toast'; readonly message: string };
+
+export function loginVerifyFailure(error: AppError): LoginVerifyFailure {
+  if (error.code === 'RATE_LIMITED') {
+    return {
+      kind: 'rejected',
+      message: 'Too many attempts. Please try again in a few minutes.',
+    };
+  }
+  if (error.kind === 'validation' || error.code === 'INVALID_REQUEST') {
+    return { kind: 'rejected', message: 'That code didn’t match. Please try again.' };
+  }
+  return { kind: 'toast', message: 'No connection. Try again.' };
+}
+
+/** "Resend in 0:25". */
+export function resendCountdownLabel(secondsRemaining: number): string {
+  const seconds = Math.max(0, secondsRemaining);
+  return `Resend in ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
