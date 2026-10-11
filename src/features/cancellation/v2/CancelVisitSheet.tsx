@@ -888,7 +888,7 @@ function ReviewStep({
                 <Text style={styles.bodyStrong}>
                   {refundMethod ?? 'Your original payment method'}
                 </Text>
-                <Text style={styles.caption}>Back in 3–5 working days</Text>
+                <Text style={styles.caption}>Back in 5-7 working days</Text>
               </View>
             </View>
           )}
@@ -1017,17 +1017,21 @@ function DoneStep({
                     <Image source={CANCEL_ART.checkTiny} style={styles.icon12} />
                   </View>
                 ) : (
-                  <View style={styles.stepDotPending} />
+                  <Image source={CANCEL_ART.dotPending} style={styles.stepDotPending} />
                 )}
               </View>
               <View style={styles.flexText}>
+                {/* The method's kind only ("UPI"); the masked id sits on the "To …" line above. */}
                 <Text style={styles.bodyStrong}>
-                  {method === null ? 'Credit to your account' : `Credit to your ${method} account`}
+                  {method === null
+                    ? 'Credit to your account'
+                    : `Credit to your ${method.split(' · ')[0] ?? method} account`}
                 </Text>
+                {/* No expected date: Razorpay gives none, so the window is stated instead. */}
                 <Text style={styles.caption}>
                   {refund?.refunded === true && refund.creditedAt !== null
                     ? `Credited ${whenLabel(refund.creditedAt, now)}`
-                    : 'Usually within 3–5 working days'}
+                    : 'Expected within 5-7 working days'}
                 </Text>
               </View>
             </View>
@@ -1097,6 +1101,7 @@ export function CancelledBanner({
         </View>
         <View style={styles.bannerBadgeBox}>
           <View style={styles.bannerBadge}>
+            <Image source={CANCEL_ART.badgeRing} style={styles.bannerBadgeRing} />
             <Image source={CANCEL_ART.stateCancelled} style={styles.bannerBadgeIcon} />
           </View>
           <Text style={styles.bannerBadgeText}>CANCELLED</Text>
@@ -1298,15 +1303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepDotPending: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: C.textDisabled,
-    backgroundColor: C.base,
-  },
+  stepDotPending: { width: 20, height: 20 },
   stepConnector: { width: 2, height: 22, backgroundColor: C.textDisabled },
   stepText: { paddingBottom: 8 },
   banner: { padding: 16, borderRadius: 24, overflow: 'hidden' },
@@ -1335,16 +1332,8 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   bannerBadgeBox: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  bannerBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  bannerBadge: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  bannerBadgeRing: { position: 'absolute', top: 0, left: 0, width: 36, height: 36 },
   bannerBadgeIcon: { width: 20, height: 20, opacity: 0.45 },
   bannerBadgeText: {
     fontFamily: T.button.fontFamily,

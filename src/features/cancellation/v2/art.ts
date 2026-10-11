@@ -36,4 +36,10 @@ export const CANCEL_ART = {
   bannerCloudA: img(require('../../../../assets/figma/cancel-v2/banner-cloud-a.png')),
   bannerCloudB: img(require('../../../../assets/figma/cancel-v2/banner-cloud-b.png')),
   checkTiny: img(require('../../../../assets/figma/cancel-v2/icon-check-tiny.png')),
+  /**
+   * The dashed rings (`2055:20876` timeline dot, `1461:6237` CANCELLED badge), drawn as images:
+   * React Native's dashed border on a circle breaks unevenly around the curve.
+   */
+  dotPending: img(require('../../../../assets/figma/cancel-v2/dot-pending.png')),
+  badgeRing: img(require('../../../../assets/figma/cancel-v2/badge-ring.png')),
 } as const;
