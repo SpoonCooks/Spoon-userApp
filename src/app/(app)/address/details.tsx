@@ -1,41 +1,43 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
 import {
-  googleReverseGeocode,
-  AddressDetailsView,
+  AddressDetailsScreen,
+  EMPTY_DETAILS_FORM,
+  RemoveAddressSheet,
   addressCreateScope,
+  cardLineOf,
+  detailsFieldsFrom,
+  detailsFormFrom,
+  googleReverseGeocode,
+  labelKindOf,
+  pinnedSummaryOf,
   resolveAddressSavePoint,
   useAddressDetailsData,
+  useAddresses,
   useCreateAddress,
+  useDeleteAddress,
   useUpdateAddress,
 } from '@features/address';
-import type { AddressFormDraft } from '@features/address';
+import type { AddressDetailsForm, SavedAddressItem } from '@features/address';
 import { useAddressDraftStore } from '@core/store/addressDraftStore';
 import { getUserMessage, isAppError } from '@core/errors';
-import { useSafeBack } from '@core/navigation';
-import { InfoDialog } from '@ui';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
+import { InfoDialog, QueryBoundary } from '@ui';
 
 /**
- * Address details - Figma `60:655` (`18b`), for BOTH adding and editing.
+ * Address details — Figma `1870:2485` / `1870:2576` (adding) and `1870:2672` (Edit address), for
+ * BOTH adding and editing.
  *
- * With `?addressId=<id>` this is the edit destination of `228:1801` (`18d`, task section 5):
- * the form opens PREFILLED with the saved record and Save issues `PUT /v1/me/addresses/:id`,
- * so the address keeps its identity and anything referencing it - a live booking's delivery
- * address - still resolves. Without the parameter it is the add flow, unchanged.
+ * With `?addressId=<id>` this is the edit destination of the saved list's kebab: the form opens
+ * PREFILLED with the saved record and Save issues `PUT /v1/me/addresses/:id`, so the address keeps
+ * its identity and anything referencing it — a live booking's address — still resolves. Without
+ * the parameter it is the add flow. The distinction is made by the PRESENCE OF AN ID rather than a
+ * mode flag: an id is the only thing that makes an update addressable.
  *
- * The distinction is made by the PRESENCE OF AN ID rather than by a mode flag: an id is the
- * only thing that makes an update addressable, so there is no state in which the screen
- * believes it is editing but has nothing to edit.
- *
- * "Check Availability & Save" is now real: `POST /v1/me/addresses` with the coordinates the map
- * step obtained from the device. Serviceability was already checked against those exact
- * coordinates on the previous screen, and the backend checks again — the client asserts nothing
- * about coverage either time.
- *
- * The label chips, the free-text "Save as" and the receiver fields all persist on the address
- * record (B-13), which is why they are sent rather than kept locally.
+ * Serviceability was already checked against the pinned coordinates on the map step, and the
+ * backend checks again on the write — the client asserts nothing about coverage either time.
  */
 export default function AddressDetailsRoute() {
   const router = useRouter();
@@ -45,19 +47,21 @@ export default function AddressDetailsRoute() {
     from?: string;
   }>();
   const editingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
-  const { state, refetch, savedPoint, savedPlaceId, savedArea, locationReady } =
-    useAddressDetailsData(editingId);
+  const { savedPoint, savedPlaceId, savedArea, locationReady } = useAddressDetailsData(editingId);
+  // The edit's own record. Only an edit needs the list; adding must not wait on a read.
+  const addresses = useAddresses({ enabled: editingId !== null });
   const draft = useAddressDraftStore((store) => store.draft);
   const clearDraft = useAddressDraftStore((store) => store.clear);
   const create = useCreateAddress();
   const update = useUpdateAddress();
+  const remove = useDeleteAddress();
   const [error, setError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<SavedAddressItem | null>(null);
 
   /**
-   * An address saved without a pincode gets one back the next time it is edited. Its point is
-   * known, so Google is asked for the postcode in the background while the form is open; the save
-   * sends it if it arrived, and the address simply keeps none if it did not (the backend accepts
-   * that). A new address never needs this: the map step resolves its pincode before it gets here.
+   * An address saved without a pincode gets one back the next time it is edited (566688b). Its
+   * point is known, so Google is asked for the postcode in the background while the form is open;
+   * the save sends it if it arrived, and the address simply keeps none if it did not.
    */
   const [recoveredPincode, setRecoveredPincode] = useState<string | null>(null);
   const needsPincode = editingId !== null && savedArea?.pincode === '';
@@ -78,20 +82,37 @@ export default function AddressDetailsRoute() {
   }, [needsPincode, pointLat, pointLng]);
 
   /**
-   * BACK and "Change area" are NO LONGER the same action (product decision reversed — see
-   * below); the two are now separate handlers with separate reasoning.
-   *
-   * `onChangeArea`'s job never changes: it is a deliberate DIGRESSION to `53:31`, unconditional
-   * regardless of how this screen was reached — an edit that never went through the map still
-   * needs to be able to.
-   *
-   * PUSH, not the old `dismissAll` + `replace`: replacing destroyed THIS screen outright, so
-   * there was nothing left to return to — back landed on the list instead of resuming the form,
-   * and Confirm on the map pushed a SECOND, blank Details rather than the one being edited. A
-   * push keeps this exact screen (with whatever the customer had already typed) alive
-   * underneath, and `resume=1` tells the map's Confirm handler to pop back to it directly
-   * instead of pushing a new one — see `location.tsx`. `addressId` still travels with it so the
-   * round trip stays an UPDATE of the same address rather than a second one (task §28).
+   * An EDIT waits for its record: the form's fields are seeded ONCE when it mounts, so rendering
+   * before `GET /v1/me/addresses` answers would seed it empty and the record would never reach the
+   * inputs. Adding waits for nothing.
+   */
+  const state = useMemo(() => {
+    if (editingId === null) return { status: 'ready' as const, data: null };
+    if (addresses.state.status !== 'ready') return addresses.state;
+    return {
+      status: 'ready' as const,
+      data: addresses.state.data.find((address) => address.id === editingId) ?? null,
+    };
+  }, [editingId, addresses.state]);
+
+  /**
+   * The draft is this screen's only when TAGGED for this exact address (`editingId`): this store
+   * persists until a save succeeds, so an abandoned attempt can leave a point behind.
+   */
+  const draftIsOurs =
+    draft.editingId === editingId && draft.latitude !== null && draft.longitude !== null;
+  const pinned = pinnedSummaryOf(draftIsOurs ? draft : (savedArea ?? draft));
+  const pinMoved =
+    editingId !== null &&
+    draftIsOurs &&
+    savedPoint !== null &&
+    (draft.latitude !== savedPoint.latitude || draft.longitude !== savedPoint.longitude);
+
+  /**
+   * "Edit" on the pinned card is a DIGRESSION to the map, unconditional however this screen was
+   * reached. PUSH, not `dismissAll` + `replace` (cc8c36b): this exact screen, with whatever was
+   * typed, stays alive underneath, and `resume=1` tells the map's Confirm to pop back to it rather
+   * than push a second, blank form. `addressId` travels with it so the round trip stays an UPDATE.
    */
   const goToLocation = () => {
     router.push(
@@ -110,173 +131,122 @@ export default function AddressDetailsRoute() {
   };
 
   /**
-   * BACK — reverses the founder's V7 ruling that forced it through `53:31` even on an edit
-   * (explicit product decision; the prior ruling is quoted in `goToLocation`'s sibling comment
-   * for history). Product now wants an edit's back to return to `68:214` directly, the way it
-   * did before that ruling.
-   *
-   * `useSafeBack`, not a fixed target: this screen has TWO genuinely different predecessors —
-   * `location.tsx`'s confirm (add flow, or a "Change area" digression) really does sit under it,
-   * while `address/index.tsx`'s "Edit" pushes here DIRECTLY, skipping the map. A plain pop
-   * resolves to whichever one is actually true each time, which is exactly what's wanted now —
-   * and, as a side effect, fixes the same "opening" animation defect fixed elsewhere on this
-   * branch, since a real pop was never possible under the old unconditional replace.
+   * BACK pops to whichever screen really sits underneath — the map (adding) or the saved list
+   * (Edit pushes here directly, skipping the map) — via `useSafeBack` (3ff4297, cc8c36b).
    */
-  const goBack = useSafeBack((from === undefined ? '/address' : `/address?from=${from}`) as Href);
+  const listHref = (from === undefined ? '/address' : `/address?from=${from}`) as Href;
+  const goBack = useSafeBack(listHref);
+  // One screen per tap: a quick double tap must not open the same screen twice.
+  const guard = useNavigationGuard();
+
+  /** Leaves the flow: the map/details pair collapses, then Home (onboarding) or the saved list. */
+  const exit = () => {
+    // Guarded: a deep link straight here has nothing to dismiss, and popping an only-child throws.
+    if (router.canDismiss()) router.dismissAll();
+    router.replace(onboarding === '1' ? '/home' : listHref);
+  };
+
+  const save = (form: AddressDetailsForm) => {
+    // The CTA is disabled while a write is out; a press can still race the state that disabled it.
+    if (create.isPending || update.isPending) return;
+
+    /**
+     * The POINT this address is saved at (bc7e2f9): adding, the draft's; editing, the record's own
+     * unless the customer pinned a new one. `null` means there is nothing to save.
+     */
+    const point = resolveAddressSavePoint(draft, editingId, savedPoint, savedPlaceId);
+    if (point === null) return;
+
+    /**
+     * AREA: the draft's, then the address's own (4962f3f). An edit that never went through the
+     * map has an empty draft, and `PUT` requires a pincode.
+     */
+    const area = draftIsOurs ? draft : null;
+    const city = area?.city ?? savedArea?.city ?? null;
+    const stateName = area?.state ?? savedArea?.state ?? null;
+    const input = {
+      ...detailsFieldsFrom(form),
+      street: area?.street ?? savedArea?.street ?? form.society.trim(),
+      pincode:
+        area?.pincode ?? (savedArea?.pincode === '' ? recoveredPincode : savedArea?.pincode) ?? '',
+      ...(city === null ? {} : { city }),
+      ...(stateName === null ? {} : { state: stateName }),
+      ...point,
+    };
+
+    const saved =
+      editingId === null
+        ? create.mutateAsync({
+            // A new address comes back as the one in use (dev note `2075:11950`).
+            input: { ...input, isDefault: true },
+            /*
+             * Scoped to the WHOLE submission: an unchanged retry reuses the `Idempotency-Key` so
+             * the backend can replay an ambiguous timeout, and any edit mints a new one.
+             */
+            scope: addressCreateScope({ ...input, isDefault: true }),
+          })
+        : update.mutateAsync({ id: editingId, input });
+
+    saved
+      .then(() => {
+        // The server owns the address now. The draft has done its job.
+        clearDraft();
+        exit();
+      })
+      .catch((thrown: unknown) => {
+        // The backend refuses an unserviceable point here too; its own message is shown.
+        setError(isAppError(thrown) ? getUserMessage(thrown) : 'We could not save this address.');
+      });
+  };
 
   return (
     <>
-      <AddressDetailsView
-        state={state}
-        onRetry={refetch}
-        onBack={goBack}
-        onChangeArea={goToLocation}
-        /**
-         * The founder's rule, applied at its two ends: `locationReady` is the CONTEXT half of the
-         * gate (a confirmed, server-approved point exists) and the form owns the FIELD half. Both
-         * have to hold before `275:4485` leaves its grey state.
-         *
-         * The pending flag is the same one the handler guards on, so the CTA cannot be pressed a
-         * second time while the first write is out — one tap, one address.
-         */
-        locationReady={locationReady}
-        submitting={create.isPending || update.isPending}
-        onSave={(form: AddressFormDraft) => {
-          /**
-           * Belt AND braces (task §J). The CTA is already disabled without a point, so this is
-           * unreachable through the UI — it exists because a write is not something to leave
-           * guarded by a style prop, and because a press can race the state that disabled it.
-           */
-          if (create.isPending || update.isPending) return;
-
-          /**
-           * The POINT this address is saved at, resolved before anything is sent.
-           *
-           * ADDING: the draft's, which only exists because `53:31` confirmed it and the server
-           * approved it. EDITING: the record's own, unless the customer walked back to the map
-           * and pinned a new one — re-sending a stale draft would silently MOVE an address they
-           * were only renaming. `resolveAddressSavePoint` is the single place that rule lives —
-           * see its own comment in `features/address/validation.ts` for why.
-           *
-           * `null` means there is no point, and there is then nothing to save. It used to be
-           * `?? 0`, which sends the Gulf of Guinea to the backend as a real coordinate.
-           */
-          const point = resolveAddressSavePoint(draft, editingId, savedPoint, savedPlaceId);
-          if (point === null) return;
-
-          /**
-           * The label the customer chose, as DRAWN.
-           *
-           * Others carries a free-text name and that name wins; every other chip stores its own
-           * word ("Parents", not the `parents` id `68:214` would then have listed). The form
-           * refuses to submit Others with an empty name, so the fallback chain never produces the
-           * word "others" as a label. Nothing here interprets the string — the backend stores it.
-           */
-          const label =
-            form.saveAs.trim() !== ''
-              ? form.saveAs.trim()
-              : form.labelText.trim() !== ''
-                ? form.labelText.trim()
-                : 'Home';
-
-          const fields = {
-            label,
-            ...(form.flat.trim() === '' ? {} : { flat: form.flat.trim() }),
-            ...(form.building.trim() === '' ? {} : { society: form.building.trim() }),
-            /*
-             * AREA: the draft's, then the address's own, then the form.
-             *
-             * The draft only carries an area when the customer went through the map step. An
-             * EDIT that never did — renaming, or fixing a flat number — has an empty draft, and
-             * reading `pincode` straight off it sent `''`. `PUT /v1/me/addresses/:id` requires a
-             * pincode, so the backend refused the whole request with a 400 and the screen showed
-             * "Couldn't save address" with no way through. Reproduced on the handset.
-             *
-             * `savedArea` is the same idea as `savedPoint` one field over: when there is no fresh
-             * draft, an edit resends what the address already holds rather than blanking it.
-             */
-            street: draft.street ?? savedArea?.street ?? form.building.trim(),
-            pincode:
-              draft.pincode ??
-              (savedArea?.pincode === '' ? recoveredPincode : savedArea?.pincode) ??
-              '',
-            ...(() => {
-              const city = draft.city ?? savedArea?.city ?? null;
-              return city === null ? {} : { city };
-            })(),
-            ...(() => {
-              const state = draft.state ?? savedArea?.state ?? null;
-              return state === null ? {} : { state };
-            })(),
-            ...(form.receiverName.trim() === '' ? {} : { receiverName: form.receiverName.trim() }),
-            ...(form.receiverPhone.trim() === ''
+      <QueryBoundary state={state} onRetry={addresses.refetch} loadingVariant="screen">
+        {(existing) => (
+          <AddressDetailsScreen
+            mode={existing === null ? 'add' : 'edit'}
+            initial={existing === null ? EMPTY_DETAILS_FORM : detailsFormFrom(existing)}
+            pinned={pinned}
+            onBack={guard(goBack)}
+            onEditPin={guard(goToLocation)}
+            onSave={save}
+            {...(existing === null
               ? {}
-              : { receiverPhone: form.receiverPhone.trim() }),
-          };
+              : {
+                  onRemove: () =>
+                    setRemoving({
+                      id: existing.id,
+                      label: existing.label,
+                      kind: labelKindOf(existing.label),
+                      line: cardLineOf(existing),
+                      tag: null,
+                    }),
+                })}
+            saving={create.isPending || update.isPending}
+            locationReady={locationReady}
+            pinMoved={pinMoved}
+          />
+        )}
+      </QueryBoundary>
 
-          const input = { ...fields, ...point };
-
-          const saved =
-            editingId === null
-              ? create.mutateAsync({
-                  input,
-                  /*
-                   * Scoped to the WHOLE submission, not to the point.
-                   *
-                   * A retry of an unchanged form is the same intent and reuses the same
-                   * `Idempotency-Key`, which is what lets the backend replay the original result
-                   * after an ambiguous timeout instead of creating a second address. Any edit —
-                   * flat, building, label, receiver, or the point itself — is a different intent
-                   * and mints a new key.
-                   *
-                   * Scoping to the coordinates alone got that backwards: the pin is the part a
-                   * customer is least likely to move between attempts, so a corrected flat number
-                   * was retried under the ORIGINAL key with a changed body, which the backend
-                   * refuses with `IDEMPOTENCY_CONFLICT` — and the key is only released on success,
-                   * so the screen stayed stuck on it. Measured on the handset.
-                   *
-                   * `addressCreateScope` derives the identity from the same function the request
-                   * body is built by, so the two cannot drift.
-                   */
-                  scope: addressCreateScope(input),
-                })
-              : update.mutateAsync({
-                  id: editingId,
-                  input,
-                });
-
-          saved
-            .then(() => {
-              // The server owns the address now (§20). The draft has done its job.
-              clearDraft();
-              // Collapses the map/details pair the customer walked through, so the screen below is
-              // the one they actually return to. Guarded: a deep link straight to this route has
-              // nothing to dismiss, and popping an only-child throws the flow off the stack.
-              if (router.canDismiss()) router.dismissAll();
-              // Section 4: the first-run flow ends at HOME, because the customer came from Home
-              // and wanted to book - not to administer a list. Reached from `68:214` instead,
-              // the same save returns to that list, which is where they were — carrying `from`
-              // forward so THAT screen's own back control still knows which entry point this
-              // whole trip started from, rather than losing it the moment this REPLACE fires.
-              router.replace(
-                (onboarding === '1'
-                  ? '/home'
-                  : from === undefined
-                    ? '/address'
-                    : `/address?from=${from}`) as Href,
-              );
-            })
-            .catch((thrown: unknown) => {
-              // The backend refuses an unserviceable point here too; its own message is shown
-              // rather than this screen deciding what went wrong.
-              setError(
-                isAppError(thrown) ? getUserMessage(thrown) : 'We could not save this address.',
-              );
-            });
+      <RemoveAddressSheet
+        address={removing}
+        onClose={() => setRemoving(null)}
+        onRemove={async (id) => {
+          try {
+            await remove.mutateAsync(id);
+            clearDraft();
+            setRemoving(null);
+            exit();
+            return 'removed';
+          } catch (thrown: unknown) {
+            return isAppError(thrown) && thrown.code === 'ADDRESS_IN_USE' ? 'in_use' : 'failed';
+          }
         }}
+        testID="address-details-remove-sheet"
       />
 
-      {/* FIGMA_PENDING — `60:655` draws no failure state for the save. */}
+      {/* Not drawn in the file: the save's failure state. */}
       <InfoDialog
         visible={error !== null}
         onClose={() => setError(null)}

@@ -1,73 +1,48 @@
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
-import { BookingListView, useMyBookingsData } from '@features/history';
-import { useSafeBack } from '@core/navigation';
+import { MyBookingsScreen, useMyBookingsV2 } from '@features/history';
+import type { MyBookingsTab } from '@features/history';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 
 /**
- * My bookings - Figma `6:227`, redesigned with an Upcoming/Past switcher.
+ * My bookings — Figma `2192:4371` (Upcoming), `2192:4430` (Past), `2192:4504` / `2192:4534`
+ * (Empty). `?tab=past` opens on Past — Account & data's "Booking history" row (dev note
+ * `2084:2781`).
  *
- * Both tabs are fetched unconditionally via `useMyBookingsData` (cheap — TanStack Query dedupes
- * by key regardless), so switching tabs is instant once both have loaded rather than re-fetching
- * per switch. Only the ACTIVE tab's `ScreenQuery` is handed to `BookingListView`.
- *
- * Profile is the fallback: it is the only screen that links here, so it is where a pop would have
- * landed had this route been reached by anything other than a deep link.
+ * Both tabs are fetched up front so switching is instant, and both stay mounted so each keeps its
+ * own scroll position (dev note `2192:4489`).
  */
 export default function HistoryRoute() {
   const router = useRouter();
-  const { upcoming, past } = useMyBookingsData();
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
-  const active = activeTab === 'upcoming' ? upcoming : past;
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const { upcoming, past } = useMyBookingsV2();
+  const [tab, setTab] = useState<MyBookingsTab>(params.tab === 'past' ? 'past' : 'upcoming');
 
   /**
-   * `6:227` back -> `6:663` Profile, never Home (V7 founder comment, task §14).
-   *
-   * `useSafeBack`, not `useDeterministicBack`: Profile's tile grid is this route's only push
-   * site, so a pop always lands correctly — and gets the platform's reverse-of-push closing
-   * animation, where `dismissAll` + `replace` played none.
+   * Back -> the Account hub, never Home (V7 founder comment, task §14). `useSafeBack`: the hub and
+   * Account & data are this route's only push sites, so a pop always lands correctly.
    */
   const goBack = useSafeBack('/profile');
+  // One screen per tap: a quick double tap must not open the same booking twice.
+  const guard = useNavigationGuard();
 
-  /**
-   * A card opens the booking it names.
-   *
-   * `BookingListView` has taken `onSelect` since it was written and `BookingCard` has taken
-   * `onPress`, but no screen ever passed either — so every card on this list, and on Refunds, has
-   * been inert. The customer could see a booking and not reach it, which also means they could
-   * not reach the Cancel control that lives on `/booking/:id`.
-   *
-   * That surfaced through account deletion: a deletion blocked by an active booking tells the
-   * customer to go and clear it, and the list it sends them to could not open the booking.
-   *
-   * Every status is a valid destination — the host draws the whole lifecycle, including cancelled
-   * and completed — so no filtering is applied here.
-   *
-   * Tagged `?from=history` so the booking host's own back control pops here instead of replacing
-   * to Home — see the matching comment on `goBack` in `booking/[id].tsx` for why that was wrong for
-   * an entry from this list specifically.
-   */
   return (
-    <BookingListView
-      state={active.state}
-      onRetry={active.refetch}
-      onBack={goBack}
-      onSelect={(bookingId) => router.push(`/booking/${bookingId}?from=history` as Href)}
-      variant="history"
-      tabs={{
-        active: activeTab,
-        onChange: (id) => setActiveTab(id === 'past' ? 'past' : 'upcoming'),
-      }}
-      // Both tabs page through the backend's `nextCursor`.
-      paging={{
-        hasMore: active.hasMore,
-        loadingMore: active.loadingMore,
-        error: active.loadMoreError !== null,
-        onLoadMore: active.loadMore,
-        onRetry: active.retryLoadMore,
-      }}
-      testID="history-screen"
+    <MyBookingsScreen
+      tab={tab}
+      onTab={setTab}
+      upcoming={upcoming}
+      past={past}
+      onBack={guard(goBack)}
+      /*
+       * A card opens Visit details. Tagged `?from=history` so the booking host's back control pops
+       * here instead of replacing to Home — see `goBack` in `booking/[id].tsx`.
+       */
+      onOpen={guard((bookingId: string) =>
+        router.push(`/booking/${bookingId}?from=history` as Href),
+      )}
+      onBook={guard(() => router.push('/scheduled'))}
     />
   );
 }

@@ -1,4 +1,3 @@
-import { BackHandler } from 'react-native';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import {
@@ -38,6 +37,11 @@ let mockRouter: {
 };
 let mockSearchParams: Record<string, string> = {};
 
+// The booking route's visit details draw the rate card, which animates with Reanimated.
+jest.mock('react-native-worklets', () =>
+  jest.requireActual('react-native-worklets/lib/module/mock'),
+);
+jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));
 jest.mock('expo-router', () => ({
   __esModule: true,
   useRouter: () => mockRouter,
@@ -123,7 +127,7 @@ beforeEach(() => {
 
 /* ------------------------------------------------------------------ Page 18d */
 
-describe('`228:1801` Address edit — back returns to the list (task §5, §15)', () => {
+describe('Saved addresses row menu — closing it stays on the list', () => {
   function renderList() {
     return renderWithRuntime(<SavedAddressesRoute />, {
       runtime: createTestRuntime({
@@ -133,22 +137,30 @@ describe('`228:1801` Address edit — back returns to the list (task §5, §15)'
   }
 
   /**
-   * `18d` is a SHEET over `68:214`, not a screen of its own — the frame draws it over a dimmed
-   * list. "Back arrow -> Page 18 Saved addresses" is therefore satisfied by dismissing it, and
-   * what has to be true is that nothing NAVIGATES: a router call here would take the customer off
-   * the list the sheet is sitting on.
+   * The row's actions are a kebab MENU anchored over the list (`1870:2770`, dev note
+   * `2075:11950`): "tap outside closes". Closing it must not NAVIGATE — a router call here would
+   * take the customer off the list the menu is sitting on.
    */
-  it('closes the sheet and stays on Page 18', async () => {
+  it('closes the menu on a tap outside and stays on the list', async () => {
+    // The menu is anchored by measuring the kebab; the test host's measure never answers.
+    jest
+      .requireActual<{ default: { measureInWindow: jest.Mock } }>(
+        '@react-native/jest-preset/jest/MockNativeMethods',
+      )
+      .default.measureInWindow.mockImplementation(
+        (callback: (x: number, y: number, w: number, h: number) => void) =>
+          callback(326, 200, 32, 32),
+      );
     renderList();
-    await screen.findByTestId('saved-addresses-screen');
+    await screen.findByTestId('saved-addresses');
 
-    fireEvent.press(screen.getByTestId('address-row-menu-addr-1'));
-    expect(await screen.findByTestId('address-edit-action')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('saved-addresses-card-addr-1-kebab'));
+    expect(await screen.findByTestId('saved-addresses-menu-edit')).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId('address-edit-sheet-back'));
+    fireEvent.press(screen.getByTestId('saved-addresses-menu-backdrop'));
 
-    await waitFor(() => expect(screen.queryByTestId('address-edit-action')).toBeNull());
-    expect(screen.getByTestId('saved-addresses-screen')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId('saved-addresses-menu-edit')).toBeNull());
+    expect(screen.getByTestId('saved-addresses')).toBeTruthy();
     expect(mockRouter.push).not.toHaveBeenCalled();
     expect(mockRouter.replace).not.toHaveBeenCalled();
     expect(mockRouter.back).not.toHaveBeenCalled();
@@ -431,14 +443,14 @@ describe('Payment Failed — retry against the same hold, or leave once the serv
 
 /* ------------------------------------------------------------- Cancel booking */
 
-describe('Cancel booking — `useCancelFlow`, shared by the booking host and Payment Failed', () => {
+describe('Cancel visit — the redesigned C1–C5 sheets on a one-time booking', () => {
   const CANCELLATION_STUBS = {
     'GET /v1/bookings/bk-1/cancellation-preview': () => ({
       bookingId: 'bk-1',
       cancellable: true,
-      band: null,
-      refundPercent: null,
-      minutesToStart: null,
+      band: 'SCHEDULED_FULL_REFUND',
+      refundPercent: 100,
+      minutesToStart: 600,
       serviceAmountPaise: 12900,
       capturedAmountPaise: 12900,
       refundAmountPaise: 12900,
@@ -453,18 +465,11 @@ describe('Cancel booking — `useCancelFlow`, shared by the booking host and Pay
       maxReschedules: 2,
       reschedulable: false,
     }),
+    'GET /v1/bookings/bk-1/refunds': () => ({ refunds: [] }),
   };
 
-  /**
-   * A live, scheduled booking is what actually draws the Cancel control on the confirmation
-   * view (`instantBooking` hides it for Instant). This is the same route ([id].tsx) `useCancelFlow`
-   * was extracted out of, so driving the sheet all the way to `confirmed` here is the regression
-   * net for that extraction — not just "it typechecks".
-   */
-  it('drives the sheet through to a confirmed cancellation', async () => {
+  function renderCancellable(cancelCalls: unknown[] = []) {
     mockSearchParams = { id: 'bk-1' };
-    const cancelCalls: unknown[] = [];
-
     renderWithRuntime(<BookingRoute />, {
       runtime: createTestRuntime({
         api: createStubApi({
@@ -480,92 +485,52 @@ describe('Cancel booking — `useCancelFlow`, shared by the booking host and Pay
         }),
       }),
     });
+  }
 
-    fireEvent.press(await screen.findByTestId('confirmation-cancel'));
-    fireEvent.press(await screen.findByTestId('cancel-continue-policy'));
-    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
-    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
-    fireEvent.press(await screen.findByTestId('cancel-confirm'));
+  async function cancelThrough() {
+    fireEvent.press(await screen.findByTestId('service-visit-dock-modify'));
+    fireEvent.press(await screen.findByTestId('cancel-visit-option-cancel'));
+    fireEvent.press(await screen.findByTestId('cancel-visit-continue'));
+    fireEvent.press(await screen.findByTestId('cancel-visit-reason-URGENT_CHANGE'));
+    fireEvent.press(screen.getByTestId('cancel-visit-reason-continue'));
+    fireEvent.press(await screen.findByTestId('cancel-visit-confirm'));
+    await screen.findByTestId('cancel-visit-done');
+  }
 
-    expect(await screen.findByTestId('cancel-step-confirmed')).toBeTruthy();
+  /** Nothing is cancelled before C4's Cancel, and that press sends the picked reason once. */
+  it('walks Modify → policy → reason → review → cancelled, sending the reason once', async () => {
+    const cancelCalls: unknown[] = [];
+    renderCancellable(cancelCalls);
+
+    await cancelThrough();
+
     expect(cancelCalls).toEqual([{ reasonCode: 'URGENT_CHANGE' }]);
+    expect(screen.getByText('Visit cancelled')).toBeTruthy();
   });
 
-  /**
-   * The confirmed step's "book again?" prompt: "Yes" hands the customer Schedule to complete a
-   * new booking themselves (never one this flow creates on their behalf), "No" is Home. Neither
-   * used to distinguish the two — both replaced to `/home` — which is the regression this guards.
-   */
+  /** Dev note `2071:2869`: Done → Bookings; "Book a visit" → the booking flow. */
   it.each([
-    ['cancel-book-again-yes', '/scheduled'],
-    ['cancel-book-again-no', '/home'],
-  ])('routes %s to %s from the confirmed step', async (testId, destination) => {
-    mockSearchParams = { id: 'bk-1' };
-
-    renderWithRuntime(<BookingRoute />, {
-      runtime: createTestRuntime({
-        api: createStubApi({
-          ...DEFAULT_API_STUBS,
-          ...CANCELLATION_STUBS,
-          'GET /v1/bookings/bk-1': () => ({
-            booking: bookingWith({ status: 'assigned', slotType: 'scheduled' }),
-          }),
-          'POST /v1/bookings/bk-1/cancel': () => ({}),
-        }),
-      }),
-    });
-
-    fireEvent.press(await screen.findByTestId('confirmation-cancel'));
-    fireEvent.press(await screen.findByTestId('cancel-continue-policy'));
-    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
-    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
-    fireEvent.press(await screen.findByTestId('cancel-confirm'));
-    await screen.findByTestId('cancel-step-confirmed');
+    ['cancel-visit-finish', '/history'],
+    ['cancel-visit-book', '/scheduled'],
+  ])('routes %s to %s from the cancelled sheet', async (testId, destination) => {
+    renderCancellable();
+    await cancelThrough();
 
     fireEvent.press(screen.getByTestId(testId));
 
     expect(mockRouter.replace).toHaveBeenCalledWith(destination);
   });
 
-  /**
-   * `[id].tsx`'s own comment explains why this exists: the sheet is a native modal that takes
-   * Android back itself in the general case, but a `QueryBoundary` still loading renders no
-   * modal at all — this is the host's own `useAndroidBackHandler`, wired through `cancelFlow`
-   * now instead of the local `cancelOpen` state it replaced, closing the loop for that gap.
-   */
-  it('Android back closes the open sheet (handled) and falls through once it is closed', async () => {
-    const spy = jest.spyOn(BackHandler, 'addEventListener');
-    mockSearchParams = { id: 'bk-1' };
+  it('closes on a scrim tap without cancelling anything', async () => {
+    const cancelCalls: unknown[] = [];
+    renderCancellable(cancelCalls);
 
-    renderWithRuntime(<BookingRoute />, {
-      runtime: createTestRuntime({
-        api: createStubApi({
-          ...DEFAULT_API_STUBS,
-          ...CANCELLATION_STUBS,
-          'GET /v1/bookings/bk-1': () => ({
-            booking: bookingWith({ status: 'assigned', slotType: 'scheduled' }),
-          }),
-        }),
-      }),
-    });
-    fireEvent.press(await screen.findByTestId('confirmation-cancel'));
-    await screen.findByTestId('cancel-sheet');
-    const backHandler = spy.mock.calls.at(-1)?.[1] as () => boolean;
+    fireEvent.press(await screen.findByTestId('service-visit-dock-modify'));
+    fireEvent.press(await screen.findByTestId('cancel-visit-modify-backdrop'));
 
-    // `backHandler` triggers a `setState` outside of `fireEvent`, so the update needs its own
-    // `act` — otherwise the close is not guaranteed to have flushed before the assertion below.
-    let handled = false;
-    await act(async () => {
-      handled = backHandler();
-    });
-    expect(handled).toBe(true);
-    await waitFor(() => expect(screen.queryByTestId('cancel-sheet')).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('cancel-visit-modify')).toBeNull());
+    expect(cancelCalls).toEqual([]);
     expect(mockRouter.replace).not.toHaveBeenCalled();
-
-    // With the sheet closed, the SAME handler now defers to whatever the screen behind it does.
-    expect(backHandler()).toBe(false);
-
-    spy.mockRestore();
   });
 });
 
@@ -605,7 +570,14 @@ describe('service lifecycle — every back button goes Home (task §11)', () => 
       }),
     });
 
-    fireEvent.press(await screen.findByTestId('booking-back'));
+    // The redesigned visit details draw the drawn phases and the cancelled state (`2165:11853`);
+    // other states keep the booking screen.
+    const back = () =>
+      screen.queryByTestId('service-visit-header-back') ??
+      screen.queryByTestId('cancelled-visit-header-back') ??
+      screen.queryByTestId('booking-back');
+    await waitFor(() => expect(back()).not.toBeNull());
+    fireEvent.press(back()!);
 
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/home');

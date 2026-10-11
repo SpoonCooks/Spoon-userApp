@@ -6,11 +6,11 @@ import { idempotency } from '@core/api';
 import { ready } from '@core/data';
 import type { DataState } from '@core/data';
 import { getUserMessage, isAppError } from '@core/errors';
-import { formatPaise } from '@core/format';
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import { ratingScopeFor, useBookingDetail, useRateBooking } from '@features/booking';
-import { CancelBookingSheet, useCancellationData } from '@features/cancellation';
-import type { CancellationStep } from '@features/cancellation';
+import { CancelVisitSheet, cancelReasonsFrom } from '@features/cancellation';
+import type { CancelQuote, CancelStep, CancelVisit } from '@features/cancellation';
+import { useCatalogue } from '@features/catalogue';
 import {
   cookProfileFrom,
   useAddCookToPool,
@@ -18,7 +18,6 @@ import {
   useCookPoolProfile,
 } from '@features/cookPool';
 import {
-  ModifyBookingSheet,
   PaymentDetailsSheet,
   RateVisitCard,
   TellUsMoreSheet,
@@ -65,6 +64,8 @@ export default function RecurringVisitRoute() {
   const router = useRouter();
   const { bookingId, visitId } = useLocalSearchParams<{ bookingId: string; visitId: string }>();
   const goBack = useSafeBack(`/recurring/${bookingId ?? ''}`);
+  // One screen per tap: a quick double tap must not open the same screen (or WhatsApp) twice.
+  const guard = useNavigationGuard();
 
   const visit = useRecurringVisit(bookingId ?? null, visitId ?? null);
   const booking = useRecurringBooking(bookingId ?? null);
@@ -142,63 +143,61 @@ export default function RecurringVisitRoute() {
           );
         };
 
-  // ─── Sheets and cancelling ─────────────────────────────────────────────────────────────────
-  const [modifyOpen, setModifyOpen] = useState(false);
+  // ─── Sheets and cancelling (Figma C1–C5) ─────────────────────────────────────────────────────
   const [paymentOpen, setPaymentOpen] = useState(false);
-  const [cancelStep, setCancelStep] = useState<CancellationStep | null>(null);
-  const [cancelError, setCancelError] = useState<string | null>(null);
-  const reasons = useCancellationData(null);
+  const [cancelStep, setCancelStep] = useState<CancelStep | null>(null);
+  const catalogue = useCatalogue({ enabled: cancelStep !== null });
   const cancelVisit = useCancelRecurringVisit();
+  // The visit's booking says whether the cook has already left (`cook_en_route`).
+  const linkedBooking = useBookingDetail(cancelStep === null ? null : (detail?.bookingId ?? null));
 
   const quoteData = quote.state.status === 'ready' ? quote.state.data : null;
-  const cancellation = useMemo(() => {
-    if (reasons.state.status !== 'ready') return null;
-    return {
-      ...reasons.state.data,
-      // The visit's own figures; Recurring has no reschedule.
-      refundRows:
-        quoteData === null
-          ? []
-          : [
-              { label: 'Original Amount Paid', value: formatPaise(quoteData.chargedPaise) },
-              { label: 'Cancellation Processing Fee', value: formatPaise(quoteData.feePaise) },
-              {
-                label: 'Refund Amount',
-                value: formatPaise(quoteData.refundPaise),
-                emphasis: 'total' as const,
-              },
-            ],
-      refundPending: quoteData === null,
-      rescheduleAllowed: false,
-    };
-  }, [reasons.state, quoteData]);
+  /** The quote the customer confirmed, for C5 once the visit has been refetched as cancelled. */
+  const [confirmedQuote, setConfirmedQuote] = useState<CancelQuote | null>(null);
+  const cancelQuote: CancelQuote | null =
+    quoteData === null
+      ? null
+      : {
+          cancellable: quoteData.cancellable,
+          feePercent: quoteData.feePercent,
+          feePaise: quoteData.feePaise,
+          refundPaise: quoteData.refundPaise,
+          paidPaise: quoteData.chargedPaise,
+          servicePaise: detail?.payment?.pricePaise ?? null,
+          taxPaise: detail?.payment?.gstPaise ?? null,
+        };
+  const cancelVisitModel: CancelVisit | null =
+    detail === null
+      ? null
+      : {
+          startsAt: detail.start,
+          durationMinutes: detail.durationMinutes,
+          cookName: detail.cook?.displayName ?? null,
+          cookOnTheWay:
+            linkedBooking.state.status === 'ready' &&
+            linkedBooking.state.data.status === 'cook_en_route',
+          etaMinutes: null,
+          wasRescheduled: false,
+        };
 
-  const confirmCancel = (reasonCode: string, reasonDetail: string) => {
-    if (bookingId === undefined || visitId === undefined) return;
-    setCancelError(null);
+  const confirmCancel = async (reasonCode: string, reasonDetail: string): Promise<boolean> => {
+    if (bookingId === undefined || visitId === undefined) return false;
+    setConfirmedQuote(cancelQuote);
     const scope = `recurring.visit.cancel:${bookingId}:${visitId}`;
-    cancelVisit.mutate(
-      {
+    try {
+      await cancelVisit.mutateAsync({
         id: bookingId,
         visitId,
         reason: reasonDetail.trim() === '' ? { reasonCode } : { reasonCode, reasonDetail },
         scope,
-      },
-      {
-        onSuccess: () => {
-          setCancelStep(null);
-          visit.refetch();
-          booking.refetch();
-          Alert.alert('Visit cancelled', 'Your other visits stay as they are.');
-        },
-        onError: (error) => {
-          idempotency.release(scope);
-          setCancelError(
-            isAppError(error) ? getUserMessage(error) : 'The visit could not be cancelled.',
-          );
-        },
-      },
-    );
+      });
+      visit.refetch();
+      booking.refetch();
+      return true;
+    } catch {
+      idempotency.release(scope);
+      return false;
+    }
   };
 
   // ─── Rating ────────────────────────────────────────────────────────────────────────────────
@@ -297,42 +296,46 @@ export default function RecurringVisitRoute() {
         <>
           <VisitDetailsScreen
             model={model}
-            onBack={goBack}
+            onBack={guard(goBack)}
             onPaymentDetails={() => setPaymentOpen(true)}
-            {...(model.modifySheet === null ? {} : { onModifyBooking: () => setModifyOpen(true) })}
-            onHelp={openHelp}
-            onShareRecipe={openRecipe}
-            onViewCookPool={() => router.push('/cook-pool')}
+            {...(model.modifySheet === null
+              ? {}
+              : { onModifyBooking: () => setCancelStep('modify') })}
+            onHelp={openHelp === undefined ? undefined : guard(openHelp)}
+            onShareRecipe={openRecipe === undefined ? undefined : guard(openRecipe)}
+            onViewCookPool={guard(() => router.push('/cook-pool'))}
             {...(nextVisitId === null || nextVisitId === visitId
               ? {}
               : {
-                  onNextVisit: () =>
+                  onNextVisit: guard(() =>
                     router.replace({
                       pathname: '/recurring/[bookingId]/visits/[visitId]',
                       params: { bookingId: bookingId ?? '', visitId: nextVisitId },
                     }),
+                  ),
                 })}
             onPrepChange={savePrep}
-            onBookAgain={() => router.push('/recurring-setup/days')}
+            onBookAgain={guard(() => router.push('/recurring-setup/days'))}
             {...(offerAddToPool ? { onAddCookToPool: addCookToPool } : {})}
             addingCookToPool={addToPool.isPending}
             {...(canTip && completedBookingId !== null
               ? {
-                  onTipCook: () =>
+                  onTipCook: guard(() =>
                     router.push({
                       pathname: '/booking/[id]',
                       params: { id: completedBookingId, tip: '1' },
                     }),
+                  ),
                 }
               : {})}
-            onBookOneTime={() =>
+            onBookOneTime={guard(() =>
               detail === null
                 ? undefined
                 : router.push({
                     pathname: '/scheduled',
                     params: { date: detail.date, durationId: `dur-${detail.durationMinutes}` },
-                  })
-            }
+                  }),
+            )}
             ratingSlot={ratingSlot}
             refundSlot={refundSlot}
           />
@@ -360,30 +363,43 @@ export default function RecurringVisitRoute() {
               : {})}
           />
           {wholeBooking.sheet}
-          {model.modifySheet === null ? null : (
-            <ModifyBookingSheet
-              visible={modifyOpen}
-              data={model.modifySheet}
-              onClose={() => setModifyOpen(false)}
-              onCancelVisit={() => {
-                setModifyOpen(false);
-                setCancelStep('reason');
-              }}
-            />
-          )}
-          {cancellation === null ? null : (
-            <CancelBookingSheet
-              visible={cancelStep !== null}
-              cancellation={cancellation}
-              step={cancelStep ?? 'reason'}
-              // Back from the reason step closes: the policy step is the one-time booking's table.
-              onStepChange={(step) => setCancelStep(step === 'policy' ? null : step)}
+          {cancelStep === null || cancelVisitModel === null ? null : (
+            <CancelVisitSheet
+              visible
+              step={cancelStep}
+              onStepChange={setCancelStep}
+              visit={cancelVisitModel}
+              quote={cancelStep === 'done' ? (confirmedQuote ?? cancelQuote) : cancelQuote}
+              reasons={
+                catalogue.state.status === 'ready' ? cancelReasonsFrom(catalogue.state.data) : []
+              }
+              // A Recurring visit is not rescheduled on its own.
+              canReschedule={false}
+              onReschedule={() => setCancelStep(null)}
               onClose={() => setCancelStep(null)}
-              onConfirmCancel={confirmCancel}
-              onBookAgain={() => setCancelStep(null)}
-              {...(openHelp === undefined ? {} : { onHelp: openHelp })}
-              cancelling={cancelVisit.isPending}
-              cancelErrorMessage={cancelError}
+              onConfirm={confirmCancel}
+              refund={
+                detail?.cancellation?.refundId === undefined ||
+                detail.cancellation.refundId === null
+                  ? null
+                  : {
+                      amountPaise: detail.cancellation.refundPaise,
+                      method: 'upi',
+                      refunded: detail.cancellation.refundStatus === 'refunded',
+                      initiatedAt: detail.cancellation.cancelledAt,
+                      creditedAt: null,
+                    }
+              }
+              onBoundary={quote.refetch}
+              onDone={guard(() => {
+                setCancelStep(null);
+                router.replace('/history');
+              })}
+              onBookVisit={guard(() => {
+                setCancelStep(null);
+                router.push('/scheduled');
+              })}
+              testID="cancel-visit"
             />
           )}
         </>

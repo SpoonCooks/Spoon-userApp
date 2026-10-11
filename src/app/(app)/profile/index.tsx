@@ -1,65 +1,68 @@
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
-import { useSafeBack } from '@core/navigation';
-import { useSignOut } from '@features/auth';
-import { ProfileView, useProfileData } from '@features/profile';
+import { useAccountSummary } from '@features/account';
+import { useMe } from '@features/auth';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
+import {
+  AccountHubScreen,
+  firstNameOf,
+  foodSummaryOf,
+  phoneLabelOf,
+  poolCardStateOf,
+} from '@features/profile';
 import { useWhatsAppHelp } from '@features/support';
+import { QueryBoundary } from '@ui';
 
-/** Profile - Figma `6:663`. */
+/**
+ * Account — Figma `2202:4311` (V1: booking flow, Accounts). Replaces the `6:663` Profile grid.
+ *
+ * Log out now lives on Manage account (`1517:10267`), and the Refunds tile is gone — the Account
+ * frame draws no Refunds entry; a cancelled booking's Visit details carries its own refund.
+ */
 export default function ProfileRoute() {
   const router = useRouter();
-  const { state, refetch } = useProfileData();
-  const signOut = useSignOut();
+  const me = useMe();
+  const summary = useAccountSummary();
   const openHelp = useWhatsAppHelp();
   /**
-   * `6:663` back -> HOME, always (V7 founder comment, task §14/§15).
-   *
-   * Profile is reachable from Home's banner and from a `spoon://profile` deep link, and both are
-   * meant to end at the same place — which is also exactly where a pop lands, since the only
-   * push to `/profile` in the app is Home's. `useSafeBack`, not `useDeterministicBack`: popping
-   * gets the platform's reverse-of-push closing animation (matching Scheduled's), where
-   * `dismissAll` + `replace` played none; the deep-link case still falls back to `/home` when
-   * there is nothing to pop.
+   * Back -> Home (V7 founder comment): pops when Home pushed this, and falls back to Home for a
+   * `spoon://profile` deep link.
    */
   const goBack = useSafeBack('/home');
+  // One screen per tap: a quick double tap must not open the same screen twice.
+  const guard = useNavigationGuard();
 
   return (
-    <ProfileView
-      state={state}
-      onRetry={refetch}
-      onBack={goBack}
-      /**
-       * `222:1590` / `456:3479` — Complete profile / View profile.
-       *
-       * ONE destination for both states, per the founder's ruling: the same `338:4508` page,
-       * opened in the EDIT context so it arrives prefilled, keeps its back control, and returns
-       * here on Confirm rather than pushing the customer into the address flow (task §10).
-       */
-      onOpenProfileDetails={() => router.push('/profile/details' as Href)}
-      onSelectTile={(tileId) => {
-        if (tileId === 'orders') router.push('/history');
-        if (tileId === 'addresses') router.push('/address?from=profile');
-        if (tileId === 'refunds') router.push('/refunds');
-        /*
-         * `69:502` — the Help tile. Blocker B-10 ("no destination anywhere in the file") is
-         * CLOSED: the founder's comment on the final file settles every Help control in the app
-         * on Spoon's WhatsApp line (task §15). It was the last inert Help entry point.
-         */
-        if (tileId === 'help') openHelp('Hi Spoon, I need help with my account.');
-      }}
-      /** V9 — the legal row moved into `@features/account`; Profile now only opens that screen. */
-      onOpenManageAccount={() => router.push('/account' as Href)}
-      onLogout={() => {
-        // Revokes the session server-side, then clears SecureStore, the query cache and the
-        // session machine. The local teardown is not conditional on the network call, so this
-        // always ends signed out.
-        signOut.mutate(undefined, {
-          onSettled() {
-            router.replace('/' as Href);
-          },
-        });
-      }}
-    />
+    <QueryBoundary state={me.state} onRetry={me.refetch}>
+      {(identity) => (
+        <AccountHubScreen
+          model={{
+            firstName: firstNameOf(identity.name),
+            phone: phoneLabelOf(identity.phone),
+            profileComplete: identity.profileComplete,
+            foodSummary: foodSummaryOf(identity),
+            pool: poolCardStateOf({ poolCount: summary.poolCount, hasBooked: summary.hasBooked }),
+            poolFaces: summary.poolFaces,
+            version: Constants.expoConfig?.version ?? '1.0.0',
+          }}
+          onBack={guard(goBack)}
+          /*
+           * Both card states open the one food profile form, prefilled (founder's ruling on
+           * `222:1590` / `456:3479`): "Finish profile" resumes it, "View & edit" reviews it.
+           */
+          onFoodProfile={guard(() => router.push('/profile/details' as Href))}
+          onViewPool={guard(() => router.push('/cook-pool' as Href))}
+          onAddCook={guard(() => router.push('/cook-pool/add' as Href))}
+          onBook={guard(() => router.push('/scheduled'))}
+          onBookings={guard(() => router.push('/history'))}
+          onAddresses={guard(() => router.push('/address?from=profile'))}
+          // Every Help control in the app opens Spoon's WhatsApp line (founder, task §15).
+          onHelp={guard(() => openHelp('Hi Spoon, I need help with my account.'))}
+          onManageAccount={guard(() => router.push('/account' as Href))}
+        />
+      )}
+    </QueryBoundary>
   );
 }

@@ -117,9 +117,9 @@ describe('routes render', () => {
     ['profile/details', ProfileDetailsRoute, 'profile-details-screen'],
     ['history', HistoryRoute, 'history-screen'],
     ['refunds', RefundsRoute, 'refunds-screen'],
-    ['address', SavedAddressesRoute, 'saved-addresses-screen'],
-    ['address/location', AddressLocationRoute, 'address-location-screen'],
-    ['address/details', AddressDetailsRoute, 'address-details-screen'],
+    ['address', SavedAddressesRoute, 'saved-addresses'],
+    ['address/location', AddressLocationRoute, 'address-map-screen'],
+    ['address/details', AddressDetailsRoute, 'address-details'],
   ])('%s', async (_name, Route, testID) => {
     render(<Route />);
     // `find*` rather than `get*`: the wired routes resolve their reads asynchronously, so the
@@ -139,18 +139,19 @@ describe('routes render', () => {
    */
   it('shows no fixture address on the map step when there is no point', async () => {
     render(<AddressLocationRoute />);
-    await screen.findByTestId('address-location-screen');
+    await screen.findByTestId('address-map-screen');
 
     expect(screen.queryByText('Area 124, subarea 2 xyz, city efg')).toBeNull();
     expect(screen.queryByText('Street Name')).toBeNull();
-    // It says what is true instead, and the helper pill beside it names the way forward.
-    expect(screen.getByText('No location selected')).toBeTruthy();
+    // The map opens on the fallback point (dev note `2075:11925`) and the hint says why — the
+    // denied permission — and names the way forward.
+    expect(await screen.findByText('Allow location, or search above')).toBeTruthy();
   });
 
   /** Same rule, one screen later: the Area row of the form that SAVES the address. */
   it('shows no fixture address in the address form before a point is pinned', async () => {
     render(<AddressDetailsRoute />);
-    await screen.findByTestId('address-details-screen');
+    await screen.findByTestId('address-details');
 
     expect(screen.queryByText('Street name, Area 124, subarea xyz, city')).toBeNull();
   });

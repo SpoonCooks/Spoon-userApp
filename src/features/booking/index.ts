@@ -40,6 +40,7 @@ export {
   durationLabelFor,
   durationMerchandisingFor,
   durationIdFor,
+  bookingStrikeOf,
   strikePaiseFor,
   useBookingDetailData,
   useBookingSubmission,

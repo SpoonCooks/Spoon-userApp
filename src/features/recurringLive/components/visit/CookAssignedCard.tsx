@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -32,6 +33,8 @@ export interface CookAssignedCardProps {
   readonly menu?: readonly VisitMenuSection[];
   /** Absent: no Call button (there is no way to reach the cook yet). */
   readonly onCall?: (() => void) | undefined;
+  /** The window's height: 450 (`1462:5794`), or 372 on Cook arrived (Service flow `2165:11952`). */
+  readonly windowHeight?: number | undefined;
   readonly testID?: string | undefined;
 }
 
@@ -41,40 +44,55 @@ export function CookAssignedCard({
   cook = DEMO.cook,
   menu = DEMO.menu,
   onCall,
+  windowHeight = 450,
   testID = 'visit-cook-assigned',
 }: CookAssignedCardProps) {
+  const scroll = useRef<ScrollView>(null);
   return (
     <View style={styles.shadow} testID={testID}>
-      <View style={[styles.window, menu.length === 0 ? styles.windowFit : null]}>
+      <View
+        style={[
+          styles.window,
+          { height: windowHeight },
+          menu.length === 0 ? styles.windowFit : null,
+        ]}
+      >
         <ScrollView
+          ref={scroll}
           nestedScrollEnabled
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
           testID={`${testID}-scroll`}
         >
           {/* `1463:7958` — the note and the Call button. */}
-          <View style={styles.info}>
-            <View style={styles.note}>
-              <Image source={VISIT_BELL_ASSIGNED} style={styles.glyph20} />
-              <Text variant="spoonCaption" color="textSecondarySoft" style={styles.noteText}>
-                {cook.note}
-              </Text>
+          {/* A one-time visit has no Pool note (Service flow `2165:11848`): the row then holds
+              only the Call button, or nothing at all before the cook sets off. */}
+          {cook.note === '' && onCall === undefined ? null : (
+            <View style={styles.info}>
+              {cook.note === '' ? null : (
+                <View style={styles.note}>
+                  <Image source={VISIT_BELL_ASSIGNED} style={styles.glyph20} />
+                  <Text variant="spoonCaption" color="textSecondarySoft" style={styles.noteText}>
+                    {cook.note}
+                  </Text>
+                </View>
+              )}
+              {onCall === undefined ? null : (
+                <Pressable
+                  onPress={onCall}
+                  accessibilityRole="button"
+                  accessibilityLabel="Call the cook"
+                  style={styles.call}
+                  testID={`${testID}-call`}
+                >
+                  <Image source={VISIT_CALL_GLYPH} style={styles.glyph20} />
+                  <Text variant="spoonBodyStrong" color="textPrimary">
+                    Call
+                  </Text>
+                </Pressable>
+              )}
             </View>
-            {onCall === undefined ? null : (
-              <Pressable
-                onPress={onCall}
-                accessibilityRole="button"
-                accessibilityLabel="Call the cook"
-                style={styles.call}
-                testID={`${testID}-call`}
-              >
-                <Image source={VISIT_CALL_GLYPH} style={styles.glyph20} />
-                <Text variant="spoonBodyStrong" color="textPrimary">
-                  Call
-                </Text>
-              </Pressable>
-            )}
-          </View>
+          )}
 
           {/* `1380:3210` — Cook profile card. */}
           <View style={styles.profile}>
@@ -88,9 +106,12 @@ export function CookAssignedCard({
 
             <View style={styles.header}>
               <View style={styles.description}>
-                <Text variant="spoonMicroStrong" color="textSecondarySoft">
-                  {cook.eyebrow}
-                </Text>
+                {/* Dev note `2226:4211`: the badge shows only for verified cooks. */}
+                {cook.eyebrow === '' ? null : (
+                  <Text variant="spoonMicroStrong" color="textSecondarySoft">
+                    {cook.eyebrow}
+                  </Text>
+                )}
                 <View style={styles.gap4}>
                   <Text variant="spoonHeading" color="textPrimary">
                     {cook.name}
@@ -165,7 +186,7 @@ export function CookAssignedCard({
         {/* `1463:7967` — the pinned scroll cue; only when there is a menu to scroll to. */}
         {menu.length === 0 ? null : (
           <LinearGradient
-            pointerEvents="none"
+            pointerEvents="box-none"
             colors={[
               lightTheme.colors.surfaceVisitCueClear,
               lightTheme.colors.surfaceVisitCueMid,
@@ -174,12 +195,20 @@ export function CookAssignedCard({
             locations={[0, 0.55, 1]}
             style={styles.cue}
           >
-            <View style={styles.cuePill}>
+            {/* Dev note `2226:4211`: "Scroll for full menu" opens the full list. */}
+            <Pressable
+              onPress={() => scroll.current?.scrollToEnd({ animated: true })}
+              accessibilityRole="button"
+              accessibilityLabel="Scroll for full menu"
+              hitSlop={8}
+              style={({ pressed }) => [styles.cuePill, pressed && { opacity: 0.85 }]}
+              testID={`${testID}-full-menu`}
+            >
               <Text variant="spoonCaptionStrong" color="textSecondarySoft">
                 Scroll for full menu
               </Text>
               <Image source={VISIT_CHEVRON_16} style={styles.chevronDown} />
-            </View>
+            </Pressable>
           </LinearGradient>
         )}
       </View>

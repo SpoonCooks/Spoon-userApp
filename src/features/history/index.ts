@@ -24,3 +24,16 @@ export type { BookingTabOption, BookingTabSwitcherProps } from './components/Boo
 export { BookingListView } from './screens/BookingListScreen';
 export type { BookingListPaging, BookingListViewProps } from './screens/BookingListScreen';
 export type * from './types';
+export { MyBookingsScreen } from './v2/MyBookingsScreen';
+export type { MyBookingsScreenProps, MyBookingsTab } from './v2/MyBookingsScreen';
+export { useMyBookingsV2 } from './v2/data';
+export {
+  bookingRowFrom,
+  countLabel,
+  durationOf,
+  kindOf,
+  monthGroupsFrom,
+  nextVisitFrom,
+  upcomingFrom,
+} from './v2/model';
+export type { BookingKind, BookingRow, MonthGroup, NextVisit } from './v2/model';

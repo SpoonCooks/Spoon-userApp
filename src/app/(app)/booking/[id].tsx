@@ -9,16 +9,18 @@ import {
   usePaymentRetry,
   payRetryingOnceWhileProcessing,
   ratingScopeFor,
+  useBookingDetail,
   useRateBooking,
   useTipCheckout,
 } from '@features/booking';
 import type { PaymentOutcome } from '@features/booking';
-import { useCancelFlow } from '@features/cancellation';
+import { useBookingCancelVisit } from '@features/cancellation';
+import { CancelledVisitHost, ServiceVisitHost, servicePhaseOf } from '@features/serviceVisit';
 import { paymentErrorMessage } from '@features/payment';
 import { useWhatsAppHelp } from '@features/support';
 import { ErrorBoundary, isNumericRating } from '@ui';
 import { createIdempotencyKey } from '@core/api';
-import { useDeterministicBack, useSafeBack } from '@core/navigation';
+import { useDeterministicBack, useNavigationGuard, useSafeBack } from '@core/navigation';
 
 /**
  * Booking lifecycle host - Confirmation (`3:1041`), En route (`3:1381` / `99:1413`), Arrived
@@ -67,6 +69,8 @@ export default function BookingRoute() {
 
   const callCook = useCallCook(bookingId === '' ? null : bookingId);
   const openHelp = useWhatsAppHelp();
+  // One screen per tap: a quick double tap must not open the same screen (or WhatsApp) twice.
+  const guard = useNavigationGuard();
 
   const rate = useRateBooking();
   const tip = useTipCheckout();
@@ -104,13 +108,15 @@ export default function BookingRoute() {
     };
   }, []);
   const extend = useExtensionCheckout();
-  const cancelFlow = useCancelFlow(bookingId === '' ? null : bookingId, {
-    onReschedule: () => router.push(`/reschedule/${bookingId}`),
-    onHelp: () => openHelp('Hi Spoon, I need help cancelling my booking.'),
-    // `115:2703`'s "book again?" prompt: "Yes" opens Schedule so the customer completes a new
-    // booking themselves — this never creates one on their behalf — and "No" returns them to
-    // Home, where booking normally starts from.
-    onCancelled: (bookAgain) => router.replace(bookAgain ? '/scheduled' : '/home'),
+  /**
+   * The redesigned cancel flow (Figma C1–C5): "Modify visit" first, then policy, reason, review and
+   * the cancelled sheet. C5's Done goes to My bookings and "Book a visit" to Schedule — neither
+   * creates a booking on the customer's behalf.
+   */
+  const cancelVisit = useBookingCancelVisit(bookingId === '' ? null : bookingId, {
+    onReschedule: guard(() => router.push(`/reschedule/${bookingId}`)),
+    onDone: guard(() => router.replace('/history')),
+    onBookVisit: guard(() => router.replace('/scheduled')),
   });
 
   /**
@@ -137,7 +143,88 @@ export default function BookingRoute() {
    */
   const goHome = useDeterministicBack('/home');
   const goToHistory = useSafeBack('/history');
-  const goBack = from === 'history' ? goToHistory : goHome;
+  const goBack = guard(from === 'history' ? goToHistory : goHome);
+
+  /**
+   * The redesigned visit details (Figma "Service flow") for the phases it draws — assigned, on the
+   * way, arrived, cooking, time's up, completed. Every other state (payment pending, a
+   * reassignment, cancelled) keeps the established screen and its flows unchanged.
+   */
+  const detail = useBookingDetail(bookingId === '' ? null : bookingId, { poll: true });
+  const booking = detail.state.status === 'ready' ? detail.state.data : null;
+  const phase =
+    booking === null || (booking.reassignment ?? null) !== null
+      ? null
+      : servicePhaseOf(booking, new Date());
+
+  if (booking !== null && phase !== null) {
+    return (
+      <ErrorBoundary scope="booking-host">
+        <ServiceVisitHost
+          booking={booking}
+          phase={phase}
+          onBack={goBack}
+          {...(booking.allowedActions.canCancel || booking.allowedActions.canReschedule
+            ? { onModifyBooking: () => cancelVisit.open() }
+            : {})}
+          onHelp={guard(() => openHelp('Hi Spoon, I need help with my booking.'))}
+          onCall={guard(() => {
+            void callCook.call();
+          })}
+          onShareRecipe={guard(() => {
+            openHelp("Hi Spoon, I'd like to share a recipe or a special request for my booking.");
+          })}
+          onExtend={(minutes) =>
+            extend.mutateAsync({
+              bookingId,
+              minutes,
+              scope: `booking.extend:${bookingId}:${minutes}`,
+            })
+          }
+          extending={extend.isPending}
+          onTip={(amountPaise) =>
+            tip.mutateAsync({
+              bookingId,
+              amountPaise,
+              scope: `booking.tip.${bookingId}.${createIdempotencyKey()}`,
+            })
+          }
+          tipping={tip.isPending}
+          onRate={(request) =>
+            rate.mutateAsync({
+              bookingId,
+              ...request,
+              scope: ratingScopeFor(bookingId, request.feedback ?? ''),
+            })
+          }
+          rating={rate.isPending}
+          onBookAnother={guard(() => router.push('/scheduled'))}
+        />
+        {cancelVisit.sheet}
+      </ErrorBoundary>
+    );
+  }
+
+  /*
+   * Cancelled (Figma `2165:11853`, dev note `2226:4224`) — by the customer or by Spoon. The cancel
+   * sheet stays mounted so its "Visit cancelled" step can still be read over the screen.
+   */
+  if (
+    booking !== null &&
+    booking.status === 'cancelled' &&
+    (booking.reassignment ?? null) === null
+  ) {
+    return (
+      <ErrorBoundary scope="booking-host">
+        <CancelledVisitHost
+          booking={booking}
+          onBack={goBack}
+          onHelp={guard(() => openHelp('Hi Spoon, I need help with my cancelled booking.'))}
+        />
+        {cancelVisit.sheet}
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary scope="booking-host">
@@ -145,17 +232,17 @@ export default function BookingRoute() {
         bookingId={bookingId}
         initialTipOpen={openOnTip === '1'}
         onBack={goBack}
-        onReschedule={() => router.push(`/reschedule/${bookingId}`)}
-        onHelp={() => {
+        onReschedule={guard(() => router.push(`/reschedule/${bookingId}`))}
+        onHelp={guard(() => {
           openHelp('Hi Spoon, I need help with my booking.');
-        }}
+        })}
         onContactSupport={openHelp}
-        onCallCook={() => {
+        onCallCook={guard(() => {
           void callCook.call();
-        }}
+        })}
         callCookError={callCook.errorMessage}
         onDismissCallCookError={callCook.clearError}
-        onCancel={cancelFlow.open}
+        onCancel={() => cancelVisit.open()}
         /**
          * The unpaid hold's only action (`status: created`, drawn by `ConfirmationBody` as a single
          * "Book now" bar under the amber "Payment pending!" banner).
@@ -215,12 +302,12 @@ export default function BookingRoute() {
          * to HOME, where booking actually starts, and "No" leaves the screen. Both are real
          * destinations — neither invents a booking — and neither answer is left inert.
          */
-        onRebook={() => router.replace('/home')}
+        onRebook={guard(() => router.replace('/home'))}
         onDeclineRebook={goBack}
         /* `383:748` — the same Spoon line as every other WhatsApp control (task §15). */
-        onShareRecipe={() => {
+        onShareRecipe={guard(() => {
           openHelp("Hi Spoon, I'd like to share a recipe or a special request for my booking.");
-        }}
+        })}
         /**
          * `306:2885` — the tip sheet's CTA (task §14).
          *
@@ -308,7 +395,7 @@ export default function BookingRoute() {
         }}
       />
 
-      {cancelFlow.sheet}
+      {cancelVisit.sheet}
     </ErrorBoundary>
   );
 }

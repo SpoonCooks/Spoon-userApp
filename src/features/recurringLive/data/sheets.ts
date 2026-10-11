@@ -34,14 +34,26 @@ export interface PaymentDetailsSheetData {
   readonly subtitle: string;
   /** `1434:1780` — the visit line. */
   readonly visitLine: PaymentLine;
+  /**
+   * `2257:4202` / `2257:4209` — one line per confirmed extension ("Extension 1 · +20 mins", "Added
+   * during the visit"), drawn like the visit line. Absent or empty: none.
+   */
+  readonly extraLines?: readonly PaymentLine[] | undefined;
   /** `1434:1785` — the GST line. */
   readonly taxLine: PaymentLine;
+  /** `2257:4216` — "Tip for Sanchita", a Caption line under GST. Absent: no tip paid. */
+  readonly tipLine?: PaymentLine | undefined;
   readonly totalLabel: string;
   readonly totalCaption: string;
   /** `1474:2506` — the struck-through list price; absent when there is none. */
   readonly totalOriginal?: string | undefined;
   readonly total: string;
   readonly methodEyebrow: string;
+  /**
+   * `2254:3982` — which "Mode of payment" variant draws the well's glyph: UPI (Autopay or not),
+   * Card, Wallet or Netbanking. Absent: the UPI glyph, as before.
+   */
+  readonly methodType?: 'upi' | 'card' | 'wallet' | 'netbanking' | undefined;
   readonly methodName: string;
   readonly methodDetail: string;
   readonly manageLabel: string;

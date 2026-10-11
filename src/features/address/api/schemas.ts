@@ -27,6 +27,12 @@ export const serviceabilitySchema = z.object({
   status: serviceabilityStatusSchema,
   /** Present only when a hub covers the point. Operational identity, shown to nobody. */
   hub: hubSchema.optional(),
+  /** `outside_service_area` only: where Spoon IS live, for the Not serviceable screen. */
+  liveAreas: z.array(z.string()).optional(),
+  /** `outside_service_area` only: the refused locality and how many others wait at its pincode. */
+  demand: z
+    .object({ locality: z.string().nullable(), neighbours: z.number().int().nonnegative() })
+    .optional(),
 });
 
 export type ServiceabilityDto = z.infer<typeof serviceabilitySchema>;
@@ -72,9 +78,35 @@ export const addressSchema = z.object({
   placeId: z.string().nullable().optional(),
   /** Current backend-evaluated serviceability, not the stored hub_id projection. */
   serviceability: addressServiceabilitySchema,
+  /**
+   * The redesigned details form's fields (Figma 1870:2485 / 1870:2576) and when the address was
+   * last used for an order. NULLISH, not required: a backend that predates them simply omits the
+   * keys, and every address it returns must still parse — one failed row fails the whole list.
+   */
+  propertyType: z
+    .enum(['apartment', 'house'])
+    .nullish()
+    .transform((value) => value ?? null),
+  floor: z
+    .string()
+    .nullish()
+    .transform((value) => value ?? null),
+  lane: z
+    .string()
+    .nullish()
+    .transform((value) => value ?? null),
+  landmark: z
+    .string()
+    .nullish()
+    .transform((value) => value ?? null),
+  lastUsedAt: z
+    .string()
+    .nullish()
+    .transform((value) => value ?? null),
 });
 
 export type AddressDto = z.infer<typeof addressSchema>;
+export type AddressPropertyType = 'apartment' | 'house';
 
 export const addressListSchema = z.array(addressSchema);
 
@@ -134,4 +166,9 @@ export interface AddressWriteInput {
   readonly receiverName?: string;
   readonly receiverPhone?: string;
   readonly isDefault?: boolean;
+  /** Sent by the redesigned form. On PUT an absent key leaves the stored value; `''` clears it. */
+  readonly propertyType?: AddressPropertyType;
+  readonly floor?: string;
+  readonly lane?: string;
+  readonly landmark?: string;
 }

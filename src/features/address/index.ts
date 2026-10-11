@@ -28,18 +28,8 @@ export {
   useAddressOutOfServiceData,
   useSavedAddressesData,
 } from './data';
-export {
-  AddressDetailsView,
-  AddressEditSheet,
-  AddressLocationView,
-  AddressOutOfServiceView,
-  SavedAddressesView,
-} from './screens/AddressScreens';
-export type {
-  AddressDetailsViewProps,
-  AddressDraft as AddressFormDraft,
-  AddressLocationViewProps,
-} from './screens/AddressScreens';
+export { AddressOutOfServiceView } from './screens/AddressScreens';
+export type { AddressOutOfServiceViewProps } from './screens/AddressScreens';
 export type { AddressGate, AddressDetailsData } from './data';
 export {
   canSubmitAddress,
@@ -57,6 +47,30 @@ export type {
   AddressSubmitGate,
 } from './validation';
 export type * from './types';
+export { RemoveAddressSheet, SavedAddressesScreen } from './v2/SavedAddressesScreen';
+export { labelKindOf } from './v2/components';
+export { AddressMapScreen } from './v2/AddressMapScreen';
+export { NotServiceableScreen, joinAreas } from './v2/NotServiceableScreen';
+export { useNotServiceableStore } from './v2/notServiceableStore';
+export type { NotServiceablePlace } from './v2/notServiceableStore';
+export type { AddressMapScreenProps, AddressSearchProps } from './v2/AddressMapScreen';
+export type { SavedAddressesScreenProps } from './v2/SavedAddressesScreen';
+export {
+  savedListFrom,
+  cardLineOf,
+  detailsFieldsFrom,
+  detailsFormFrom,
+  pinnedSummaryOf,
+} from './v2/model';
+export {
+  AddressDetailsScreen,
+  EMPTY_DETAILS_FORM,
+  detailsFingerprint,
+  isDetailsFormComplete,
+} from './v2/AddressDetailsScreen';
+export type { AddressDetailsForm, AddressDetailsScreenProps } from './v2/AddressDetailsScreen';
+export type { SavedAddressItem, SavedListContext } from './v2/model';
+export type { ToastNotice as AddressToastNotice } from '@ui/v2/Toast';
 export * from './api';
 export { useAddressLocation } from './location/useAddressLocation';
 export type { AddressLocationState } from './location/useAddressLocation';

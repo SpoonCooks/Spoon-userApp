@@ -47,6 +47,11 @@ export const priceSchema = z.object({
   totalAmountPaise: z.number().int().nonnegative(),
   currency: z.literal('INR'),
   pricingVersion: z.string(),
+  /**
+   * The struck-through "was" price shown at checkout, pre-tax (backend DEC-088). Booking detail
+   * only; null/absent when there was none.
+   */
+  strikeAmountPaise: z.number().int().positive().nullish(),
 });
 
 export type PriceDto = z.infer<typeof priceSchema>;
@@ -403,6 +408,32 @@ export const bookingDetailSchema = z.object({
   reassignment: bookingReassignmentSchema.nullish(),
   recovery: bookingRecoverySchema.nullish(),
   cancellation: bookingCancellationSchema.nullable(),
+  /** The authoritative tip state — a captured tip is what the completed screen reports as paid. */
+  tip: z
+    .object({
+      tipId: z.string(),
+      amountPaise: z.number().int().positive(),
+      status: z.enum(['payment_pending', 'captured', 'failed']),
+      capturedAt: z.string().datetime().nullable(),
+    })
+    .nullish(),
+  /** What was paid beyond the booking: each confirmed extension, and captured tips (V0). */
+  charges: z
+    .object({
+      extensions: z.array(
+        z.object({
+          minutes: z.number().int().positive(),
+          baseAmountPaise: z.number().int().nonnegative(),
+          chargedAmountPaise: z.number().int().nonnegative(),
+        }),
+      ),
+      tipAmountPaise: z.number().int().nonnegative(),
+    })
+    .nullish(),
+  /** How the booking was paid, masked by the server ("UPI", "••••@okhdfcbank"). */
+  paymentMethod: z
+    .object({ type: z.string(), label: z.string(), detail: z.string().nullable() })
+    .nullish(),
   /**
    * How many times the customer moved this booking -- capped at 1 by product policy (DEC-070),
    * the same field `BookingSummaryDto` carries and My bookings already draws a pill from.
@@ -513,6 +544,9 @@ export const bookingSummarySchema = z.object({
   /** The customer's OWN rating for this specific booking — never the cook's aggregate average
    * (`cook.ratingAverage`, a different field with different meaning). */
   ratingStars: z.number().nullish(),
+  /** The recurring plan this booking is a visit of; absent/null for a one-time booking. My
+   * bookings tags and draws the two kinds differently. */
+  recurringBookingId: z.string().nullish(),
 });
 
 export type BookingSummaryDto = z.infer<typeof bookingSummarySchema>;

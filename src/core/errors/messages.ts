@@ -38,6 +38,7 @@ const CODE_COPY: Readonly<Record<string, string>> = {
   FORBIDDEN: 'You do not have access to that.',
   RESOURCE_NOT_FOUND: 'We could not find that any more.',
   ADDRESS_NOT_SERVICEABLE: 'We are not serving this address yet.',
+  ADDRESS_IN_USE: 'Used in an upcoming booking',
   SLOT_UNAVAILABLE: 'That time was just taken. Please pick another.',
   NO_ELIGIBLE_COOK: 'No cook is available for that time right now.',
   INVALID_BOOKING_STATE: 'This booking has moved on. Refresh to see the latest.',

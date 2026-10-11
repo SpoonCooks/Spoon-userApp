@@ -1,5 +1,5 @@
 export { ADDRESS_PATHS, addressCreateScope, createAddressApi } from './addressApi';
-export type { AddressApi } from './addressApi';
+export type { AddressApi, ServiceabilityCheckInput } from './addressApi';
 export {
   addressLineOf,
   addressListFrom,
@@ -29,6 +29,7 @@ export {
 export type {
   AddressServiceabilityDto,
   AddressDto,
+  AddressPropertyType,
   AddressWriteInput,
   AddressWriteResponse,
   ServiceabilityDto,

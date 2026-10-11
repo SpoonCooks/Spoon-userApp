@@ -15,10 +15,6 @@ import {
   DEMO_SCHEDULE_BOOK,
 } from '@/demo/fixtures/booking';
 import {
-  DEMO_ADDRESS_DETAILS,
-  DEMO_ADDRESS_LIST,
-  DEMO_ADDRESS_LOCATION,
-  DEMO_ADDRESS_OUT_OF_SERVICE,
   DEMO_BOOKING_HISTORY,
   DEMO_LOGIN,
   DEMO_OTP,
@@ -29,10 +25,11 @@ import { DEMO_COOK_PROFILES } from '@/demo/fixtures/cooks';
 import { HomeView } from '@features/home';
 import { BookingDetailView } from '@features/booking';
 import {
-  AddressDetailsView,
-  AddressLocationView,
-  AddressOutOfServiceView,
-  SavedAddressesView,
+  AddressDetailsScreen,
+  AddressMapScreen,
+  EMPTY_DETAILS_FORM,
+  NotServiceableScreen,
+  SavedAddressesScreen,
 } from '@features/address';
 import { LoginScreen, OtpScreen } from '@features/auth';
 import { BookingListView } from '@features/history';
@@ -146,91 +143,101 @@ describe.each(HEIGHTS)('on a %s viewport', (_label, height) => {
     /* --------------------------------------------------------------- address */
 
     /**
-     * `53:31` is the screen with the least slack: a header, a search bar, a map that must stay
-     * usable, a resolved-address row and a CTA. The map is the block that absorbs the squeeze, so
-     * the row and the CTA both have to survive it.
+     * `1870:2379` is the screen with the least slack: a map that must stay usable, with the top
+     * bar, the current-location pill and the sheet (hint, pinned place, Confirm) over it.
      */
-    it('renders the map step with its resolved row and Confirm', () => {
+    it('renders the map step with its pinned place and Confirm', () => {
       render(
-        <AddressLocationView
-          state={ready(DEMO_ADDRESS_LOCATION)}
-          onRetry={noop}
+        <AddressMapScreen
+          coordinates={{ latitude: 12.97, longitude: 77.64 }}
+          place={{ title: '100 Feet Road', line: 'Indiranagar, Sector 2, HAL phase 3, Bengaluru' }}
+          locating={false}
+          resolving={false}
+          message={undefined}
+          canConfirm
+          confirming={false}
           onBack={noop}
+          onSettle={noop}
+          onLocate={noop}
           onConfirm={noop}
+          search={{
+            open: false,
+            onOpen: noop,
+            onClose: noop,
+            query: '',
+            suggestions: [],
+            state: 'idle',
+            onQuery: noop,
+            onChoose: noop,
+            onUseCurrentLocation: noop,
+          }}
         />,
       );
 
-      expect(screen.getByTestId('address-location-screen')).toBeTruthy();
-      expect(screen.getByTestId('address-helper')).toBeTruthy();
+      expect(screen.getByTestId('address-map-screen')).toBeTruthy();
+      expect(screen.getByTestId('address-hint')).toBeTruthy();
       expect(screen.getByTestId('address-confirm')).toBeTruthy();
     });
 
-    it('renders the address form with its pinned Confirm', () => {
-      render(
-        <AddressDetailsView
-          state={ready(DEMO_ADDRESS_DETAILS)}
-          onRetry={noop}
-          onBack={noop}
-          onChangeArea={noop}
-          onSave={noop}
-          locationReady
-          submitting={false}
-        />,
-      );
-
-      expect(screen.getByTestId('address-details-screen')).toBeTruthy();
-      expect(screen.getByTestId('address-save')).toBeTruthy();
-    });
-
     /**
-     * The state a first-time customer actually opens `60:655` in: nothing filled, so `275:4485`
-     * is drawn in `275:4690`'s grey. It is the same 34pt bar in the same place — a disabled CTA
-     * must not be a differently-sized control that reflows the footer at 320.
+     * The state a first-time customer opens the details form in: nothing filled, so Save is
+     * drawn disabled — the same bar in the same place, not a control that reflows the dock.
      */
-    it('keeps the DISABLED Confirm bar mounted and inert on an empty form', () => {
+    it('renders the address form with its DISABLED Save on an empty form', () => {
       render(
-        <AddressDetailsView
-          state={ready(DEMO_ADDRESS_DETAILS)}
-          onRetry={noop}
+        <AddressDetailsScreen
+          mode="add"
+          initial={EMPTY_DETAILS_FORM}
+          pinned={{ title: '100 Feet Road', line: 'HAL 2nd Stage, Bengaluru' }}
           onBack={noop}
-          onChangeArea={noop}
+          onEditPin={noop}
           onSave={noop}
-          locationReady={false}
-          submitting={false}
+          saving={false}
+          locationReady
         />,
       );
 
-      const cta = screen.getByTestId('address-save');
-      expect(cta).toBeTruthy();
+      const cta = screen.getByTestId('address-details-save');
+      expect(screen.getByTestId('address-details')).toBeTruthy();
       expect(cta.props.accessibilityState.disabled).toBe(true);
     });
 
     it('renders the saved-address list', () => {
       render(
-        <SavedAddressesView
-          state={ready(DEMO_ADDRESS_LIST)}
-          onRetry={noop}
+        <SavedAddressesScreen
+          addresses={[
+            { id: 'a', label: 'Home', kind: 'home', line: 'Flat 402, B, Purva', tag: 'Last used' },
+          ]}
           onBack={noop}
           onAdd={noop}
-          onSelect={noop}
-          onOpenActions={noop}
+          onEdit={noop}
+          onRemove={async () => 'removed'}
+          notice={null}
         />,
       );
 
-      expect(screen.getByTestId('saved-addresses-screen')).toBeTruthy();
-      expect(screen.getByTestId('address-add')).toBeTruthy();
+      expect(screen.getByTestId('saved-addresses')).toBeTruthy();
+      expect(screen.getByTestId('saved-addresses-add')).toBeTruthy();
     });
 
-    it('renders the out-of-service screen', () => {
+    it('renders the Not serviceable screen with its redirect footer', () => {
       render(
-        <AddressOutOfServiceView
-          state={ready(DEMO_ADDRESS_OUT_OF_SERVICE)}
-          onRetry={noop}
+        <NotServiceableScreen
+          place={{
+            title: '100 Feet Road',
+            line: 'Indiranagar, Bengaluru',
+            locality: 'Indiranagar',
+            liveAreas: ['HSR Layout', 'Haralur'],
+            neighbours: 128,
+          }}
           onBack={noop}
+          onGoHome={noop}
+          onTimeout={noop}
         />,
       );
 
-      expect(screen.getByText(DEMO_ADDRESS_OUT_OF_SERVICE.title)).toBeTruthy();
+      expect(screen.getByText('We’re not in Indiranagar yet')).toBeTruthy();
+      expect(screen.getByTestId('not-serviceable-home')).toBeTruthy();
     });
 
     /* --------------------------------------------------------------- profile */

@@ -29,3 +29,9 @@ export type {
 } from './deletionError';
 export { ACCOUNT_PATHS, createAccountApi, deleteAccountResponseSchema } from './api';
 export type { AccountApi, DeleteAccountResponse } from './api';
+export { AccountDataScreen, ManageAccountScreen } from './v2/AccountScreens';
+export type { AccountDataScreenProps, ManageAccountScreenProps } from './v2/AccountScreens';
+export { DeleteAccountSheetV2 } from './v2/DeleteAccountSheetV2';
+export type { DeleteAccountSheetV2Props, DeletionLosses } from './v2/DeleteAccountSheetV2';
+export { useAccountSummary } from './v2/useAccountSummary';
+export type { AccountSummary, PoolFace } from './v2/useAccountSummary';

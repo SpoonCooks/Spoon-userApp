@@ -102,6 +102,12 @@ export function addressWriteInputFrom(dto: AddressDto): AddressWriteInput {
     ...(dto.placeId === null || dto.placeId === undefined ? {} : { placeId: dto.placeId }),
     ...(dto.receiverName === null ? {} : { receiverName: dto.receiverName }),
     ...(dto.receiverPhone === null ? {} : { receiverPhone: dto.receiverPhone }),
+    // Replayed only when the server returned them. A backend that predates these fields never
+    // returns them, so this never sends a key it would refuse; one that has them gets them back.
+    ...(dto.propertyType === null ? {} : { propertyType: dto.propertyType }),
+    ...(dto.floor === null ? {} : { floor: dto.floor }),
+    ...(dto.lane === null ? {} : { lane: dto.lane }),
+    ...(dto.landmark === null ? {} : { landmark: dto.landmark }),
   };
 }
 

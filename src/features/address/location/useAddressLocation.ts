@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 import { getLogger } from '@core/logging';
 
 import { serviceabilityMessageFor, useServiceabilityCheck } from '../api';
-import type { ServiceabilityStatus } from '../api';
+import type { ServiceabilityDto, ServiceabilityStatus } from '../api';
 
 import { getCurrentCoordinates, reverseGeocode } from './deviceLocation';
 import type {
@@ -117,7 +117,16 @@ export type ConfirmOutcome =
       readonly coordinates: DeviceCoordinates;
       readonly geocoded: ReverseGeocodedAddress | null;
     }
-  | { readonly kind: 'refused'; readonly status: ServiceabilityStatus }
+  /**
+   * `outside_service_area` carries what the Not serviceable screen names: the place the customer
+   * pinned, where Spoon is live, and how many others are waiting there.
+   */
+  | {
+      readonly kind: 'refused';
+      readonly status: ServiceabilityStatus;
+      readonly verdict: ServiceabilityDto;
+      readonly geocoded: ReverseGeocodedAddress | null;
+    }
   /** No point to check, or a check already in flight. Nothing happened; nothing should move. */
   | { readonly kind: 'blocked' }
   /** Offline, timed out, or the server errored. The customer stays on the map. */
@@ -509,7 +518,14 @@ export function useAddressLocation(): AddressLocationState {
     setConfirmError(false);
 
     try {
-      const verdict = await checkServiceability(point);
+      const named = latestGeocoded.current;
+      const verdict = await checkServiceability({
+        ...point,
+        street: named?.street ?? null,
+        locality: named?.locality ?? null,
+        city: named?.city ?? null,
+        pincode: named?.pincode ?? null,
+      });
       // A point selected WHILE the check was in flight invalidates its answer: the verdict
       // describes coordinates the customer has already moved away from.
       if (latestPoint.current !== point) return { kind: 'blocked' };
@@ -517,7 +533,7 @@ export function useAddressLocation(): AddressLocationState {
 
       return verdict.status === 'serviceable'
         ? { kind: 'serviceable', coordinates: point, geocoded: latestGeocoded.current }
-        : { kind: 'refused', status: verdict.status };
+        : { kind: 'refused', status: verdict.status, verdict, geocoded: named };
     } catch {
       // The verdict is unknown, so nothing moves. Reported as an error rather than as
       // "unserviceable", which would be this client asserting what it cannot know.

@@ -137,6 +137,91 @@ export const DEV_ROUTES: readonly DevRoute[] = [
     note: 'IN PROGRESS · dev preview, no session needed',
   },
   {
+    path: '/booking-flow?view=assigned',
+    label: 'Booking flow · assigned',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=onTheWay',
+    label: 'Booking flow · onTheWay',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=arrived',
+    label: 'Booking flow · arrived',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=cooking',
+    label: 'Booking flow · cooking',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=timesUp',
+    label: 'Booking flow · timesUp',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=completed',
+    label: 'Booking flow · completed',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c1',
+    label: 'Booking flow · c1',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c2',
+    label: 'Booking flow · c2',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c2-25',
+    label: 'Booking flow · c2-25',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c2-50',
+    label: 'Booking flow · c2-50',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c2-cook',
+    label: 'Booking flow · c2-cook',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c3',
+    label: 'Booking flow · c3',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c4',
+    label: 'Booking flow · c4',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c4b',
+    label: 'Booking flow · c4b',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c5',
+    label: 'Booking flow · c5',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=c5b',
+    label: 'Booking flow · c5b',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
+    path: '/booking-flow?view=not-serviceable',
+    label: 'Booking flow · not-serviceable',
+    note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',
+  },
+  {
     path: '/recurring-live',
     label: 'Recurring live · Live booking calendar',
     note: 'IN PROGRESS · static UI, dev preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1005:131',

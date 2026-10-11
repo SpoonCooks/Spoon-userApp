@@ -73,3 +73,7 @@ export {
 export type { ProfileDetailsValues, ProfileSubmitGate } from './validation';
 
 export type * from './types';
+export { AccountHubScreen } from './v2/AccountHubScreen';
+export type { AccountHubModel, AccountHubScreenProps } from './v2/AccountHubScreen';
+export { firstNameOf, foodSummaryOf, phoneLabelOf, poolCardStateOf } from './v2/model';
+export type { PoolCardState } from './v2/model';

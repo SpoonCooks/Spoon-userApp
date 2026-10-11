@@ -79,6 +79,8 @@ export interface VisitDetailsScreenProps {
   readonly addingCookToPool?: boolean;
   /** Completed only: tip the cook (only while the server allows it). */
   readonly onTipCook?: (() => void) | undefined;
+  /** The header title; "Visit details" by default, "On-time visit" for a one-time booking. */
+  readonly title?: string | undefined;
   readonly testID?: string | undefined;
 }
 
@@ -102,6 +104,7 @@ export function VisitDetailsScreen({
   onAddCookToPool,
   addingCookToPool = false,
   onTipCook,
+  title = 'Visit details',
   testID = 'visit-details-screen',
 }: VisitDetailsScreenProps) {
   const model = given ?? visitDemoModel(demoVariant, prepState);
@@ -125,7 +128,7 @@ export function VisitDetailsScreen({
         tone="plain"
         testID={testID}
         contentStyle={styles.body}
-        header={<VisitHeader title="Visit details" onBack={onBack} testID={`${testID}-header`} />}
+        header={<VisitHeader title={title} onBack={onBack} testID={`${testID}-header`} />}
         footer={
           <ActionDock
             showModify={upcoming && model.modifySheet !== null}
