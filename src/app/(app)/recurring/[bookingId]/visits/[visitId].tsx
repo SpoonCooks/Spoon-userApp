@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { idempotency } from '@core/api';
@@ -107,8 +107,12 @@ export default function RecurringVisitRoute() {
   const openRecipe = whatsApp('recipe');
 
   // ─── Refund tracker (DEC-090) ──────────────────────────────────────────────────────────────
-  const refund = useRefund(detail?.cancellation?.refundId ?? null);
+  const refundId = detail?.cancellation?.refundId ?? null;
+  const refund = useRefund(refundId);
   const contactSupport = useWhatsAppHelp();
+  // The tracker replaces the payment summary (handoff A1). While it loads, nothing is drawn in its
+  // place rather than the summary's older statuses; the summary stands in only when the visit has
+  // no refund linked yet or the tracker cannot be read.
   const refundSlot =
     refund.state.status === 'ready' ? (
       <RefundTracker
@@ -116,6 +120,8 @@ export default function RecurringVisitRoute() {
         onContactSupport={contactSupport}
         testID="visit-refund-tracker"
       />
+    ) : refundId !== null && refund.state.status === 'loading' ? (
+      <View testID="visit-refund-tracker-loading" />
     ) : undefined;
 
   // ─── Checklist ─────────────────────────────────────────────────────────────────────────────

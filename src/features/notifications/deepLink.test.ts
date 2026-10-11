@@ -26,7 +26,12 @@ describe('routeForNotification', () => {
 
   it('opens the refund tracker for a refund push', () => {
     const refundId = '3f1c2a5e-0000-4000-8000-0000000000aa';
-    for (const eventType of ['refund.requested', 'refund.credited']) {
+    for (const eventType of [
+      'refund.requested',
+      'refund.credited',
+      'recurring.visit.refund_started',
+      'recurring.visit.refund_credited',
+    ]) {
       expect(routeForNotification({ bookingId: BOOKING, refundId, eventType })).toBe(
         `/refund/${refundId}`,
       );

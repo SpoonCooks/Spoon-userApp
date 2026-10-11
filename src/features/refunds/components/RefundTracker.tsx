@@ -10,11 +10,11 @@ import type { RefundBreakdownLine, RefundStatus, RefundTrackerView } from '../ad
 /**
  * The refund tracker card (DEC-090, handoff §B) — one card for every refund, one-time or Recurring.
  *
- * Header (what was refunded, when, and who cancelled), the breakdown (one of three versions), then
- * the refund itself: amount, destination and status, which opens on the three-step stepper. The
- * bank's reference appears only once the refund is completed. A failed refund replaces the
- * reference with "Refund didn't go through" and a Contact support button; why it failed is never
- * shown.
+ * Handoff Part 1 A2: header (the visit, its date, who cancelled), the breakdown (one of three
+ * versions), then the refund itself — amount, destination and status with a collapse arrow, a
+ * dashed line, and the three-step stepper, open by default. The bank's reference is its own line
+ * under "Refund completed", only once completed. A failed refund adds "Refund didn't go through"
+ * and a Contact support button and nothing else; why it failed is never shown.
  */
 export interface RefundTrackerProps {
   readonly refund: RefundTrackerView;
@@ -105,6 +105,8 @@ export function RefundTracker({
           </View>
         </Pressable>
 
+        {open ? <DashedLine /> : null}
+
         {open ? (
           <View style={styles.steps} testID={`${testID}-steps`}>
             {refund.steps.map((step, index) => (
@@ -129,25 +131,25 @@ export function RefundTracker({
                       {step.when}
                     </Text>
                   )}
+                  {step.key === 'completed' && refund.reference !== undefined ? (
+                    <Text
+                      variant="spoonCaptionStrong"
+                      color="textPrimary"
+                      testID={`${testID}-reference`}
+                    >
+                      {refund.reference}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
             ))}
           </View>
         ) : null}
 
-        {refund.reference === undefined ? null : (
-          <Text variant="spoonCaptionStrong" color="textPrimary" testID={`${testID}-reference`}>
-            {refund.reference}
-          </Text>
-        )}
-
         {refund.status === 'failed' ? (
           <View style={styles.failed} testID={`${testID}-failed`}>
             <Text variant="spoonBodyStrong" color="danger">
               Refund didn&apos;t go through
-            </Text>
-            <Text variant="spoonCaption" color="textSecondarySoft">
-              Our team will help you get your money back.
             </Text>
             <Button
               label="Contact support"
@@ -163,7 +165,25 @@ export function RefundTracker({
   );
 }
 
+/** A2's dashed line between the refund row and the stepper; clipped to the card's width. */
+function DashedLine() {
+  return (
+    <View style={styles.dashes} testID="refund-tracker-dashes">
+      {Array.from({ length: 60 }, (_, index) => (
+        <View key={index} style={styles.dash} />
+      ))}
+    </View>
+  );
+}
+
 function BreakdownLine({ line }: { readonly line: RefundBreakdownLine }) {
+  if (line.note === true) {
+    return (
+      <Text variant="spoonBody" color="textSecondarySoft">
+        {line.label}
+      </Text>
+    );
+  }
   return (
     <View style={styles.line}>
       <Text variant="spoonBody" color="textPrimary" style={styles.label}>
@@ -217,6 +237,8 @@ const styles = StyleSheet.create({
   },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.sm },
   chevronOpen: { transform: [{ rotate: '180deg' }] },
+  dashes: { flexDirection: 'row', overflow: 'hidden', gap: 4, height: 1 },
+  dash: { width: 6, height: 1, backgroundColor: lightTheme.colors.border },
   steps: { gap: 0 },
   step: { flexDirection: 'row', gap: lightTheme.space.md },
   rail: { alignItems: 'center', width: NODE },
