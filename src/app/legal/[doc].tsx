@@ -2,7 +2,7 @@ import { Redirect, useLocalSearchParams } from 'expo-router';
 import type { Href } from 'expo-router';
 
 import { LEGAL_DOCUMENTS, LegalDocumentView, legalDocumentFor } from '@features/legal';
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 
 /**
  * `spoon://legal/terms` and `spoon://legal/privacy` — the two customer documents, in-app.
@@ -39,9 +39,11 @@ import { useSafeBack } from '@core/navigation';
 export default function LegalDocumentRoute() {
   const { doc } = useLocalSearchParams<{ doc?: string }>();
   const goBack = useSafeBack('/profile');
+  // One pop per tap: a quick double tap must not pop past the screen the reader came from.
+  const guard = useNavigationGuard();
 
   const id = legalDocumentFor(doc);
   if (id === null) return <Redirect href={'/profile' as Href} />;
 
-  return <LegalDocumentView document={LEGAL_DOCUMENTS[id]} onBack={goBack} />;
+  return <LegalDocumentView document={LEGAL_DOCUMENTS[id]} onBack={guard(goBack)} />;
 }

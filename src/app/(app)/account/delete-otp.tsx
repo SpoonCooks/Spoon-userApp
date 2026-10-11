@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { idempotency } from '@core/api';
 import { getUserMessage, isAppError } from '@core/errors';
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import {
   accountDeletionScope,
   deletionFailureView,
@@ -50,6 +50,8 @@ export default function DeleteAccountOtpRoute() {
   const requestOtp = useRequestAccountDeletionOtp();
   const confirmDeletion = useConfirmAccountDeletion();
   const goBack = useSafeBack('/account');
+  // One screen per tap: a quick double tap must not open the same screen (or WhatsApp) twice.
+  const guard = useNavigationGuard();
 
   /*
    * Seeded from the send that already happened on the Account screen, exactly as Login's OTP
@@ -96,7 +98,7 @@ export default function DeleteAccountOtpRoute() {
       return {
         message: blocked.message,
         actionLabel: blocked.actionLabel,
-        onAction: () => {
+        onAction: guard(() => {
           /*
            * REPLACE, not push. Taking this link abandons the deletion: the blocker has to be
            * cleared first, and the code in the boxes will have expired long before that is done.
@@ -113,10 +115,10 @@ export default function DeleteAccountOtpRoute() {
           // line every other Help control in the app goes to. That one does not navigate, so
           // the screen stays as it is.
           if (target === 'support') openHelp('Hi Spoon, I want to delete my account.');
-        },
+        }),
       };
     },
-    [openHelp, router],
+    [guard, openHelp, router],
   );
 
   return (
@@ -173,7 +175,7 @@ export default function DeleteAccountOtpRoute() {
               );
             }}
             onResend={onResend}
-            onEditNumber={goBack}
+            onEditNumber={guard(goBack)}
             {...(notice === undefined ? {} : { notice })}
           />
         );

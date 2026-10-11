@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import { CookProfileScreen } from '@features/cookPool';
 
 /**
@@ -11,13 +11,15 @@ import { CookProfileScreen } from '@features/cookPool';
 export default function CookProfileRoute() {
   const router = useRouter();
   const { cookId } = useLocalSearchParams<{ cookId: string }>();
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+  const guard = useNavigationGuard();
   const goBack = useSafeBack('/cook-pool');
 
   return (
     <CookProfileScreen
       cookId={cookId}
-      onBack={goBack}
-      onRemoved={() => router.dismissTo('/cook-pool')}
+      onBack={guard(goBack)}
+      onRemoved={guard(() => router.dismissTo('/cook-pool'))}
     />
   );
 }

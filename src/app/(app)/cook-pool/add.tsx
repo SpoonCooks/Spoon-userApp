@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import { CookPoolDeckScreen } from '@features/cookPool';
 
 /**
@@ -14,12 +14,14 @@ import { CookPoolDeckScreen } from '@features/cookPool';
  */
 export default function CookPoolDeckRoute() {
   const router = useRouter();
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+  const guard = useNavigationGuard();
   const goBack = useSafeBack('/cook-pool');
 
   return (
     <>
       <Stack.Screen options={{ gestureEnabled: false }} />
-      <CookPoolDeckScreen onDone={goBack} onBookVisit={() => router.dismissTo('/home')} />
+      <CookPoolDeckScreen onDone={guard(goBack)} onBookVisit={() => router.dismissTo('/home')} />
     </>
   );
 }

@@ -3,6 +3,7 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 
 import { isGuest } from '@core/auth';
+import { useNavigationGuard } from '@core/navigation';
 import { getLogger } from '@core/logging';
 import { useSessionStore } from '@core/store';
 import { useMe } from '@features/auth';
@@ -53,7 +54,9 @@ export default function HomeRoute() {
 function GuestHomeRoute() {
   const router = useRouter();
   const home = useGuestHomeRedesignData();
-  const signIn = () => router.replace('/login');
+  // One screen per tap: a quick double tap must not open Login twice.
+  const guard = useNavigationGuard();
+  const signIn = guard(() => router.replace('/login'));
 
   return (
     <QueryBoundary state={home.state} onRetry={home.refetch}>
@@ -108,6 +111,10 @@ function SignedInHomeRoute() {
               : notice.message,
         };
 
+  // One screen per tap: a quick double tap must not open the same screen twice. "Book now" has its
+  // own guard — it ignores a press while a submission is in flight.
+  const guard = useNavigationGuard();
+
   // Re-resolve the variant on every Home focus (address change, a first completed booking).
   const { refetch } = home;
   useFocusEffect(
@@ -161,26 +168,27 @@ function SignedInHomeRoute() {
           model={model}
           bookingBusy={submission.submitting}
           notice={shownNotice}
-          onPressAddress={() => router.push('/address?from=home')}
-          onPressProfile={() => router.push('/profile')}
+          onPressAddress={guard(() => router.push('/address?from=home'))}
+          onPressProfile={guard(() => router.push('/profile'))}
           onDurationSelected={(event) => {
             setDurationId(durationIdFor(event.durationMin));
             logger.info('duration_selected', event);
           }}
           onBookNow={bookNow}
-          onPickSlot={(request) =>
+          onPickSlot={guard((request: BookingRequest) =>
             router.push({
               pathname: '/scheduled',
               params: { durationId: request.duration.id },
-            })
-          }
-          onPressRecurring={(target) =>
-            openRecurring(target, model.activeRecurringPlan?.id ?? null)
-          }
-          onPressCookPool={() => router.push('/cook-pool')}
-          onPressPoolCook={(cook) =>
-            router.push({ pathname: '/cook-pool/[cookId]', params: { cookId: cook.id } })
-          }
+            }),
+          )}
+          onPressRecurring={(target) => {
+            guard(() => openRecurring(target, model.activeRecurringPlan?.id ?? null))();
+            return true;
+          }}
+          onPressCookPool={guard(() => router.push('/cook-pool'))}
+          onPressPoolCook={guard((cook: { readonly id: string }) =>
+            router.push({ pathname: '/cook-pool/[cookId]', params: { cookId: cook.id } }),
+          )}
           onRefreshAvailability={home.refetch}
           onJoinWaitlist={async () => {
             const meData = me.state.status === 'ready' ? me.state.data : null;

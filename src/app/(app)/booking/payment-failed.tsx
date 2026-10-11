@@ -107,7 +107,8 @@ export default function PaymentFailedRoute() {
             amountPaise={booking.price.totalAmountPaise}
             retrying={retryPayment.retrying}
             onRetry={() => {
-              if (bookingId === null) return;
+              // One checkout at a time: a second press while one is open would start another.
+              if (bookingId === null || retryPayment.retrying) return;
               void retryPayment.retry().then((outcome) => {
                 // Guarded by `left`: the poll above can already have moved the customer on (the
                 // hold settled via an earlier attempt's webhook, say) while this retry was still

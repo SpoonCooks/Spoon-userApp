@@ -13,7 +13,7 @@ import type {
   RecurringBookingDto,
   RecurringPlanDraft,
 } from '@features/recurringSetup';
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 
 /**
  * Recurring setup — the whole flow: pick days and plans → Schedule each plan's visits → Summary
@@ -46,6 +46,8 @@ type Stage =
 
 export default function RecurringSetupRoute() {
   const router = useRouter();
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+  const guard = useNavigationGuard();
   const goBack = useSafeBack('/home');
   const planning = useRecurringPlanningSource();
   const [stage, setStage] = useState<Stage>({ kind: 'flow', plans: null });
@@ -55,7 +57,7 @@ export default function RecurringSetupRoute() {
       <RecurringBookedScreen
         booking={stage.booking}
         mandate={stage.mandate}
-        onDone={() => router.dismissTo('/home')}
+        onDone={guard(() => router.dismissTo('/home'))}
       />
     );
   }
@@ -82,8 +84,8 @@ export default function RecurringSetupRoute() {
       <Stack.Screen options={{ gestureEnabled: false }} />
       <RecurringPlanningProvider value={planning}>
         <RecurringPlanFlow
-          onExit={goBack}
-          onOpenInfo={() => router.push('/recurring')}
+          onExit={guard(goBack)}
+          onOpenInfo={guard(() => router.push('/recurring'))}
           onComplete={(plans) => setStage({ kind: 'autopay', plans })}
           {...(stage.plans === null
             ? {}

@@ -11,7 +11,7 @@ import {
 import { useCatalogue } from '@features/catalogue';
 import type { ScheduleSelection } from '@features/scheduled';
 import { getUserMessage, isAppError } from '@core/errors';
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import { InfoDialog } from '@ui';
 
 /**
@@ -96,6 +96,8 @@ export default function RescheduleRoute() {
    * deep-links here (or a `spoon://reschedule/:id`) therefore backs out to that booking rather
    * than to Home, which is where the customer expects to be when they abandon the change.
    */
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+  const guard = useNavigationGuard();
   const goBack = useSafeBack(bookingId === '' ? '/home' : `/booking/${bookingId}`);
 
   return (
@@ -104,7 +106,7 @@ export default function RescheduleRoute() {
         key={selectionScope}
         state={state}
         onRetry={refetch}
-        onBack={goBack}
+        onBack={guard(goBack)}
         {...(initialSelection === undefined ? {} : { initialSelection })}
         onSelectionChange={handleSelectionChange}
         /* Reschedule is free, so there is no quote to wait on — but the call in flight still has

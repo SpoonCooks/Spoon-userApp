@@ -535,15 +535,21 @@ describe('Home is a root', () => {
     expect(screen.queryByTestId('booking-back')).toBeNull();
   });
 
-  it('routes the address and profile controls to real destinations', async () => {
+  // One control per render: Home's tap guard opens one screen per tap, so a second control pressed
+  // straight after the first is (rightly) ignored.
+  it('routes the address control to Saved addresses', async () => {
     render(<HomeRoute />);
 
     // Tagged with its entry point, so Saved addresses' back control can send it straight home
     // rather than through Profile — see "Saved addresses back target follows its entry point".
     fireEvent.press(await screen.findByRole('button', { name: /^Delivery address/ }));
     expect(mockRouter.push).toHaveBeenCalledWith('/address?from=home');
+  });
 
-    fireEvent.press(screen.getByRole('button', { name: 'Profile' }));
+  it('routes the profile control to the Account hub', async () => {
+    render(<HomeRoute />);
+
+    fireEvent.press(await screen.findByRole('button', { name: 'Profile' }));
     expect(mockRouter.push).toHaveBeenCalledWith('/profile');
   });
 
