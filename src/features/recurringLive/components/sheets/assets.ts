@@ -55,3 +55,14 @@ export const SHEET_BELL_GLYPH =
  * to the frame's 338. */
 export const SHEET_STITCH =
   require('../../../../../assets/figma/recurring/sheets/stitch.webp') as ImageSourcePropType;
+
+/**
+ * `2254:3982` "Mode of payment" — the Card, Wallet and Netbanking variants' 24pt glyphs (UPI uses
+ * `SHEET_MONEY_GLYPH`). Rasterised at 3× from each icon's SVG.
+ */
+export const SHEET_CARD_GLYPH =
+  require('../../../../../assets/figma/recurring/sheets/method-card.png') as ImageSourcePropType;
+export const SHEET_WALLET_GLYPH =
+  require('../../../../../assets/figma/recurring/sheets/method-wallet.png') as ImageSourcePropType;
+export const SHEET_NETBANKING_GLYPH =
+  require('../../../../../assets/figma/recurring/sheets/method-netbanking.png') as ImageSourcePropType;

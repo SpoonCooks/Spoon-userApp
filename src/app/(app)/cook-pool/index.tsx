@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import { CookPoolScreen } from '@features/cookPool';
 
 /**
@@ -9,13 +9,17 @@ import { CookPoolScreen } from '@features/cookPool';
  */
 export default function CookPoolRoute() {
   const router = useRouter();
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+  const guard = useNavigationGuard();
   const goBack = useSafeBack('/home');
 
   return (
     <CookPoolScreen
-      onBack={goBack}
-      onAddCooks={() => router.push('/cook-pool/add')}
-      onOpenCook={(cookId) => router.push({ pathname: '/cook-pool/[cookId]', params: { cookId } })}
+      onBack={guard(goBack)}
+      onAddCooks={guard(() => router.push('/cook-pool/add'))}
+      onOpenCook={guard((cookId) =>
+        router.push({ pathname: '/cook-pool/[cookId]', params: { cookId } }),
+      )}
     />
   );
 }

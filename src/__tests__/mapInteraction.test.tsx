@@ -110,9 +110,19 @@ beforeEach(() => {
   verdict = { status: 'serviceable' };
 });
 
-/** The fixed pin, once the device fix has produced a point to centre the map on. */
+/** The map, once the device fix has produced a point to centre it on and its address resolved. */
 async function pin() {
-  return screen.findByTestId('address-map-pin');
+  await screen.findByTestId('address-map-canvas');
+  await resolved();
+  return screen.getByTestId('address-map-pin');
+}
+
+/**
+ * Confirm waits for the address under the pin to resolve (dev note `2075:11925`), so a press is
+ * only meaningful once the geocode for the latest settle has answered.
+ */
+async function resolved() {
+  await waitFor(() => expect(screen.getByTestId('address-confirm')).not.toBeDisabled());
 }
 
 /**
@@ -211,7 +221,11 @@ describe('selecting a point is local', () => {
 
     // No Maps key in the test build, so Places reports `unconfigured` — the designed state for a
     // build without one. What matters here is that typing costs no serviceability request.
-    fireEvent.changeText(screen.getByTestId('address-search'), 'Koramangala');
+    fireEvent.press(screen.getByTestId('address-map-screen-search'));
+    fireEvent.changeText(
+      await screen.findByTestId('address-map-screen-search-layer-input'),
+      'Koramangala',
+    );
     await act(async () => {
       await Promise.resolve();
     });
@@ -306,6 +320,7 @@ describe('confirm is the only thing that asks the server', () => {
     await pin();
 
     settleAt(13.0101, 77.5502);
+    await resolved();
     fireEvent.press(screen.getByTestId('address-confirm'));
 
     await waitFor(() => expect(checks).toHaveLength(1));
@@ -313,18 +328,22 @@ describe('confirm is the only thing that asks the server', () => {
   });
 
   /**
-   * The LAST settle wins, including one that lands in the same tick as the press.
+   * The LAST settle wins, and a press before its address has resolved does nothing.
    *
    * `confirm` reads the point from a ref rather than from render state, and the route writes the
-   * draft from the outcome rather than from its own closure — so a customer who presses Confirm the
-   * instant the map stops cannot have the previous point checked or saved.
+   * draft from the outcome rather than from its own closure — so the previous point can never be
+   * checked or saved. Confirm itself waits for the new point's address (dev note `2075:11925`).
    */
-  it('confirms the last point the map settled on, even pressed in the same tick', async () => {
+  it('confirms the last point the map settled on, and not before it resolves', async () => {
     render();
     await pin();
 
     settleAt(12.95, 77.61);
     settleAt(13.0101, 77.5502);
+    fireEvent.press(screen.getByTestId('address-confirm'));
+    expect(checks).toHaveLength(0);
+
+    await resolved();
     fireEvent.press(screen.getByTestId('address-confirm'));
 
     await waitFor(() => expect(checks).toHaveLength(1));
@@ -402,7 +421,7 @@ describe('confirm is the only thing that asks the server', () => {
     fireEvent.press(screen.getByTestId('address-confirm'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('address-serviceability')).toBeTruthy();
+      expect(screen.getByTestId('address-message')).toBeTruthy();
     });
     expect(mockRouter.push).not.toHaveBeenCalled();
     expect(mockRouter.replace).not.toHaveBeenCalled();
@@ -426,7 +445,7 @@ describe('confirm is the only thing that asks the server', () => {
     });
     expect(mockRouter.push).not.toHaveBeenCalled();
     // Everything being confirmed is still on screen; nothing was blanked for the round trip.
-    expect(screen.getByTestId('address-map')).toBeTruthy();
+    expect(screen.getByTestId('address-map-canvas')).toBeTruthy();
     expect(screen.getByTestId('address-map-pin')).toBeTruthy();
   });
 

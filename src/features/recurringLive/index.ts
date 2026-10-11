@@ -32,7 +32,8 @@ export type { RecurringPlansScreenProps } from './screens/RecurringPlansScreen';
 export { VisitDetailsScreen } from './screens/VisitDetailsScreen';
 export type { VisitDetailsScreenProps } from './screens/VisitDetailsScreen';
 export type { VisitDetailsModel, VisitPrepKey, VisitPrepReady, VisitVariant } from './data/visit';
-export { visitDemoModel } from './data/visit';
+export { REFUND_CREDIT_NOTE, visitDemoModel } from './data/visit';
+export type { VisitRefundData } from './data/visit';
 export {
   rateVisitInfo,
   ratingRequestFor,
@@ -57,3 +58,14 @@ export type { TellUsMoreSheetProps } from './components/rating/TellUsMoreSheet';
 export type { VisitRatingValue } from './data/rating';
 
 export { useCancelWholeBooking } from './cancelWholeBooking';
+
+// Shared with the one-time visit details (`@features/serviceVisit`).
+export { ActionDock } from './components/visit/ActionDock';
+export { BeforeArrivalCard } from './components/visit/BeforeArrivalCard';
+export { CookAssignedCard } from './components/visit/CookAssignedCard';
+export { RecipeShareRow } from './components/visit/RecipeShareRow';
+export { VisitHeader } from './components/visit/VisitHeader';
+export { VisitToast } from './components/visit/VisitToast';
+export type { VisitToastHandle } from './components/visit/VisitToast';
+export type { VisitCookData, VisitMenuSection } from './data/visit';
+export type { PaymentDetailsSheetData } from './data/sheets';

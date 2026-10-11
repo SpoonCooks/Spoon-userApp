@@ -32,6 +32,11 @@ const SAVED: AddressDto = {
     reason: 'AVAILABLE',
     hub: { id: 'hub-1', name: 'Bengaluru Hub' },
   },
+  propertyType: null,
+  floor: null,
+  lane: null,
+  landmark: null,
+  lastUsedAt: null,
 };
 
 describe('addressWriteInputFrom', () => {

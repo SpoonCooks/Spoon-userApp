@@ -1,0 +1,606 @@
+import { useState } from 'react';
+import type { ReactNode } from 'react';
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import type { AddressPropertyType } from '../api';
+
+import { ADDRESS_ART } from './art';
+import { AddIcon, FieldInput, GradientHeader, PrimaryButton } from './components';
+import type { AddressLabelKind } from './components';
+import { C, GRADIENT, T } from './theme';
+
+/**
+ * Address details — Figma `1870:2485` (Apartment), `1870:2576` (Independent house) and
+ * `1870:2672` (Edit address), built to dev notes `2075:11932`, `2075:11941` and `2075:11945`.
+ *
+ *   header   the flow's gradient header: "Address details", or "Edit address" when editing
+ *   pinned   `1870:2495` — `#FFF7CC` r24 p12: the 64pt mini map, "PINNED LOCATION", the place and
+ *            its line, and a white "Edit" pill that goes back to the map keeping everything typed
+ *   steps    four numbered steps on a dashed rail (visual only, not tappable):
+ *            1 Property type — two tiles, the selected one on the yellow gradient
+ *            2 Flat / House details — the type's own fields
+ *            3 Save it as — Home · Parents · Friends · Others; Others adds a name (max 20)
+ *            4 Someone else receiving the service? — an optional, expandable receiver
+ *   dock     "Save address" (editing: "Save changes" over a "Remove this address" link)
+ *
+ * Rules (dev notes): the property type swaps the fields and Floor carries over; `*` marks a
+ * required field; labels are single-select and may repeat across addresses; the receiver is
+ * optional and its X collapses it AND clears it; Save is disabled until the required fields and a
+ * label are filled — and, when editing, until something has changed.
+ */
+export interface AddressDetailsForm {
+  readonly propertyType: AddressPropertyType;
+  /** Flat no. (apartment) or House/ Plot no. (house). */
+  readonly number: string;
+  readonly floor: string;
+  readonly tower: string;
+  readonly society: string;
+  readonly lane: string;
+  readonly landmark: string;
+  readonly label: AddressLabelKind | null;
+  /** The Others name. */
+  readonly otherName: string;
+  readonly receiverOpen: boolean;
+  readonly receiverName: string;
+  /** National digits only; the +91 is fixed. */
+  readonly receiverPhone: string;
+}
+
+export const EMPTY_DETAILS_FORM: AddressDetailsForm = {
+  propertyType: 'apartment',
+  number: '',
+  floor: '',
+  tower: '',
+  society: '',
+  lane: '',
+  landmark: '',
+  label: null,
+  otherName: '',
+  receiverOpen: false,
+  receiverName: '',
+  receiverPhone: '',
+};
+
+const OTHER_NAME_MAX = 20;
+const PHONE_DIGITS = 10;
+
+/** Whether Save may proceed: required fields, a label, and a complete receiver if one is open. */
+export function isDetailsFormComplete(form: AddressDetailsForm): boolean {
+  const filled = (value: string) => value.trim().length > 0;
+  const fields =
+    form.propertyType === 'apartment'
+      ? filled(form.number) && filled(form.society)
+      : filled(form.number);
+  const label = form.label !== null && (form.label !== 'others' || filled(form.otherName));
+  const receiver =
+    !form.receiverOpen ||
+    (form.receiverName.trim() === '' && form.receiverPhone === '') ||
+    (filled(form.receiverName) && /^[6-9]\d{9}$/.test(form.receiverPhone));
+  return fields && label && receiver;
+}
+
+/** What Save actually sends, for comparing an edit with what it started from. */
+export function detailsFingerprint(form: AddressDetailsForm): string {
+  const apartment = form.propertyType === 'apartment';
+  const receiver = form.receiverOpen ? [form.receiverName.trim(), form.receiverPhone] : ['', ''];
+  return JSON.stringify([
+    form.propertyType,
+    form.number.trim(),
+    form.floor.trim(),
+    apartment ? form.tower.trim() : '',
+    apartment ? form.society.trim() : '',
+    apartment ? '' : form.lane.trim(),
+    apartment ? '' : form.landmark.trim(),
+    form.label,
+    form.label === 'others' ? form.otherName.trim() : '',
+    ...receiver,
+  ]);
+}
+
+export interface AddressDetailsScreenProps {
+  readonly mode: 'add' | 'edit';
+  readonly initial: AddressDetailsForm;
+  readonly pinned: { readonly title: string; readonly line: string };
+  readonly onBack: () => void;
+  /** Back to the map. The host keeps the form alive underneath, so nothing typed is lost. */
+  readonly onEditPin: () => void;
+  readonly onSave: (form: AddressDetailsForm) => void;
+  readonly onRemove?: () => void;
+  readonly saving: boolean;
+  /** Whether a saveable point exists yet. */
+  readonly locationReady: boolean;
+  /** Editing: the pin itself was moved on the map, which is a change even with the form as it was. */
+  readonly pinMoved?: boolean;
+  readonly testID?: string;
+}
+
+export function AddressDetailsScreen({
+  mode,
+  initial,
+  pinned,
+  onBack,
+  onEditPin,
+  onSave,
+  onRemove,
+  saving,
+  locationReady,
+  pinMoved = false,
+  testID = 'address-details',
+}: AddressDetailsScreenProps) {
+  const { bottom } = useSafeAreaInsets();
+  const [form, setForm] = useState(initial);
+  const [initialPrint] = useState(() => detailsFingerprint(initial));
+  const set = (patch: Partial<AddressDetailsForm>) =>
+    setForm((current) => ({ ...current, ...patch }));
+
+  const changed = mode === 'add' || pinMoved || detailsFingerprint(form) !== initialPrint;
+  const ready = locationReady && isDetailsFormComplete(form) && changed;
+  const apartment = form.propertyType === 'apartment';
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      testID={testID}
+    >
+      <GradientHeader
+        title={mode === 'edit' ? 'Edit address' : 'Address details'}
+        onBack={onBack}
+        testID={`${testID}-header`}
+      />
+      <ScrollView
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.pinned} testID={`${testID}-pinned`}>
+          <Image source={ADDRESS_ART.miniMap} style={styles.miniMap} />
+          <View style={styles.pinnedText}>
+            <Text style={styles.overline}>PINNED LOCATION</Text>
+            <Text style={styles.bodyStrong}>{pinned.title}</Text>
+            {pinned.line === '' ? null : <Text style={styles.caption}>{pinned.line}</Text>}
+          </View>
+          <Pressable
+            onPress={onEditPin}
+            accessibilityRole="button"
+            accessibilityLabel="Edit pinned location"
+            hitSlop={6}
+            style={({ pressed }) => [styles.editPill, pressed && styles.pressed]}
+            testID={`${testID}-edit-pin`}
+          >
+            <Image source={ADDRESS_ART.edit} style={styles.icon18} />
+            <Text style={styles.captionStrong}>Edit</Text>
+          </Pressable>
+        </View>
+
+        <View>
+          <Step number={1} title="Property type">
+            <View style={styles.tiles}>
+              <PropertyTile
+                icon={ADDRESS_ART.apartment}
+                label="Apartment/ Society"
+                selected={apartment}
+                onPress={() => set({ propertyType: 'apartment' })}
+                testID={`${testID}-type-apartment`}
+              />
+              <PropertyTile
+                icon={ADDRESS_ART.home}
+                label="Independent house"
+                selected={!apartment}
+                onPress={() => set({ propertyType: 'house' })}
+                testID={`${testID}-type-house`}
+              />
+            </View>
+          </Step>
+
+          <Step number={2} title={apartment ? 'Flat details' : 'House details'}>
+            <View style={styles.fields}>
+              <View style={styles.fieldRow}>
+                <FieldInput
+                  value={form.number}
+                  onChangeText={(number) => set({ number })}
+                  placeholder={apartment ? 'Flat no. *' : 'House/ Plot no. *'}
+                  style={styles.flex}
+                  testID={`${testID}-number`}
+                />
+                <FieldInput
+                  value={form.floor}
+                  onChangeText={(floor) => set({ floor })}
+                  placeholder="Floor"
+                  style={styles.flex}
+                  testID={`${testID}-floor`}
+                />
+              </View>
+              {apartment ? (
+                <>
+                  <FieldInput
+                    value={form.tower}
+                    onChangeText={(tower) => set({ tower })}
+                    placeholder="Tower / Block"
+                    testID={`${testID}-tower`}
+                  />
+                  <FieldInput
+                    value={form.society}
+                    onChangeText={(society) => set({ society })}
+                    placeholder="Society / Building name *"
+                    testID={`${testID}-society`}
+                  />
+                </>
+              ) : (
+                <>
+                  <FieldInput
+                    value={form.lane}
+                    onChangeText={(lane) => set({ lane })}
+                    placeholder="Street/ Lane"
+                    testID={`${testID}-lane`}
+                  />
+                  <FieldInput
+                    value={form.landmark}
+                    onChangeText={(landmark) => set({ landmark })}
+                    placeholder="Landmark (optional)"
+                    testID={`${testID}-landmark`}
+                  />
+                </>
+              )}
+            </View>
+          </Step>
+
+          <Step number={3} title="Save it as">
+            <View style={styles.chips}>
+              {LABELS.map((option) => (
+                <LabelChip
+                  key={option.kind}
+                  icon={option.icon}
+                  label={option.label}
+                  selected={form.label === option.kind}
+                  onPress={() => set({ label: option.kind })}
+                  testID={`${testID}-label-${option.kind}`}
+                />
+              ))}
+            </View>
+            {form.label === 'others' ? (
+              <FieldInput
+                value={form.otherName}
+                onChangeText={(otherName) => set({ otherName })}
+                placeholder="Save as *"
+                maxLength={OTHER_NAME_MAX}
+                testID={`${testID}-other-name`}
+              />
+            ) : null}
+          </Step>
+
+          <Step number={4} title="Someone else receiving the service?" last>
+            <View style={styles.receiver} testID={`${testID}-receiver`}>
+              <Pressable
+                onPress={() =>
+                  form.receiverOpen
+                    ? set({ receiverOpen: false, receiverName: '', receiverPhone: '' })
+                    : set({ receiverOpen: true })
+                }
+                accessibilityRole="button"
+                accessibilityLabel={
+                  form.receiverOpen ? 'Remove receiver' : 'Add a receiver (optional)'
+                }
+                style={styles.receiverRow}
+                testID={`${testID}-receiver-toggle`}
+              >
+                <View style={styles.receiverWell}>
+                  <Image source={ADDRESS_ART.profile} style={styles.icon24} />
+                </View>
+                <View style={styles.receiverText}>
+                  <Text style={styles.bodyStrong}>
+                    {form.receiverOpen ? 'Receiver added' : 'Add a receiver (optional)'}
+                  </Text>
+                  <Text style={styles.caption}>
+                    {form.receiverOpen
+                      ? 'Helps the cook coordinate better reach without any confusion'
+                      : 'So the cook can call them on arrival'}
+                  </Text>
+                </View>
+                {form.receiverOpen ? (
+                  <View style={[styles.toggleWell, styles.toggleClose]}>
+                    <Image source={ADDRESS_ART.close} style={styles.icon24} />
+                  </View>
+                ) : (
+                  <View style={[styles.toggleWell, styles.toggleAdd]}>
+                    <AddIcon />
+                  </View>
+                )}
+              </Pressable>
+              {form.receiverOpen ? (
+                <>
+                  <FieldInput
+                    value={form.receiverName}
+                    onChangeText={(receiverName) => set({ receiverName })}
+                    placeholder="Receiver’s name"
+                    testID={`${testID}-receiver-name`}
+                  />
+                  <FieldInput
+                    value={form.receiverPhone}
+                    onChangeText={(text) =>
+                      set({ receiverPhone: text.replace(/\D/g, '').slice(-PHONE_DIGITS) })
+                    }
+                    placeholder="Receiver’s contact"
+                    keyboardType="phone-pad"
+                    leading={
+                      form.receiverPhone === '' ? null : <Text style={styles.dial}>+91</Text>
+                    }
+                    inputProps={{ textContentType: 'telephoneNumber' }}
+                    testID={`${testID}-receiver-phone`}
+                  />
+                </>
+              ) : null}
+            </View>
+          </Step>
+        </View>
+      </ScrollView>
+
+      <View style={[styles.dock, { paddingBottom: Math.max(8, bottom) }]}>
+        <PrimaryButton
+          label={mode === 'edit' ? 'Save changes' : 'Save address'}
+          onPress={() => onSave(form)}
+          disabled={!ready}
+          loading={saving}
+          style={styles.save}
+          testID={`${testID}-save`}
+        />
+        {mode === 'edit' && onRemove !== undefined ? (
+          <Pressable
+            onPress={onRemove}
+            accessibilityRole="button"
+            hitSlop={8}
+            testID={`${testID}-remove`}
+          >
+            <Text style={styles.captionStrong}>Remove this address</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const LABELS: readonly {
+  readonly kind: AddressLabelKind;
+  readonly label: string;
+  readonly icon: ImageSourcePropType;
+}[] = [
+  { kind: 'home', label: 'Home', icon: ADDRESS_ART.home },
+  { kind: 'parents', label: 'Parents', icon: ADDRESS_ART.parents },
+  { kind: 'friends', label: 'Friends', icon: ADDRESS_ART.friends },
+  { kind: 'others', label: 'Others', icon: ADDRESS_ART.location },
+];
+
+/** A step on the rail: the 28pt flower badge with its number, the dashed connector, the content. */
+function Step({
+  number,
+  title,
+  last = false,
+  children,
+}: {
+  number: number;
+  title: string;
+  last?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.step}>
+      <View style={styles.rail}>
+        <View style={styles.badge}>
+          <Image source={ADDRESS_ART.stepFlower} style={styles.flower} />
+          <Text style={styles.captionStrong}>{number}</Text>
+        </View>
+        {last ? null : <DashedRail />}
+      </View>
+      <View style={[styles.stepContent, !last && styles.stepContentPad]}>
+        <Text style={styles.emphasis}>{title}</Text>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+/** `1870:2516` — a 2pt `#FFD600` line, dashes 2 on / 5 off with round caps. */
+function DashedRail() {
+  const [height, setHeight] = useState(0);
+  const count = Math.max(0, Math.floor((height + 3) / 7));
+  return (
+    <View
+      style={styles.dashes}
+      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+      pointerEvents="none"
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <View key={index} style={styles.dash} />
+      ))}
+    </View>
+  );
+}
+
+function PropertyTile({
+  icon,
+  label,
+  selected,
+  onPress,
+  testID,
+}: {
+  icon: ImageSourcePropType;
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  testID: string;
+}) {
+  const content = (
+    <>
+      <View style={styles.tileWell}>
+        <Image source={icon} style={styles.icon24} />
+      </View>
+      {/* `1870:2710` — one line in the 104pt tile; iOS sets Livvic a hair wider than Figma. */}
+      <Text
+        style={styles.bodyStrong}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
+      >
+        {label}
+      </Text>
+    </>
+  );
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={styles.flex}
+      testID={testID}
+    >
+      {selected ? (
+        <LinearGradient colors={GRADIENT.tile} style={styles.tile}>
+          {content}
+        </LinearGradient>
+      ) : (
+        <View style={[styles.tile, styles.tileIdle]}>{content}</View>
+      )}
+    </Pressable>
+  );
+}
+
+function LabelChip({
+  icon,
+  label,
+  selected,
+  onPress,
+  testID,
+}: {
+  icon: ImageSourcePropType;
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={[styles.chip, selected && styles.chipSelected]}
+      testID={testID}
+    >
+      <Image source={icon} style={styles.icon24} />
+      <Text style={styles.chipLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.base },
+  body: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16, gap: 24 },
+  flex: { flex: 1 },
+  pinned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 24,
+    backgroundColor: C.subtle,
+  },
+  miniMap: { width: 64, height: 64 },
+  pinnedText: { flex: 1, minWidth: 0, gap: 4 },
+  overline: { ...T.microStrong, color: C.textSecondary },
+  editPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 9999,
+    backgroundColor: C.base,
+  },
+  step: { flexDirection: 'row', gap: 12 },
+  rail: { width: 28, alignItems: 'center', gap: 4 },
+  badge: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  flower: { position: 'absolute', left: 0, top: 1.47, width: 28, height: 25.06 },
+  dashes: { flex: 1, width: 2, alignItems: 'center', gap: 3, overflow: 'hidden' },
+  dash: { width: 2, height: 4, borderRadius: 1, backgroundColor: C.brand },
+  stepContent: { flex: 1, minWidth: 0, gap: 12 },
+  stepContentPad: { paddingBottom: 24 },
+  tiles: { flexDirection: 'row', gap: 12, alignItems: 'stretch' },
+  tile: { flex: 1, gap: 8, padding: 16, borderRadius: 24 },
+  tileIdle: { backgroundColor: C.subtle },
+  tileWell: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: C.base,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fields: { gap: 16 },
+  fieldRow: { flexDirection: 'row', gap: 12 },
+  chips: { flexDirection: 'row', gap: 8 },
+  chip: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.base,
+  },
+  chipSelected: { backgroundColor: C.tint },
+  chipLabel: { ...T.body, color: C.text, textAlign: 'center' },
+  receiver: {
+    gap: 16,
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: C.brand,
+    backgroundColor: C.base,
+  },
+  receiverRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  receiverWell: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: C.tint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiverText: { flex: 1, minWidth: 0, gap: 4 },
+  toggleWell: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleAdd: { backgroundColor: C.brand },
+  toggleClose: { backgroundColor: C.subtle },
+  dial: { ...T.body, color: C.text },
+  dock: { paddingHorizontal: 16, paddingTop: 16, gap: 12, alignItems: 'center' },
+  /** The dock centres the "Remove" link; the button itself spans the width. */
+  save: { alignSelf: 'stretch' },
+  emphasis: { ...T.emphasis, color: C.text },
+  bodyStrong: { ...T.bodyStrong, color: C.text },
+  caption: { ...T.caption, color: C.textSecondary },
+  captionStrong: { ...T.captionStrong, color: C.text },
+  icon18: { width: 18, height: 18 },
+  icon24: { width: 24, height: 24 },
+  pressed: { opacity: 0.85 },
+});

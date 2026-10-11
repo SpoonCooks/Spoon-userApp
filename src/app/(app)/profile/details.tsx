@@ -3,7 +3,7 @@ import type { Href } from 'expo-router';
 
 import { QueryBoundary } from '@ui';
 import { getUserMessage, normalizeError } from '@core/errors';
-import { useAndroidBackHandler, useSafeBack } from '@core/navigation';
+import { useAndroidBackHandler, useNavigationGuard, useSafeBack } from '@core/navigation';
 import { useAddressGate } from '@features/address';
 import {
   ProfileDetailsView,
@@ -71,6 +71,8 @@ export default function ProfileDetailsRoute() {
    * and gets the platform's reverse-of-push closing animation, where `dismissAll` + `replace`
    * played none. A deep link straight into the edit context still falls back to `/profile`.
    */
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+  const guard = useNavigationGuard();
   const goBack = useSafeBack('/profile');
 
   /**
@@ -105,7 +107,7 @@ export default function ProfileDetailsRoute() {
           initialValues={data.values}
           // Absent on first run: the page is the one step onboarding cannot skip, so a back
           // control there is either inert or an escape from it.
-          onBack={onboarding ? undefined : goBack}
+          onBack={onboarding ? undefined : guard(goBack)}
           submitting={save.isPending}
           {...(error === undefined ? {} : { errorMessage: error })}
           onSubmit={(values) => {

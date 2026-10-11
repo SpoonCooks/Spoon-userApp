@@ -143,22 +143,20 @@ describe('Recurring Visit details route', () => {
     expect(screen.queryByText('Before the Cook arrives')).toBeNull();
   });
 
-  it('cancels the visit with the reason the customer picks', async () => {
+  it('cancels the visit through the redesigned sheets, with the reason the customer picks', async () => {
     const onCancel = render();
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     await screen.findByTestId('visit-details-screen');
 
     fireEvent.press(await screen.findByTestId('visit-details-screen-dock-modify'));
-    fireEvent.press(await screen.findByText('Cancel this visit'));
-    fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
-    fireEvent.press(screen.getByTestId('cancel-continue-reason'));
-    fireEvent.press(await screen.findByTestId('cancel-confirm'));
+    fireEvent.press(await screen.findByTestId('cancel-visit-option-cancel'));
+    fireEvent.press(await screen.findByTestId('cancel-visit-continue'));
+    fireEvent.press(await screen.findByTestId('cancel-visit-reason-URGENT_CHANGE'));
+    fireEvent.press(screen.getByTestId('cancel-visit-reason-continue'));
+    fireEvent.press(await screen.findByTestId('cancel-visit-confirm'));
 
     await waitFor(() => expect(onCancel).toHaveBeenCalledWith({ reasonCode: 'URGENT_CHANGE' }));
-    await waitFor(() =>
-      expect(alert).toHaveBeenCalledWith('Visit cancelled', 'Your other visits stay as they are.'),
-    );
-    alert.mockRestore();
+    expect(await screen.findByTestId('cancel-visit-done')).toBeTruthy();
+    // A Recurring visit is not rescheduled on its own: C1 offers only Cancel.
   });
 
   it('opens Help on WhatsApp, prefilled, with a toast while it opens', async () => {
@@ -265,21 +263,27 @@ describe('Recurring Visit details route', () => {
     await waitFor(() => expect(screen.queryByTestId('rate-visit-card')).toBeNull());
   });
 
-  it('offers a one-time visit for the same slot, and Book again, after a failed debit', async () => {
-    render(jest.fn(), {
-      ...VISIT,
-      status: 'cancelled',
-      displayState: 'cancelled',
-      cancelledBy: 'payment_failed',
-    } as unknown as typeof VISIT);
-    await screen.findByTestId('visit-details-screen');
+  const FAILED_DEBIT = {
+    ...VISIT,
+    status: 'cancelled',
+    displayState: 'cancelled',
+    cancelledBy: 'payment_failed',
+  } as unknown as typeof VISIT;
 
+  // Each CTA in its own render: the screen's tap guard opens one screen per tap, so a second CTA
+  // pressed straight after the first is (rightly) ignored.
+  it('offers a one-time visit for the same slot after a failed debit', async () => {
+    render(jest.fn(), FAILED_DEBIT);
     fireEvent.press(await screen.findByTestId('visit-details-screen-rebook-one-time'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/scheduled',
       params: { date: '2026-10-14', durationId: 'dur-60' },
     });
-    fireEvent.press(screen.getByTestId('visit-details-screen-rebook-again'));
+  });
+
+  it('offers Book again after a failed debit', async () => {
+    render(jest.fn(), FAILED_DEBIT);
+    fireEvent.press(await screen.findByTestId('visit-details-screen-rebook-again'));
     expect(mockPush).toHaveBeenCalledWith('/recurring-setup/days');
   });
 

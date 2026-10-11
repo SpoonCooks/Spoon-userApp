@@ -1,41 +1,38 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useCallback, useRef } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
-import { AddressOutOfServiceView, useAddressOutOfServiceData } from '@features/address';
+import { NotServiceableScreen, useNotServiceableStore } from '@features/address';
 import { useSafeBack } from '@core/navigation';
 
 /**
- * Address out of service — Figma `215:1472`, "Coming soon to your area!".
+ * Address · Not serviceable — Figma `2214:4260`, dev note `2214:4364`.
  *
- * Reached from `53:31` when the SERVER answers `outside_service_area` for the point the customer
- * CONFIRMED. The client never decides this: every string on the screen is copy, and the verdict
- * that brought the customer here came from `POST /v1/serviceability/check`.
+ * Reached from the map when the SERVER answers `outside_service_area` for the point the customer
+ * CONFIRMED; the address details step is skipped and nothing is saved as an address. The server
+ * remembered the place as demand when it answered, so this screen only reads what the map step
+ * handed over (`useNotServiceableStore`).
  *
- * The frame's own header reads "Choose another location", so back is not an escape from a dead
- * end — it IS the screen's action. The map step arrived here with `push` and is still mounted
- * underneath, so backing out returns to the pin the customer placed rather than to a map that
- * re-acquires the device fix and discards their work (task §8).
- *
- * Nothing re-checks on the way back: serviceability now runs only on Confirm, so there is no
- * effect left that could bounce the customer straight back to this screen.
+ * Back and "Try a different location" return to the map, which was PUSHED under this screen and
+ * still holds the pin (cc8c36b). The 3s redirect and "Go to home now" leave the flow for Home.
  */
-export default function AddressOutOfServiceRoute() {
+export default function AddressNotServiceableRoute() {
+  const router = useRouter();
   const { onboarding, addressId, from, resume } = useLocalSearchParams<{
     onboarding?: string;
     addressId?: string;
     from?: string;
     resume?: string;
   }>();
-  const { state, refetch } = useAddressOutOfServiceData();
+  const place = useNotServiceableStore((store) => store.place);
+  const left = useRef(false);
 
   /**
-   * A genuine pop in every reachable case. The fallback covers only the unreachable one — a deep
-   * link straight to this route — and it goes to the MAP, because "choose another location" has to
-   * lead somewhere a location can be chosen. `onboarding` is preserved so a first-run customer
-   * still finishes at Home rather than at the saved-address list; `resume` likewise, so the map's
-   * own Confirm still knows to pop back to an open `60:655` rather than pushing a new one.
+   * A genuine pop in every reachable case. The fallback covers only a deep link straight here,
+   * and it goes to the MAP, carrying the flow's context, because "Try a different location" has
+   * to lead somewhere a location can be chosen.
    */
-  const goBack = useSafeBack(
+  const backToMap = useSafeBack(
     [
       onboarding === '1' ? 'onboarding=1' : null,
       typeof addressId === 'string' && addressId !== ''
@@ -51,5 +48,35 @@ export default function AddressOutOfServiceRoute() {
       ) as Href,
   );
 
-  return <AddressOutOfServiceView state={state} onRetry={refetch} onBack={goBack} />;
+  // Once only: the timer and a tap can land together.
+  const leave = useCallback((go: () => void) => {
+    if (left.current) return;
+    left.current = true;
+    go();
+  }, []);
+  const goHome = useCallback(
+    () =>
+      leave(() => {
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/home');
+      }),
+    [leave, router],
+  );
+
+  return (
+    <NotServiceableScreen
+      place={
+        place ?? {
+          title: 'Selected location',
+          line: '',
+          locality: null,
+          liveAreas: [],
+          neighbours: 0,
+        }
+      }
+      onBack={() => leave(backToMap)}
+      onGoHome={goHome}
+      onTimeout={goHome}
+    />
+  );
 }

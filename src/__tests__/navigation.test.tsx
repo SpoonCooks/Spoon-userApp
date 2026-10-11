@@ -29,6 +29,7 @@ import {
  */
 
 import AccountRoute from '@/app/(app)/account';
+import AccountDataRoute from '@/app/(app)/account/data';
 import AddressDetailsRoute from '@/app/(app)/address/details';
 import SavedAddressesRoute from '@/app/(app)/address/index';
 import AddressLocationRoute from '@/app/(app)/address/location';
@@ -194,7 +195,7 @@ beforeEach(() => {
 const POPPING_BACK_ROUTES = [
   // `215:1472` is PUSHED over a live `53:31`, and popping is what returns the customer to the pin
   // they placed rather than to a map that re-acquires the device fix (task §5).
-  ['address/out-of-service', AddressOutOfServiceRoute, 'address-header-back', '/address/location'],
+  ['address/out-of-service', AddressOutOfServiceRoute, 'not-serviceable-back', '/address/location'],
   ['scheduled', ScheduledRoute, 'schedule-header-back', '/home'],
   // `275:4321`'s "edit number" IS the back control on OTP — the frame draws no chevron.
   ['otp', OtpRoute, 'login-otp-screen-edit', '/login'],
@@ -202,30 +203,30 @@ const POPPING_BACK_ROUTES = [
   // "Saved addresses back target follows its entry point" below), so popping both lands on the
   // right screen AND plays the platform's reverse-of-push closing animation, which a bare
   // `replace` does not. No `?from=` here, so the fallback below is the un-tagged default.
-  ['address', SavedAddressesRoute, 'address-header-back', '/profile'],
-  // `6:663` is always pushed directly on top of Home (its one push site, `home.tsx`), so the same
-  // pop-gets-the-closing-animation reasoning as `address` above applies here too. The `spoon://`
-  // deep-link case has no history, which is exactly what the fallback below covers.
-  ['profile', ProfileRoute, 'screen-header-back', '/home'],
+  ['address', SavedAddressesRoute, 'saved-addresses-header-back', '/profile'],
+  // The Account hub (`2202:4311`, which replaced `6:663`) draws no back control — the system
+  // back gesture pops it — so it has no row here.
   // `53:31`'s only push site is `68:214`'s "Add a new address" (the first-run case reaches it by
   // a `<Redirect>` and draws no back control at all), so the same pop-gets-the-closing-animation
   // reasoning applies once more — a right-to-left "opening" animation on the way back out was the
   // exact defect reported here.
-  ['address/location', AddressLocationRoute, 'address-header-back', '/address'],
+  ['address/location', AddressLocationRoute, 'address-map-screen-back', '/address'],
   // `6:227` and `71:615` are each pushed only from Profile's tile grid — their rows draw no
   // secondary navigation of their own — so the same pop-gets-the-closing-animation reasoning
   // applies to both.
-  ['history', HistoryRoute, 'screen-header-back', '/profile'],
+  ['history', HistoryRoute, 'history-screen-back', '/profile'],
   ['refunds', RefundsRoute, 'screen-header-back', '/profile'],
   // Account (V9) is reached only from Profile's "Manage account" row — same reasoning as
   // History and Refunds above.
-  ['account', AccountRoute, 'screen-header-back', '/profile'],
+  ['account', AccountRoute, 'account-screen-back', '/profile'],
+  // Account & data (`1517:10315`) is reached only from Manage account's row.
+  ['account/data', AccountDataRoute, 'account-data-screen-back', '/account'],
   // `60:655`'s header back NO LONGER forces `53:31` on an edit (reversed product decision — see
   // "address edit now returns to the list" below): it has two genuinely different predecessors
   // (the map's confirm, or `68:214`'s "Edit" pushing here directly), and a plain pop resolves to
   // whichever is actually true — which is also what fixes the same "opening" animation defect
   // fixed everywhere else in this file. No `?from=` here, so `/address` is the un-tagged default.
-  ['address/details', AddressDetailsRoute, 'address-header-back', '/address'],
+  ['address/details', AddressDetailsRoute, 'address-details-header-back', '/address'],
 ] as const;
 
 describe('back is always handled', () => {
@@ -268,7 +269,7 @@ describe('address details "Change area" is a push, not a replace', () => {
 
     render(<AddressDetailsRoute />);
 
-    fireEvent.press(await screen.findByTestId('address-change-area'));
+    fireEvent.press(await screen.findByTestId('address-details-edit-pin'));
 
     expect(mockRouter.push).toHaveBeenCalledWith('/address/location?resume=1&addressId=addr-1');
     expect(mockRouter.replace).not.toHaveBeenCalled();
@@ -288,7 +289,7 @@ describe('Saved addresses back target follows its entry point', () => {
     mockSearchParams = { from: 'home' };
     render(<SavedAddressesRoute />);
 
-    fireEvent.press(await screen.findByTestId('address-header-back'));
+    fireEvent.press(await screen.findByTestId('saved-addresses-header-back'));
 
     expect(mockRouter.back).toHaveBeenCalledTimes(1);
     expect(mockRouter.replace).not.toHaveBeenCalled();
@@ -299,7 +300,7 @@ describe('Saved addresses back target follows its entry point', () => {
     mockSearchParams = { from: 'home' };
     render(<SavedAddressesRoute />);
 
-    fireEvent.press(await screen.findByTestId('address-header-back'));
+    fireEvent.press(await screen.findByTestId('saved-addresses-header-back'));
 
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/home');
@@ -310,7 +311,7 @@ describe('Saved addresses back target follows its entry point', () => {
     mockSearchParams = { from: 'profile' };
     render(<SavedAddressesRoute />);
 
-    fireEvent.press(await screen.findByTestId('address-header-back'));
+    fireEvent.press(await screen.findByTestId('saved-addresses-header-back'));
 
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/profile');
@@ -336,7 +337,7 @@ describe('booking host — back follows the stack shape', () => {
 
     render(<BookingRoute />);
 
-    fireEvent.press(await screen.findByTestId('booking-back'));
+    fireEvent.press(await screen.findByTestId('service-visit-header-back'));
 
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/home');
@@ -348,7 +349,7 @@ describe('booking host — back follows the stack shape', () => {
 
     render(<BookingRoute />);
 
-    fireEvent.press(await screen.findByTestId('booking-back'));
+    fireEvent.press(await screen.findByTestId('service-visit-header-back'));
 
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/home');
@@ -360,7 +361,7 @@ describe('booking host — back follows the stack shape', () => {
 
     render(<BookingRoute />);
 
-    fireEvent.press(await screen.findByTestId('booking-back'));
+    fireEvent.press(await screen.findByTestId('service-visit-header-back'));
 
     expect(mockRouter.back).toHaveBeenCalledTimes(1);
     expect(mockRouter.replace).not.toHaveBeenCalled();
@@ -373,7 +374,7 @@ describe('booking host — back follows the stack shape', () => {
 
     render(<BookingRoute />);
 
-    fireEvent.press(await screen.findByTestId('booking-back'));
+    fireEvent.press(await screen.findByTestId('service-visit-header-back'));
 
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/history');
@@ -431,9 +432,9 @@ describe('first-run address flow', () => {
     mockSearchParams = { onboarding: '1' };
 
     render(<AddressLocationRoute />);
-    await screen.findByTestId('address-location-screen');
+    await screen.findByTestId('address-map-screen');
 
-    expect(screen.queryByTestId('address-header-back')).toBeNull();
+    expect(screen.queryByTestId('address-map-screen-back')).toBeNull();
   });
 
   /**
@@ -448,7 +449,7 @@ describe('first-run address flow', () => {
   it('draws a back control for a repeat customer, and it pops to the saved list', async () => {
     render(<AddressLocationRoute />);
 
-    fireEvent.press(await screen.findByTestId('address-header-back'));
+    fireEvent.press(await screen.findByTestId('address-map-screen-back'));
 
     expect(mockRouter.back).toHaveBeenCalledTimes(1);
     expect(mockRouter.replace).not.toHaveBeenCalled();
@@ -464,7 +465,7 @@ describe('first-run address flow', () => {
     mockSearchParams = { from: 'home' };
     render(<AddressLocationRoute />);
 
-    fireEvent.press(await screen.findByTestId('address-header-back'));
+    fireEvent.press(await screen.findByTestId('address-map-screen-back'));
 
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/address?from=home');
@@ -482,7 +483,7 @@ describe('address edit now returns to the list', () => {
 
     render(<AddressDetailsRoute />);
 
-    fireEvent.press(await screen.findByTestId('address-header-back'));
+    fireEvent.press(await screen.findByTestId('address-details-header-back'));
 
     expect(mockRouter.back).toHaveBeenCalledTimes(1);
     expect(mockRouter.replace).not.toHaveBeenCalled();
@@ -494,18 +495,26 @@ describe('address edit now returns to the list', () => {
 
     render(<AddressDetailsRoute />);
 
-    fireEvent.press(await screen.findByTestId('address-header-back'));
+    fireEvent.press(await screen.findByTestId('address-details-header-back'));
 
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/address?from=home');
   });
 
   it('opens Edit with the id of the row that was tapped', async () => {
+    // The kebab menu is anchored by measuring the kebab; the test host's measure never answers.
+    const native = jest.requireActual<{ default: { measureInWindow: jest.Mock } }>(
+      '@react-native/jest-preset/jest/MockNativeMethods',
+    ).default;
+    native.measureInWindow.mockImplementation(
+      (callback: (x: number, y: number, w: number, h: number) => void) =>
+        callback(326, 200, 32, 32),
+    );
     render(<SavedAddressesRoute />);
-    await screen.findByTestId('saved-addresses-screen');
+    await screen.findByTestId('saved-addresses');
 
-    fireEvent.press(screen.getByTestId('address-row-menu-addr-1'));
-    fireEvent.press(await screen.findByTestId('address-edit-action'));
+    fireEvent.press(screen.getByTestId('saved-addresses-card-addr-1-kebab'));
+    fireEvent.press(await screen.findByTestId('saved-addresses-menu-edit'));
 
     expect(mockRouter.push).toHaveBeenCalledWith('/address/details?addressId=addr-1');
   });
@@ -526,15 +535,21 @@ describe('Home is a root', () => {
     expect(screen.queryByTestId('booking-back')).toBeNull();
   });
 
-  it('routes the address and profile controls to real destinations', async () => {
+  // One control per render: Home's tap guard opens one screen per tap, so a second control pressed
+  // straight after the first is (rightly) ignored.
+  it('routes the address control to Saved addresses', async () => {
     render(<HomeRoute />);
 
     // Tagged with its entry point, so Saved addresses' back control can send it straight home
     // rather than through Profile — see "Saved addresses back target follows its entry point".
     fireEvent.press(await screen.findByRole('button', { name: /^Delivery address/ }));
     expect(mockRouter.push).toHaveBeenCalledWith('/address?from=home');
+  });
 
-    fireEvent.press(screen.getByRole('button', { name: 'Profile' }));
+  it('routes the profile control to the Account hub', async () => {
+    render(<HomeRoute />);
+
+    fireEvent.press(await screen.findByRole('button', { name: 'Profile' }));
     expect(mockRouter.push).toHaveBeenCalledWith('/profile');
   });
 
@@ -597,7 +612,6 @@ describe('profile children', () => {
   it.each([
     ['orders', '/history'],
     ['addresses', '/address?from=profile'],
-    ['refunds', '/refunds'],
   ])('%s opens %s', async (tile, destination) => {
     render(<ProfileRoute />);
 
@@ -610,6 +624,31 @@ describe('profile children', () => {
    * V9 — the legal footer row is gone from Profile. "Manage account" opens `@features/account`
    * instead, which is the screen that now carries both documents (and Delete Account).
    */
+  // The Account frame draws no Refunds entry.
+  it('draws no Refunds tile', async () => {
+    render(<ProfileRoute />);
+    await screen.findByTestId('profile-manage-account');
+    expect(screen.queryByTestId('profile-tile-refunds')).toBeNull();
+  });
+
+  it('opens the food profile from the Food Profile card', async () => {
+    render(<ProfileRoute />);
+    fireEvent.press(await screen.findByTestId('profile-completion-cta'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/profile/details');
+  });
+
+  // A quick double (or triple) tap opens the screen once, not once per tap.
+  it('opens one screen for a quick multi-tap on a CTA', async () => {
+    render(<ProfileRoute />);
+    const cta = await screen.findByTestId('profile-completion-cta');
+    fireEvent.press(cta);
+    fireEvent.press(cta);
+    fireEvent.press(cta);
+    fireEvent.press(screen.getByTestId('profile-manage-account'));
+    expect(mockRouter.push).toHaveBeenCalledTimes(1);
+    expect(mockRouter.push).toHaveBeenCalledWith('/profile/details');
+  });
+
   it('opens Account from Manage account', async () => {
     render(<ProfileRoute />);
 
@@ -627,8 +666,21 @@ describe('account children', () => {
   it.each([
     ['account-terms', '/legal/terms'],
     ['account-privacy', '/legal/privacy'],
+    ['account-data', '/account/data'],
   ])('%s opens %s', async (testId, href) => {
     render(<AccountRoute />);
+
+    fireEvent.press(await screen.findByTestId(testId));
+    expect(mockRouter.push).toHaveBeenCalledWith(href);
+  });
+
+  // Dev note `2084:2781`: the rows deep-link to the taste profile, the saved list and Past.
+  it.each([
+    ['account-data-taste', '/profile/details'],
+    ['account-data-addresses', '/address?from=profile'],
+    ['account-data-history', '/history?tab=past'],
+  ])('Account & data %s opens %s', async (testId, href) => {
+    render(<AccountDataRoute />);
 
     fireEvent.press(await screen.findByTestId(testId));
     expect(mockRouter.push).toHaveBeenCalledWith(href);
@@ -714,7 +766,8 @@ describe('My bookings opens the booking it lists', () => {
     });
     renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
 
-    fireEvent.press(await screen.findByTestId('history-screen-card-bk-live-1'));
+    // The only upcoming booking is the "Next visit" card.
+    fireEvent.press(await screen.findByTestId('history-screen-next-bk-live-1'));
 
     // Tagged so the booking host's back control pops here instead of replacing to Home — see
     // "booking host — back follows the stack shape" above.
@@ -730,6 +783,30 @@ describe('My bookings opens the booking it lists', () => {
  * abandons the attempt — the blocker has to be cleared first and the code expires long before
  * that — so it replaces, leaving Account behind them, which is where a second attempt begins.
  */
+/**
+ * Delete account moved from Manage account to Account & data (`1517:10315`). It still asks for the
+ * deletion code before opening the OTP screen, carrying the server's cooldown.
+ */
+describe('Account & data asks for the deletion code', () => {
+  it('pushes the OTP screen with the server cooldown from Delete permanently', async () => {
+    const api = createStubApi({
+      ...NAV_STUBS,
+      'POST /v1/me/account-deletion/otp': () => ({ accepted: true, retryAfterSeconds: 42 }),
+    });
+    renderWithRuntime(<AccountDataRoute />, { runtime: createTestRuntime({ api }) });
+
+    fireEvent.press(await screen.findByTestId('account-delete'));
+    fireEvent.press(await screen.findByTestId('delete-account-yes'));
+
+    await waitFor(() =>
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        pathname: '/account/delete-otp',
+        params: { retryAfter: '42' },
+      }),
+    );
+  }, 15000);
+});
+
 describe('a blocked deletion leaves a way out', () => {
   it('replaces the OTP screen rather than stacking the bookings list on it', async () => {
     const api = createStubApi({

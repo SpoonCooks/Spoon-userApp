@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { MealBriefView, useMealBriefData } from '@features/mealBrief';
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import { InfoDialog } from '@ui';
 
 /**
@@ -27,6 +27,10 @@ export default function MealBriefRoute() {
   const { state, refetch } = useMealBriefData();
   const [unavailable, setUnavailable] = useState(false);
 
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+
+  const guard = useNavigationGuard();
+
   const goBack = useSafeBack('/home');
 
   return (
@@ -34,8 +38,8 @@ export default function MealBriefRoute() {
       <MealBriefView
         state={state}
         onRetry={refetch}
-        onBack={goBack}
-        onSkip={goBack}
+        onBack={guard(goBack)}
+        onSkip={guard(goBack)}
         onSubmit={() => setUnavailable(true)}
       />
 

@@ -65,6 +65,8 @@ export interface ReverseGeocodedAddress {
   readonly region: string | null;
   /** Present when the address came from a Places selection; absent for device/OS geocoding. */
   readonly placeId?: string;
+  /** The neighbourhood ("Indiranagar") when the geocoder names one — the Not serviceable copy. */
+  readonly locality?: string | null;
 }
 
 /**
@@ -239,5 +241,6 @@ export async function reverseGeocode(
     street: first.street ?? first.name ?? null,
     city: first.city ?? null,
     region: first.region ?? null,
+    locality: first.district ?? null,
   };
 }

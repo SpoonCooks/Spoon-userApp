@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import { RecurringLandingScreen, useExplainerVideoSource } from '@features/recurringLanding';
 import { useRecurringEligibility } from '@features/recurringSetup';
 
@@ -18,6 +18,8 @@ import { useRecurringEligibility } from '@features/recurringSetup';
  */
 export default function RecurringRoute() {
   const router = useRouter();
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+  const guard = useNavigationGuard();
   const goBack = useSafeBack('/home');
   const videoSource = useExplainerVideoSource();
   const eligibility = useRecurringEligibility();
@@ -25,9 +27,9 @@ export default function RecurringRoute() {
 
   return (
     <RecurringLandingScreen
-      onBack={goBack}
-      onSchedule={() => router.push(locked ? '/cook-pool' : '/recurring-setup/days')}
-      onMakeCookPool={() => router.push('/cook-pool')}
+      onBack={guard(goBack)}
+      onSchedule={guard(() => router.push(locked ? '/cook-pool' : '/recurring-setup/days'))}
+      onMakeCookPool={guard(() => router.push('/cook-pool'))}
       {...(videoSource === undefined ? {} : { videoSource })}
     />
   );

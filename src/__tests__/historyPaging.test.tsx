@@ -99,10 +99,14 @@ function pagedApi(kind: 'bookings' | 'refunds', options: { failSecondPageOnce?: 
 const reachEnd = (testID: string) =>
   fireEvent(screen.getByTestId(testID), 'endReached', { distanceFromEnd: 0 });
 
+/** A booking's card, or the "Next visit" card the Upcoming tab lifts its nearest booking into. */
+const findRow = (id: string) =>
+  screen.findByTestId(new RegExp(`^history-screen-(card|next)-${id}$`));
+
 describe('My bookings → Past', () => {
   async function openPast(api: ApiClient) {
     renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
-    fireEvent.press(await screen.findByRole('radio', { name: 'Past' }));
+    fireEvent.press(await screen.findByTestId('history-screen-tabs-past'));
     await screen.findByTestId('history-screen-card-a');
   }
 
@@ -112,11 +116,11 @@ describe('My bookings → Past', () => {
 
     expect(screen.queryByTestId('history-screen-card-c')).toBeNull();
 
-    reachEnd('history-screen-list');
+    reachEnd('history-screen-past-list');
     await screen.findByTestId('history-screen-card-c');
     expect(screen.getByTestId('history-screen-card-d')).toBeTruthy();
 
-    reachEnd('history-screen-list');
+    reachEnd('history-screen-past-list');
     await screen.findByTestId('history-screen-card-e');
 
     expect(paths.filter((path) => path.startsWith('/v1/me/bookings?'))).toEqual([
@@ -126,7 +130,7 @@ describe('My bookings → Past', () => {
     ]);
 
     // The last page said `null`: reaching the end again asks for nothing.
-    reachEnd('history-screen-list');
+    reachEnd('history-screen-past-list');
     expect(paths.filter((path) => path.startsWith('/v1/me/bookings?'))).toHaveLength(3);
   });
 
@@ -134,7 +138,7 @@ describe('My bookings → Past', () => {
     const { api } = pagedApi('bookings', { failSecondPageOnce: true });
     await openPast(api);
 
-    reachEnd('history-screen-list');
+    reachEnd('history-screen-past-list');
     await screen.findByText('Couldn’t load more');
     expect(screen.getByTestId('history-screen-card-a')).toBeTruthy();
 
@@ -175,14 +179,14 @@ describe('My bookings → Upcoming', () => {
       'cursor-3': { rows: [upcoming('e', 5)], nextCursor: null },
     });
     renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
-    await screen.findByTestId('history-screen-card-a');
+    await findRow('a');
     expect(screen.queryByTestId('history-screen-card-c')).toBeNull();
 
-    reachEnd('history-screen-list');
-    await screen.findByTestId('history-screen-card-c');
+    reachEnd('history-screen-upcoming-list');
+    await findRow('c');
 
-    reachEnd('history-screen-list');
-    await screen.findByTestId('history-screen-card-e');
+    reachEnd('history-screen-upcoming-list');
+    await findRow('e');
 
     // The first request has no parameters (an older backend would 400 on any); the rest carry
     // the cursor alone.
@@ -192,7 +196,7 @@ describe('My bookings → Upcoming', () => {
       '/v1/me/bookings/active?cursor=cursor-3',
     ]);
 
-    reachEnd('history-screen-list');
+    reachEnd('history-screen-upcoming-list');
     expect(paths.filter((path) => path.startsWith('/v1/me/bookings/active'))).toHaveLength(3);
   });
 
@@ -204,15 +208,15 @@ describe('My bookings → Upcoming', () => {
       'cursor-3': { rows: [upcoming('e', 9)], nextCursor: null },
     });
     renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
-    await screen.findByTestId('history-screen-card-a');
-    reachEnd('history-screen-list');
-    await screen.findByTestId('history-screen-card-c');
-    reachEnd('history-screen-list');
-    await screen.findByTestId('history-screen-card-e');
+    await findRow('a');
+    reachEnd('history-screen-upcoming-list');
+    await findRow('c');
+    reachEnd('history-screen-upcoming-list');
+    await findRow('e');
 
     const order = screen
-      .getAllByTestId(/^history-screen-card-[a-e]$/)
-      .map((node) => String(node.props.testID).replace('history-screen-card-', ''));
+      .getAllByTestId(/^history-screen-(card|next)-[a-e]$/)
+      .map((node) => String(node.props.testID).replace(/^history-screen-(card|next)-/, ''));
     expect(order).toEqual(['a', 'b', 'c', 'd', 'e']);
   });
 
@@ -226,16 +230,16 @@ describe('My bookings → Upcoming', () => {
     });
     renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
 
-    await screen.findByTestId('history-screen-card-live');
+    await findRow('live');
     expect(screen.queryByTestId('history-screen-card-old-1')).toBeNull();
   });
 
   it('degrades to one page against a backend that sends no cursor', async () => {
     const { api, paths } = upcomingApi({ '': { rows: [upcoming('a', 9)], nextCursor: null } });
     renderWithRuntime(<HistoryRoute />, { runtime: createTestRuntime({ api }) });
-    await screen.findByTestId('history-screen-card-a');
+    await findRow('a');
 
-    reachEnd('history-screen-list');
+    reachEnd('history-screen-upcoming-list');
     expect(paths.filter((path) => path.startsWith('/v1/me/bookings/active'))).toEqual([
       '/v1/me/bookings/active',
     ]);

@@ -302,6 +302,23 @@ export function strikePaiseFor(duration: {
   return anchorPaise;
 }
 
+/**
+ * A booking's struck "was" price (backend DEC-088), pre-tax and with the booking's own tax rate
+ * applied — or null when there was no strike, or it is not above what was charged.
+ */
+export function bookingStrikeOf(price: {
+  readonly serviceAmountPaise: number;
+  readonly taxRateBps: number;
+  readonly strikeAmountPaise?: number | null | undefined;
+}): { readonly servicePaise: number; readonly totalPaise: number } | null {
+  const strike = price.strikeAmountPaise ?? null;
+  if (strike === null || strike <= price.serviceAmountPaise) return null;
+  return {
+    servicePaise: strike,
+    totalPaise: strike + Math.round((strike * price.taxRateBps) / 10_000),
+  };
+}
+
 /** `dur-90` <-> 90. The id is the client's own handle for a server duration, not a server id. */
 const DURATION_ID_PREFIX = 'dur-';
 

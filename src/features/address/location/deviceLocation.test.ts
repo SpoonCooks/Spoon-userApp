@@ -151,6 +151,7 @@ describe('reverseGeocode', () => {
       street: '18th Main Road',
       city: 'Bengaluru',
       region: 'Karnataka',
+      locality: 'HSR Layout',
     });
   });
 

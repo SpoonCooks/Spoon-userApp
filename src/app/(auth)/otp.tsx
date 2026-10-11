@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 
 import { isAppError } from '@core/errors';
-import { useAndroidBackHandler, useSafeBack } from '@core/navigation';
+import { useAndroidBackHandler, useNavigationGuard, useSafeBack } from '@core/navigation';
 import {
   displayPhone,
   LoginOtpScreen,
@@ -55,6 +55,8 @@ export default function OtpRoute() {
   }, [secondsLeft]);
 
   const goBack = useSafeBack('/login');
+  // One pop per tap: a quick double tap on "edit number" must not pop Login too.
+  const guard = useNavigationGuard();
   const back = useCallback(() => {
     if (verify.isPending) return;
     requestPhoneEdit();
@@ -92,7 +94,8 @@ export default function OtpRoute() {
           if (verify.error !== null) verify.reset();
         }}
         onVerify={(code) => {
-          if (phone.length === 0) return;
+          // A code verifies once: a second submit while the first is out would race it.
+          if (phone.length === 0 || verify.isPending) return;
           verify.mutate(
             { phone, otp: code },
             {
@@ -136,7 +139,7 @@ export default function OtpRoute() {
             },
           });
         }}
-        onBack={back}
+        onBack={guard(back)}
       />
     </>
   );

@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ready } from '@core/data';
 import type { DataState } from '@core/data';
 import { getUserMessage, isAppError } from '@core/errors';
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import {
   AutopayNotice,
   RecurringLiveScreen,
@@ -48,6 +48,8 @@ import { QueryBoundary } from '@ui';
 export default function RecurringBookingRoute() {
   const router = useRouter();
   const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+  const guard = useNavigationGuard();
   const goBack = useSafeBack('/home');
   const booking = useRecurringBooking(bookingId ?? null);
 
@@ -146,7 +148,7 @@ export default function RecurringBookingRoute() {
   const { askToCancel, sheet: cancelSheet } = useCancelWholeBooking({
     bookingId: bookingId ?? null,
     enabled: tab === 'plans',
-    onViewRefunds: () => router.push('/refunds'),
+    onViewRefunds: guard(() => router.push('/refunds')),
     onCancelled: () => {
       setTab('live');
       booking.refetch();
@@ -160,23 +162,23 @@ export default function RecurringBookingRoute() {
           <>
             <RecurringPlansScreen
               model={plans}
-              onBack={goBack}
+              onBack={guard(goBack)}
               onTabChange={setTab}
               onDelete={data?.status === 'active' ? askToCancel : undefined}
-              onHistoryPress={(_visitKey, visitId) => openDetails(visitId)}
+              onHistoryPress={guard((_visitKey: string, visitId: string) => openDetails(visitId))}
             />
             {cancelSheet}
           </>
         ) : (
           <RecurringLiveScreen
             model={model}
-            onBack={goBack}
+            onBack={guard(goBack)}
             onTabChange={setTab}
             notice={notice}
-            onOpenVisit={onOpenVisit}
-            onOpenUpNext={() => {
+            onOpenVisit={guard(onOpenVisit)}
+            onOpenUpNext={guard(() => {
               if (data?.upNext) openVisit(data.upNext, true);
-            }}
+            })}
           />
         )
       }

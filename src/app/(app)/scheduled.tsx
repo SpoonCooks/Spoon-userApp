@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { destinationForPayment, useBookingSubmission } from '@features/booking';
 import { formatPaise } from '@core/format';
-import { useSafeBack } from '@core/navigation';
+import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import { ScheduleView, devScheduleSelection, useScheduleData } from '@features/scheduled';
 import type { ScheduleSelection } from '@features/scheduled';
 
@@ -78,13 +78,15 @@ export default function ScheduledRoute() {
    * Home. Reached from the Home tile and from the Instant sheet's "Schedule instead", both of
    * which sit on Home; a `spoon://scheduled` deep link has nothing behind it and lands there too.
    */
+  // One screen per tap: a quick double tap must not open (or pop) a screen twice.
+  const guard = useNavigationGuard();
   const goBack = useSafeBack('/home');
 
   return (
     <ScheduleView
       state={state}
       onRetry={refetch}
-      onBack={goBack}
+      onBack={guard(goBack)}
       {...(seed === undefined ? {} : { initialSelection: seed })}
       {...(submission.quote.state.status === 'ready'
         ? {

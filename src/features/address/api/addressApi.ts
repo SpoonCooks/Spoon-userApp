@@ -27,6 +27,16 @@ import type {
  * pincode allow-list and no cached "we serve Bengaluru" rule anywhere in this app.
  */
 
+/** `POST /v1/serviceability/check`'s body: the point, plus what the geocoder read there. */
+export interface ServiceabilityCheckInput {
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly street?: string | null;
+  readonly locality?: string | null;
+  readonly city?: string | null;
+  readonly pincode?: string | null;
+}
+
 export const ADDRESS_PATHS = {
   list: '/v1/me/addresses',
   byId: (addressId: string) => `/v1/me/addresses/${addressId}`,
@@ -46,6 +56,12 @@ function bodyOf(input: AddressWriteInput): JsonValue {
     ...(input.flat === undefined ? {} : { flat: input.flat }),
     ...(input.tower === undefined ? {} : { tower: input.tower }),
     ...(input.society === undefined ? {} : { society: input.society }),
+    // The details redesign's fields. Absent on a PUT means "unchanged" to the server, so builds
+    // that predate them can keep replaying a row without erasing what a newer build saved.
+    ...(input.propertyType === undefined ? {} : { propertyType: input.propertyType }),
+    ...(input.floor === undefined ? {} : { floor: input.floor }),
+    ...(input.lane === undefined ? {} : { lane: input.lane }),
+    ...(input.landmark === undefined ? {} : { landmark: input.landmark }),
     ...(input.city === undefined ? {} : { city: input.city }),
     ...(input.state === undefined ? {} : { state: input.state }),
     ...(input.receiverName === undefined ? {} : { receiverName: input.receiverName }),
@@ -138,13 +154,23 @@ export function createAddressApi(api: ApiClient) {
      * asks. It does not answer "can we cook at this address" — that additionally requires a
      * supported society, and only the address write and the availability reads know it.
      */
-    async check(
-      point: { latitude: number; longitude: number },
-      signal?: AbortSignal,
-    ): Promise<ServiceabilityDto> {
+    async check(point: ServiceabilityCheckInput, signal?: AbortSignal): Promise<ServiceabilityDto> {
+      // The geocoder's reading is optional and only names a refused place as demand; coverage is
+      // decided by the coordinates alone. Empty values are omitted, never sent as null.
+      const named = (key: 'street' | 'locality' | 'city' | 'pincode') => {
+        const value = point[key]?.trim();
+        return value === undefined || value === '' ? {} : { [key]: value };
+      };
       return api.request(ADDRESS_PATHS.serviceability, {
         method: 'POST',
-        body: { latitude: point.latitude, longitude: point.longitude },
+        body: {
+          latitude: point.latitude,
+          longitude: point.longitude,
+          ...named('street'),
+          ...named('locality'),
+          ...named('city'),
+          ...named('pincode'),
+        },
         parse: (data) => serviceabilitySchema.parse(data),
         ...(signal === undefined ? {} : { signal }),
       });

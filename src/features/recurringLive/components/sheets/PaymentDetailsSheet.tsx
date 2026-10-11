@@ -5,8 +5,25 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { PAYMENT_DETAILS_SHEET } from '../../data/sheets';
 import type { PaymentDetailsSheetData } from '../../data/sheets';
-import { SHEET_BELL_GLYPH, SHEET_CHEVRON_GLYPH, SHEET_MONEY_GLYPH, SHEET_STITCH } from './assets';
+import {
+  SHEET_BELL_GLYPH,
+  SHEET_CARD_GLYPH,
+  SHEET_CHEVRON_GLYPH,
+  SHEET_MONEY_GLYPH,
+  SHEET_NETBANKING_GLYPH,
+  SHEET_STITCH,
+  SHEET_WALLET_GLYPH,
+} from './assets';
+
 import { RecurringSheet } from './RecurringSheet';
+
+/** `2254:3982` — the Mode of payment well's glyph per variant. */
+const METHOD_GLYPH = {
+  upi: SHEET_MONEY_GLYPH,
+  card: SHEET_CARD_GLYPH,
+  wallet: SHEET_WALLET_GLYPH,
+  netbanking: SHEET_NETBANKING_GLYPH,
+} as const;
 
 /**
  * Visit details / assigned · Payment details sheet — Figma `1434:1678`, sheet `1434:1770`
@@ -74,12 +91,39 @@ export function PaymentDetailsSheet({
           </View>
         </View>
 
+        {(data.extraLines ?? []).map((line, index) => (
+          <View
+            key={`${line.label}-${String(index)}`}
+            style={styles.line}
+            testID={`${testID}-extra-${String(index)}`}
+          >
+            <View style={styles.label}>
+              <Text variant="spoonBody">{line.label}</Text>
+              {line.caption === undefined ? null : (
+                <Text variant="spoonCaption" color="textSecondarySoft">
+                  {line.caption}
+                </Text>
+              )}
+            </View>
+            <Text variant="spoonBodyStrong">{line.amount}</Text>
+          </View>
+        ))}
+
         <View style={styles.line}>
           <View style={styles.label}>
             <Text variant="spoonCaption">{data.taxLine.label}</Text>
           </View>
           <Text variant="spoonCaption">{data.taxLine.amount}</Text>
         </View>
+
+        {data.tipLine === undefined ? null : (
+          <View style={styles.line} testID={`${testID}-tip`}>
+            <View style={styles.label}>
+              <Text variant="spoonCaption">{data.tipLine.label}</Text>
+            </View>
+            <Text variant="spoonCaption">{data.tipLine.amount}</Text>
+          </View>
+        )}
 
         {/* `1434:1793` — the dashed stitch, a 338 × 2 strip. */}
         <Image source={SHEET_STITCH} style={styles.stitch} resizeMode="stretch" />
@@ -105,41 +149,49 @@ export function PaymentDetailsSheet({
         </View>
       </View>
 
-      <View style={styles.payment} testID={`${testID}-method`}>
-        <View style={styles.method}>
-          <View style={styles.moneyWell}>
-            <Image source={SHEET_MONEY_GLYPH} style={styles.glyph24} />
+      {/* `2254:3982` — Mode of payment: hidden when the method is not known yet. */}
+      {data.methodName === '' ? null : (
+        <View style={styles.payment} testID={`${testID}-method`}>
+          <View style={styles.method}>
+            <View style={styles.moneyWell}>
+              <Image source={METHOD_GLYPH[data.methodType ?? 'upi']} style={styles.glyph24} />
+            </View>
+            <View style={styles.methodText}>
+              <Text variant="spoonMicroStrong" color="textSecondarySoft">
+                {data.methodEyebrow}
+              </Text>
+              <Text variant="spoonEmphasis">{data.methodName}</Text>
+              {data.methodDetail === '' ? null : (
+                <Text variant="spoonCaption" color="textSecondarySoft">
+                  {data.methodDetail}
+                </Text>
+              )}
+            </View>
+            {onManageAutopay === undefined ? null : (
+              <Pressable
+                onPress={onManageAutopay}
+                accessibilityRole="link"
+                hitSlop={lightTheme.space.md}
+                style={({ pressed }) => [styles.manage, pressed ? styles.pressed : null]}
+                testID={`${testID}-manage`}
+              >
+                <Text variant="spoonCaptionStrong">{data.manageLabel}</Text>
+                <Image source={SHEET_CHEVRON_GLYPH} style={styles.glyph16} />
+              </Pressable>
+            )}
           </View>
-          <View style={styles.methodText}>
-            <Text variant="spoonMicroStrong" color="textSecondarySoft">
-              {data.methodEyebrow}
-            </Text>
-            <Text variant="spoonEmphasis">{data.methodName}</Text>
-            <Text variant="spoonCaption" color="textSecondarySoft">
-              {data.methodDetail}
-            </Text>
-          </View>
-          {onManageAutopay === undefined ? null : (
-            <Pressable
-              onPress={onManageAutopay}
-              accessibilityRole="link"
-              hitSlop={lightTheme.space.md}
-              style={({ pressed }) => [styles.manage, pressed ? styles.pressed : null]}
-              testID={`${testID}-manage`}
-            >
-              <Text variant="spoonCaptionStrong">{data.manageLabel}</Text>
-              <Image source={SHEET_CHEVRON_GLYPH} style={styles.glyph16} />
-            </Pressable>
+
+          {/* A one-time visit has no Autopay reminder (Service flow `2165:12246`). */}
+          {data.reminder === '' ? null : (
+            <View style={styles.status}>
+              <Image source={SHEET_BELL_GLYPH} style={styles.glyph24} />
+              <Text variant="spoonCaption" style={styles.statusText}>
+                {data.reminder}
+              </Text>
+            </View>
           )}
         </View>
-
-        <View style={styles.status}>
-          <Image source={SHEET_BELL_GLYPH} style={styles.glyph24} />
-          <Text variant="spoonCaption" style={styles.statusText}>
-            {data.reminder}
-          </Text>
-        </View>
-      </View>
+      )}
     </RecurringSheet>
   );
 }

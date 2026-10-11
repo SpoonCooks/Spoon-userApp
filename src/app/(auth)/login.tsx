@@ -4,6 +4,7 @@ import type { Href } from 'expo-router';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { readLastPhone } from '@core/auth';
+import { useNavigationGuard } from '@core/navigation';
 import { isAppError } from '@core/errors';
 import type { AppError } from '@core/errors';
 import {
@@ -59,6 +60,8 @@ export default function LoginRoute() {
    * read is in flight and `LoginScreen` just waits; there is deliberately no second loading
    * surface here (task §13/§25 — the boot splash is the only one).
    */
+  // One screen per tap: a quick double tap must not open Terms or Privacy twice.
+  const guard = useNavigationGuard();
   const [initialPhone, setInitialPhone] = useState<string | undefined>(undefined);
   useEffect(() => {
     let cancelled = false;
@@ -91,8 +94,8 @@ export default function LoginRoute() {
          * `/legal/:doc` sits outside the `(app)` group precisely so it is reachable from here,
          * with no session. Pushed, so Back returns to Login with the typed number intact.
          */
-        onOpenTerms={() => router.push('/legal/terms' as Href)}
-        onOpenPrivacy={() => router.push('/legal/privacy' as Href)}
+        onOpenTerms={guard(() => router.push('/legal/terms' as Href))}
+        onOpenPrivacy={guard(() => router.push('/legal/privacy' as Href))}
         /**
          * Guest mode (iOS only). Replacing rather than pushing: Home is the
          * guest's root, and every "sign in to continue" there REPLACES back to this screen, so
@@ -109,6 +112,8 @@ export default function LoginRoute() {
             }
           : {})}
         onRequestOtp={(digits) => {
+          // A second press while the first send is out would send two codes and push OTP twice.
+          if (sendOtp.isPending) return;
           const phone = toE164(digits, DEMO_LOGIN.dialCode);
 
           sendOtp.mutate(phone, {

@@ -1,57 +1,50 @@
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 
-import { AddressLocationView, useAddressLocationData } from '@features/address';
+import {
+  AddressMapScreen,
+  currentAddressOf,
+  useAddresses,
+  useAddressLocation,
+  useNotServiceableStore,
+} from '@features/address';
 import { useAddressDraftStore } from '@core/store/addressDraftStore';
-import { useAndroidBackHandler, useSafeBack } from '@core/navigation';
+import { useAndroidBackHandler, useNavigationGuard, useSafeBack } from '@core/navigation';
 
 /**
- * Select service location - Figma `53:31`.
+ * Where the map opens when the device cannot say where the customer is (dev note `2075:11925`):
+ * the last saved pin, else the city centre. MG Road, Bengaluru — the city Spoon serves.
+ */
+const CITY_CENTRE = { latitude: 12.9756, longitude: 77.6066 };
+
+/**
+ * Map location — Figma `1870:2379` with Search location `1870:2436` as a layer over it.
  *
- * The map is REAL: Google Maps through `react-native-maps`, Places (New) behind the search field,
- * and a pin fixed to the middle of the canvas that the customer drags the CITY beneath. Every one
- * of those produces the same thing — a coordinate.
+ * The map is REAL: Google Maps through `react-native-maps`, Places (New) behind search, and a pin
+ * fixed to the centre that the customer drags the CITY beneath. Every one of those produces the
+ * same thing — a coordinate.
  *
- * ## Selecting is not confirming (task §5, §6)
+ * ## Selecting is not confirming
  *
- * This screen previously ran `POST /v1/serviceability/check` on every point, and navigated away
- * from an `outside_service_area` verdict out of an effect. Two defects came out of that: the
- * customer paid a request for every exploratory tap, and touching the map in the wrong place
- * ejected them from it before they had chosen anything.
+ *   search / PAN  ->  the map settles, the point under the pin updates, its address follows.
+ *                     NO network decision, NO navigation.
+ *   CONFIRM       ->  one serviceability call, and the answer decides where to go:
+ *                       outside_service_area     -> `/address/out-of-service`
+ *                       temporarily_unavailable  -> inline ("not right now" is not "not here")
+ *                       offline / timeout / 5xx  -> inline; a failure is not a verdict
  *
- * The order is now the one the product actually has:
- *
- *   search / PAN         ->  the map settles, the coordinate under the pin updates, the address
- *                            preview follows.  NO network decision, NO navigation.
- *   CONFIRM              ->  one serviceability call, and the answer decides where to go.
- *
- * Ruling R-4 said serviceability surfaces inline here and that no separate rejection screen
- * exists. The final file draws one (`215:1472`) and the product decision has now been made:
- *
- *   outside_service_area      -> `215:1472` "Coming soon to your area!"
- *   temporarily_unavailable   -> stays INLINE, because "not right now" is not "not here" and
- *                                sending someone to a coming-soon screen would be wrong
- *   anything else (offline,
- *   a timeout, a 5xx)         -> stays INLINE. A network failure is not a verdict, and throwing
- *                                the customer onto another route for one would be a lie about
- *                                where they live (§7).
- *
- * The client still evaluates no coverage: it reads `status` off the server's response and routes.
- *
- * Confirm carries the coordinates forward in the address draft — the permitted client-owned
- * pre-submit state — because `60:655` is a separate route and the coordinates are what make the
- * address real.
+ * The client evaluates no coverage: it reads `status` off the server's response and routes.
+ * Confirm carries the approved coordinates forward in the address draft, because the details
+ * form is a separate route and the coordinates are what make the address real.
  */
 export default function AddressLocationRoute() {
   const router = useRouter();
   /**
-   * `onboarding=1` is the FLOW CONTEXT the founder's rule turns on (task §4), set by Home's
-   * address gate and carried through every step. `addressId` is present only when the customer
-   * walked back here from an EDIT — it keeps the edit addressed to the same record. `from` is
-   * `68:214`'s own entry-point tag (Home or Profile), carried through so this whole sub-flow's
-   * REPLACE-based back controls can still return the customer to the list's correct destination
-   * once they eventually land back on it — see `address/index.tsx`. `resume=1` marks THIS visit
-   * as a "Change area" digression from an already-open `60:655` — see the Confirm handler below.
+   * `onboarding=1` is the first-run flow context set by Home's address gate. `addressId` is present
+   * only when the customer came here from an EDIT — it keeps the edit addressed to the same
+   * record. `from` is the saved list's entry point (Home or Profile). `resume=1` marks this visit
+   * as an "Edit" digression from an already-open details form — see the Confirm handler.
    */
   const { onboarding, addressId, from, resume } = useLocalSearchParams<{
     onboarding?: string;
@@ -61,159 +54,182 @@ export default function AddressLocationRoute() {
   }>();
   const firstRun = onboarding === '1';
   const editingId = typeof addressId === 'string' && addressId !== '' ? addressId : null;
-  const { state, refetch, location } = useAddressLocationData();
+  const location = useAddressLocation();
+  const addresses = useAddresses({ enabled: !firstRun });
   const setPoint = useAddressDraftStore((store) => store.setPoint);
+  const setNotServiceable = useNotServiceableStore((store) => store.set);
+  const [searchOpen, setSearchOpen] = useState(false);
+  /** The device failure the fallback point was chosen for, kept until the customer moves the map. */
+  const [fallbackNotice, setFallbackNotice] = useState<string | undefined>(undefined);
 
   /**
-   * FIRST-TIME: **no back control at all** (V7 founder comment, task §4/§15).
+   * FIRST-TIME: no back control at all (V7 founder comment, task §4/§15) — the screen is reached
+   * by `<Redirect>`s that replace, so there is genuinely nothing behind it.
    *
-   * A new account reaches this screen by a `<Redirect>` from Home, itself reached by a
-   * `<Redirect>` from `/`. Both replace, so there is genuinely nothing behind it, and the address
-   * gate would bounce any escape straight back — a chevron there is a control that cannot work.
-   * It is now absent rather than inert.
-   *
-   * REPEAT / ADD ADDRESS: back goes to `68:214`, the saved-address list this screen was opened
-   * from. `useSafeBack`, not `useDeterministicBack`: this route's only push site is `68:214`'s
-   * "Add a new address" (the first-run case above reaches it by a `<Redirect>` and draws no back
-   * control at all, and nothing else in the app pushes here), so a pop always lands on the same
-   * screen the fallback below names — and gets the platform's reverse-of-push closing animation
-   * (left-to-right, matching Scheduled's / `68:214`'s own back), where `dismissAll` + `replace`
-   * played none.
+   * REPEAT: back pops to the saved list it was opened from, `useSafeBack` for the platform's
+   * reverse-of-push animation (ec0f39e, 3ff4297).
    */
   const goBackToList = useSafeBack(
     (from === undefined ? '/address' : `/address?from=${from}`) as Href,
   );
   const goBack = firstRun ? undefined : goBackToList;
+  // One screen per tap: a quick double tap must not open the same screen twice.
+  const guard = useNavigationGuard();
 
   /**
-   * Android back closes the Places prediction list before it touches the stack.
-   *
-   * The list is drawn inside the sticky search bar rather than in a modal — it has to cover the
-   * map without moving the panel the pin is aimed in — so nothing else would dismiss it, and
-   * leaving the screen with predictions still open reads as the app having ignored the press.
+   * The device gave no fix (denied, location off, none to be had): open on the last saved pin,
+   * else the city centre, so there is a map to drag rather than a blank panel. The reason stays
+   * in the hint until the customer moves the pin themselves.
    */
+  const savedFallback =
+    addresses.state.status === 'ready' ? currentAddressOf(addresses.state.data) : null;
+  const failed =
+    !location.locating && location.coordinates === null && location.message !== undefined;
+  // Adjusted while rendering, not in the effect: the reason is known now, the point follows.
+  if (failed && fallbackNotice !== location.message) setFallbackNotice(location.message);
+  const { selectPoint } = location;
+  useEffect(() => {
+    if (!failed) return;
+    selectPoint(
+      savedFallback === null || savedFallback === undefined
+        ? CITY_CENTRE
+        : { latitude: savedFallback.latitude, longitude: savedFallback.longitude },
+    );
+  }, [failed, savedFallback, selectPoint]);
+
+  /** Android back closes the Search layer before it touches the stack. */
   useAndroidBackHandler(() => {
-    if (location.suggestions.length === 0) return false;
+    if (!searchOpen) return false;
     location.dismissSuggestions();
+    setSearchOpen(false);
     return true;
   });
 
+  const confirm = () => {
+    void location.confirm().then((outcome) => {
+      /**
+       * `blocked` — no point, a check already in flight, or the map settled somewhere new while
+       * this one was out. `error` — the hook has put a retry message in the hint. Nothing moves.
+       */
+      if (outcome.kind === 'blocked' || outcome.kind === 'error') return;
+
+      if (outcome.kind === 'refused') {
+        // The parameters that describe WHICH address is being placed travel with it, so "Choose
+        // another location" returns to a map that still knows.
+        const query = [
+          firstRun ? 'onboarding=1' : null,
+          editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
+          from === undefined ? null : `from=${from}`,
+          resume === undefined ? null : `resume=${resume}`,
+        ]
+          .filter((part): part is string => part !== null)
+          .join('&');
+        // PUSH, not replace: coming back returns to exactly the point they were looking at.
+        if (outcome.status === 'outside_service_area') {
+          // What the Not serviceable screen names (`2214:4260`): the server's answer first.
+          setNotServiceable({
+            title: outcome.geocoded?.title ?? 'Selected location',
+            line: outcome.geocoded?.line ?? '',
+            locality:
+              outcome.verdict.demand?.locality ??
+              outcome.geocoded?.locality ??
+              outcome.geocoded?.city ??
+              null,
+            liveAreas: outcome.verdict.liveAreas ?? [],
+            neighbours: outcome.verdict.demand?.neighbours ?? 0,
+          });
+          router.push(
+            (query === '' ? '/address/out-of-service' : `/address/out-of-service?${query}`) as Href,
+          );
+        }
+        // `temporarily_unavailable` is already in the hint. Not a place-based refusal: no screen.
+        return;
+      }
+
+      /**
+       * Serviceable. The coordinates the SERVER approved are the ones carried forward — read off
+       * the OUTCOME, never off `location.coordinates`, which can be one settle behind.
+       */
+      setPoint({
+        latitude: outcome.coordinates.latitude,
+        longitude: outcome.coordinates.longitude,
+        placeId: outcome.geocoded?.placeId ?? null,
+        serviceable: true,
+        // Tags this point as belonging to THIS edit (or to no address, while adding) — c695638.
+        editingId,
+        street: outcome.geocoded?.street ?? null,
+        city: outcome.geocoded?.city ?? null,
+        state: outcome.geocoded?.region ?? null,
+        pincode: outcome.geocoded?.pincode ?? null,
+      });
+
+      /**
+       * `resume=1`: the details form that sent the customer here is still underneath, holding
+       * what they typed, and it reads the point just written. Pop back to it rather than push a
+       * second, blank form (cc8c36b).
+       */
+      if (resume !== undefined) {
+        router.back();
+        return;
+      }
+
+      // The details form, with the SAME context — `addressId` keeps an edit a `PUT`.
+      const forward = [
+        firstRun ? 'onboarding=1' : null,
+        editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
+        from === undefined ? null : `from=${from}`,
+      ]
+        .filter((part): part is string => part !== null)
+        .join('&');
+
+      router.push((forward === '' ? '/address/details' : `/address/details?${forward}`) as Href);
+    });
+  };
+
   return (
-    <AddressLocationView
-      state={state}
-      onRetry={refetch}
-      onBack={goBack}
+    <AddressMapScreen
+      coordinates={location.coordinates}
+      place={
+        location.geocoded === null
+          ? null
+          : { title: location.geocoded.title, line: location.geocoded.line }
+      }
+      locating={location.locating}
+      resolving={location.resolving}
+      message={location.message ?? fallbackNotice}
       canConfirm={location.canConfirm}
       confirming={location.confirming}
-      map={{
-        coordinates: location.coordinates,
-        onSettle: location.selectPoint,
+      onBack={goBack === undefined ? undefined : guard(goBack)}
+      onSettle={(point) => {
+        setFallbackNotice(undefined);
+        location.selectPoint(point);
+      }}
+      onLocate={() => {
+        setFallbackNotice(undefined);
+        location.locate();
+      }}
+      onConfirm={confirm}
+      search={{
+        open: searchOpen,
+        onOpen: () => setSearchOpen(true),
+        onClose: () => {
+          location.dismissSuggestions();
+          setSearchOpen(false);
+        },
         query: location.query,
         suggestions: location.suggestions,
-        searchState: location.searchState,
-        onSearch: location.search,
-        onChooseSuggestion: location.chooseSuggestion,
-        onDismissSuggestions: location.dismissSuggestions,
-      }}
-      onConfirm={() => {
-        void location.confirm().then((outcome) => {
-          /**
-           * `blocked` — no point, or a check already in flight, or the map settled somewhere new
-           * while this one was out. Nothing happened and nothing should move.
-           *
-           * `error` — the hook has already put a retry message in the helper pill. The customer
-           * keeps their map, their pin and their resolved row, and presses Confirm again.
-           */
-          if (outcome.kind === 'blocked' || outcome.kind === 'error') return;
-
-          if (outcome.kind === 'refused') {
-            // `215:1472` is reached the same way in both flows; the parameters that describe
-            // WHICH address is being placed travel with it so "Choose another location" returns
-            // to a map that still knows.
-            const query = [
-              firstRun ? 'onboarding=1' : null,
-              editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
-              from === undefined ? null : `from=${from}`,
-              resume === undefined ? null : `resume=${resume}`,
-            ]
-              .filter((part): part is string => part !== null)
-              .join('&');
-            /**
-             * PUSH, not replace. Replacing unmounts this screen, so "Choose another location"
-             * would land on a FRESH map that re-runs the device fix and loses the point the
-             * customer spent time framing. Pushing keeps this screen alive underneath: coming
-             * back returns them to exactly the point they were looking at, with Confirm live
-             * again so they can pan somewhere else and try once more.
-             */
-            if (outcome.status === 'outside_service_area') {
-              router.push(
-                (query === ''
-                  ? '/address/out-of-service'
-                  : `/address/out-of-service?${query}`) as Href,
-              );
-            }
-            // `temporarily_unavailable` is already in the helper pill. It is not a place-based
-            // refusal, so it gets no screen — the customer waits, or picks somewhere else.
-            return;
-          }
-
-          /**
-           * Serviceable. The coordinates the SERVER approved are the ones carried forward — read
-           * off the OUTCOME, never off `location.coordinates`.
-           *
-           * The pin no longer moves; the map does, and it commits a new coordinate every time it
-           * comes to rest. This closure was built by a render, so `location.coordinates` can be
-           * one settle behind what `confirm()` actually checked. Taking the point from the outcome
-           * is what guarantees the address is saved at the coordinate the server approved.
-           */
-          setPoint({
-            latitude: outcome.coordinates.latitude,
-            longitude: outcome.coordinates.longitude,
-            placeId: outcome.geocoded?.placeId ?? null,
-            serviceable: true,
-            // Tags this point as belonging to THIS edit (or to no address, while adding), so
-            // `60:655` can tell a point just picked here apart from a leftover from an unrelated
-            // attempt — see `AddressDraft.editingId`.
-            editingId,
-            street: outcome.geocoded?.street ?? null,
-            city: outcome.geocoded?.city ?? null,
-            state: outcome.geocoded?.region ?? null,
-            pincode: outcome.geocoded?.pincode ?? null,
-          });
-          /**
-           * `resume=1` means this visit was a "Change area" DIGRESSION from an already-open
-           * `60:655` (`address/details.tsx` pushed here, rather than the customer arriving via
-           * the ordinary add/edit flow) — that Details screen is still sitting right underneath,
-           * still holding whatever the customer had already typed, and it already reads the
-           * point `setPoint` just wrote above. Popping back to it is what "Confirm should return
-           * to the screen Change area was pressed from" means; pushing a SECOND, blank Details
-           * on top of the first would both lose that typed state and leave a stray screen behind
-           * `60:655`'s own back control.
-           */
-          if (resume !== undefined) {
-            router.back();
-            return;
-          }
-
-          /**
-           * `60:655`, carrying the SAME context this screen was entered with.
-           *
-           * `addressId` is what stops an edit that walked back to the map from being saved as a
-           * NEW address on the way forward again (task §5, §28): the record's identity survives
-           * the round trip, so Save is still a `PUT` on the address the customer opened.
-           */
-          const forward = [
-            firstRun ? 'onboarding=1' : null,
-            editingId === null ? null : `addressId=${encodeURIComponent(editingId)}`,
-            from === undefined ? null : `from=${from}`,
-          ]
-            .filter((part): part is string => part !== null)
-            .join('&');
-
-          router.push(
-            (forward === '' ? '/address/details' : `/address/details?${forward}`) as Href,
-          );
-        });
+        state: location.searchState,
+        onQuery: location.search,
+        onChoose: (placeId) => {
+          setFallbackNotice(undefined);
+          location.chooseSuggestion(placeId);
+          setSearchOpen(false);
+        },
+        onUseCurrentLocation: () => {
+          setFallbackNotice(undefined);
+          location.locate();
+          setSearchOpen(false);
+        },
       }}
     />
   );

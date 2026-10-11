@@ -7,6 +7,7 @@ import { useRuntime } from '@core/runtimeContext';
 
 import { addressWriteInputFrom } from './adapters';
 import { createAddressApi } from './addressApi';
+import type { ServiceabilityCheckInput } from './addressApi';
 import { addressKeys } from './keys';
 import type {
   AddressDto,
@@ -48,7 +49,7 @@ export function useServiceabilityCheck() {
   const { api } = useRuntime();
   const addresses = createAddressApi(api);
 
-  return useMutation<ServiceabilityDto, Error, { latitude: number; longitude: number }>({
+  return useMutation<ServiceabilityDto, Error, ServiceabilityCheckInput>({
     mutationFn: (point) => addresses.check(point),
   });
 }
@@ -106,6 +107,12 @@ export function useCreateAddress() {
         longitude: result.address.longitude,
         ...(result.address.placeId === undefined ? {} : { placeId: result.address.placeId }),
         serviceability: result.address.serviceability,
+        propertyType: variables.input.propertyType ?? null,
+        floor: variables.input.floor ?? null,
+        lane: variables.input.lane ?? null,
+        landmark: variables.input.landmark ?? null,
+        // Just created: the address has not been used for an order yet.
+        lastUsedAt: null,
       };
       queryClient.setQueryData<readonly AddressDto[]>(addressKeys.list(), (previous) =>
         previous === undefined ? [created] : [...previous, created],

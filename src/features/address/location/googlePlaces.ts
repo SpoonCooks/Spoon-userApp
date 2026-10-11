@@ -274,6 +274,7 @@ export async function placeDetails(input: {
           component('administrative_area_level_2') ??
           component('sublocality'),
         region: component('administrative_area_level_1'),
+        locality: component('sublocality') ?? component('sublocality_level_1'),
       },
     },
   };
@@ -330,6 +331,7 @@ export async function googleReverseGeocode(
       street,
       city: component('locality') ?? component('administrative_area_level_2'),
       region: component('administrative_area_level_1'),
+      locality: sublocality,
     },
   };
 }

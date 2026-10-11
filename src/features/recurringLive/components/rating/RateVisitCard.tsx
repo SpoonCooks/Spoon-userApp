@@ -104,8 +104,14 @@ export interface RateVisitCardProps {
   readonly onSubmit?: (submission: RateVisitSubmission) => void;
   /** The say-more row — mic, camera or video — opens "Tell us more". */
   readonly onTellUsMore?: () => void;
-  /** `1501:6636` — "Later" on the first look. */
+  /** `1501:6636` — "Later" on the first look. Absent: no "Later" link. */
   readonly onLater?: () => void;
+  /**
+   * Whose copy the first look reads. `visit` (the Recurring frames, `1501:6628`) or `service` — the
+   * one-time Service flow's Completed frame (`2165:12076`): "How was the service today?", its own
+   * subtitle and scale hint, no "Later", and the 5+ nudge without a fill.
+   */
+  readonly variant?: 'visit' | 'service';
   readonly testID?: string;
 }
 
@@ -120,6 +126,7 @@ export function RateVisitCard({
   onSubmit,
   onTellUsMore,
   onLater,
+  variant = 'visit',
   testID = 'rate-visit-card',
 }: RateVisitCardProps) {
   const [rating, setRating] = useState<VisitRatingValue | null>(initialRating);
@@ -208,7 +215,7 @@ export function RateVisitCard({
               {visit.meta}
             </Text>
           </View>
-          {tier === 'idle' ? (
+          {tier === 'idle' && onLater !== undefined ? (
             <Pressable
               onPress={onLater}
               accessibilityRole="button"
@@ -229,6 +236,7 @@ export function RateVisitCard({
             tapRef={tapRef}
             cookName={visit.cookName}
             live={live}
+            variant={variant}
             testID={testID}
           />
         ) : (
@@ -273,6 +281,7 @@ function FirstLook({
   tapRef,
   cookName,
   live,
+  variant,
   testID,
 }: {
   readonly rating: VisitRatingValue | null;
@@ -280,8 +289,10 @@ function FirstLook({
   readonly tapRef: MutableRefObject<StarTap | null>;
   readonly cookName: string;
   readonly live: boolean;
+  readonly variant: 'visit' | 'service';
   readonly testID: string;
 }) {
+  const service = variant === 'service';
   const loop = useTimeline({ durationMs: RATING_TIMELINE_MS, loop: true, restAt: 0 });
   const spin = useTimeline({ durationMs: IDLE_RING_TURN_MS, loop: true, restAt: 0 });
   return (
@@ -290,10 +301,12 @@ function FirstLook({
       <View style={styles.idleHero}>
         <IdleSticker clock={loop} spin={spin} testID={`${testID}-sticker`} />
         <Text variant="spoonTitle" align="center">
-          How was the food today?
+          {service ? 'How was the service today?' : 'How was the food today?'}
         </Text>
         <Text variant="spoonCaption" color="textRatingSubtle" align="center">
-          One tap! Your rating helps us assign you better cooks
+          {service
+            ? 'Your rating helps us assign appropriate cooks to you'
+            : 'One tap! Your rating helps us assign you better cooks'}
         </Text>
       </View>
 
@@ -311,7 +324,9 @@ function FirstLook({
             Not great
           </Text>
           <Text variant="spoonMicro" color="textSecondarySoft">
-            Single tap for 0.5. Fast double tap for full star
+            {service
+              ? 'Single tap for half star. Double tap for full star'
+              : 'Single tap for 0.5. Fast double tap for full star'}
           </Text>
           <Text variant="spoonMicroStrong" color="textSecondarySoft">
             Amazing!
@@ -320,7 +335,7 @@ function FirstLook({
       </View>
 
       {/* `1501:6689` — the 5+ nudge. */}
-      <View style={styles.nudge}>
+      <View style={[styles.nudge, service && styles.nudgePlain]}>
         <View style={styles.nudgeDisc}>
           <Animated.Image
             source={RATING_ART.nudgeSparkle}
@@ -330,7 +345,7 @@ function FirstLook({
         <Text variant="spoonCaption" style={styles.flex}>
           {'Blown away? Give a '}
           <Text variant="ratingCaptionBold">5+</Text>
-          {live
+          {live && !service
             ? `, it tells ${cookName} the visit went above & beyond and delivered that extra delight!`
             : `, it tells ${cookName} she went above & beyond to deliver that extra delight!`}
         </Text>
@@ -607,6 +622,8 @@ const styles = StyleSheet.create({
     borderRadius: lightTheme.radius.md,
     backgroundColor: lightTheme.colors.surfaceRatingNudge,
   },
+  /** `2165:12076` — the Service flow's nudge has no fill. */
+  nudgePlain: { backgroundColor: 'transparent' },
   /** `1501:6690` — 28pt lime disc; the 14pt sparkle at 7,7. */
   nudgeDisc: {
     width: 28,
