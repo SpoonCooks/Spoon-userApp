@@ -399,22 +399,87 @@ describe('rating a visit', () => {
     expect(rateVisitInfo(visit())).toBeNull();
   });
 
+  const draft = (text = '') => ({ voice: null, media: [], text });
+
   it('sends 5+ as five stars marked exceptional', () => {
-    expect(ratingRequestFor({ rating: '5+', chips: [] }, '')).toEqual({
-      stars: 5,
-      exceptional: true,
-    });
-    expect(ratingRequestFor({ rating: 4.5, chips: [] }, '')).toEqual({ stars: 4.5 });
+    expect(
+      ratingRequestFor({ rating: '5+', chips: [], avoidCook: false, feedback: draft() }),
+    ).toEqual({ stars: 5, exceptional: true, chips: [], attachments: [] });
+    expect(
+      ratingRequestFor({ rating: 4.5, chips: [], avoidCook: false, feedback: draft() }),
+    ).toEqual({ stars: 4.5, chips: [], attachments: [] });
   });
 
-  it('carries the note, then the picked chips under the card’s own question', () => {
-    expect(ratingRequestFor({ rating: 4.5, chips: ['taste', 'onTime'] }, '  Lovely dal ')).toEqual({
-      stars: 4.5,
-      feedback: 'Lovely dal\n\nWhat stood out? Taste, On time',
+  it('sends the band’s chips by key and the note as written (Figma 1603:50)', () => {
+    expect(
+      ratingRequestFor({
+        rating: 4.5,
+        chips: ['taste', 'onTime', 'slow'],
+        avoidCook: false,
+        feedback: draft('  Lovely dal '),
+      }),
+    ).toEqual({ stars: 4.5, feedback: 'Lovely dal', chips: ['taste', 'onTime'], attachments: [] });
+  });
+
+  it('asks for a different cook only below 4', () => {
+    expect(
+      ratingRequestFor({ rating: 2.5, chips: ['slow', 'oil'], avoidCook: true, feedback: draft() }),
+    ).toEqual({ stars: 2.5, chips: ['slow', 'oil'], avoidCook: true, attachments: [] });
+    expect(
+      ratingRequestFor({ rating: 4, chips: [], avoidCook: true, feedback: draft() }),
+    ).not.toHaveProperty('avoidCook');
+  });
+
+  it('uploads the voice note first, then photos and video as added', () => {
+    const request = ratingRequestFor({
+      rating: 4,
+      chips: [],
+      avoidCook: false,
+      feedback: {
+        voice: { uri: 'file:///voice.m4a', durationMs: 9_000, sizeBytes: 900, bars: [] },
+        media: [
+          {
+            id: 'p1',
+            kind: 'photo',
+            uri: 'file:///a.jpg',
+            mimeType: 'image/jpeg',
+            sizeBytes: 100,
+            durationMs: null,
+          },
+          {
+            id: 'v1',
+            kind: 'video',
+            uri: 'file:///b.mov',
+            mimeType: 'video/quicktime',
+            sizeBytes: 500,
+            durationMs: 12_000,
+          },
+        ],
+        text: '',
+      },
     });
-    expect(ratingRequestFor({ rating: 2, chips: ['slow', 'oil'] }, '')).toEqual({
-      stars: 2,
-      feedback: 'What went wrong? Slow, Too much oil',
-    });
+    expect(request.attachments).toEqual([
+      {
+        kind: 'voice',
+        uri: 'file:///voice.m4a',
+        mimeType: 'audio/mp4',
+        sizeBytes: 900,
+        durationMs: 9_000,
+      },
+      {
+        kind: 'photo',
+        uri: 'file:///a.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 100,
+        durationMs: null,
+      },
+      {
+        kind: 'video',
+        uri: 'file:///b.mov',
+        mimeType: 'video/quicktime',
+        sizeBytes: 500,
+        durationMs: 12_000,
+      },
+    ]);
   });
 });

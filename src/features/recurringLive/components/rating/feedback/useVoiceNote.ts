@@ -1,0 +1,154 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Linking } from 'react-native';
+import type { loadExpoAudio } from '@core/native';
+import { localFileSize } from '@features/booking';
+
+import { MAX_VOICE_MS, WAVE_BAR_COUNT, barFromMetering, foldBars } from './model';
+import type { FeedbackVoiceNote } from './model';
+
+/** `expo-audio`, as `loadExpoAudio` hands it over on a build that has it. */
+export type ExpoAudioModule = NonNullable<ReturnType<typeof loadExpoAudio>>;
+
+/** How long the microphone may take to open before recording gives up. */
+const PREPARE_TIMEOUT_MS = 8_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('The microphone didn’t respond.')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+}
+
+/** How often the live waveform takes a reading. */
+const SAMPLE_MS = 120;
+
+/**
+ * The feedback block's voice note (`2093:5673` recording, `2093:5759` recorded): record with a
+ * live waveform from the microphone's metering, stop into a note, play it back.
+ *
+ * Recording asks for the microphone first; a refusal explains itself and offers Settings rather
+ * than failing silently. The note stops itself at {@link MAX_VOICE_MS}.
+ */
+export function useVoiceNote(
+  audio: ExpoAudioModule,
+  onRecorded: (note: FeedbackVoiceNote) => void,
+) {
+  const recorder = audio.useAudioRecorder({
+    ...audio.RecordingPresets.HIGH_QUALITY,
+    isMeteringEnabled: true,
+  });
+  const [recording, setRecording] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [liveBars, setLiveBars] = useState<readonly number[]>([]);
+  const samples = useRef<number[]>([]);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopping = useRef(false);
+
+  const clearTimer = () => {
+    if (timer.current !== null) clearInterval(timer.current);
+    timer.current = null;
+  };
+
+  const stop = useCallback(async () => {
+    if (stopping.current) return;
+    stopping.current = true;
+    clearTimer();
+    try {
+      const durationMs = recorder.getStatus().durationMillis;
+      await recorder.stop();
+      // Keep playsInSilentMode: Android resets anything left out, and a phone on silent would
+      // then refuse to play the customer's own note back.
+      await audio.setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      const uri = recorder.uri;
+      setRecording(false);
+      if (uri === null || durationMs < 500) return;
+      onRecorded({
+        uri,
+        durationMs,
+        sizeBytes: (await localFileSize(uri)) ?? 0,
+        bars: foldBars(samples.current),
+      });
+    } finally {
+      stopping.current = false;
+    }
+  }, [audio, onRecorded, recorder]);
+
+  const start = useCallback(async () => {
+    const permission = await audio.requestRecordingPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Microphone is off',
+        'Allow Spoon to use the microphone to record a voice note.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+        ],
+      );
+      return;
+    }
+    try {
+      await audio.setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      // Preparing can stall rather than fail when there is no input to open (seen on a
+      // simulator without microphone access); give up and say so instead of waiting forever.
+      await withTimeout(recorder.prepareToRecordAsync(), PREPARE_TIMEOUT_MS);
+      recorder.record();
+    } catch (error) {
+      // No microphone to open (another app holds it, or a simulator without input): say so.
+      Alert.alert(
+        'Couldn’t start recording',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+      return;
+    }
+    samples.current = [];
+    setLiveBars([]);
+    setElapsedMs(0);
+    setRecording(true);
+    timer.current = setInterval(() => {
+      const status = recorder.getStatus();
+      samples.current.push(barFromMetering(status.metering));
+      setLiveBars(samples.current.slice(-WAVE_BAR_COUNT));
+      setElapsedMs(status.durationMillis);
+      if (status.durationMillis >= MAX_VOICE_MS) void stop();
+    }, SAMPLE_MS);
+  }, [audio, recorder, stop]);
+
+  useEffect(
+    () => () => {
+      clearTimer();
+    },
+    [],
+  );
+
+  return { recording, elapsedMs, liveBars, start, stop };
+}
+
+/** Plays a recorded note; `null` (the preview's drawn note) plays nothing. */
+export function useVoicePlayback(audio: ExpoAudioModule, uri: string | null) {
+  // One source object per note: a new `{ uri }` each render makes the hook replace its player, and
+  // `play()` then lands on one that is already being released.
+  const source = useMemo(() => (uri === null ? null : { uri }), [uri]);
+  const player = audio.useAudioPlayer(source);
+  const status = audio.useAudioPlayerStatus(player);
+  const toggle = useCallback(() => {
+    if (uri === null) return;
+    if (status.playing) {
+      player.pause();
+      return;
+    }
+    if (status.didJustFinish || (status.duration > 0 && status.currentTime >= status.duration)) {
+      void player.seekTo(0);
+    }
+    player.play();
+  }, [player, status, uri]);
+  return { playing: status.playing, positionMs: status.currentTime * 1000, toggle };
+}

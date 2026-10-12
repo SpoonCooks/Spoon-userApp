@@ -18,6 +18,8 @@ import type {
 import type { CheckoutLauncher } from '@features/payment';
 import { unavailableCheckoutLauncher } from '@features/payment';
 import { bookingKeys } from './keys';
+import { uploadRatingAttachments } from '../ratingMedia';
+import type { RatingAttachment } from '../ratingMedia';
 import { availabilityKeys } from '@features/availability';
 import type {
   BookingCreateResponse,
@@ -584,6 +586,52 @@ export function ratingScopeFor(bookingId: string, feedback: string | undefined):
   return words === '' ? `booking.rate:${bookingId}` : `booking.rate:${bookingId}:words`;
 }
 
+/**
+ * The scope for a rate-card submission (Figma "Ratings" `1603:50`): one per distinct submission.
+ *
+ * The card sends stars, chips, a note, the different-cook answer and media in one call, and the
+ * customer can change any of them after a failed send. Keyed on the content, a genuine retry
+ * repeats its key (and, with the upload cache below, its media ids) and replays; a changed
+ * submission gets a key of its own instead of an IDEMPOTENCY_CONFLICT.
+ */
+export function ratingSubmissionScope(
+  bookingId: string,
+  request: {
+    readonly stars: number;
+    readonly exceptional?: boolean;
+    readonly feedback?: string;
+    readonly chips?: readonly string[];
+    readonly avoidCook?: boolean;
+    readonly attachments?: readonly RatingAttachment[];
+  },
+): string {
+  const content = JSON.stringify([
+    request.stars,
+    request.exceptional === true,
+    request.feedback?.trim() ?? '',
+    request.chips ?? [],
+    request.avoidCook === true,
+    (request.attachments ?? []).map((attachment) => attachment.uri),
+  ]);
+  return `booking.rate:${bookingId}:${digest(content)}`;
+}
+
+/** A short, stable fingerprint (FNV-1a) — a scope name, not a security boundary. */
+function digest(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/**
+ * Media already uploaded for a booking, by local file — so a retry after a failed rating call
+ * reuses what landed rather than uploading it again under a new id.
+ */
+const uploadedRatingMedia = new Map<string, string>();
+
 export function useRateBooking() {
   const { api } = useRuntime();
   const queryClient = useQueryClient();
@@ -592,18 +640,48 @@ export function useRateBooking() {
   return useMutation<
     RatingResultDto,
     Error,
-    { bookingId: string; stars: number; exceptional?: boolean; feedback?: string; scope: string }
+    {
+      bookingId: string;
+      stars: number;
+      exceptional?: boolean;
+      feedback?: string;
+      chips?: readonly string[];
+      avoidCook?: boolean;
+      /** Uploaded first, each to its own signed URL; the rating then names them. */
+      attachments?: readonly RatingAttachment[];
+      scope: string;
+    }
   >({
-    mutationFn: ({ bookingId, stars, exceptional, feedback, scope }) =>
-      service.rate(
+    mutationFn: async ({
+      bookingId,
+      stars,
+      exceptional,
+      feedback,
+      chips,
+      avoidCook,
+      attachments,
+      scope,
+    }) => {
+      const mediaIds =
+        attachments === undefined || attachments.length === 0
+          ? []
+          : await uploadRatingAttachments(service, bookingId, attachments, undefined, {
+              get: (uri) => uploadedRatingMedia.get(`${bookingId}|${uri}`),
+              set: (uri, mediaId) => uploadedRatingMedia.set(`${bookingId}|${uri}`, mediaId),
+            });
+      return service.rate(
         bookingId,
         {
           stars,
           ...(exceptional === undefined ? {} : { exceptional }),
           ...(feedback === undefined ? {} : { feedback }),
+          ...(chips === undefined ? {} : { chips }),
+          ...(avoidCook === undefined ? {} : { avoidCook }),
+          ...(mediaIds.length === 0 ? {} : { mediaIds }),
         },
         scope,
-      ),
+      );
+    },
     onSuccess(_result, variables) {
       idempotency.release(variables.scope);
       // A rating changes the booking's own state (`allowedActions.canRate` flips) and Home

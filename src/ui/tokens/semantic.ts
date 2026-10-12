@@ -312,8 +312,6 @@ export const lightColors = {
   textRatingQuiet: palette.black40,
   /** `1501:6655` — the idle "?": black at 35 %. */
   textRatingPlaceholder: palette.black35,
-  /** `1501:7270` — "1 voice · 2 photos · 1 video": black at 50 %. */
-  textRatingMeta: palette.black50,
   /** `1501:6667` — the 1.5pt rule between the stars and the 5+ burst: black at 12 %. */
   surfaceRatingDivider: palette.black12,
   /** `1501:6689` — the "Blown away?" nudge, `#ECFF9B`. */
@@ -324,27 +322,6 @@ export const lightColors = {
   surfaceRatingQuiet: palette.black3,
   /** `1517:9299` — the low-score card wash's lead stop. */
   surfaceRatingPoorTop: palette.linen,
-  /** `1501:7209` — the sheet's close well: black at 6 %. */
-  surfaceRatingCloseWell: palette.black6,
-  /** `1501:7204` / `1501:7244` — the grabber and the not-yet-recorded bars: black at 15 %. */
-  surfaceRatingGrabber: palette.black15,
-  /** `1501:7276` — the saved voice note's bars: black at 75 %. */
-  surfaceRatingWave: palette.black75,
-  /** `1501:7310` — a thumbnail's remove disc: black at 55 %. */
-  surfaceRatingRemove: palette.black55,
-  /** `1501:7323` — the video thumbnail's play disc: white at 90 %. */
-  surfaceRatingPlayDisc: palette.white90,
-  /** `1501:7327` — the dashed "Photo/Video" tile edge: black at 20 %. */
-  borderRatingAdd: palette.black20,
-  /** `1501:7261` — the Stop button's 8pt outer ring: `#FFD600` at 35 %. */
-  surfaceRatingStopRing: palette.yellow500Ring,
-  /** `1501:7308` / `1501:7313` / `1501:7318` — the fixture thumbnails' 135° washes. */
-  surfaceRatingThumbAmberTop: palette.thumbAmberTop,
-  surfaceRatingThumbAmberBottom: palette.thumbAmberBottom,
-  surfaceRatingThumbGreenTop: palette.thumbGreenTop,
-  surfaceRatingThumbGreenBottom: palette.thumbGreenBottom,
-  surfaceRatingThumbVideoTop: palette.thumbVideoTop,
-  surfaceRatingThumbVideoBottom: palette.thumbVideoBottom,
 
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */

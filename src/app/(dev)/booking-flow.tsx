@@ -15,6 +15,7 @@ import {
   VisitDetailsScreen,
   visitDemoModel,
 } from '@features/recurringLive';
+import type { VisitRatingValue } from '@features/recurringLive';
 import {
   ServiceVisitScreen,
   cancelledVisitModelFrom,
@@ -376,6 +377,7 @@ function BookingFlowPreview({ view, recurring }: { view: string; recurring: bool
   const cancel = CANCEL[view];
   const [step, setStep] = useState<CancelStep>(cancel?.step ?? 'modify');
   const [brief, setBrief] = useState<readonly ('menu' | 'time' | 'needs')[]>([]);
+  const [rated, setRated] = useState<VisitRatingValue | null>(null);
 
   if (!__DEV__) {
     return <RouteScaffold title="Booking flow" status="foundation" notes={['Development only']} />;
@@ -429,11 +431,13 @@ function BookingFlowPreview({ view, recurring }: { view: string; recurring: bool
                 photoUri: null,
               }}
               submitting={false}
+              onRatingChange={setRated}
               onSubmit={() => undefined}
               testID="preview-rate"
             />
           ) : undefined
         }
+        ratedHigh={rated !== null && (rated === '5+' || rated >= 4)}
         onShareRecipe={() => undefined}
         onModifyBooking={() => setStep('modify')}
         briefChecked={brief}

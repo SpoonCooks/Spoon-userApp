@@ -9,6 +9,7 @@ import {
   usePaymentRetry,
   payRetryingOnceWhileProcessing,
   ratingScopeFor,
+  ratingSubmissionScope,
   useBookingDetail,
   useRateBooking,
   useTipCheckout,
@@ -222,7 +223,7 @@ export default function BookingRoute() {
             rate.mutateAsync({
               bookingId,
               ...request,
-              scope: ratingScopeFor(bookingId, request.feedback ?? ''),
+              scope: ratingSubmissionScope(bookingId, request),
             })
           }
           rating={rate.isPending}

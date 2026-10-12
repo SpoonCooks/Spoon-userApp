@@ -62,3 +62,10 @@ export { BookingDetailScreen, BookingDetailView } from './screens/BookingDetailS
 export type { BookingDetailActions, BookingDetailViewProps } from './screens/BookingDetailScreen';
 export type * from './types';
 export * from './api';
+export {
+  canUploadRatingMedia,
+  localFileSize,
+  ratingMimeTypeOf,
+  uploadRatingAttachments,
+} from './ratingMedia';
+export type { RatingAttachment, RatingFileUploader } from './ratingMedia';

@@ -39,104 +39,67 @@ export function formatRating(value: VisitRatingValue): string {
   return String(value);
 }
 
-/** Which support toggle a low score offers. */
-export type RatingSupportKind = 'differentCook' | 'callBack';
-
 export interface RatingTierCopy {
   readonly headline: string;
   readonly body: string;
   /** The chip block's label. */
   readonly chipsLabel: string;
-  readonly sayMoreTitle: string;
-  readonly sayMoreBody: string;
-  /** Low scores only. */
-  readonly support?: {
-    readonly kind: RatingSupportKind;
-    readonly title: string;
-    readonly body: string;
-    /** As drawn: `1501:7477` off, `1501:7626` / `1501:7772` on. */
-    readonly initiallyOn: boolean;
-  };
-  /** The CTA label; with a call-back toggle ON it reads `submitCallBack` instead. */
+  /** `2093:6050` — the feedback block's heading and nudge. */
+  readonly feedbackTitle: string;
+  readonly feedbackBody: string;
+  /**
+   * `1501:7471` — "Prefer a different cook next time?", drawn only below 4 (dev note `2238:930`).
+   * ON excludes this cook from future matching for the household.
+   */
+  readonly differentCook: boolean;
   readonly submit: string;
 }
 
-const SAY_MORE_POSITIVE = {
-  sayMoreTitle: 'Tap to talk',
-  sayMoreBody: 'Say it like you’d tell a friend',
-} as const;
-
-const SAY_MORE_NEGATIVE = {
-  sayMoreTitle: 'What happened?',
-  sayMoreBody: 'A quick voice note helps us fix it',
+/** `1501:7475` / `1501:7476`. */
+export const RATING_DIFFERENT_COOK = {
+  title: 'Prefer a different cook next time?',
+  body: 'We’ll match you with someone new',
 } as const;
 
 /**
- * On a real visit the say-more row opens the WRITTEN half of "Tell us more" only: the rating
- * endpoint takes words (`feedback`) but no voice note, photo or video yet.
+ * The tier copy for a cook by first name (the frames' Rekha in the preview). Bands per dev note
+ * `2238:908`: below 4 is the Poor card, 4 – 5 the Rated card, 5+ its own.
  */
-export const RATING_SAY_MORE_WRITTEN = {
-  sayMoreTitle: 'Add a note',
-  sayMoreBody: 'Tell us in your own words',
-} as const;
-
-const CALL_BACK = {
-  kind: 'callBack',
-  title: 'Get a call back from Spoon',
-  body: 'Our team reaches out within 24 hrs',
-  initiallyOn: true,
-} as const;
-
-export const RATING_SUBMIT_CALL_BACK = 'Submit & request call back';
-
-/** The tier copy for a cook by first name (the frames' Rekha in the preview). */
 export function ratingTierCopy(
   cookName: string,
 ): Record<Exclude<RatingTier, 'idle'>, RatingTierCopy> {
+  const good = {
+    feedbackTitle: `Tell ${cookName} what made it special`,
+    feedbackBody: 'A 10-sec voice note means more to her than stars',
+    differentCook: false,
+    submit: 'Submit',
+  } as const;
+  // `1517:9301` — every score below 4 draws the same Poor card.
+  const poor: RatingTierCopy = {
+    headline: 'We’re so sorry',
+    body: 'It’s heartbreaking. Tell us what went wrong, we’ll act on it immediately.',
+    chipsLabel: 'What went wrong?',
+    feedbackTitle: 'Show us what went wrong',
+    feedbackBody: 'A photo or quick note helps us fix it better and fast',
+    differentCook: true,
+    submit: 'Submit',
+  };
   return {
     loved: {
       headline: 'Loved it!',
       body: `${cookName} will be thrilled. Anything that made it special?`,
       chipsLabel: 'What stood out?',
-      ...SAY_MORE_POSITIVE,
-      submit: 'Submit rating',
+      ...good,
     },
     magic: {
       headline: 'Off the charts!',
-      body: `We’ll make sure ${cookName} hears this. What made it magic?`,
-      chipsLabel: 'What made it magic?',
-      ...SAY_MORE_POSITIVE,
-      submit: `Send 5+ to ${cookName}`,
+      body: `We’ll make sure ${cookName} hears this. What made it amazing?`,
+      chipsLabel: 'What made it amazing?',
+      ...good,
     },
-    belowPar: {
-      headline: 'Not quite there',
-      body: 'Sorry it wasn’t great. What fell short?',
-      chipsLabel: 'What fell short?',
-      ...SAY_MORE_NEGATIVE,
-      support: {
-        kind: 'differentCook',
-        title: 'Prefer a different cook next time?',
-        body: 'We’ll match you with someone new',
-        initiallyOn: false,
-      },
-      submit: 'Submit rating',
-    },
-    disappointing: {
-      headline: 'That’s disappointing',
-      body: 'We’re sorry. Tell us what went wrong, we’ll act on it immediately.',
-      chipsLabel: 'What went wrong?',
-      ...SAY_MORE_NEGATIVE,
-      support: CALL_BACK,
-      submit: 'Submit rating',
-    },
-    veryPoor: {
-      headline: 'That’s not okay',
-      body: 'We’re really sorry. Someone from Spoon will look into this personally.',
-      chipsLabel: 'What went wrong?',
-      ...SAY_MORE_NEGATIVE,
-      support: CALL_BACK,
-      submit: 'Submit rating',
-    },
+    belowPar: poor,
+    disappointing: poor,
+    veryPoor: poor,
   };
 }
 
@@ -180,55 +143,14 @@ export const RATING_VISIT_FIXTURE = {
   cookName: 'Rekha',
 } as const;
 
-// --- Tell us more (`1501:7203`) ------------------------------------------------------------------
+// --- Feedback block (`2093:6050`) ---------------------------------------------------------------
 
-/** `1501:7217` — the live recorder's 38 bars; the first 26 are recorded (black), the rest pending. */
-export const RECORDER_BARS: readonly number[] = [
-  38.247, 37.289, 12.345, 32.047, 30.163, 14.977, 12.435, 25.682, 30.755, 11.767, 36.33, 40.925,
-  21.788, 16.956, 13.371, 18.588, 11.162, 33.099, 42.76, 25.04, 23.055, 29.856, 17.489, 11.033,
-  23.122, 35.187, 24.017, 25.86, 40.847, 29.286, 11.359, 12.77, 20.524, 19.309, 24.267, 43.023,
-  35.396, 12.171,
-];
-export const RECORDER_BARS_RECORDED = 26;
-
-/** `1501:7275` — the saved voice note's 30 bars. */
+/** `2093:5682` — the voice note's 38 bars as drawn, in points (2.45 wide, 2.52 apart, 30.8 tall). */
 export const VOICE_NOTE_BARS: readonly number[] = [
-  9.977, 11.703, 5.911, 5.728, 13.632, 19.791, 13.109, 11.975, 18.513, 12.747, 5.586, 7.488, 13.634,
-  11.301, 12.117, 21.502, 17.285, 5.591, 10.43, 5.886, 7.932, 10.215, 19.746, 18.249, 5.641, 16.053,
-  14.228, 6.912, 6.717, 13.731,
+  26.773, 26.102, 8.642, 22.433, 21.114, 10.484, 8.704, 17.977, 21.528, 8.237, 25.431, 28.648,
+  15.252, 11.869, 9.36, 13.012, 7.814, 23.17, 29.932, 17.528, 16.138, 20.899, 12.242, 7.723, 16.186,
+  24.631, 16.812, 18.102, 28.593, 20.5, 7.951, 8.939, 14.366, 13.517, 16.987, 30.116, 24.777, 8.519,
 ];
 
-export const FEEDBACK_PROMPT =
-  'Try: how the sabzi tasted · was she on time · anything to change next visit · what was good?';
-
-export type FeedbackMediaKind = 'photo' | 'video';
-
-export interface FeedbackMedia {
-  readonly id: string;
-  readonly kind: FeedbackMediaKind;
-  /** Fixture thumbnails are flat 135° washes (`1501:7308` …), named by their token pair. */
-  readonly wash: 'amber' | 'green' | 'video';
-  /** Videos only — `1501:7326`. */
-  readonly duration?: string;
-}
-
-export const FEEDBACK_FIXTURE = {
-  recordingTime: '0:23',
-  voiceNote: { duration: '0:41' },
-  media: [
-    { id: 'photo-1', kind: 'photo', wash: 'amber' },
-    { id: 'photo-2', kind: 'photo', wash: 'green' },
-    { id: 'video-1', kind: 'video', wash: 'video', duration: '0:12' },
-  ] as readonly FeedbackMedia[],
-} as const;
-
-/** `1501:7270` — "1 voice · 2 photos · 1 video". */
-export function addedSummary(voiceNotes: number, media: readonly FeedbackMedia[]): string {
-  const photos = media.filter((item) => item.kind === 'photo').length;
-  const videos = media.length - photos;
-  return [
-    `${voiceNotes} voice`,
-    `${photos} ${photos === 1 ? 'photo' : 'photos'}`,
-    `${videos} ${videos === 1 ? 'video' : 'videos'}`,
-  ].join(' · ');
-}
+/** The frames' recorded note: "0:23". */
+export const VOICE_NOTE_FIXTURE_MS = 23_000;

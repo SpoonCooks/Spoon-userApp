@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Alert } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import { useExtensionOptions, useTracking } from '@features/booking';
@@ -15,6 +16,8 @@ import {
 import type {
   PaymentDetailsSheetData,
   RateVisitSubmission,
+  VisitRatingValue,
+  VisitRatingRequest,
   VisitMenuSection,
   VisitPrepKey,
 } from '@features/recurringLive';
@@ -65,11 +68,8 @@ export interface ServiceVisitHostProps {
   readonly extending: boolean;
   readonly onTip: (amountPaise: number) => Promise<unknown>;
   readonly tipping: boolean;
-  readonly onRate: (request: {
-    readonly stars: number;
-    readonly exceptional?: true;
-    readonly feedback?: string;
-  }) => Promise<unknown>;
+  /** The rate card's submission: uploads its media, then sends the rating. */
+  readonly onRate: (request: VisitRatingRequest) => Promise<unknown>;
   readonly rating: boolean;
   readonly onBookAnother: () => void;
   /** A Recurring visit's Payment details → Manage → "View refunds" on the cancellation result. */
@@ -115,6 +115,9 @@ export function ServiceVisitHost({
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [tipPaid, setTipPaid] = useState<ServiceVisitModel['tipPaid']>(null);
   const [rated, setRated] = useState(false);
+  // The score picked on the rate card; 4 and above warms the tip card (`2165:14445`).
+  const [picked, setPicked] = useState<VisitRatingValue | null>(null);
+  const ratedHigh = picked !== null && (picked === '5+' || picked >= 4);
 
   // A Recurring visit's booking (Figma `2165:13928` → `2216:6600`): the same screens titled
   // "Recurring visit", paid by the plan's UPI Autopay — whose "Manage" cancels the whole booking,
@@ -261,10 +264,16 @@ export function ServiceVisitHost({
           photoUri: photoUrl,
         }}
         submitting={rating}
+        onRatingChange={setPicked}
         onSubmit={(submission: RateVisitSubmission) => {
-          void onRate(ratingRequestFor(submission, ''))
+          void onRate(ratingRequestFor(submission))
             .then(() => setRated(true))
-            .catch(() => undefined);
+            .catch(() =>
+              Alert.alert(
+                'Couldn’t send your rating',
+                'Check your connection and try again. Nothing you added is lost.',
+              ),
+            );
         }}
         testID="service-visit-rate"
       />
@@ -308,6 +317,7 @@ export function ServiceVisitHost({
         }}
         onBookAnother={onBookAnother}
         ratingSlot={ratingSlot}
+        ratedHigh={ratedHigh}
         tipping={tipping}
         onTip={(amountPaise) => {
           void onTip(amountPaise)

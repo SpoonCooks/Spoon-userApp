@@ -588,8 +588,12 @@ function ScopeRow({ title, body, included }: { title: string; body: string; incl
 /* ---------------------------------------------------------------------------------- Tip card */
 
 /**
- * `Tip card` (`2216:4327`): Default — nothing picked, the CTA disabled; Selected — "Pay ₹X tip";
+ * `Tip card` (`2216:4327`): Default — nothing picked, the CTA disabled; Selected — "Pay tip"
+ * (`2165:14105`; the amount is the lit chip, not repeated on the button);
  * "Other" turns into a ₹ input; Paid (`2216:4368`) — the confirmation and thank-you strip.
+ *
+ * Rated 4+ (`2165:14105`, dev note `2165:14445`): once the customer gives 4 or more, the card
+ * opens on the Most tipped amount (`suggestedPaise`) until they pick one themselves.
  */
 /** `2216:4327` — `linear-gradient(157.14deg, …)`. */
 const TIP_GRADIENT = gradientAngle(157.14);
@@ -600,6 +604,7 @@ export function TipCard({
   paid,
   paying,
   onPay,
+  suggestedPaise = null,
   testID,
 }: {
   cookName: string | null;
@@ -607,9 +612,12 @@ export function TipCard({
   paid: { readonly amountPaise: number; readonly when: string } | null;
   paying: boolean;
   onPay: (amountPaise: number) => void;
+  /** Preselected until the customer picks — the Most tipped amount after a 4+ rating. */
+  suggestedPaise?: number | null;
   testID: string;
 }) {
-  const [picked, setPicked] = useState<number | 'other' | null>(null);
+  const [chosen, setPicked] = useState<number | 'other' | null>(null);
+  const picked = chosen ?? suggestedPaise;
   const [other, setOther] = useState('');
   const name = cookName ?? 'your cook';
   const otherPaise = /^\d+$/.test(other) ? Number(other) * 100 : 0;
@@ -699,7 +707,7 @@ export function TipCard({
                   ? 'Pick an amount to say thanks'
                   : paying
                     ? 'Opening payment…'
-                    : `Pay ${rupees(amount)} tip`}
+                    : 'Pay tip'}
               </Text>
             </Pressable>
           </>
@@ -747,7 +755,9 @@ function TipPill({
           <Text style={styles.microStrong}>Most tipped</Text>
         </View>
       ) : null}
-      <Text style={styles.button}>{label}</Text>
+      <Text style={styles.button} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -1040,7 +1050,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    // Figma's px12 leaves "Other" a few points short on a 384dp phone, and Android then wraps it;
+    // the label is centred, so the narrower inset changes nothing else.
+    paddingHorizontal: 4,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
