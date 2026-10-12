@@ -94,7 +94,8 @@ export function DayVisitsPopup({
 }
 
 /**
- * `Visit/*` — `1354:1749` Completed, `1354:1772` Cancelled, `1354:1849` upcoming / unassigned.
+ * `Visit/*` — `1354:1749` Completed, `1354:1772` Cancelled, `1735:2654` upcoming / assigned,
+ * `1354:1849` upcoming / unassigned.
  * A 36pt glyph disc, the title / status pair (2 apart) and a 20pt chevron, 12 apart, py 8. An
  * unassigned visit adds the `1006:740` "Cook pending" card 8 below its row.
  */
@@ -116,7 +117,7 @@ function VisitRow({
       testID={testID}
     >
       <View style={styles.visitLine}>
-        <VisitGlyph status={visit.status} />
+        <VisitGlyph status={visit.status} photo={visit.photo} />
         <View style={styles.visitText}>
           <Text variant="calendarVisitTitle" color="textPrimary" numberOfLines={1}>
             {visit.title}
@@ -153,9 +154,22 @@ function VisitRow({
   );
 }
 
-/** `1354:1707` Glyph/done, `1354:1717` Glyph/cancelled, `1354:1835` Glyph/pending. */
-function VisitGlyph({ status }: { readonly status: DayVisit['status'] }) {
+/** `1354:1707` Glyph/done, `1354:1717` Glyph/cancelled, `1735:2607` Glyph/cook, `1354:1835` Glyph/pending. */
+function VisitGlyph({
+  status,
+  photo,
+}: {
+  readonly status: DayVisit['status'];
+  readonly photo?: DayVisit['photo'];
+}) {
   switch (status) {
+    case 'assigned':
+      // `1735:2607` Glyph/cook — the cook's face in a 2pt yellow ring over `#FFF7CC`.
+      return (
+        <View style={[styles.glyph, styles.glyphCook]}>
+          {photo === undefined ? null : <Image source={photo} style={styles.glyphPhoto} />}
+        </View>
+      );
     case 'completed':
       return (
         <View style={[styles.glyph, styles.glyphDone]}>
@@ -222,6 +236,13 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderColor: lightTheme.colors.borderNotice,
   },
+  glyphCook: {
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: lightTheme.colors.borderNotice,
+    backgroundColor: lightTheme.colors.surfaceAccent,
+  },
+  glyphPhoto: { width: 32, height: 32, borderRadius: 16 },
   glyphIcon: { width: 20, height: 20 },
   glyphClose: { width: 18, height: 18 },
   /** `1006:740` — 52 tall, px 12 / py 10, 16pt radius, 12 gap. */

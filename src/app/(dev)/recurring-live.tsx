@@ -22,7 +22,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
  * `recurring-setup.tsx`: the screens are static UI with fixture data and no real route yet, so
  * this is where they can be looked at on a device. Query params pick the Figma state:
  *
- *   ?screen=live    [&date=past|today|upcoming]       `1005:132`, `1354:1543`, `1006:*` pop-ups
+ *   ?screen=live    [&date=past|today|upcoming|assigned] `1005:132`, `1354:1543`, `1006:*`, `1735:2630`
  *   ?screen=plans   [&visit=2] [&edited=1]             `1017:433` / `1017:5997` / `1017:6054`
  *   ?screen=visit   &variant=assigned|pending|completed|cancelled [&prep=0|1|3]
  *                   [&sheet=modify|payment]            `1008:5398`, `1466:*`, `1441:*`, `1433:1537`,
@@ -118,8 +118,7 @@ function RecurringLivePreview({ params }: { readonly params: PreviewParams }) {
             prepState={parsePrep(params.prep)}
             onModifyBooking={() => setSheet('modify')}
             onPaymentDetails={() => setSheet('payment')}
-            // Nothing to dial or open in the preview; these draw Call and the WhatsApp toast.
-            onCall={() => undefined}
+            // Nothing to open in the preview; these draw the WhatsApp toast.
             onHelp={() => undefined}
             onShareRecipe={() => undefined}
             ratingSlot={

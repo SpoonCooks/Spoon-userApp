@@ -357,12 +357,21 @@ const ACCOUNT_VIEWS = new Set([
 ]);
 
 export default function DevBookingFlowRoute() {
-  const { view = 'assigned' } = useLocalSearchParams<{ view?: string }>();
+  const { view = 'assigned', recurring } = useLocalSearchParams<{
+    view?: string;
+    recurring?: string;
+  }>();
   // Keyed by view: a deep link to another view must start that view's sheet afresh.
-  return <BookingFlowPreview key={view} view={view} />;
+  return (
+    <BookingFlowPreview
+      key={`${view}:${recurring ?? ''}`}
+      view={view}
+      recurring={recurring === '1'}
+    />
+  );
 }
 
-function BookingFlowPreview({ view }: { view: string }) {
+function BookingFlowPreview({ view, recurring }: { view: string; recurring: boolean }) {
   const router = useRouter();
   const cancel = CANCEL[view];
   const [step, setStep] = useState<CancelStep>(cancel?.step ?? 'modify');
@@ -397,7 +406,13 @@ function BookingFlowPreview({ view }: { view: string }) {
   return (
     <>
       <ServiceVisitScreen
-        model={{ ...MODEL, ...SERVICE[phase], phase }}
+        // `recurring=1`: a Recurring visit's booking (Figma `2165:13928` → `2216:6600`).
+        model={{
+          ...MODEL,
+          ...SERVICE[phase],
+          phase,
+          ...(recurring ? { title: 'Recurring visit' } : {}),
+        }}
         onBack={() => router.back()}
         onPaymentDetails={() => undefined}
         onCall={() => undefined}

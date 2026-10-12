@@ -8,6 +8,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 import { gradientAxis } from '@ui/tokens/semantic';
 
 import {
+  VISIT_BADGE_ASSIGNED_GLYPH,
   VISIT_BADGE_CANCELLED,
   VISIT_BADGE_CONFIRMED,
   VISIT_SKY_AFTERNOON,
@@ -29,7 +30,8 @@ import {
  * export per time of day, 370×104, pinned to the banner's right edge where the sun sits behind
  * the countdown.
  */
-export type VisitBannerState = 'upcoming' | 'confirmed' | 'cancelled';
+/** `assigned` — the cook is confirmed (`2165:13861` in `2165:13847`): a person glyph, "ASSIGNED". */
+export type VisitBannerState = 'upcoming' | 'assigned' | 'confirmed' | 'cancelled';
 
 export interface VisitStatusBannerProps {
   readonly state: VisitBannerState;
@@ -37,6 +39,8 @@ export interface VisitStatusBannerProps {
   readonly slot: string;
   /** Upcoming only — the "10" over "DAYS TO GO". */
   readonly daysToGo?: string | undefined;
+  /** What the countdown counts; "DAYS TO GO" by default. */
+  readonly toGoLabel?: string | undefined;
   readonly testID?: string | undefined;
 }
 
@@ -50,6 +54,7 @@ export function VisitStatusBanner({
   date,
   slot,
   daysToGo,
+  toGoLabel = 'DAYS TO GO',
   testID = 'visit-status-banner',
 }: VisitStatusBannerProps) {
   const [box, setBox] = useState(FRAME_BOX);
@@ -111,17 +116,23 @@ export function VisitStatusBanner({
                 {daysToGo}
               </Text>
               <Text variant="spoonMicro" color="textPrimary" align="center">
-                DAYS TO GO
+                {toGoLabel}
               </Text>
             </View>
           ) : (
             <View style={[styles.countdown, styles.badgeSlot]} testID={`${testID}-badge`}>
-              <Image
-                source={cancelled ? VISIT_BADGE_CANCELLED : VISIT_BADGE_CONFIRMED}
-                style={styles.badge}
-              />
+              {state === 'assigned' ? (
+                <View style={[styles.badge, styles.badgeDisc]}>
+                  <Image source={VISIT_BADGE_ASSIGNED_GLYPH} style={styles.badgeGlyph} />
+                </View>
+              ) : (
+                <Image
+                  source={cancelled ? VISIT_BADGE_CANCELLED : VISIT_BADGE_CONFIRMED}
+                  style={styles.badge}
+                />
+              )}
               <Text variant="visitBannerBadge" color={ink} align="center" numberOfLines={1}>
-                {cancelled ? 'CANCELLED' : 'CONFIRMED'}
+                {cancelled ? 'CANCELLED' : state === 'assigned' ? 'ASSIGNED' : 'CONFIRMED'}
               </Text>
             </View>
           )}
@@ -159,4 +170,11 @@ const styles = StyleSheet.create({
   },
   badgeSlot: { gap: lightTheme.space.s6 },
   badge: { width: 36, height: 36 },
+  badgeDisc: {
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: lightTheme.colors.surface,
+  },
+  badgeGlyph: { width: 20, height: 20 },
 });
