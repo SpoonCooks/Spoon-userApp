@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 
 import {
@@ -158,6 +158,25 @@ export default function BookingRoute() {
       ? null
       : servicePhaseOf(booking, new Date());
 
+  /*
+   * A Recurring visit's booking (`booking.recurring`) is drawn by the same screens, titled
+   * "Recurring visit" (Figma `1005:131`, `2165:13928` → `2216:6600`). It is cancelled — never
+   * rescheduled — from the plan's own Modify booking sheet, and once cancelled it is the plan's
+   * Visit details (`2165:13866`) that tell its story.
+   */
+  const recurring = booking?.recurring ?? null;
+  const recurringVisit =
+    recurring === null
+      ? null
+      : {
+          pathname: '/recurring/[bookingId]/visits/[visitId]' as const,
+          params: { bookingId: recurring.recurringBookingId, visitId: recurring.visitId },
+        };
+
+  if (booking !== null && recurringVisit !== null && booking.status === 'cancelled') {
+    return <Redirect href={recurringVisit} />;
+  }
+
   if (booking !== null && phase !== null) {
     return (
       <ErrorBoundary scope="booking-host">
@@ -165,9 +184,18 @@ export default function BookingRoute() {
           booking={booking}
           phase={phase}
           onBack={goBack}
-          {...(booking.allowedActions.canCancel || booking.allowedActions.canReschedule
-            ? { onModifyBooking: () => cancelVisit.open() }
-            : {})}
+          {...(recurringVisit !== null
+            ? {
+                onModifyBooking: guard(() =>
+                  router.push({
+                    ...recurringVisit,
+                    params: { ...recurringVisit.params, modify: '1' },
+                  }),
+                ),
+              }
+            : booking.allowedActions.canCancel || booking.allowedActions.canReschedule
+              ? { onModifyBooking: () => cancelVisit.open() }
+              : {})}
           onHelp={guard(() => openHelp('Hi Spoon, I need help with my booking.'))}
           onCall={guard(() => {
             void callCook.call();
@@ -200,6 +228,7 @@ export default function BookingRoute() {
           }
           rating={rate.isPending}
           onBookAnother={guard(() => router.push('/scheduled'))}
+          onViewRefunds={guard(() => router.push('/refunds'))}
         />
         {cancelVisit.sheet}
       </ErrorBoundary>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -11,12 +11,7 @@ import { ratingSubmissionScope, useBookingDetail, useRateBooking } from '@featur
 import { CancelVisitSheet, cancelReasonsFrom } from '@features/cancellation';
 import type { CancelQuote, CancelStep, CancelVisit } from '@features/cancellation';
 import { useCatalogue } from '@features/catalogue';
-import {
-  cookProfileFrom,
-  useAddCookToPool,
-  useCookPoolList,
-  useCookPoolProfile,
-} from '@features/cookPool';
+import { cookProfileFrom, useAddCookToPool, useCookPoolProfile } from '@features/cookPool';
 import {
   PaymentDetailsSheet,
   RateVisitCard,
@@ -59,17 +54,21 @@ import { QueryBoundary } from '@ui';
  *                 (`allowedActions.canRate`): stars, 5+, the chips, a written note, the
  *                 different-cook answer and the voice note / photos / video (uploaded first)
  *                 go to `PUT /v1/bookings/:id/rating`
+ *   modify=1      "Modify booking" on the visit's live booking page lands here with the sheet open
  */
 export default function RecurringVisitRoute() {
   const router = useRouter();
-  const { bookingId, visitId } = useLocalSearchParams<{ bookingId: string; visitId: string }>();
+  const { bookingId, visitId, modify } = useLocalSearchParams<{
+    bookingId: string;
+    visitId: string;
+    modify?: string;
+  }>();
   const goBack = useSafeBack(`/recurring/${bookingId ?? ''}`);
   // One screen per tap: a quick double tap must not open the same screen (or WhatsApp) twice.
   const guard = useNavigationGuard();
 
   const visit = useRecurringVisit(bookingId ?? null, visitId ?? null);
   const booking = useRecurringBooking(bookingId ?? null);
-  const pool = useCookPoolList();
   const quote = useRecurringVisitCancellationQuote(bookingId ?? null, visitId ?? null);
   const cookId = visit.state.status === 'ready' ? (visit.state.data.cook?.cookId ?? null) : null;
   const profile = useCookPoolProfile(cookId ?? 'none', { enabled: cookId !== null });
@@ -84,12 +83,12 @@ export default function RecurringVisitRoute() {
         booking: booking.state.status === 'ready' ? booking.state.data : null,
         cookProfile,
         cookCard: cookProfile === null ? null : cookProfileFrom(cookProfile),
-        pool: pool.state.status === 'ready' ? pool.state.data : null,
         quote: quote.state.status === 'ready' ? quote.state.data : null,
         todayId: todayInKolkata(),
+        now: new Date(),
       }),
     );
-  }, [visit.state, booking.state, pool.state, quote.state, profile.state, cookId]);
+  }, [visit.state, booking.state, quote.state, profile.state, cookId]);
 
   const detail = visit.state.status === 'ready' ? visit.state.data : null;
   // `Note · Help deep link`: one tap to WhatsApp, prefilled. `wa.me` is a universal link, so it
@@ -156,6 +155,16 @@ export default function RecurringVisitRoute() {
   const cancelVisit = useCancelRecurringVisit();
   // The visit's booking says whether the cook has already left (`cook_en_route`).
   const linkedBooking = useBookingDetail(cancelStep === null ? null : (detail?.bookingId ?? null));
+
+  // `modify=1`: "Modify booking" on the visit's live booking page — open the sheet once the visit
+  // says it can still be cancelled. Once only, so closing it stays closed.
+  const modifyAsked = useRef(modify === '1');
+  const canModify = state.status === 'ready' && state.data.modifySheet !== null;
+  useEffect(() => {
+    if (!modifyAsked.current || !canModify) return;
+    modifyAsked.current = false;
+    setCancelStep('modify');
+  }, [canModify]);
 
   const quoteData = quote.state.status === 'ready' ? quote.state.data : null;
   /** The quote the customer confirmed, for C5 once the visit has been refetched as cancelled. */

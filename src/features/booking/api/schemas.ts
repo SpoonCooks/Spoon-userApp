@@ -463,6 +463,12 @@ export const bookingDetailSchema = z.object({
     .object({ type: z.string(), label: z.string(), detail: z.string().nullable() })
     .nullish(),
   /**
+   * The Recurring visit this booking fulfils; null/absent for a one-time booking. Visit details
+   * then reads "Recurring visit" and its Payment details are the plan's Autopay (Figma
+   * `2165:13928`, `2165:14262`).
+   */
+  recurring: z.object({ recurringBookingId: z.string(), visitId: z.string() }).nullish(),
+  /**
    * How many times the customer moved this booking -- capped at 1 by product policy (DEC-070),
    * the same field `BookingSummaryDto` carries and My bookings already draws a pill from.
    *

@@ -203,7 +203,14 @@ function dayVisitOf(visit: VisitSummaryDto): DayVisit {
     };
   }
   if (cook !== null) {
-    return { id: visit.visitId, status: 'unassigned', title, meta: cook };
+    const photoUrl = visit.cook?.profileImageUrl ?? null;
+    return {
+      id: visit.visitId,
+      status: 'assigned',
+      title,
+      meta: `Upcoming · ${cook}`,
+      ...(photoUrl === null ? {} : { photo: { uri: photoUrl } }),
+    };
   }
   return {
     id: visit.visitId,

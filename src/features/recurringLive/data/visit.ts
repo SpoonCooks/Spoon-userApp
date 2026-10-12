@@ -1,12 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 
-import {
-  VISIT_COOK_PHOTO,
-  VISIT_DISH_PHOTO,
-  VISIT_POOL_JYOTI,
-  VISIT_POOL_REKHA,
-  VISIT_POOL_SANCHITA,
-} from '../components/visit/assets';
+import { VISIT_COOK_PHOTO, VISIT_DISH_PHOTO } from '../components/visit/assets';
 import { MODIFY_BOOKING_SHEET, PAYMENT_DETAILS_SHEET } from './sheets';
 import type { ModifyBookingSheetData, PaymentDetailsSheetData } from './sheets';
 
@@ -30,12 +24,6 @@ export interface VisitPrepItem {
   readonly label: string;
 }
 
-export interface VisitPoolCook {
-  readonly key: 'sanchita' | 'jyoti' | 'rekha';
-  readonly name: string;
-  readonly match: string;
-}
-
 export interface VisitRefundLine {
   readonly label: string;
   readonly detail?: string | undefined;
@@ -57,8 +45,9 @@ export const VISIT_FIXTURE = {
   /** `1461:6164` / `1461:6166` — the banner's date and slot. */
   date: 'Wed, 14 Oct',
   slot: '9:00 AM – 10:00 AM · 1 hr',
-  /** `1443:478` — the pending banner's countdown. */
-  daysToGo: '10',
+  /** `2165:13861` — the pending banner's countdown. */
+  daysToGo: '5',
+  toGoLabel: 'HOURS TO GO',
 
   /** `1463:7966` — the assigned cook. */
   cook: {
@@ -81,13 +70,7 @@ export const VISIT_FIXTURE = {
   pending: {
     note: 'We’ll notify you the moment your cook is confirmed',
     eyebrow: 'FROM YOUR COOK POOL',
-    title: 'Cook confirmed by Mon, 8 PM',
-    body: 'We’re picking the best fit for your kitchen from cooks who’ve cooked for you before.',
-    pool: [
-      { key: 'sanchita', name: 'Sanchita', match: '92% match' },
-      { key: 'jyoti', name: 'Jyoti', match: '88% match' },
-      { key: 'rekha', name: 'Rekha', match: '85% match' },
-    ] as readonly VisitPoolCook[],
+    title: 'Cook confirmed by Mon, 8:45 AM',
     cta: 'View Cook Pool',
   },
 
@@ -172,6 +155,8 @@ export interface VisitBannerData {
   readonly slot: string;
   /** Upcoming (cook pending) only. */
   readonly daysToGo?: string | undefined;
+  /** What `daysToGo` counts: "DAYS TO GO" (the default), "HOURS TO GO". */
+  readonly toGoLabel?: string | undefined;
 }
 
 export interface VisitCookData {
@@ -196,19 +181,10 @@ export interface VisitMenuSection {
   readonly dishes: readonly VisitDish[];
 }
 
-export interface VisitPendingCook {
-  readonly id: string;
-  readonly name: string;
-  readonly match?: string | undefined;
-  readonly photo?: ImageSourcePropType | undefined;
-}
-
 export interface VisitPendingData {
   readonly note: string;
   readonly eyebrow: string;
   readonly title: string;
-  readonly body: string;
-  readonly pool: readonly VisitPendingCook[];
   readonly cta: string;
 }
 
@@ -282,12 +258,6 @@ export interface VisitDetailsModel {
   readonly paymentFailed: boolean;
 }
 
-const DEMO_POOL_PHOTOS: Record<VisitPoolCook['key'], ImageSourcePropType> = {
-  sanchita: VISIT_POOL_SANCHITA,
-  jyoti: VISIT_POOL_JYOTI,
-  rekha: VISIT_POOL_REKHA,
-};
-
 /** The frames' own content, per variant (`prepReady` ticks the first N checks, as the frames do). */
 export function visitDemoModel(
   variant: VisitVariant,
@@ -296,7 +266,7 @@ export function visitDemoModel(
   const f = VISIT_FIXTURE;
   return {
     variant,
-    banner: { date: f.date, slot: f.slot, daysToGo: f.daysToGo },
+    banner: { date: f.date, slot: f.slot, daysToGo: f.daysToGo, toGoLabel: f.toGoLabel },
     cook: { ...f.cook, photo: VISIT_COOK_PHOTO },
     menu: f.menu.sections.map((id) => ({
       id,
@@ -307,15 +277,7 @@ export function visitDemoModel(
         image: VISIT_DISH_PHOTO,
       })),
     })),
-    pending: {
-      ...f.pending,
-      pool: f.pending.pool.map((cook) => ({
-        id: cook.key,
-        name: cook.name,
-        match: cook.match,
-        photo: DEMO_POOL_PHOTOS[cook.key],
-      })),
-    },
+    pending: { ...f.pending },
     cancelled: { ...f.cancelled },
     recipe: { ...f.recipe },
     prep: { ...f.prep },

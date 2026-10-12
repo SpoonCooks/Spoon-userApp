@@ -1,7 +1,7 @@
 import type { BookingDetailDto, RefundDto } from '@features/booking';
 
 import { cancelledVisitModelFrom } from './cancelledVisit';
-import { paidTipOf, paymentSheetFrom } from './model';
+import { paidTipOf, paymentSheetFrom, recurringPaymentSheetFrom } from './model';
 
 const START = '2026-10-14T03:30:00.000Z';
 
@@ -101,6 +101,44 @@ describe('Payment details sheet (2257:3939, dev note 2255:3939)', () => {
       ),
     ).toEqual({ amountPaise: 5000, when: 'Paid via UPI · Wed, 14 Oct, 1:22 PM' });
     expect(paidTipOf(booking())).toBeNull();
+  });
+});
+
+describe('Payment details for a Recurring visit’s booking (2165:14262)', () => {
+  it('charges what the booking charged, under the plan’s caption, paid by its UPI Autopay', () => {
+    const plan = paymentSheetFrom(booking(), null);
+    const sheet = recurringPaymentSheetFrom(
+      booking({
+        charges: {
+          extensions: [{ minutes: 20, baseAmountPaise: 5932, chargedAmountPaise: 7000 }],
+          tipAmountPaise: 0,
+        },
+      }),
+      'Cook Sanchita',
+      {
+        ...plan,
+        visitLine: { ...plan.visitLine, caption: 'Recurring · Plan 1, Visit 1' },
+        methodName: 'UPI Autopay',
+        methodDetail: '••••@okhdfcbank · Mandate active',
+        manageLabel: 'Manage',
+        reminder:
+          'Mandate is shared 27 hrs before & payment is auto-debited 3 hrs before the service time.',
+      },
+    );
+    expect(sheet.visitLine).toEqual({
+      label: 'Cook visit · 1 hr',
+      caption: 'Recurring · Plan 1, Visit 1',
+      amount: '₹253.39',
+    });
+    expect(sheet.extraLines).toHaveLength(1);
+    expect(sheet.total).toBe('₹369');
+    expect(sheet).toMatchObject({
+      methodType: 'upi',
+      methodName: 'UPI Autopay',
+      methodDetail: '••••@okhdfcbank · Mandate active',
+      manageLabel: 'Manage',
+    });
+    expect(sheet.reminder).toContain('auto-debited 3 hrs before');
   });
 });
 

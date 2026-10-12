@@ -5,7 +5,14 @@ import type { ImageSourcePropType } from 'react-native';
 import { useExtensionOptions, useTracking } from '@features/booking';
 import type { BookingDetailDto, ExtensionOptionDto } from '@features/booking';
 import { cookProfileFrom, useCookPoolProfile } from '@features/cookPool';
-import { PaymentDetailsSheet, RateVisitCard, ratingRequestFor } from '@features/recurringLive';
+import {
+  PaymentDetailsSheet,
+  RateVisitCard,
+  ratingRequestFor,
+  todayInKolkata,
+  useCancelWholeBooking,
+  visitDetailsFrom,
+} from '@features/recurringLive';
 import type {
   PaymentDetailsSheetData,
   RateVisitSubmission,
@@ -13,7 +20,12 @@ import type {
   VisitMenuSection,
   VisitPrepKey,
 } from '@features/recurringLive';
-import { useBookingPrep, useUpdateBookingPrep } from '@features/recurringSetup';
+import {
+  useBookingPrep,
+  useRecurringBooking,
+  useRecurringVisit,
+  useUpdateBookingPrep,
+} from '@features/recurringSetup';
 
 import { ServiceVisitScreen } from './ServiceVisitScreen';
 import type { ServiceVisitModel } from './ServiceVisitScreen';
@@ -32,6 +44,7 @@ import {
   otpDigits,
   paidTipOf,
   paymentSheetFrom,
+  recurringPaymentSheetFrom,
   servicePhaseOf,
 } from './model';
 import type { ServicePhase } from './model';
@@ -58,6 +71,8 @@ export interface ServiceVisitHostProps {
   readonly onRate: (request: VisitRatingRequest) => Promise<unknown>;
   readonly rating: boolean;
   readonly onBookAnother: () => void;
+  /** A Recurring visit's Payment details → Manage → "View refunds" on the cancellation result. */
+  readonly onViewRefunds?: (() => void) | undefined;
 }
 
 /** "Brief your cook" ticks: optional, per visit, kept for the app session. */
@@ -78,6 +93,7 @@ export function ServiceVisitHost({
   onRate,
   rating,
   onBookAnother,
+  onViewRefunds,
 }: ServiceVisitHostProps) {
   const now = useMinuteClock();
   const live =
@@ -98,6 +114,24 @@ export function ServiceVisitHost({
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [tipPaid, setTipPaid] = useState<ServiceVisitModel['tipPaid']>(null);
   const [rated, setRated] = useState(false);
+
+  // A Recurring visit's booking (Figma `2165:13928` → `2216:6600`): the same screens titled
+  // "Recurring visit", paid by the plan's UPI Autopay — whose "Manage" cancels the whole booking,
+  // as it does on the plan's own Visit details.
+  const link = booking.recurring ?? null;
+  const planVisit = useRecurringVisit(link?.recurringBookingId ?? null, link?.visitId ?? null);
+  const planBooking = useRecurringBooking(link?.recurringBookingId ?? null);
+  const planActive =
+    planBooking.state.status === 'ready' && planBooking.state.data.status === 'active';
+  const wholeBooking = useCancelWholeBooking({
+    bookingId: link?.recurringBookingId ?? null,
+    enabled: planActive,
+    onCancelled: () => {
+      planVisit.refetch();
+      planBooking.refetch();
+    },
+    ...(onViewRefunds === undefined ? {} : { onViewRefunds }),
+  });
 
   const options: readonly ExtensionOptionDto[] =
     extension.state.status === 'ready' ? extension.state.data : [];
@@ -135,7 +169,12 @@ export function ServiceVisitHost({
 
   const model: ServiceVisitModel = {
     phase,
-    title: booking.slotType === 'instant' ? 'Instant visit' : 'On-time visit',
+    title:
+      link !== null
+        ? 'Recurring visit'
+        : booking.slotType === 'instant'
+          ? 'Instant visit'
+          : 'On-time visit',
     bannerTitle:
       start === null
         ? length
@@ -193,7 +232,21 @@ export function ServiceVisitHost({
     canTip: booking.allowedActions.canTip,
   };
 
-  const paymentSheet: PaymentDetailsSheetData = paymentSheetFrom(booking, cookName);
+  const planSheet =
+    planVisit.state.status === 'ready'
+      ? visitDetailsFrom({
+          visit: planVisit.state.data,
+          booking: planBooking.state.status === 'ready' ? planBooking.state.data : null,
+          cookProfile: null,
+          cookCard: null,
+          quote: null,
+          todayId: todayInKolkata(),
+        }).paymentSheet
+      : null;
+  const paymentSheet: PaymentDetailsSheetData =
+    planSheet === null
+      ? paymentSheetFrom(booking, cookName)
+      : recurringPaymentSheetFrom(booking, cookName, planSheet);
 
   const ratingSlot =
     phase === 'completed' && booking.allowedActions.canRate && !rated ? (
@@ -275,7 +328,16 @@ export function ServiceVisitHost({
         visible={paymentOpen}
         data={paymentSheet}
         onClose={() => setPaymentOpen(false)}
+        {...(planActive
+          ? {
+              onManageAutopay: () => {
+                setPaymentOpen(false);
+                wholeBooking.askToCancel();
+              },
+            }
+          : {})}
       />
+      {wholeBooking.sheet}
     </>
   );
 }
