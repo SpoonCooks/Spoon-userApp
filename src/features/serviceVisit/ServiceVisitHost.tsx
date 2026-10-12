@@ -16,6 +16,7 @@ import {
 import type {
   PaymentDetailsSheetData,
   RateVisitSubmission,
+  VisitRatingValue,
   VisitRatingRequest,
   VisitMenuSection,
   VisitPrepKey,
@@ -114,6 +115,9 @@ export function ServiceVisitHost({
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [tipPaid, setTipPaid] = useState<ServiceVisitModel['tipPaid']>(null);
   const [rated, setRated] = useState(false);
+  // The score picked on the rate card; 4 and above warms the tip card (`2165:14445`).
+  const [picked, setPicked] = useState<VisitRatingValue | null>(null);
+  const ratedHigh = picked !== null && (picked === '5+' || picked >= 4);
 
   // A Recurring visit's booking (Figma `2165:13928` → `2216:6600`): the same screens titled
   // "Recurring visit", paid by the plan's UPI Autopay — whose "Manage" cancels the whole booking,
@@ -260,6 +264,7 @@ export function ServiceVisitHost({
           photoUri: photoUrl,
         }}
         submitting={rating}
+        onRatingChange={setPicked}
         onSubmit={(submission: RateVisitSubmission) => {
           void onRate(ratingRequestFor(submission))
             .then(() => setRated(true))
@@ -312,6 +317,7 @@ export function ServiceVisitHost({
         }}
         onBookAnother={onBookAnother}
         ratingSlot={ratingSlot}
+        ratedHigh={ratedHigh}
         tipping={tipping}
         onTip={(amountPaise) => {
           void onTip(amountPaise)

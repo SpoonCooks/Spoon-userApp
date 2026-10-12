@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -110,6 +110,8 @@ export interface RateVisitCardProps {
   /** The preview's drawn feedback states (`2093:*`); a real visit starts empty. */
   readonly initialFeedback?: FeedbackDraft;
   readonly initialFeedbackFocus?: 'voice' | 'write' | null;
+  /** The score as it is picked — the tip card beside it warms up at 4 and above (`2165:14445`). */
+  readonly onRatingChange?: (rating: VisitRatingValue | null) => void;
   /** `1501:6636` — "Later" on the first look. Absent: no "Later" link. */
   readonly onLater?: () => void;
   /**
@@ -131,6 +133,7 @@ export function RateVisitCard({
   onSubmit,
   initialFeedback = EMPTY_FEEDBACK,
   initialFeedbackFocus = null,
+  onRatingChange,
   onLater,
   variant = 'visit',
   testID = 'rate-visit-card',
@@ -170,6 +173,9 @@ export function RateVisitCard({
   };
 
   const tapRef = useRef<StarTap | null>(null);
+  useEffect(() => {
+    onRatingChange?.(rating);
+  }, [onRatingChange, rating]);
 
   const tier = ratingTier(rating);
   const low = LOW_TIERS.includes(tier);

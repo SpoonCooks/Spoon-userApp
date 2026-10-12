@@ -33,6 +33,7 @@ import {
   TipCard,
 } from './components';
 import type { BriefKey } from './components';
+import { MOST_TIPPED_PAISE } from './model';
 import type { ExtendChoice, ServicePhase } from './model';
 
 /**
@@ -93,6 +94,8 @@ export interface ServiceVisitScreenProps {
   readonly onExtend: (minutes: number) => void;
   readonly onBookAnother: () => void;
   readonly ratingSlot?: ReactNode;
+  /** A rating of 4 or more is picked: the tip card opens on the Most tipped amount (`2165:14105`). */
+  readonly ratedHigh?: boolean;
   readonly tipping: boolean;
   readonly onTip: (amountPaise: number) => void;
   readonly testID?: string;
@@ -115,6 +118,7 @@ export function ServiceVisitScreen({
   onExtend,
   onBookAnother,
   ratingSlot,
+  ratedHigh = false,
   tipping,
   onTip,
   testID = 'service-visit',
@@ -303,6 +307,7 @@ export function ServiceVisitScreen({
                 paid={model.tipPaid}
                 paying={tipping}
                 onPay={onTip}
+                suggestedPaise={ratedHigh ? MOST_TIPPED_PAISE : null}
                 testID={`${testID}-tip`}
               />
             ) : null}
