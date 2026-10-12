@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import type { MutableRefObject } from 'react';
 import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -37,7 +36,6 @@ import {
   STICKER_MOTION,
 } from './ratingMotion';
 import { RatingStars } from './RatingStars';
-import type { StarTap } from './RatingStars';
 import { IdleSticker, ScoreSticker } from './ScoreSticker';
 
 /**
@@ -172,14 +170,46 @@ export function RateVisitCard({
     }, SHEET_DISMISS_MS);
   };
 
-  const tapRef = useRef<StarTap | null>(null);
+  /*
+   * The first pick stays on the first look for a moment before the card swaps to its rated layout.
+   * The swap moves the stars up the card, so swapping on the first tap would put a quick second tap
+   * on the same star — the one that fills its second half — on whatever moved under the finger.
+   */
+  const [settled, setSettled] = useState(initialRating !== null);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (settleTimer.current !== null) clearTimeout(settleTimer.current);
+    },
+    [],
+  );
+  const onRate = (value: VisitRatingValue) => {
+    setRating(value);
+    if (settled) return;
+    if (settleTimer.current !== null) {
+      // The second tap of the double tap: settle on it now.
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+      setSettled(true);
+      return;
+    }
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null;
+      setSettled(true);
+    }, FIRST_PICK_SETTLE_MS);
+  };
   useEffect(() => {
     onRatingChange?.(rating);
   }, [onRatingChange, rating]);
 
-  const tier = ratingTier(rating);
+  // The card's look follows the score once it has settled; until then it is still the first look.
+  const tier = settled ? ratingTier(rating) : 'idle';
   const low = LOW_TIERS.includes(tier);
-  const entrance = useTimeline({ durationMs: RATING_TIMELINE_MS, replayKey: rating });
+  // Replays on each new score once the rated layout is up (not while it waits to settle).
+  const entrance = useTimeline({
+    durationMs: RATING_TIMELINE_MS,
+    replayKey: settled ? rating : null,
+  });
 
   return (
     <View style={styles.shadow} testID={testID}>
@@ -269,8 +299,7 @@ export function RateVisitCard({
         {rating === null || tier === 'idle' ? (
           <FirstLook
             rating={rating}
-            onRate={setRating}
-            tapRef={tapRef}
+            onRate={onRate}
             cookName={visit.cookName}
             live={live}
             variant={variant}
@@ -280,8 +309,7 @@ export function RateVisitCard({
           <RatedBody
             tier={tier}
             rating={rating}
-            onRate={setRating}
-            tapRef={tapRef}
+            onRate={onRate}
             picked={low ? negativePicked : positivePicked}
             onTogglePick={(key) => {
               const update = (current: readonly string[]) =>
@@ -340,7 +368,6 @@ export function RateVisitCard({
 function FirstLook({
   rating,
   onRate,
-  tapRef,
   cookName,
   live,
   variant,
@@ -348,7 +375,6 @@ function FirstLook({
 }: {
   readonly rating: VisitRatingValue | null;
   readonly onRate: (value: VisitRatingValue) => void;
-  readonly tapRef: MutableRefObject<StarTap | null>;
   readonly cookName: string;
   readonly live: boolean;
   readonly variant: 'visit' | 'service';
@@ -374,13 +400,7 @@ function FirstLook({
 
       {/* `1501:6660` — stars over the scale captions, 10pt apart. */}
       <View style={styles.idleInput}>
-        <RatingStars
-          value={rating}
-          onChange={onRate}
-          tapRef={tapRef}
-          clock={loop}
-          testID={`${testID}-stars`}
-        />
+        <RatingStars value={rating} onChange={onRate} clock={loop} testID={`${testID}-stars`} />
         <View style={styles.scaleLabels}>
           <Text variant="spoonMicro" color="textSecondarySoft">
             Not great
@@ -418,7 +438,6 @@ interface RatedBodyProps {
   readonly tier: Exclude<RatingTier, 'idle'>;
   readonly rating: VisitRatingValue;
   readonly onRate: (value: VisitRatingValue) => void;
-  readonly tapRef: MutableRefObject<StarTap | null>;
   readonly picked: readonly string[];
   readonly onTogglePick: (key: string) => void;
   readonly avoidCook: boolean;
@@ -440,7 +459,6 @@ function RatedBody({
   tier,
   rating,
   onRate,
-  tapRef,
   picked,
   onTogglePick,
   avoidCook,
@@ -479,13 +497,7 @@ function RatedBody({
       </View>
 
       {/* `1501:6758` — stars, no captions once rated. */}
-      <RatingStars
-        value={rating}
-        onChange={onRate}
-        tapRef={tapRef}
-        clock={clock}
-        testID={`${testID}-stars`}
-      />
+      <RatingStars value={rating} onChange={onRate} clock={clock} testID={`${testID}-stars`} />
 
       {/* `1501:6807` — chips. */}
       <View style={styles.chipsBlock}>
@@ -509,7 +521,9 @@ function RatedBody({
                 testID={`${testID}-chip-${chip.key}`}
               >
                 {on ? <Image source={RATING_ART.check} style={styles.chipCheck} /> : null}
-                <Text variant="spoonCaptionStrong">{chip.label}</Text>
+                <Text variant="spoonCaptionStrong" numberOfLines={1}>
+                  {chip.label}
+                </Text>
               </Pressable>
             );
           })}
@@ -542,10 +556,9 @@ function RatedBody({
             <Image source={RATING_ART.restart} style={styles.icon} />
           </View>
           <View style={styles.supportText}>
-            <Text variant="spoonCaptionStrong" numberOfLines={1}>
-              {RATING_DIFFERENT_COOK.title}
-            </Text>
-            <Text variant="spoonMicro" color="textRatingSubtle" numberOfLines={1}>
+            {/* Wraps rather than truncating on a narrow phone (a 384dp Android leaves ~182pt). */}
+            <Text variant="spoonCaptionStrong">{RATING_DIFFERENT_COOK.title}</Text>
+            <Text variant="spoonMicro" color="textRatingSubtle">
               {RATING_DIFFERENT_COOK.body}
             </Text>
           </View>
@@ -577,6 +590,9 @@ function RatedBody({
 
 /** The source sheet's slide-out (220 ms) and the modal dismissal behind it. */
 const SHEET_DISMISS_MS = 450;
+
+/** How long the first pick waits on the first look for a quick second tap (see `settled`). */
+const FIRST_PICK_SETTLE_MS = 350;
 
 const CARD_RADIUS = 28;
 
@@ -664,6 +680,9 @@ const styles = StyleSheet.create({
   chipsBlock: { alignSelf: 'stretch', gap: lightTheme.space.s10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: lightTheme.space.sm },
   chip: {
+    // Never squeezed to fit what is left of a row: Android then wraps the label inside the pill
+    // and clips it ("Too much oil" → "Too much"). A chip that doesn't fit moves to the next row.
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: lightTheme.space.xs,

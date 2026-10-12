@@ -1,5 +1,3 @@
-import { useRef } from 'react';
-import type { MutableRefObject } from 'react';
 import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@ui';
@@ -26,11 +24,10 @@ import { PLUS_IDLE, PLUS_PICKED, starPops } from './ratingMotion';
  * Motion (`ratingMotion.ts`), on the card's `clock`: on the first look the 5+ button wiggles
  * every loop; once rated the five stars pop in turn, and picking 5+ jolts the button.
  *
- * Input, per the idle caption "Single tap for 0.5. Fast double tap for full star": a tap on star
- * N picks N − 0.5, a second tap on the same star within `DOUBLE_TAP_MS` upgrades it to N.
+ * Input: the first tap on star N fills its first half (N − 0.5); the next tap on the same star —
+ * however much later, until the rating is submitted — fills the second half (N), and another
+ * takes it back to half. A tap on any other star starts that star at its first half.
  */
-
-const DOUBLE_TAP_MS = 300;
 const STAR_SIZE = 42;
 /** `inset-[12.49%_13.87%…]` of a 42pt frame. */
 const STAR_INSET_LEFT = 42 * 0.1387;
@@ -54,37 +51,18 @@ function toRating(score: number): VisitRatingValue {
 export interface RatingStarsProps {
   readonly value: VisitRatingValue | null;
   readonly onChange: (value: VisitRatingValue) => void;
-  /**
-   * The last star tap, owned by the CARD: the first tap swaps the idle layout for the rated one,
-   * which remounts this row, and the double-tap window has to survive that.
-   */
-  readonly tapRef?: MutableRefObject<StarTap | null>;
   /** The first look's loop while idle, the entrance once rated. */
   readonly clock?: Animated.Value | undefined;
   readonly testID: string;
 }
 
-export interface StarTap {
-  readonly index: number;
-  readonly at: number;
-}
-
-export function RatingStars({ value, onChange, tapRef, clock, testID }: RatingStarsProps) {
-  const ownTap = useRef<StarTap | null>(null);
-  const lastTap = tapRef ?? ownTap;
+export function RatingStars({ value, onChange, clock, testID }: RatingStarsProps) {
   const tier = ratingTier(value);
   const low = tier === 'belowPar' || tier === 'disappointing' || tier === 'veryPoor';
 
-  /** `now` is the press event's own timestamp, so the double-tap window is measured on taps. */
-  const onStar = (index: number, now: number) => {
-    const last = lastTap.current;
-    if (last !== null && last.index === index && now - last.at < DOUBLE_TAP_MS) {
-      lastTap.current = null;
-      onChange(toRating(index));
-      return;
-    }
-    lastTap.current = { index, at: now };
-    onChange(toRating(index - 0.5));
+  /** Half, then whole, then half again on the same star; any other star starts at its half. */
+  const onStar = (index: number) => {
+    onChange(toRating(value === index - 0.5 ? index : index - 0.5));
   };
 
   const burst =
@@ -106,7 +84,7 @@ export function RatingStars({ value, onChange, tapRef, clock, testID }: RatingSt
         return (
           <Pressable
             key={index}
-            onPress={(event) => onStar(index, event.nativeEvent.timestamp)}
+            onPress={() => onStar(index)}
             accessibilityRole="radio"
             accessibilityLabel={`${index} star`}
             accessibilityState={{ selected: fill !== 'empty' }}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { RateVisitCard } from './RateVisitCard';
 import type { RateVisitSubmission } from './RateVisitCard';
@@ -61,6 +61,24 @@ describe('Rate card (Figma 1603:50)', () => {
       avoidCook: true,
       feedback: { voice: null, media: [], text: 'Sabzi was a little salty' },
     });
+  });
+
+  it('fills a star’s first half on one tap and its second half on the next, however late', () => {
+    jest.useFakeTimers();
+    const onRatingChange = jest.fn();
+    render(<RateVisitCard live visit={VISIT} onRatingChange={onRatingChange} />);
+    fireEvent.press(screen.getByTestId('rate-visit-card-stars-star-4'));
+    expect(onRatingChange).toHaveBeenLastCalledWith(3.5);
+    // Long after any double-tap window, the same star still takes its second half.
+    act(() => jest.advanceTimersByTime(5_000));
+    fireEvent.press(screen.getByTestId('rate-visit-card-stars-star-4'));
+    expect(onRatingChange).toHaveBeenLastCalledWith(4);
+    // Again: back to half. Another star starts at its own first half.
+    fireEvent.press(screen.getByTestId('rate-visit-card-stars-star-4'));
+    expect(onRatingChange).toHaveBeenLastCalledWith(3.5);
+    fireEvent.press(screen.getByTestId('rate-visit-card-stars-star-2'));
+    expect(onRatingChange).toHaveBeenLastCalledWith(1.5);
+    jest.useRealTimers();
   });
 
   it('offers only Write on a build without the camera, microphone and picker', () => {
