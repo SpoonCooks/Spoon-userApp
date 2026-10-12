@@ -153,10 +153,10 @@ export default function BookingRoute() {
    */
   const detail = useBookingDetail(bookingId === '' ? null : bookingId, { poll: true });
   const booking = detail.state.status === 'ready' ? detail.state.data : null;
-  const phase =
-    booking === null || (booking.reassignment ?? null) !== null
-      ? null
-      : servicePhaseOf(booking, new Date());
+  // The API sends `reassignment` on every booking (`{ occurred: false, … }` when the cook never
+  // changed), so only one that actually happened sends the booking to the established screen.
+  const reassigned = booking?.reassignment?.occurred === true;
+  const phase = booking === null || reassigned ? null : servicePhaseOf(booking, new Date());
 
   /*
    * A Recurring visit's booking (`booking.recurring`) is drawn by the same screens, titled
@@ -239,11 +239,7 @@ export default function BookingRoute() {
    * Cancelled (Figma `2165:11853`, dev note `2226:4224`) — by the customer or by Spoon. The cancel
    * sheet stays mounted so its "Visit cancelled" step can still be read over the screen.
    */
-  if (
-    booking !== null &&
-    booking.status === 'cancelled' &&
-    (booking.reassignment ?? null) === null
-  ) {
+  if (booking !== null && booking.status === 'cancelled' && !reassigned) {
     return (
       <ErrorBoundary scope="booking-host">
         <CancelledVisitHost
