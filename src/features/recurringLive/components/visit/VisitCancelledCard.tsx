@@ -14,11 +14,12 @@ import {
 } from './assets';
 
 /**
- * `Cook details` · Cancelled — Figma `1466:8451` (component `1466:797`).
+ * `Cook details` · Cancelled — Figma `1466:8451` (component `1466:797`); one-time `2165:11853`.
  *
  * White, 1pt `#FFD600` edge, 16pt corners, p 16 / 16 gap: the "Visit cancelled" header on a 48pt
- * `#FFF7CC` well, the snipped thread (`1466:734`: a solid yellow thread, a 24pt ✕ well, a dotted
- * grey one) and "Your plan continues" with its 40pt yellow chevron well.
+ * `#FFF7CC` well and the snipped thread (`1466:734`: a solid yellow thread, a 24pt ✕ well, a
+ * dotted grey one) on every cancelled visit; then, for a Recurring plan only (dev note "Upcoming ·
+ * Cancelled"), "Your plan continues" with its 40pt yellow chevron well.
  */
 export interface VisitCancelledCardProps {
   /** Defaults to the frame's. No next visit leaves out "Your plan continues". */
@@ -50,17 +51,22 @@ export function VisitCancelledCard({
         </View>
       </View>
 
+      {/* `1466:734` — the snipped thread, 28 tall. */}
+      <View
+        style={styles.snip}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+        testID={`${testID}-thread`}
+      >
+        <Image source={VISIT_THREAD_SNIPPED_LEFT} style={styles.threadLeft} />
+        <Image source={VISIT_THREAD_SNIPPED_RIGHT} style={styles.threadRight} />
+        <View style={styles.snipWell}>
+          <Image source={VISIT_CLOSE_14} style={styles.close} />
+        </View>
+      </View>
+
       {cancelled.nextVisit === null ? null : (
         <>
-          {/* `1466:734` — the snipped thread, 28 tall. */}
-          <View style={styles.snip} accessibilityElementsHidden importantForAccessibility="no">
-            <Image source={VISIT_THREAD_SNIPPED_LEFT} style={styles.threadLeft} />
-            <Image source={VISIT_THREAD_SNIPPED_RIGHT} style={styles.threadRight} />
-            <View style={styles.snipWell}>
-              <Image source={VISIT_CLOSE_14} style={styles.close} />
-            </View>
-          </View>
-
           <Pressable
             onPress={onNextVisit}
             accessibilityRole="button"
