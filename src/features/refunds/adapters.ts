@@ -3,14 +3,14 @@ import { formatPaise } from '@core/format';
 import type { CustomerRefundDto, RefundTrackerDto } from './api';
 
 /**
- * The refund tracker as the card draws it (DEC-090, handoff §B).
+ * The refund tracker as the card draws it (DEC-090; handoff Part 1 A, copy in A4).
  *
  * Everything here is the server's `tracker` read into words; nothing is summed or derived from a
- * booking total. The three breakdown versions are the doc's:
+ * booking total. The three breakdown versions are the doc's (A2):
  *
- *   spoon     Spoon cancelled: the whole amount comes back, no fee line.
- *   full      The customer cancelled in a free window: paid, then the same refund.
- *   partial   The customer cancelled late: paid, the fee at its percent, then the refund.
+ *   full      Amount paid, Refund amount.
+ *   partial   Amount paid, Cancellation fee (25% or 50%), Refund amount.
+ *   spoon     Amount paid, "Cancelled by Spoon · No fee", Refund amount.
  *
  * The bank reference is shown only once the refund is completed, labelled by what the bank
  * issued (RRN for UPI, ARN for a card, UTR for netbanking). A failed refund never shows why: the
@@ -24,12 +24,14 @@ export interface RefundBreakdownLine {
   readonly amount: string;
   /** The fee line is subtracted. */
   readonly deducted?: boolean;
+  /** A line with no amount ("Cancelled by Spoon · No fee"). */
+  readonly note?: boolean;
 }
 
 export interface RefundStepView {
   readonly key: 'initiated' | 'processed' | 'completed';
   readonly title: string;
-  /** "10 Oct" once the step has happened; undefined while it is still pending. */
+  /** "8 Oct, 11:00 AM" once the step has happened; undefined while it is still pending. */
   readonly when: string | undefined;
   readonly done: boolean;
 }
@@ -38,9 +40,9 @@ export interface RefundTrackerView {
   readonly refundId: string;
   readonly bookingId: string | null;
   readonly title: string;
-  /** The service the refund belongs to ("Sat, 10 Oct · 1 hr"), else when it was raised. */
+  /** The visit's date and time ("Sat, 10 Oct, 1:00 PM"), else when the refund was raised. */
   readonly date: string;
-  /** "Plan 3 · Visit 4 of 12" for a Recurring visit. */
+  /** "Recurring · Plan 1, visit 1 of 3" for a Recurring visit. */
   readonly recurringLine: string | undefined;
   /** "Cancelled by you" / "Cancelled by Spoon"; absent when the cause is neither. */
   readonly cancelledBy: string | undefined;
@@ -51,7 +53,7 @@ export interface RefundTrackerView {
   readonly statusLabel: string;
   readonly destination: string;
   readonly steps: readonly RefundStepView[];
-  /** "RRN: 664320396937" — only for a completed refund. */
+  /** "RRN: 664320396937" — only for a completed refund with a number; drawn under step 3. */
   readonly reference: string | undefined;
   /** The WhatsApp message a failed refund's "Contact support" opens with. */
   readonly supportMessage: string;
@@ -59,8 +61,8 @@ export interface RefundTrackerView {
 
 const STEP_TITLES: Record<RefundStepView['key'], string> = {
   initiated: 'Refund initiated',
-  processed: 'Processed by Spoon',
-  completed: 'Credited by your bank',
+  processed: 'Refund processed',
+  completed: 'Refund completed',
 };
 
 const STATUS_LABELS: Record<RefundStatus, string> = {
@@ -89,8 +91,15 @@ function formatOn(
   return new Intl.DateTimeFormat('en-IN', options).format(instant);
 }
 
-function dayLabel(timeZone: string | undefined, at: string): string {
-  return formatOn(timeZone, at, { day: 'numeric', month: 'short' });
+/** "8 Oct, 11:00 AM" — a step's date and time (A2). */
+function stepLabel(timeZone: string | undefined, at: string): string {
+  return formatOn(timeZone, at, {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
 }
 
 function durationLabel(minutes: number): string {
@@ -113,8 +122,11 @@ function breakdownOf(
   if (tracker.cause === 'spoon_cancel' && feePaise === 0) {
     return {
       breakdownKind: 'spoon',
-      breakdown: [{ label: 'Amount paid', amount: formatPaise(paidPaise) }],
-      total: { label: 'Full refund', amount: formatPaise(refundPaise) },
+      breakdown: [
+        { label: 'Amount paid', amount: formatPaise(paidPaise) },
+        { label: 'Cancelled by Spoon · No fee', amount: '', note: true },
+      ],
+      total,
     };
   }
   if (feePaise === 0) {
@@ -153,27 +165,30 @@ export function refundTrackerFrom(
   const { timeZone } = options;
   const recurring = tracker.recurring;
 
-  const serviceDate =
+  // A2: the visit's title and date. The title names the visit by its length; the date carries the
+  // start time. A refund with no service on record is dated by when it was raised.
+  const title =
+    refund.durationMinutes === null || refund.durationMinutes === undefined
+      ? 'Cook visit'
+      : `Cook visit · ${durationLabel(refund.durationMinutes)}`;
+  const date =
     refund.serviceStart === null || refund.serviceStart === undefined
-      ? undefined
+      ? `Refund raised ${stepLabel(timeZone, refund.requestedAt)}`
       : formatOn(timeZone, refund.serviceStart, {
           weekday: 'short',
           day: 'numeric',
           month: 'short',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
         });
-  const date =
-    serviceDate === undefined
-      ? `Raised ${dayLabel(timeZone, refund.requestedAt)}`
-      : refund.durationMinutes === null || refund.durationMinutes === undefined
-        ? serviceDate
-        : `${serviceDate} · ${durationLabel(refund.durationMinutes)}`;
 
   const steps = (['initiated', 'processed', 'completed'] as const).map((key) => {
     const at = tracker.steps.find((step) => step.key === key)?.at ?? null;
     return {
       key,
       title: STEP_TITLES[key],
-      when: at === null ? undefined : dayLabel(timeZone, at),
+      when: at === null ? undefined : stepLabel(timeZone, at),
       done: at !== null,
     };
   });
@@ -189,12 +204,12 @@ export function refundTrackerFrom(
   return {
     refundId: refund.refundId,
     bookingId: refund.bookingId,
-    title: recurring === null ? 'Booking refund' : 'Recurring visit refund',
+    title,
     date,
     recurringLine:
       recurring === null
         ? undefined
-        : `Plan ${recurring.planNumber} · Visit ${recurring.visitNumber} of ${recurring.planVisitCount}`,
+        : `Recurring · Plan ${recurring.planNumber}, visit ${recurring.visitNumber} of ${recurring.planVisitCount}`,
     cancelledBy: cancelledByLabel(tracker.cause),
     ...breakdownOf(tracker),
     status: tracker.status,

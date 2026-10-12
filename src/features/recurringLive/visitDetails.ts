@@ -17,7 +17,7 @@ import {
   ratingTier,
   ratingTierCopy,
 } from './data/rating';
-import { REFUND_CREDIT_NOTE, VISIT_FIXTURE } from './data/visit';
+import { VISIT_FIXTURE } from './data/visit';
 import type {
   VisitDetailsModel,
   VisitMenuSection,
@@ -225,12 +225,14 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
     variant === 'cancelled' && cancellation !== null && charged
       ? {
           title: 'Payment & refund',
+          // The tracker's words (handoff A4). This card stands in only until the visit's refund
+          // tracker loads (DEC-090).
           badge:
             cancellation.refundStatus === 'refunded'
-              ? 'Refunded'
+              ? 'Refund completed'
               : cancellation.refundStatus === 'failed'
                 ? 'Refund failed'
-                : 'Processing',
+                : 'Refund in progress',
           lines: [
             {
               label: 'Amount paid',
@@ -251,10 +253,7 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
           ],
           total: {
             label: 'Refund amount',
-            detail:
-              cancellation.feePaise === 0
-                ? 'Full refund, inclusive of taxes'
-                : 'Inclusive of taxes',
+            detail: 'Inclusive of taxes',
             amount: formatPaise(cancellation.refundPaise),
           },
           modeEyebrow: 'REFUND TO',
@@ -267,9 +266,6 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
               title: 'Refund initiated',
               ...(cancelledAt === null ? {} : { when: dayLabel(cancelledAt.dateId) }),
             },
-            ...(cancellation.refundStatus === 'failed'
-              ? []
-              : [{ title: REFUND_CREDIT_NOTE, note: true }]),
           ],
         }
       : null;
