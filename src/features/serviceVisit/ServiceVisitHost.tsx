@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
-import { useExtensionOptions, useTracking } from '@features/booking';
+import { useExtensionOptions, useMyRatingMedia, useTracking } from '@features/booking';
 import type { BookingDetailDto, ExtensionOptionDto } from '@features/booking';
 import { cookProfileFrom, useCookPoolProfile } from '@features/cookPool';
 import {
   PaymentDetailsSheet,
   RateVisitCard,
   ratingRequestFor,
+  submittedFeedbackFrom,
   todayInKolkata,
   useCancelWholeBooking,
   visitDetailsFrom,
@@ -252,17 +253,47 @@ export function ServiceVisitHost({
       ? paymentSheetFrom(booking, cookName)
       : recurringPaymentSheetFrom(booking, cookName, planSheet);
 
+  /*
+   * Rate card (`1517:*`) until it is sent, then `Rate card / Submitted` (`2306:929`) in its place.
+   * Sent here: the same card flips to read-only and keeps what was entered. Sent before (a reopened
+   * visit): it is drawn submitted from the server's copy — the score, chips and words on the
+   * booking, the voice note / photos / video on signed links — once that media has been read, so
+   * the card mounts complete.
+   */
+  const ratedBefore = !rated && (booking.ratingStars ?? null) !== null;
+  const savedMedia = useMyRatingMedia(phase === 'completed' && ratedBefore ? booking.id : null);
+  const visitInfo = {
+    title: cookName === null ? 'Your cook' : `Cook ${firstName(cookName) ?? cookName}`,
+    meta: start === null ? length : `${day(start)} · ${clock(start)} · ${length}`,
+    cookName: firstName(cookName) ?? 'your cook',
+    photoUri: photoUrl,
+  };
   const ratingSlot =
-    phase === 'completed' && booking.allowedActions.canRate && !rated ? (
+    phase !== 'completed' ? undefined : ratedBefore ? (
+      savedMedia.state.status === 'loading' ? undefined : (
+        <RateVisitCard
+          live
+          submitted
+          variant="service"
+          visit={visitInfo}
+          initialRating={
+            booking.ratingExceptional === true ? '5+' : (booking.ratingStars as VisitRatingValue)
+          }
+          initialChips={booking.ratingChips ?? []}
+          initialFeedback={submittedFeedbackFrom({
+            text: booking.ratingFeedback,
+            media: savedMedia.state.status === 'ready' ? savedMedia.state.data.media : [],
+          })}
+          onRatingChange={setPicked}
+          testID="service-visit-rate"
+        />
+      )
+    ) : booking.allowedActions.canRate || rated ? (
       <RateVisitCard
         live
+        submitted={rated}
         variant="service"
-        visit={{
-          title: cookName === null ? 'Your cook' : `Cook ${firstName(cookName) ?? cookName}`,
-          meta: start === null ? length : `${day(start)} · ${clock(start)} · ${length}`,
-          cookName: firstName(cookName) ?? 'your cook',
-          photoUri: photoUrl,
-        }}
+        visit={visitInfo}
         submitting={rating}
         onRatingChange={setPicked}
         onSubmit={(submission: RateVisitSubmission) => {

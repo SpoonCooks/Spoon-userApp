@@ -10,6 +10,8 @@ import {
   galleryVideoProblem,
   hasFeedback,
   photosLeft,
+  placeholderBars,
+  submittedFeedbackFrom,
   videoAllowed,
 } from './model';
 import type { FeedbackDraft } from './model';
@@ -75,5 +77,48 @@ describe('feedback block model (Figma 2093:6050)', () => {
   it('holds each file to the server’s limit: 5 MB a photo, 25 MB the video', () => {
     expect(MAX_MEDIA_BYTES.photo).toBe(5 * 1024 * 1024);
     expect(MAX_MEDIA_BYTES.video).toBe(25 * 1024 * 1024);
+  });
+
+  it('reads a sent rating back: the voice note first, then photos and video, then the words', () => {
+    const draft = submittedFeedbackFrom({
+      text: 'Roti was soft.',
+      media: [
+        {
+          mediaId: 'p1',
+          kind: 'photo',
+          contentType: 'image/jpeg',
+          sizeBytes: 9,
+          durationMs: null,
+          url: 'https://x/p1',
+        },
+        {
+          mediaId: 'v1',
+          kind: 'voice',
+          contentType: 'audio/mp4',
+          sizeBytes: 8,
+          durationMs: 23_000,
+          url: 'https://x/v1',
+        },
+        {
+          mediaId: 'c1',
+          kind: 'video',
+          contentType: 'video/mp4',
+          sizeBytes: 7,
+          durationMs: 9_000,
+          url: 'https://x/c1',
+        },
+      ],
+    });
+    expect(draft.text).toBe('Roti was soft.');
+    expect(draft.voice).toMatchObject({ uri: 'https://x/v1', durationMs: 23_000 });
+    expect(draft.voice?.bars).toHaveLength(WAVE_BAR_COUNT);
+    expect(draft.media.map((item) => `${item.kind}:${item.id}`)).toEqual(['photo:p1', 'video:c1']);
+    expect(submittedFeedbackFrom({ text: null, media: [] })).toEqual(EMPTY_FEEDBACK);
+  });
+
+  it('draws the same waveform for the same note, inside the band', () => {
+    expect(placeholderBars('m-1')).toEqual(placeholderBars('m-1'));
+    expect(placeholderBars('m-1')).not.toEqual(placeholderBars('m-2'));
+    expect(Math.max(...placeholderBars('m-1'))).toBeLessThanOrEqual(WAVE_HEIGHT);
   });
 });

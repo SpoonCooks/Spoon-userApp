@@ -113,6 +113,23 @@ export function foldBars(samples: readonly number[]): readonly number[] {
   return bars;
 }
 
+/**
+ * A waveform for a voice note read back from the server, which keeps the audio but not the bars
+ * drawn while it was recorded. Seeded by the note's id, so the same note draws the same shape
+ * every time it is opened, within the recorded band's range.
+ */
+export function placeholderBars(seed: string): readonly number[] {
+  let state = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    state = Math.imul(state ^ seed.charCodeAt(index), 16777619) >>> 0;
+  }
+  return Array.from({ length: WAVE_BAR_COUNT }, () => {
+    state = Math.imul(state ^ (state >>> 13), 1274126177) >>> 0;
+    const level = (state % 1000) / 1000;
+    return WAVE_MIN + level * (WAVE_HEIGHT - WAVE_MIN);
+  });
+}
+
 /** The draft as the rating sends it: the voice note first, then photos and video as added. */
 export function attachmentsOf(draft: FeedbackDraft): readonly RatingAttachment[] {
   const voice: RatingAttachment[] =
@@ -159,5 +176,48 @@ export function feedbackFixture(
       durationMs: null,
     })),
     text: 'Sabzi was little salty, but overall food was good. Sabzi was little salty, but overall food was good.',
+  };
+}
+
+/** One piece of a submitted rating's media as the server reads it back. */
+export interface SubmittedMediaInput {
+  readonly mediaId: string;
+  readonly kind: 'photo' | 'video' | 'voice';
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly durationMs: number | null;
+  readonly url: string;
+}
+
+/**
+ * A rating the server already holds, as the read-only card draws it: the voice note (its waveform
+ * seeded, since only the audio is kept), the photos and video in the order sent, and the words.
+ */
+export function submittedFeedbackFrom(input: {
+  readonly text: string | null | undefined;
+  readonly media: readonly SubmittedMediaInput[];
+}): FeedbackDraft {
+  const voice = input.media.find((item) => item.kind === 'voice') ?? null;
+  return {
+    text: input.text ?? '',
+    voice:
+      voice === null
+        ? null
+        : {
+            uri: voice.url,
+            durationMs: voice.durationMs ?? 0,
+            sizeBytes: voice.sizeBytes,
+            bars: placeholderBars(voice.mediaId),
+          },
+    media: input.media
+      .filter((item) => item.kind !== 'voice')
+      .map((item) => ({
+        id: item.mediaId,
+        kind: item.kind === 'video' ? ('video' as const) : ('photo' as const),
+        uri: item.url,
+        mimeType: item.contentType,
+        sizeBytes: item.sizeBytes,
+        durationMs: item.durationMs,
+      })),
   };
 }

@@ -20,7 +20,7 @@ import {
 } from '../../data/rating';
 import type { RatingTier, VisitRatingValue } from '../../data/rating';
 import { CONFETTI_ART, RATING_ART } from './assets';
-import { FeedbackBlock } from './feedback/FeedbackBlock';
+import { FeedbackBlock, SubmittedFeedback } from './feedback/FeedbackBlock';
 import { MediaCaptureModal } from './feedback/MediaCaptureModal';
 import type { CaptureMode } from './feedback/MediaCaptureModal';
 import { MediaSourceSheet } from './feedback/MediaSourceSheet';
@@ -75,6 +75,13 @@ import { IdleSticker, ScoreSticker } from './ScoreSticker';
  *
  * The preview draws the frames as drawn. On a real visit (`live`) the card draws the visit's own
  * cook and slot and starts with no chips ticked.
+ *
+ * `submitted` — `Rate card / Submitted` (`2306:929`, dev note beside it): the same card stays in
+ * place, read-only. A lime "Rating submitted" banner leads it; the stars and 5+ take no taps; only
+ * the picked chips show; "Your note to <cook>" plays the voice note, opens the photos and video
+ * full-screen and reads the words, with nothing to add or delete; there is no Submit. The host
+ * flips it on once the rating is sent, keeping what was entered, or mounts it already submitted
+ * from the server's copy (`initialRating`, `initialChips`, `initialFeedback`) on a reopened visit.
  */
 
 export interface RateVisitSubmission {
@@ -118,6 +125,10 @@ export interface RateVisitCardProps {
    * subtitle and scale hint, no "Later", and the 5+ nudge without a fill.
    */
   readonly variant?: 'visit' | 'service';
+  /** The rating has been sent: draw it read-only (`2306:929`). */
+  readonly submitted?: boolean;
+  /** The chips already picked — a reopened, submitted rating's, from the server. */
+  readonly initialChips?: readonly string[];
   readonly testID?: string;
 }
 
@@ -134,14 +145,16 @@ export function RateVisitCard({
   onRatingChange,
   onLater,
   variant = 'visit',
+  submitted = false,
+  initialChips,
   testID = 'rate-visit-card',
 }: RateVisitCardProps) {
   const [rating, setRating] = useState<VisitRatingValue | null>(initialRating);
   const [positivePicked, setPositivePicked] = useState<readonly string[]>(
-    live ? [] : RATING_CHIPS_POSITIVE_PICKED,
+    initialChips ?? (live ? [] : RATING_CHIPS_POSITIVE_PICKED),
   );
   const [negativePicked, setNegativePicked] = useState<readonly string[]>(
-    live ? [] : RATING_CHIPS_NEGATIVE_PICKED,
+    initialChips ?? (live ? [] : RATING_CHIPS_NEGATIVE_PICKED),
   );
   const [avoidCook, setAvoidCook] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackDraft>(initialFeedback);
@@ -266,6 +279,18 @@ export function RateVisitCard({
           </View>
         ) : null}
 
+        {submitted ? (
+          // `2306:1135` — lime banner, 28pt `#CFFF04` well round an 18pt check.
+          <View style={styles.banner} testID={`${testID}-submitted`}>
+            <View style={styles.bannerWell}>
+              <Image source={RATING_ART.check} style={styles.chipCheck} />
+            </View>
+            <Text variant="spoonCaptionStrong" style={styles.bannerText}>
+              Rating submitted · Thanks for the feedback!
+            </Text>
+          </View>
+        ) : null}
+
         {/* `1501:6631` — cook row. */}
         <View style={styles.cook}>
           {live ? (
@@ -285,7 +310,7 @@ export function RateVisitCard({
               {visit.meta}
             </Text>
           </View>
-          {tier === 'idle' && onLater !== undefined ? (
+          {tier === 'idle' && onLater !== undefined && !submitted ? (
             <Pressable
               onPress={onLater}
               accessibilityRole="button"
@@ -332,6 +357,7 @@ export function RateVisitCard({
             cookName={visit.cookName}
             submitting={submitting}
             preparingVideo={preparingVideo}
+            submitted={submitted}
             testID={testID}
           />
         )}
@@ -458,6 +484,8 @@ interface RatedBodyProps {
   readonly submitting: boolean;
   /** An Android gallery video is being compressed: nothing can be sent until it is ready. */
   readonly preparingVideo: boolean;
+  /** Sent: everything reads back, nothing is edited (`2306:929`). */
+  readonly submitted: boolean;
   readonly testID: string;
 }
 
@@ -479,6 +507,7 @@ function RatedBody({
   cookName,
   submitting,
   preparingVideo,
+  submitted,
   testID,
 }: RatedBodyProps) {
   const busy = submitting || preparingVideo;
@@ -498,102 +527,173 @@ function RatedBody({
           </Animated.View>
           <Animated.View style={keyframedStyle(clock, motion.body)}>
             <Text variant="spoonCaption" color="textRatingSubtle">
-              {copy.body}
+              {submitted ? copy.submittedBody : copy.body}
             </Text>
           </Animated.View>
         </View>
       </View>
 
       {/* `1501:6758` — stars, no captions once rated. */}
-      <RatingStars value={rating} onChange={onRate} clock={clock} testID={`${testID}-stars`} />
+      <RatingStars
+        value={rating}
+        {...(submitted ? {} : { onChange: onRate })}
+        clock={clock}
+        testID={`${testID}-stars`}
+      />
 
-      {/* `1501:6807` — chips. */}
-      <View style={styles.chipsBlock}>
-        <Text variant="spoonCaptionStrong" color="textSecondary">
-          {copy.chipsLabel}
-        </Text>
-        <View style={styles.chips}>
-          {chips.map((chip) => {
-            const on = picked.includes(chip.key);
-            return (
-              <Pressable
+      {submitted ? (
+        <SubmittedBody
+          chips={chips.filter((chip) => picked.includes(chip.key))}
+          chipsLabel={copy.chipsLabel.replace(/\?$/, '')}
+          low={low}
+          feedback={feedback}
+          cookName={cookName}
+          testID={testID}
+        />
+      ) : (
+        <>
+          {/* `1501:6807` — chips. */}
+          <View style={styles.chipsBlock}>
+            <Text variant="spoonCaptionStrong" color="textSecondary">
+              {copy.chipsLabel}
+            </Text>
+            <View style={styles.chips}>
+              {chips.map((chip) => {
+                const on = picked.includes(chip.key);
+                return (
+                  <Pressable
+                    key={chip.key}
+                    onPress={() => onTogglePick(chip.key)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on }}
+                    style={[
+                      styles.chip,
+                      on ? styles.chipOn : styles.chipOff,
+                      on && low ? styles.chipOnLow : null,
+                    ]}
+                    testID={`${testID}-chip-${chip.key}`}
+                  >
+                    {on ? <Image source={RATING_ART.check} style={styles.chipCheck} /> : null}
+                    <Text variant="spoonCaptionStrong" numberOfLines={1}>
+                      {chip.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* `2093:6050` — Voice / Media / Write. */}
+          <FeedbackBlock
+            title={copy.feedbackTitle}
+            body={copy.feedbackBody}
+            draft={feedback}
+            onChange={onFeedback}
+            focus={focus}
+            onFocus={onFocus}
+            onOpenMedia={onOpenMedia}
+            disabled={busy}
+            testID={`${testID}-feedback`}
+          />
+
+          {/* `1501:7471` — below 4 only (dev note `2238:930`). */}
+          {copy.differentCook ? (
+            <Pressable
+              onPress={onToggleAvoidCook}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: avoidCook }}
+              style={styles.support}
+              testID={`${testID}-support`}
+            >
+              <View style={styles.supportDisc}>
+                <Image source={RATING_ART.restart} style={styles.icon} />
+              </View>
+              <View style={styles.supportText}>
+                {/* Wraps rather than truncating on a narrow phone (a 384dp Android leaves ~182pt). */}
+                <Text variant="spoonCaptionStrong">{RATING_DIFFERENT_COOK.title}</Text>
+                <Text variant="spoonMicro" color="textRatingSubtle">
+                  {RATING_DIFFERENT_COOK.body}
+                </Text>
+              </View>
+              <Image
+                source={avoidCook ? RATING_ART.toggleOn : RATING_ART.toggleOff}
+                style={styles.toggle}
+              />
+            </Pressable>
+          ) : null}
+
+          {/* `1501:6844` — CTA. */}
+          <Pressable
+            onPress={() =>
+              onSubmit?.({ rating, chips: picked, avoidCook: low && avoidCook, feedback })
+            }
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityState={{ busy, disabled: busy }}
+            style={[
+              styles.submit,
+              tier === 'magic' ? styles.submitLime : null,
+              busy ? styles.submitBusy : null,
+            ]}
+            testID={`${testID}-submit`}
+          >
+            <Text variant="spoonButton">
+              {submitting ? 'Sending…' : preparingVideo ? 'Preparing video…' : copy.submit}
+            </Text>
+          </Pressable>
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * `2306:957` / `2306:980` — what the rating said, read back: only the picked chips (ticked, not
+ * tappable) under the question as a statement ("What stood out"), then "Your note to <cook>".
+ */
+function SubmittedBody({
+  chips,
+  chipsLabel,
+  low,
+  feedback,
+  cookName,
+  testID,
+}: {
+  readonly chips: readonly { readonly key: string; readonly label: string }[];
+  readonly chipsLabel: string;
+  readonly low: boolean;
+  readonly feedback: FeedbackDraft;
+  readonly cookName: string;
+  readonly testID: string;
+}) {
+  return (
+    <>
+      {chips.length === 0 ? null : (
+        <View style={styles.chipsBlock}>
+          <Text variant="spoonCaptionStrong" color="textSecondary">
+            {chipsLabel}
+          </Text>
+          <View style={styles.chips}>
+            {chips.map((chip) => (
+              <View
                 key={chip.key}
-                onPress={() => onTogglePick(chip.key)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: on }}
-                style={[
-                  styles.chip,
-                  on ? styles.chipOn : styles.chipOff,
-                  on && low ? styles.chipOnLow : null,
-                ]}
+                style={[styles.chip, styles.chipOn, low ? styles.chipOnLow : null]}
                 testID={`${testID}-chip-${chip.key}`}
               >
-                {on ? <Image source={RATING_ART.check} style={styles.chipCheck} /> : null}
+                <Image source={RATING_ART.check} style={styles.chipCheck} />
                 <Text variant="spoonCaptionStrong" numberOfLines={1}>
                   {chip.label}
                 </Text>
-              </Pressable>
-            );
-          })}
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
-
-      {/* `2093:6050` — Voice / Media / Write. */}
-      <FeedbackBlock
-        title={copy.feedbackTitle}
-        body={copy.feedbackBody}
+      )}
+      <SubmittedFeedback
+        title={`Your note to ${cookName}`}
         draft={feedback}
-        onChange={onFeedback}
-        focus={focus}
-        onFocus={onFocus}
-        onOpenMedia={onOpenMedia}
-        disabled={busy}
         testID={`${testID}-feedback`}
       />
-
-      {/* `1501:7471` — below 4 only (dev note `2238:930`). */}
-      {copy.differentCook ? (
-        <Pressable
-          onPress={onToggleAvoidCook}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: avoidCook }}
-          style={styles.support}
-          testID={`${testID}-support`}
-        >
-          <View style={styles.supportDisc}>
-            <Image source={RATING_ART.restart} style={styles.icon} />
-          </View>
-          <View style={styles.supportText}>
-            {/* Wraps rather than truncating on a narrow phone (a 384dp Android leaves ~182pt). */}
-            <Text variant="spoonCaptionStrong">{RATING_DIFFERENT_COOK.title}</Text>
-            <Text variant="spoonMicro" color="textRatingSubtle">
-              {RATING_DIFFERENT_COOK.body}
-            </Text>
-          </View>
-          <Image
-            source={avoidCook ? RATING_ART.toggleOn : RATING_ART.toggleOff}
-            style={styles.toggle}
-          />
-        </Pressable>
-      ) : null}
-
-      {/* `1501:6844` — CTA. */}
-      <Pressable
-        onPress={() => onSubmit?.({ rating, chips: picked, avoidCook: low && avoidCook, feedback })}
-        disabled={busy}
-        accessibilityRole="button"
-        accessibilityState={{ busy, disabled: busy }}
-        style={[
-          styles.submit,
-          tier === 'magic' ? styles.submitLime : null,
-          busy ? styles.submitBusy : null,
-        ]}
-        testID={`${testID}-submit`}
-      >
-        <Text variant="spoonButton">
-          {submitting ? 'Sending…' : preparingVideo ? 'Preparing video…' : copy.submit}
-        </Text>
-      </Pressable>
     </>
   );
 }
@@ -641,6 +741,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: lightTheme.space.md,
   },
+  /** `2306:1135` — `#ECFF9B`, r14, pl10 / pr14 / py10, 10pt gap. */
+  banner: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: lightTheme.space.s10,
+    paddingLeft: lightTheme.space.s10,
+    paddingRight: 14,
+    paddingVertical: lightTheme.space.s10,
+    borderRadius: 14,
+    backgroundColor: lightTheme.colors.surfaceRatingNudge,
+  },
+  bannerWell: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: lightTheme.colors.surfaceRatingLime,
+  },
+  /** `2306:1139` — Livvic SemiBold 13. */
+  bannerText: { flex: 1, fontSize: 13, lineHeight: 16 },
   cookPhoto: { width: 44, height: 44 },
   /** A real cook's photo in the frame's 44pt ring (`1501:6632`). */
   cookPhotoLive: {

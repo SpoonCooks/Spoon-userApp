@@ -323,6 +323,26 @@ export const ratingMediaUploadSchema = z.object({
 
 export type RatingMediaUploadDto = z.infer<typeof ratingMediaUploadSchema>;
 
+/**
+ * `GET /v1/bookings/:id/rating/media` — the customer's own voice note, photos and video on their
+ * rating, each on a signed link that lasts about ten minutes. Empty when unrated, and after 180
+ * days. Read back so a reopened visit redraws its submitted rate card.
+ */
+export const myRatingMediaSchema = z.object({
+  media: z.array(
+    z.object({
+      mediaId: z.string(),
+      kind: ratingMediaKindSchema,
+      contentType: z.string(),
+      sizeBytes: z.number(),
+      durationMs: z.number().nullable(),
+      url: z.string().url(),
+    }),
+  ),
+});
+
+export type MyRatingMediaDto = z.infer<typeof myRatingMediaSchema>;
+
 export const bookingReassignmentSchema = z.object({
   /** True when the current assignment replaced an earlier cook assignment. */
   occurred: z.boolean(),
@@ -427,6 +447,8 @@ export const bookingDetailSchema = z.object({
   ratingStars: z.number().nullish(),
   ratingExceptional: z.boolean().nullish(),
   ratingFeedback: z.string().nullish(),
+  /** The rate card's chips the customer picked (keys). Absent from an older API. */
+  ratingChips: z.array(z.string()).nullish(),
   address: bookingAddressSchema,
   mealNotes: z.string().nullable(),
   referenceUrl: z.string().nullable(),
