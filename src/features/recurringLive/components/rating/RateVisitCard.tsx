@@ -148,6 +148,7 @@ export function RateVisitCard({
   const [focus, setFocus] = useState<'voice' | 'write' | null>(initialFeedbackFocus);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [capture, setCapture] = useState<CaptureMode | null>(null);
+  const [preparingVideo, setPreparingVideo] = useState(false);
 
   // What this build can capture: a build from before rating media has none of these modules, and
   // the card then offers only words.
@@ -163,7 +164,9 @@ export function RateVisitCard({
     // closing before the camera screen or the system picker comes up.
     setTimeout(() => {
       if (source === 'gallery') {
-        void pickFromGallery(photosLeft(feedback), videoAllowed(feedback)).then(addMedia);
+        void pickFromGallery(photosLeft(feedback), videoAllowed(feedback), setPreparingVideo).then(
+          addMedia,
+        );
       } else {
         setCapture(source);
       }
@@ -328,6 +331,7 @@ export function RateVisitCard({
             clock={entrance}
             cookName={visit.cookName}
             submitting={submitting}
+            preparingVideo={preparingVideo}
             testID={testID}
           />
         )}
@@ -452,6 +456,8 @@ interface RatedBodyProps {
   readonly clock: Animated.Value;
   readonly cookName: string;
   readonly submitting: boolean;
+  /** An Android gallery video is being compressed: nothing can be sent until it is ready. */
+  readonly preparingVideo: boolean;
   readonly testID: string;
 }
 
@@ -472,8 +478,10 @@ function RatedBody({
   clock,
   cookName,
   submitting,
+  preparingVideo,
   testID,
 }: RatedBodyProps) {
+  const busy = submitting || preparingVideo;
   const motion = STICKER_MOTION[tier];
   const copy = ratingTierCopy(cookName)[tier];
   const low = LOW_TIERS.includes(tier);
@@ -539,7 +547,7 @@ function RatedBody({
         focus={focus}
         onFocus={onFocus}
         onOpenMedia={onOpenMedia}
-        disabled={submitting}
+        disabled={busy}
         testID={`${testID}-feedback`}
       />
 
@@ -572,17 +580,19 @@ function RatedBody({
       {/* `1501:6844` — CTA. */}
       <Pressable
         onPress={() => onSubmit?.({ rating, chips: picked, avoidCook: low && avoidCook, feedback })}
-        disabled={submitting}
+        disabled={busy}
         accessibilityRole="button"
-        accessibilityState={{ busy: submitting, disabled: submitting }}
+        accessibilityState={{ busy, disabled: busy }}
         style={[
           styles.submit,
           tier === 'magic' ? styles.submitLime : null,
-          submitting ? styles.submitBusy : null,
+          busy ? styles.submitBusy : null,
         ]}
         testID={`${testID}-submit`}
       >
-        <Text variant="spoonButton">{submitting ? 'Sending…' : copy.submit}</Text>
+        <Text variant="spoonButton">
+          {submitting ? 'Sending…' : preparingVideo ? 'Preparing video…' : copy.submit}
+        </Text>
       </Pressable>
     </>
   );

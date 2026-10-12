@@ -11,7 +11,8 @@ export type MediaSource = 'photo' | 'video' | 'gallery';
 
 /**
  * M1 · "Add photos & videos" — Figma `1796:3298`. Opened from the feedback block's Media tile:
- * Title 20/28 with a 32pt `#FFF7CC` close well, the 500 MB note, then three `Media option`s
+ * Title 20/28 with a 32pt `#FFF7CC` close well, the 30-second note (Figma's 500 MB line, made
+ * true to the server's limits), then three `Media option`s
  * (`2036:16003`) — a 56pt `#FFE666` well over a Caption Strong label, 12 apart, each a third.
  *
  * An option the rating has no room for (five photos, or a video already) is drawn dimmed and does
@@ -57,7 +58,7 @@ export function MediaSourceSheet({
           </Pressable>
         </View>
         <Text variant="spoonCaption" color="textSecondarySoft">
-          Maximum size for media is 500 MB
+          Videos up to 30 seconds
         </Text>
       </View>
       <View style={styles.options}>
