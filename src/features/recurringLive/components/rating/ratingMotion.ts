@@ -313,13 +313,6 @@ export const STICKER_MOTION: Record<RatedTier, StickerMotion> = {
   veryPoor: blob(0.12, 0.07),
 };
 
-/** `1501:7456` … — on a low score the mic pulses as the card settles. */
-export const MIC_PULSE: Track = [
-  [80, 1, 'out'],
-  [90, 1.12, 'spring'],
-  [100, 0.999],
-];
-
 // ─── 5+ confetti (`1501:6849`) ─────────────────────────────────────────────────────────────────
 
 export interface ConfettiPiece {

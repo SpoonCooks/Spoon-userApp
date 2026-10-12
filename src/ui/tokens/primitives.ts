@@ -60,8 +60,6 @@ export const palette = {
   /** `#FFF7CC` at 0 % / 90 % — the Visit details scroll cue's wash (`1463:7967`). */
   yellow200Clear: 'rgba(255,247,204,0)',
   yellow200Veil: 'rgba(255,247,204,0.9)',
-  /** `#FFD600` at 35 % — the recorder Stop button's outer ring (`1501:7261`). */
-  yellow500Ring: 'rgba(255,214,0,0.35)',
   /** `1005:183` — the flat legend / meta grey. */
   grey42: '#6B6B6B',
   /** `848:7802` — a dish card's name. */
@@ -80,13 +78,6 @@ export const palette = {
   linen: '#F3F0E8',
   /** `1006:323` — the date pop-up's warm shadow, `#998000` at 18 %. */
   ochreShadow: 'rgba(153,128,0,0.18)',
-  /** `1501:7308` / `1501:7313` / `1501:7318` — the feedback sheet's placeholder thumbnail washes. */
-  thumbAmberTop: '#F7C873',
-  thumbAmberBottom: '#D9822B',
-  thumbGreenTop: '#BFE38A',
-  thumbGreenBottom: '#5E9C3A',
-  thumbVideoTop: '#5A4632',
-  thumbVideoBottom: '#1E1710',
 
   // Neutrals — color/grey/*
   grey100: '#F3F4F6',

@@ -3,6 +3,8 @@ import type { MutableRefObject } from 'react';
 import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { loadExpoCamera, loadExpoImagePicker } from '@core/native';
+import { canUploadRatingMedia } from '@features/booking';
 import { Text } from '@ui';
 import { keyframedStyle, useTimeline } from '@ui/motion/keyframes';
 import { lightTheme } from '@ui/theme/ThemeProvider';
@@ -12,19 +14,24 @@ import {
   RATING_CHIPS_NEGATIVE_PICKED,
   RATING_CHIPS_POSITIVE,
   RATING_CHIPS_POSITIVE_PICKED,
-  RATING_SAY_MORE_WRITTEN,
-  RATING_SUBMIT_CALL_BACK,
+  RATING_DIFFERENT_COOK,
   RATING_VISIT_FIXTURE,
   ratingTier,
   ratingTierCopy,
 } from '../../data/rating';
-import type { RatingSupportKind, RatingTier, VisitRatingValue } from '../../data/rating';
-import { VISIT_EDIT } from '../visit/assets';
+import type { RatingTier, VisitRatingValue } from '../../data/rating';
 import { CONFETTI_ART, RATING_ART } from './assets';
+import { FeedbackBlock } from './feedback/FeedbackBlock';
+import { MediaCaptureModal } from './feedback/MediaCaptureModal';
+import type { CaptureMode } from './feedback/MediaCaptureModal';
+import { MediaSourceSheet } from './feedback/MediaSourceSheet';
+import type { MediaSource } from './feedback/MediaSourceSheet';
+import { EMPTY_FEEDBACK, photosLeft, videoAllowed } from './feedback/model';
+import type { FeedbackDraft, FeedbackMediaItem } from './feedback/model';
+import { pickFromGallery } from './feedback/pickFromGallery';
 import {
   CONFETTI,
   IDLE_RING_TURN_MS,
-  MIC_PULSE,
   NUDGE_SPARKLE,
   RATING_TIMELINE_MS,
   STICKER_MOTION,
@@ -34,52 +41,52 @@ import type { StarTap } from './RatingStars';
 import { IdleSticker, ScoreSticker } from './ScoreSticker';
 
 /**
- * Rate card — Figma `cCQlzTeiObQkpVBzwI8mZi` page `1005:131`, components `Rate card / *`
- * (`1517:9293` … `1517:9303`). One self-contained card; the Visit details · Completed screen
- * drops it into its `ratingSlot`.
+ * Rate card — Figma "Ratings" page `1603:50`, components `Rate card / *` (`1517:9293` Idle,
+ * `1517:9295` Rated, `1517:9297` 5+, `1517:9301` Poor; dev notes `2238:908` … `2238:935`). One
+ * self-contained card; the Visit details · Completed screens drop it into their rating slot.
  *
  * Every drawn state is the SAME card at a different picked score, held as local UI state:
- *   null       `1501:6628` first look — 112pt "?" sticker, empty stars, scale captions, lime nudge
- *   4 – 5      `1501:6696` "Loved it!" — scallop, "What stood out?" chips, Tap to talk, Submit
- *   5+         `1501:6846` "Off the charts!" — lime wash + confetti, lime "Send 5+ to Rekha"
- *   3 – 3.5    `1501:7335` "Not quite there" — blob, "What fell short?", different-cook toggle
- *   2 – 2.5    `1501:7481` "That's disappointing" — call-back toggle ON, "Submit & request call back"
- *   1 – 1.5    `1501:7630` "That's not okay" — as 2–2.5
+ *   null       Idle — 112pt "?" sticker, empty stars, scale captions, lime 5+ nudge
+ *   4 – 5      Rated "Loved it!" — scallop, "What stood out?" chips, the feedback block, Submit
+ *   5+         "Off the charts!" — lime wash + confetti, "What made it amazing?", lime Submit
+ *   below 4    Poor "We're so sorry" — "What went wrong?", "Show us what went wrong", and
+ *              "Prefer a different cook next time?" (ON excludes the cook from future matching)
+ * Changing the score swaps badge, headline, subtext and chips in place; picks reset with the band.
+ *
+ * The feedback block (`2093:6050`, `FeedbackBlock`) records a voice note, takes photos and a video
+ * through "Add photos & videos" (M1) and the camera (M3 – M5) or the gallery, and holds a written
+ * note. Nothing uploads until Submit: `onSubmit` hands up the score, chips, the different-cook
+ * answer and the draft, and the caller uploads the media and sends the rating.
  *
  * Geometry, verbatim:
  *   card     370 wide in the frames (stretches to its slot here), r28, `0 8 24 rgba(0,0,0,0.08)`,
- *            p20 (idle: pt20 / pb24), 20pt between blocks; 5+ washes `#ECFF9B` → white by 55 %,
- *            1–3.5 wash `#F3F0E8` → white by 40 %
+ *            p20 (idle: pt20 / pb24), 20pt between blocks; 5+ washes `#ECFF9B` → white by 34 %,
+ *            below 4 `#F3F0E8` → white by 40 %
  *   cook     44pt photo, 12pt gap, SemiBold 14/20 over Caption 12/16 at 55 %, 2pt apart
  *   hero     idle: centred column, 12pt gap; rated: 96pt sticker, 16pt gap, Display 24/32 over
  *            Caption at 55 %, 4pt apart
  *   chips    label SemiBold 12/16 at 70 %, 10pt below it a wrap at 8pt; ticked chips pl10 / pr14
  *            / py8 with a 1.5pt edge (`#FFD600`, or black 25 % on a low score) on `#FFF7CC` with an
  *            18pt check 4pt from the label; unticked px14 / py8, 1pt black 25 % on white
- *   say more p8 (1–1.5: pr12), r24, 8pt gap; `#FFF7CC` (black 3 % on a low score); 44pt yellow mic
- *            disc, Body Strong over Micro at 55 %, two 40pt white discs (camera, video)
  *   support  pl12 / pr14 / py12, r18, 12pt gap; 36pt white disc, Caption Strong over Micro, 44 × 26
  *            toggle
  *   CTA      52 tall, r26, `#FFD600` (5+: `#CFFF04`), Spoon/Button
- *
- * Frame 6 (`1501:7575`) draws BOTH "What went wrong?" and, nested under it, a second "What fell
- * short?" label — a leftover from copying frame 5's block. Frame 7 draws only the first, so the
- * card draws only "What went wrong?" on 1–2.5.
  *
  * Motion follows Figma's 2 s timelines (`ratingMotion.ts`): the first look loops; a picked score
  * plays its entrance once, again on every new pick. Reduce Motion rests each on its final frame.
  *
  * The preview draws the frames as drawn. On a real visit (`live`) the card draws the visit's own
- * cook and slot, starts with no chips ticked, and offers only what the rating endpoint takes —
- * stars, the 5+ appreciation and words: the say-more row becomes "Add a note" (the written half of
- * "Tell us more"), and the call-back / different-cook toggles are left out until something acts
- * on them. `onSubmit` hands the picks up; the caller sends them.
+ * cook and slot and starts with no chips ticked.
  */
 
 export interface RateVisitSubmission {
   readonly rating: VisitRatingValue;
+  /** Chip keys, as picked under the band's question. */
   readonly chips: readonly string[];
-  readonly support?: { readonly kind: RatingSupportKind; readonly on: boolean };
+  /** "Prefer a different cook next time?" — only ever true below 4. */
+  readonly avoidCook: boolean;
+  /** What the Voice / Media / Write block holds: a voice note, photos, a video, words. */
+  readonly feedback: FeedbackDraft;
 }
 
 /** The visit being rated: the header row and the cook named in the copy. */
@@ -99,11 +106,10 @@ export interface RateVisitCardProps {
   readonly live?: boolean;
   /** Whether the submit is on its way: the CTA reads "Sending…" and takes no taps. */
   readonly submitting?: boolean;
-  /** A real visit's note has been written; the note row says so. */
-  readonly noteAdded?: boolean;
   readonly onSubmit?: (submission: RateVisitSubmission) => void;
-  /** The say-more row — mic, camera or video — opens "Tell us more". */
-  readonly onTellUsMore?: () => void;
+  /** The preview's drawn feedback states (`2093:*`); a real visit starts empty. */
+  readonly initialFeedback?: FeedbackDraft;
+  readonly initialFeedbackFocus?: 'voice' | 'write' | null;
   /** `1501:6636` — "Later" on the first look. Absent: no "Later" link. */
   readonly onLater?: () => void;
   /**
@@ -122,9 +128,9 @@ export function RateVisitCard({
   visit = RATING_VISIT_FIXTURE,
   live = false,
   submitting = false,
-  noteAdded = false,
   onSubmit,
-  onTellUsMore,
+  initialFeedback = EMPTY_FEEDBACK,
+  initialFeedbackFocus = null,
   onLater,
   variant = 'visit',
   testID = 'rate-visit-card',
@@ -136,7 +142,28 @@ export function RateVisitCard({
   const [negativePicked, setNegativePicked] = useState<readonly string[]>(
     live ? [] : RATING_CHIPS_NEGATIVE_PICKED,
   );
-  const [supportOn, setSupportOn] = useState<Partial<Record<RatingSupportKind, boolean>>>({});
+  const [avoidCook, setAvoidCook] = useState(false);
+  const [feedback, setFeedback] = useState<FeedbackDraft>(initialFeedback);
+  const [focus, setFocus] = useState<'voice' | 'write' | null>(initialFeedbackFocus);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const [capture, setCapture] = useState<CaptureMode | null>(null);
+
+  // What this build can capture: a build from before rating media has none of these modules, and
+  // the card then offers only words.
+  const cameraModule = canUploadRatingMedia() ? loadExpoCamera() : null;
+  const galleryAvailable = canUploadRatingMedia() && loadExpoImagePicker() !== null;
+  const mediaAvailable = cameraModule !== null || galleryAvailable;
+
+  const addMedia = (items: readonly FeedbackMediaItem[]) =>
+    setFeedback((current) => ({ ...current, media: [...current.media, ...items] }));
+  const onPickSource = (source: MediaSource) => {
+    setSourceOpen(false);
+    if (source === 'gallery') {
+      void pickFromGallery(photosLeft(feedback), videoAllowed(feedback)).then(addMedia);
+    } else {
+      setCapture(source);
+    }
+  };
 
   const tapRef = useRef<StarTap | null>(null);
 
@@ -154,7 +181,7 @@ export function RateVisitCard({
               lightTheme.colors.surface,
               lightTheme.colors.surface,
             ]}
-            locations={[0, 0.55, 1]}
+            locations={[0, 0.34, 1]}
             style={StyleSheet.absoluteFill}
           />
         ) : null}
@@ -252,21 +279,46 @@ export function RateVisitCard({
               if (low) setNegativePicked(update);
               else setPositivePicked(update);
             }}
-            supportOn={supportOn}
-            onToggleSupport={(kind, initial) =>
-              setSupportOn((current) => ({ ...current, [kind]: !(current[kind] ?? initial) }))
-            }
-            onTellUsMore={onTellUsMore}
+            avoidCook={avoidCook}
+            onToggleAvoidCook={() => setAvoidCook((current) => !current)}
+            feedback={feedback}
+            onFeedback={setFeedback}
+            focus={focus}
+            onFocus={setFocus}
+            onOpenMedia={mediaAvailable ? () => setSourceOpen(true) : undefined}
             onSubmit={onSubmit}
             clock={entrance}
             cookName={visit.cookName}
-            live={live}
             submitting={submitting}
-            noteAdded={noteAdded}
             testID={testID}
           />
         )}
       </View>
+      <MediaSourceSheet
+        visible={sourceOpen}
+        onClose={() => setSourceOpen(false)}
+        onPick={onPickSource}
+        canPhoto={photosLeft(feedback) > 0}
+        canVideo={videoAllowed(feedback)}
+        cameraAvailable={cameraModule !== null}
+        galleryAvailable={galleryAvailable}
+        testID={`${testID}-media-source`}
+      />
+      {capture === null || cameraModule === null ? null : (
+        <MediaCaptureModal
+          camera={cameraModule}
+          visible
+          initialMode={capture}
+          canPhoto={photosLeft(feedback) > 0}
+          canVideo={videoAllowed(feedback)}
+          onUse={(item) => {
+            addMedia([item]);
+            setCapture(null);
+          }}
+          onClose={() => setCapture(null)}
+          testID={`${testID}-capture`}
+        />
+      )}
     </View>
   );
 }
@@ -301,7 +353,7 @@ function FirstLook({
       <View style={styles.idleHero}>
         <IdleSticker clock={loop} spin={spin} testID={`${testID}-sticker`} />
         <Text variant="spoonTitle" align="center">
-          {service ? 'How was the service today?' : 'How was the food today?'}
+          How was the service today?
         </Text>
         <Text variant="spoonCaption" color="textRatingSubtle" align="center">
           {service
@@ -324,9 +376,7 @@ function FirstLook({
             Not great
           </Text>
           <Text variant="spoonMicro" color="textSecondarySoft">
-            {service
-              ? 'Single tap for half star. Double tap for full star'
-              : 'Single tap for 0.5. Fast double tap for full star'}
+            Single tap for half star. Double tap for full star
           </Text>
           <Text variant="spoonMicroStrong" color="textSecondarySoft">
             Amazing!
@@ -361,16 +411,18 @@ interface RatedBodyProps {
   readonly tapRef: MutableRefObject<StarTap | null>;
   readonly picked: readonly string[];
   readonly onTogglePick: (key: string) => void;
-  readonly supportOn: Partial<Record<RatingSupportKind, boolean>>;
-  readonly onToggleSupport: (kind: RatingSupportKind, initial: boolean) => void;
-  readonly onTellUsMore?: (() => void) | undefined;
+  readonly avoidCook: boolean;
+  readonly onToggleAvoidCook: () => void;
+  readonly feedback: FeedbackDraft;
+  readonly onFeedback: (feedback: FeedbackDraft) => void;
+  readonly focus: 'voice' | 'write' | null;
+  readonly onFocus: (focus: 'voice' | 'write' | null) => void;
+  readonly onOpenMedia: (() => void) | undefined;
   readonly onSubmit?: ((submission: RateVisitSubmission) => void) | undefined;
   /** The entrance, played on each new score. */
   readonly clock: Animated.Value;
   readonly cookName: string;
-  readonly live: boolean;
   readonly submitting: boolean;
-  readonly noteAdded: boolean;
   readonly testID: string;
 }
 
@@ -381,32 +433,23 @@ function RatedBody({
   tapRef,
   picked,
   onTogglePick,
-  supportOn,
-  onToggleSupport,
-  onTellUsMore,
+  avoidCook,
+  onToggleAvoidCook,
+  feedback,
+  onFeedback,
+  focus,
+  onFocus,
+  onOpenMedia,
   onSubmit,
   clock,
   cookName,
-  live,
   submitting,
-  noteAdded,
   testID,
 }: RatedBodyProps) {
   const motion = STICKER_MOTION[tier];
-  const tierCopy = ratingTierCopy(cookName)[tier];
-  const copy = live
-    ? {
-        ...tierCopy,
-        ...RATING_SAY_MORE_WRITTEN,
-        ...(noteAdded ? { sayMoreBody: 'Note added · tap to edit' } : {}),
-      }
-    : tierCopy;
+  const copy = ratingTierCopy(cookName)[tier];
   const low = LOW_TIERS.includes(tier);
   const chips = low ? RATING_CHIPS_NEGATIVE : RATING_CHIPS_POSITIVE;
-  const support = live ? undefined : copy.support;
-  const supportActive = support ? (supportOn[support.kind] ?? support.initiallyOn) : false;
-  const submitLabel =
-    support?.kind === 'callBack' && supportActive ? RATING_SUBMIT_CALL_BACK : copy.submit;
 
   return (
     <>
@@ -463,68 +506,41 @@ function RatedBody({
         </View>
       </View>
 
-      {/* `1501:6828` — say more. */}
-      <Pressable
-        onPress={onTellUsMore}
-        accessibilityRole="button"
-        accessibilityLabel={copy.sayMoreTitle}
-        style={[
-          styles.sayMore,
-          low ? styles.sayMoreLow : null,
-          tier === 'veryPoor' ? styles.sayMoreWide : null,
-        ]}
-        testID={`${testID}-say-more`}
-      >
-        <Animated.View
-          style={[styles.micDisc, low ? keyframedStyle(clock, { scale: MIC_PULSE }) : null]}
-        >
-          <Image source={live ? VISIT_EDIT : RATING_ART.mic} style={styles.icon} />
-        </Animated.View>
-        <View style={styles.sayMoreText}>
-          <Text variant="spoonBodyStrong" numberOfLines={1}>
-            {copy.sayMoreTitle}
-          </Text>
-          <Text variant="spoonMicro" color="textRatingSubtle" numberOfLines={1}>
-            {copy.sayMoreBody}
-          </Text>
-        </View>
-        {live ? null : (
-          <>
-            <View style={styles.mediaDisc}>
-              <Image source={RATING_ART.camera} style={styles.icon} />
-            </View>
-            <View style={styles.mediaDisc}>
-              <Image source={RATING_ART.video} style={styles.icon} />
-            </View>
-          </>
-        )}
-      </Pressable>
+      {/* `2093:6050` — Voice / Media / Write. */}
+      <FeedbackBlock
+        title={copy.feedbackTitle}
+        body={copy.feedbackBody}
+        draft={feedback}
+        onChange={onFeedback}
+        focus={focus}
+        onFocus={onFocus}
+        onOpenMedia={onOpenMedia}
+        disabled={submitting}
+        testID={`${testID}-feedback`}
+      />
 
-      {/* `1501:7471` / `1501:7619` — low-score support toggle. */}
-      {support ? (
+      {/* `1501:7471` — below 4 only (dev note `2238:930`). */}
+      {copy.differentCook ? (
         <Pressable
-          onPress={() => onToggleSupport(support.kind, support.initiallyOn)}
+          onPress={onToggleAvoidCook}
           accessibilityRole="switch"
-          accessibilityState={{ checked: supportActive }}
+          accessibilityState={{ checked: avoidCook }}
           style={styles.support}
           testID={`${testID}-support`}
         >
           <View style={styles.supportDisc}>
-            <Image
-              source={support.kind === 'callBack' ? RATING_ART.phone : RATING_ART.restart}
-              style={styles.icon}
-            />
+            <Image source={RATING_ART.restart} style={styles.icon} />
           </View>
           <View style={styles.supportText}>
             <Text variant="spoonCaptionStrong" numberOfLines={1}>
-              {support.title}
+              {RATING_DIFFERENT_COOK.title}
             </Text>
             <Text variant="spoonMicro" color="textRatingSubtle" numberOfLines={1}>
-              {support.body}
+              {RATING_DIFFERENT_COOK.body}
             </Text>
           </View>
           <Image
-            source={supportActive ? RATING_ART.toggleOn : RATING_ART.toggleOff}
+            source={avoidCook ? RATING_ART.toggleOn : RATING_ART.toggleOff}
             style={styles.toggle}
           />
         </Pressable>
@@ -532,13 +548,7 @@ function RatedBody({
 
       {/* `1501:6844` — CTA. */}
       <Pressable
-        onPress={() =>
-          onSubmit?.(
-            support
-              ? { rating, chips: picked, support: { kind: support.kind, on: supportActive } }
-              : { rating, chips: picked },
-          )
-        }
+        onPress={() => onSubmit?.({ rating, chips: picked, avoidCook: low && avoidCook, feedback })}
         disabled={submitting}
         accessibilityRole="button"
         accessibilityState={{ busy: submitting, disabled: submitting }}
@@ -549,7 +559,7 @@ function RatedBody({
         ]}
         testID={`${testID}-submit`}
       >
-        <Text variant="spoonButton">{submitting ? 'Sending…' : submitLabel}</Text>
+        <Text variant="spoonButton">{submitting ? 'Sending…' : copy.submit}</Text>
       </Pressable>
     </>
   );
@@ -668,37 +678,6 @@ const styles = StyleSheet.create({
     backgroundColor: lightTheme.colors.surface,
   },
   chipCheck: { width: 18, height: 18 },
-  /** `1501:6828` — p8, r24, 8pt gap on `#FFF7CC`. */
-  sayMore: {
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: lightTheme.space.sm,
-    padding: lightTheme.space.sm,
-    borderRadius: lightTheme.radius.lg,
-    backgroundColor: lightTheme.colors.surfaceAccent,
-  },
-  /** `1501:7448` — black 3 % on a low score. */
-  sayMoreLow: { backgroundColor: lightTheme.colors.surfaceRatingQuiet },
-  /** `1501:7742` — 1–1.5 pads 12 on the right. */
-  sayMoreWide: { paddingRight: lightTheme.space.md },
-  micDisc: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: lightTheme.colors.surfaceCta,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sayMoreText: { flex: 1, gap: lightTheme.space.xxs },
-  mediaDisc: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: lightTheme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   icon: { width: 24, height: 24 },
   /** `1501:7471` — pl12 / pr14 / py12, r18, 12pt gap. */
   support: {

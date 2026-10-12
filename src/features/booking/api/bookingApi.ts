@@ -10,6 +10,7 @@ import {
   extensionOptionsResponseSchema,
   extensionQuoteSchema,
   quoteResponseSchema,
+  ratingMediaUploadSchema,
   ratingResultSchema,
   tipOrderSchema,
   tipStatusSchema,
@@ -25,6 +26,7 @@ import type {
   BookingSummaryDto,
   CancellationPreviewDto,
   QuoteResponse,
+  RatingMediaKind,
   RefundDto,
   RescheduleOptionsDto,
 } from './schemas';
@@ -91,6 +93,7 @@ export const BOOKING_PATHS = {
   tracking: (id: string) => `/v1/bookings/${id}/tracking`,
   cookContact: (id: string) => `/v1/bookings/${id}/cook-contact`,
   rating: (id: string) => `/v1/bookings/${id}/rating`,
+  ratingMedia: (id: string) => `/v1/bookings/${id}/rating/media`,
   tips: (id: string) => `/v1/bookings/${id}/tips`,
   tipsVerify: (id: string) => `/v1/bookings/${id}/tips/verify`,
   extensionVerify: (bookingId: string, extensionId: string) =>
@@ -417,7 +420,17 @@ export function createServiceApi(api: ApiClient) {
      */
     async rate(
       bookingId: string,
-      input: { stars: number; exceptional?: boolean; feedback?: string },
+      input: {
+        stars: number;
+        exceptional?: boolean;
+        feedback?: string;
+        /** The rate card's chip keys (Figma `1603:50`). */
+        chips?: readonly string[];
+        /** "Prefer a different cook next time?" — below 4 stars only; the server refuses it above. */
+        avoidCook?: boolean;
+        /** Uploads from `requestRatingMedia`, already PUT. */
+        mediaIds?: readonly string[];
+      },
       scope: string,
     ) {
       return api.request(BOOKING_PATHS.rating(bookingId), {
@@ -429,8 +442,43 @@ export function createServiceApi(api: ApiClient) {
           ...(input.feedback === undefined || input.feedback.trim().length === 0
             ? {}
             : { feedback: input.feedback.trim() }),
+          ...(input.chips === undefined || input.chips.length === 0
+            ? {}
+            : { chips: [...input.chips] }),
+          ...(input.avoidCook === true ? { avoidCook: true } : {}),
+          ...(input.mediaIds === undefined || input.mediaIds.length === 0
+            ? {}
+            : { mediaIds: [...input.mediaIds] }),
         },
         parse: (data) => ratingResultSchema.parse(data),
+      });
+    },
+
+    /**
+     * `POST /v1/bookings/:id/rating/media` — a signed upload for one photo, video or voice note
+     * on the rating about to be sent. Size and duration are declared up front: the signature binds
+     * the content type and length, and the server checks the limits before it signs.
+     */
+    async requestRatingMedia(
+      bookingId: string,
+      input: {
+        kind: RatingMediaKind;
+        contentType: string;
+        sizeBytes: number;
+        durationMs?: number | null;
+      },
+    ) {
+      return api.request(BOOKING_PATHS.ratingMedia(bookingId), {
+        method: 'POST',
+        body: {
+          kind: input.kind,
+          contentType: input.contentType,
+          sizeBytes: input.sizeBytes,
+          ...(input.durationMs === undefined || input.durationMs === null
+            ? {}
+            : { durationMs: Math.max(1, Math.round(input.durationMs)) }),
+        },
+        parse: (data) => ratingMediaUploadSchema.parse(data),
       });
     },
 

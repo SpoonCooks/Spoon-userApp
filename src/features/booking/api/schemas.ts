@@ -290,10 +290,38 @@ export const ratingResultSchema = z.object({
   stars: z.number(),
   isFivePlus: z.boolean(),
   exceptional: z.boolean(),
+  /** The rate card's chip keys and "Prefer a different cook next time?" (Figma `1603:50`). */
+  chips: z.array(z.string()).nullish(),
+  avoidCook: z.boolean().nullish(),
+  /** The photos, video and voice note attached to the rating. */
+  media: z
+    .array(z.object({ mediaId: z.string(), kind: z.enum(['photo', 'video', 'voice']) }))
+    .nullish(),
   created: z.boolean(),
 });
 
 export type RatingResultDto = z.infer<typeof ratingResultSchema>;
+
+export const ratingMediaKindSchema = z.enum(['photo', 'video', 'voice']);
+export type RatingMediaKind = z.infer<typeof ratingMediaKindSchema>;
+
+/**
+ * `POST /v1/bookings/:id/rating/media` — a signed upload for one rating photo, video or voice
+ * note. The app PUTs the file to `upload.url` carrying exactly `upload.headers`, then names
+ * `mediaId` in the rating.
+ */
+export const ratingMediaUploadSchema = z.object({
+  mediaId: z.string(),
+  kind: ratingMediaKindSchema,
+  upload: z.object({
+    method: z.literal('PUT'),
+    url: z.string().url(),
+    headers: z.record(z.string(), z.string()),
+    expiresAt: z.string(),
+  }),
+});
+
+export type RatingMediaUploadDto = z.infer<typeof ratingMediaUploadSchema>;
 
 export const bookingReassignmentSchema = z.object({
   /** True when the current assignment replaced an earlier cook assignment. */

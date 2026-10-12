@@ -1,14 +1,7 @@
 import { bake } from '@ui/motion/keyframes';
 import type { MotionPart, Track } from '@ui/motion/keyframes';
 
-import {
-  CONFETTI,
-  MIC_PULSE,
-  PLUS_IDLE,
-  PLUS_PICKED,
-  STICKER_MOTION,
-  starPops,
-} from './ratingMotion';
+import { CONFETTI, PLUS_IDLE, PLUS_PICKED, STICKER_MOTION, starPops } from './ratingMotion';
 
 const tracksOf = (part: MotionPart): Track[] => Object.values(part) as Track[];
 
@@ -17,7 +10,6 @@ describe('rate card motion', () => {
     const parts: MotionPart[] = [
       PLUS_IDLE,
       PLUS_PICKED,
-      { scale: MIC_PULSE },
       ...CONFETTI.map((piece) => piece.motion),
       ...Object.values(STICKER_MOTION).flatMap((m) => [
         m.shape,

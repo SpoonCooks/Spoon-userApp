@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { Image, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,8 +10,9 @@ import {
   RateVisitCard,
   RecurringLiveScreen,
   RecurringPlansScreen,
-  TellUsMoreSheet,
+  VOICE_NOTE_BARS,
   VisitDetailsScreen,
+  feedbackFixture,
 } from '@features/recurringLive';
 import type { RecurringTab, VisitPrepReady, VisitRatingValue } from '@features/recurringLive';
 import { RouteScaffold } from '@ui';
@@ -27,7 +28,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
  *   ?screen=visit   &variant=assigned|pending|completed|cancelled [&prep=0|1|3]
  *                   [&sheet=modify|payment]            `1008:5398`, `1466:*`, `1441:*`, `1433:1537`,
  *                                                      `1434:1678`
- *   ?screen=rating  [&rating=4.5|5plus|3.5|2.5|1] [&sheet=more]   `1501:*`
+ *   ?screen=rating  [&rating=4.5|5plus|2.5] [&feedback=voice|write|uploaded]   "Ratings" `1603:50`
  *
  * The tabs, the pop-ups and the dock buttons are live within the preview so the flow can be
  * clicked through; none of it is the real navigation.
@@ -36,6 +37,12 @@ type Screen = 'live' | 'plans' | 'visit' | 'rating';
 
 const DATE_PRESETS: Record<string, string> = CALENDAR_DEMO_DATES;
 const VISIT_VARIANTS = ['assigned', 'pending', 'completed', 'cancelled'] as const;
+/** `?feedback=` — the drawn feedback states (`2093:5738`, `2093:5817`, `2093:5898`). */
+const FEEDBACK_STATES = ['voice', 'write', 'uploaded'] as const;
+/** A real file for the preview's photo thumbnails. */
+const DEMO_PHOTO_URI = Image.resolveAssetSource(
+  require('../../../assets/figma/recurring/visit/dish-thali.webp') as number,
+).uri;
 const RATINGS: readonly VisitRatingValue[] = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, '5+'];
 
 function parseRating(raw: string | undefined): VisitRatingValue | null {
@@ -58,6 +65,7 @@ type PreviewParams = {
   prep?: string;
   sheet?: string;
   rating?: string;
+  feedback?: string;
 };
 
 /**
@@ -137,18 +145,24 @@ function RecurringLivePreview({ params }: { readonly params: PreviewParams }) {
         </>
       );
     }
-    case 'rating':
+    case 'rating': {
+      const feedback = FEEDBACK_STATES.find((value) => value === params.feedback);
       return (
         <SafeAreaView style={styles.ratingGround} edges={['top', 'bottom']}>
           <ScrollView contentContainerStyle={styles.ratingContent}>
             <RateVisitCard
               initialRating={parseRating(params.rating)}
-              onTellUsMore={() => setSheet('more')}
+              {...(feedback === undefined
+                ? {}
+                : {
+                    initialFeedback: feedbackFixture(feedback, DEMO_PHOTO_URI, VOICE_NOTE_BARS),
+                    initialFeedbackFocus: feedback === 'voice' ? 'voice' : 'write',
+                  })}
             />
           </ScrollView>
-          <TellUsMoreSheet visible={sheet === 'more'} onClose={closeSheet} />
         </SafeAreaView>
       );
+    }
     default:
       return (
         <RecurringLiveScreen

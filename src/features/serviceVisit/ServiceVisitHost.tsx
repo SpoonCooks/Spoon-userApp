@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Alert } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import { useExtensionOptions, useTracking } from '@features/booking';
@@ -8,6 +9,7 @@ import { PaymentDetailsSheet, RateVisitCard, ratingRequestFor } from '@features/
 import type {
   PaymentDetailsSheetData,
   RateVisitSubmission,
+  VisitRatingRequest,
   VisitMenuSection,
   VisitPrepKey,
 } from '@features/recurringLive';
@@ -52,11 +54,8 @@ export interface ServiceVisitHostProps {
   readonly extending: boolean;
   readonly onTip: (amountPaise: number) => Promise<unknown>;
   readonly tipping: boolean;
-  readonly onRate: (request: {
-    readonly stars: number;
-    readonly exceptional?: true;
-    readonly feedback?: string;
-  }) => Promise<unknown>;
+  /** The rate card's submission: uploads its media, then sends the rating. */
+  readonly onRate: (request: VisitRatingRequest) => Promise<unknown>;
   readonly rating: boolean;
   readonly onBookAnother: () => void;
 }
@@ -209,9 +208,14 @@ export function ServiceVisitHost({
         }}
         submitting={rating}
         onSubmit={(submission: RateVisitSubmission) => {
-          void onRate(ratingRequestFor(submission, ''))
+          void onRate(ratingRequestFor(submission))
             .then(() => setRated(true))
-            .catch(() => undefined);
+            .catch(() =>
+              Alert.alert(
+                'Couldn’t send your rating',
+                'Check your connection and try again. Nothing you added is lost.',
+              ),
+            );
         }}
         testID="service-visit-rate"
       />

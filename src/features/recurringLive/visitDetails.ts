@@ -1,6 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import { formatPaise } from '@core/format';
+import type { RatingAttachment } from '@features/booking';
 import type { CookPoolListDto, CookProfile, PoolCookProfileDto } from '@features/cookPool';
 import type {
   RecurringBookingDto,
@@ -9,13 +10,13 @@ import type {
 } from '@features/recurringSetup';
 
 import { clockText, durationText } from './adapters';
+import { attachmentsOf } from './components/rating/feedback/model';
 import type { RateVisitInfo, RateVisitSubmission } from './components/rating/RateVisitCard';
 import {
   RATING_CHIPS_NEGATIVE,
   RATING_CHIPS_POSITIVE,
   VISIT_RATING_PLUS,
   ratingTier,
-  ratingTierCopy,
 } from './data/rating';
 import { REFUND_CREDIT_NOTE, VISIT_FIXTURE } from './data/visit';
 import type {
@@ -427,31 +428,37 @@ export function rateVisitInfo(visit: VisitDetailDto): RateVisitInfo | null {
 const FEEDBACK_MAX = 2000;
 
 /**
- * What `PUT /v1/bookings/:id/rating` is sent for a rate-card submission. The endpoint takes stars
- * (1–5 in halves), `exceptional` for 5+ — which is 5 stars, never a sixth — and free text. The
- * card's chips have no field of their own yet, so they ride in the text after the customer's
- * note, under the card's own question: "What stood out? Taste, On time".
+ * What `PUT /v1/bookings/:id/rating` is sent for a rate-card submission (Figma "Ratings"
+ * `1603:50`): stars (1–5 in halves), `exceptional` for 5+ — which is 5 stars, never a sixth — the
+ * band's chip keys, the written note, "Prefer a different cook next time?" below 4, and the voice
+ * note, photos and video to upload first.
  */
-export function ratingRequestFor(
-  submission: RateVisitSubmission,
-  note: string,
-): { readonly stars: number; readonly exceptional?: true; readonly feedback?: string } {
+export type VisitRatingRequest = ReturnType<typeof ratingRequestFor>;
+
+export function ratingRequestFor(submission: RateVisitSubmission): {
+  readonly stars: number;
+  readonly exceptional?: true;
+  readonly feedback?: string;
+  readonly chips: readonly string[];
+  readonly avoidCook?: true;
+  readonly attachments: readonly RatingAttachment[];
+} {
   const plus = submission.rating === VISIT_RATING_PLUS;
   const stars = plus ? 5 : (submission.rating as number);
   const tier = ratingTier(submission.rating);
   const low = tier === 'belowPar' || tier === 'disappointing' || tier === 'veryPoor';
+  // Only the band's own chips, in its drawn order — a pick left over from the other band is not
+  // something the customer can see they chose.
   const chips = (low ? RATING_CHIPS_NEGATIVE : RATING_CHIPS_POSITIVE)
     .filter((chip) => submission.chips.includes(chip.key))
-    .map((chip) => chip.label);
-  const question = tier === 'idle' ? '' : ratingTierCopy('')[tier].chipsLabel;
-  const parts = [
-    note.trim(),
-    chips.length === 0 ? '' : `${question} ${chips.join(', ')}`.trim(),
-  ].filter((part) => part !== '');
-  const feedback = parts.join('\n\n').slice(0, FEEDBACK_MAX);
+    .map((chip) => chip.key);
+  const feedback = submission.feedback.text.trim().slice(0, FEEDBACK_MAX);
   return {
     stars,
     ...(plus ? { exceptional: true as const } : {}),
     ...(feedback === '' ? {} : { feedback }),
+    chips,
+    ...(low && submission.avoidCook ? { avoidCook: true as const } : {}),
+    attachments: attachmentsOf(submission.feedback),
   };
 }

@@ -40,7 +40,7 @@ export {
   visitDetailsFrom,
   visitWhatsAppLink,
 } from './visitDetails';
-export type { VisitDetailsSources } from './visitDetails';
+export type { VisitDetailsSources, VisitRatingRequest } from './visitDetails';
 
 export { ModifyBookingSheet } from './components/sheets/ModifyBookingSheet';
 export type { ModifyBookingSheetProps } from './components/sheets/ModifyBookingSheet';
@@ -53,8 +53,6 @@ export type {
   RateVisitInfo,
   RateVisitSubmission,
 } from './components/rating/RateVisitCard';
-export { TellUsMoreSheet } from './components/rating/TellUsMoreSheet';
-export type { TellUsMoreSheetProps } from './components/rating/TellUsMoreSheet';
 export type { VisitRatingValue } from './data/rating';
 
 export { useCancelWholeBooking } from './cancelWholeBooking';
@@ -69,3 +67,6 @@ export { VisitToast } from './components/visit/VisitToast';
 export type { VisitToastHandle } from './components/visit/VisitToast';
 export type { VisitCookData, VisitMenuSection } from './data/visit';
 export type { PaymentDetailsSheetData } from './data/sheets';
+export { feedbackFixture } from './components/rating/feedback/model';
+export type { FeedbackDraft } from './components/rating/feedback/model';
+export { VOICE_NOTE_BARS } from './data/rating';

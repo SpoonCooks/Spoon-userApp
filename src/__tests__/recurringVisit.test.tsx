@@ -228,9 +228,7 @@ describe('Recurring Visit details route', () => {
     fireEvent.press(screen.getByTestId('rate-visit-card-chip-taste'));
     fireEvent.press(screen.getByTestId('rate-visit-card-submit'));
 
-    await waitFor(() =>
-      expect(onRate).toHaveBeenCalledWith({ stars: 4.5, feedback: 'What stood out? Taste' }),
-    );
+    await waitFor(() => expect(onRate).toHaveBeenCalledWith({ stars: 4.5, chips: ['taste'] }));
     await waitFor(() =>
       expect(alert).toHaveBeenCalledWith('Thanks for rating', expect.any(String)),
     );

@@ -42,6 +42,16 @@ const BUNDLE_SUFFIX: Record<AppEnv, string> = {
 const SPLASH_BACKGROUND = '#FFFDF5';
 
 /**
+ * The permission strings for rating feedback (Figma "Ratings" `1603:50`): one source for the
+ * Info.plist key and every plugin that writes it, so they can never disagree.
+ */
+const MEDIA_PERMISSIONS = {
+  camera: 'Spoon uses the camera when you add a photo or video to a rating.',
+  microphone: 'Spoon uses the microphone when you record a voice note or a video for a rating.',
+  photos: 'Spoon lets you choose photos and a video from your library to add to a rating.',
+} as const;
+
+/**
  * The deployed API, used when no `EXPO_PUBLIC_API_BASE_URL` is supplied in development.
  *
  * A developer who has not written a `.env` gets the real PRODUCTION deployment rather than an
@@ -230,8 +240,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     ...(GOOGLE_SERVICES_PLIST === '' ? {} : { googleServicesFile: GOOGLE_SERVICES_PLIST }),
     infoPlist: {
-      NSPhotoLibraryUsageDescription:
-        'Spoon does not access your photo library directly. This declaration is required for compatibility with a bundled system component.',
+      // The rate card's Gallery (Figma "Ratings" `1603:50`, M1) picks photos and a video to add
+      // to a rating. The same words as `MEDIA_PERMISSIONS` below, which the picker's plugin writes.
+      NSPhotoLibraryUsageDescription: MEDIA_PERMISSIONS.photos,
 
       /**
        * HTTPS is all this app speaks, and that is exempt. Without the key App Store Connect asks
@@ -292,6 +303,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
         {
           NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePurchaseHistory',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        /**
+         * A rating's photos, video and voice note (Figma "Ratings" `1603:50`): what the customer
+         * chooses to add, uploaded to Spoon's own storage and read by Ops to act on the feedback.
+         */
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypePhotosorVideos',
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        },
+        {
+          NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeAudioData',
           NSPrivacyCollectedDataTypeLinked: true,
           NSPrivacyCollectedDataTypeTracking: false,
           NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
@@ -558,6 +585,40 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         androidGoogleMapsApiKey: GOOGLE_MAPS_ANDROID_API_KEY,
         iosGoogleMapsApiKey: GOOGLE_MAPS_IOS_API_KEY,
+      },
+    ],
+
+    // The rate card's Voice / Media / Write block (Figma "Ratings" `1603:50`): a voice note, the
+    // camera for photos and a 30-second video (M3 – M5), and the system picker for the gallery.
+    // All three plugins write the camera / microphone / photos strings; they are handed the SAME
+    // words so whichever runs last cannot leave Expo's placeholder or delete a key another needs.
+    [
+      'expo-camera',
+      {
+        cameraPermission: MEDIA_PERMISSIONS.camera,
+        microphonePermission: MEDIA_PERMISSIONS.microphone,
+        recordAudioAndroid: true,
+        barcodeScannerEnabled: false,
+      },
+    ],
+    [
+      'expo-audio',
+      {
+        microphonePermission: MEDIA_PERMISSIONS.microphone,
+        recordAudioAndroid: true,
+        // A rating's voice note plays and records only on screen. Background playback would add
+        // the FOREGROUND_SERVICE_MEDIA_PLAYBACK permission (a Play declaration) and iOS's `audio`
+        // background mode for nothing.
+        enableBackgroundPlayback: false,
+        enableBackgroundRecording: false,
+      },
+    ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: MEDIA_PERMISSIONS.photos,
+        cameraPermission: MEDIA_PERMISSIONS.camera,
+        microphonePermission: MEDIA_PERMISSIONS.microphone,
       },
     ],
   ],

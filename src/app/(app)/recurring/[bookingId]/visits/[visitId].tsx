@@ -7,7 +7,7 @@ import { ready } from '@core/data';
 import type { DataState } from '@core/data';
 import { getUserMessage, isAppError } from '@core/errors';
 import { useNavigationGuard, useSafeBack } from '@core/navigation';
-import { ratingScopeFor, useBookingDetail, useRateBooking } from '@features/booking';
+import { ratingSubmissionScope, useBookingDetail, useRateBooking } from '@features/booking';
 import { CancelVisitSheet, cancelReasonsFrom } from '@features/cancellation';
 import type { CancelQuote, CancelStep, CancelVisit } from '@features/cancellation';
 import { useCatalogue } from '@features/catalogue';
@@ -20,7 +20,6 @@ import {
 import {
   PaymentDetailsSheet,
   RateVisitCard,
-  TellUsMoreSheet,
   VisitDetailsScreen,
   rateVisitInfo,
   useCancelWholeBooking,
@@ -57,8 +56,9 @@ import { QueryBoundary } from '@ui';
  *   Help, Share   WhatsApp with Spoon (`1434:2205`), when the backend gives the link
  *   Cook Pool     the pool landing; the next-visit row that visit's own details
  *   Rate          a completed visit's own booking, while the server still allows it
- *                 (`allowedActions.canRate`): stars, 5+ and a written note go to
- *                 `PUT /v1/bookings/:id/rating`; the card's chips ride in the note
+ *                 (`allowedActions.canRate`): stars, 5+, the chips, a written note, the
+ *                 different-cook answer and the voice note / photos / video (uploaded first)
+ *                 go to `PUT /v1/bookings/:id/rating`
  */
 export default function RecurringVisitRoute() {
   const router = useRouter();
@@ -210,14 +210,12 @@ export default function RecurringVisitRoute() {
     ratedBooking.state.status === 'ready' && ratedBooking.state.data.allowedActions.canRate;
   const rateInfo = detail === null ? null : rateVisitInfo(detail);
   const rate = useRateBooking();
-  const [note, setNote] = useState('');
-  const [noteOpen, setNoteOpen] = useState(false);
   const [rateHidden, setRateHidden] = useState(false);
 
   const submitRating = (submission: RateVisitSubmission) => {
     if (completedBookingId === null) return;
-    const request = ratingRequestFor(submission, note);
-    const scope = ratingScopeFor(completedBookingId, request.feedback);
+    const request = ratingRequestFor(submission);
+    const scope = ratingSubmissionScope(completedBookingId, request);
     rate.mutate(
       { bookingId: completedBookingId, ...request, scope },
       {
@@ -241,8 +239,6 @@ export default function RecurringVisitRoute() {
         live
         visit={rateInfo}
         submitting={rate.isPending}
-        noteAdded={note !== ''}
-        onTellUsMore={() => setNoteOpen(true)}
         onLater={() => setRateHidden(true)}
         onSubmit={submitRating}
       />
@@ -338,16 +334,6 @@ export default function RecurringVisitRoute() {
             )}
             ratingSlot={ratingSlot}
             refundSlot={refundSlot}
-          />
-          <TellUsMoreSheet
-            visible={noteOpen}
-            writtenOnly
-            initialText={note}
-            onClose={() => setNoteOpen(false)}
-            onSend={({ text }) => {
-              setNote(text.trim());
-              setNoteOpen(false);
-            }}
           />
           <PaymentDetailsSheet
             visible={paymentOpen}
