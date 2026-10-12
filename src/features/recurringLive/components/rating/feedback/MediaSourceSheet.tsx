@@ -42,7 +42,9 @@ export function MediaSourceSheet({
     <Sheet visible={visible} onClose={onClose} testID={testID}>
       <View style={styles.header}>
         <View style={styles.title}>
-          <Text variant="spoonTitle">Add photos & videos</Text>
+          <Text variant="spoonTitle" style={styles.titleText}>
+            Add photos & videos
+          </Text>
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
@@ -126,6 +128,8 @@ function Option({
 const styles = StyleSheet.create({
   header: { gap: lightTheme.space.xs },
   title: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  /** Fills the row so Android lays it out on one line beside the close well. */
+  titleText: { flex: 1 },
   close: {
     width: 32,
     height: 32,

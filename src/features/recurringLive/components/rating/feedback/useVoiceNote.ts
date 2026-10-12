@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking } from 'react-native';
 import type { loadExpoAudio } from '@core/native';
 import { localFileSize } from '@features/booking';
@@ -65,7 +65,9 @@ export function useVoiceNote(
     try {
       const durationMs = recorder.getStatus().durationMillis;
       await recorder.stop();
-      await audio.setAudioModeAsync({ allowsRecording: false });
+      // Keep playsInSilentMode: Android resets anything left out, and a phone on silent would
+      // then refuse to play the customer's own note back.
+      await audio.setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
       const uri = recorder.uri;
       setRecording(false);
       if (uri === null || durationMs < 500) return;
@@ -132,7 +134,10 @@ export function useVoiceNote(
 
 /** Plays a recorded note; `null` (the preview's drawn note) plays nothing. */
 export function useVoicePlayback(audio: ExpoAudioModule, uri: string | null) {
-  const player = audio.useAudioPlayer(uri === null ? null : { uri });
+  // One source object per note: a new `{ uri }` each render makes the hook replace its player, and
+  // `play()` then lands on one that is already being released.
+  const source = useMemo(() => (uri === null ? null : { uri }), [uri]);
+  const player = audio.useAudioPlayer(source);
   const status = audio.useAudioPlayerStatus(player);
   const toggle = useCallback(() => {
     if (uri === null) return;
