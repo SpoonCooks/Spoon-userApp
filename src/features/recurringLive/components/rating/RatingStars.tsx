@@ -50,7 +50,8 @@ function toRating(score: number): VisitRatingValue {
 
 export interface RatingStarsProps {
   readonly value: VisitRatingValue | null;
-  readonly onChange: (value: VisitRatingValue) => void;
+  /** Absent once the rating is submitted: the stars and 5+ show the score and take no taps. */
+  readonly onChange?: (value: VisitRatingValue) => void;
   /** The first look's loop while idle, the entrance once rated. */
   readonly clock?: Animated.Value | undefined;
   readonly testID: string;
@@ -62,7 +63,7 @@ export function RatingStars({ value, onChange, clock, testID }: RatingStarsProps
 
   /** Half, then whole, then half again on the same star; any other star starts at its half. */
   const onStar = (index: number) => {
-    onChange(toRating(value === index - 0.5 ? index : index - 0.5));
+    onChange?.(toRating(value === index - 0.5 ? index : index - 0.5));
   };
 
   const burst =
@@ -85,6 +86,7 @@ export function RatingStars({ value, onChange, clock, testID }: RatingStarsProps
           <Pressable
             key={index}
             onPress={() => onStar(index)}
+            disabled={onChange === undefined}
             accessibilityRole="radio"
             accessibilityLabel={`${index} star`}
             accessibilityState={{ selected: fill !== 'empty' }}
@@ -111,7 +113,8 @@ export function RatingStars({ value, onChange, clock, testID }: RatingStarsProps
       })}
       <View style={styles.divider} />
       <Pressable
-        onPress={() => onChange(VISIT_RATING_PLUS)}
+        onPress={() => onChange?.(VISIT_RATING_PLUS)}
+        disabled={onChange === undefined}
         accessibilityRole="radio"
         accessibilityLabel="5 plus — went above and beyond"
         accessibilityState={{ selected: tier === 'magic' }}

@@ -83,6 +83,51 @@ describe('Rate card (Figma 1603:50)', () => {
     jest.useRealTimers();
   });
 
+  it('stays in place read-only once sent: banner, picked chips, the note, no Submit (2306:929)', () => {
+    const view = render(
+      <RateVisitCard live visit={VISIT} initialRating={4.5} onSubmit={jest.fn()} />,
+    );
+    fireEvent.press(screen.getByTestId('rate-visit-card-chip-taste'));
+    fireEvent.press(screen.getByTestId('rate-visit-card-feedback-write'));
+    fireEvent.changeText(screen.getByTestId('rate-visit-card-feedback-input'), 'Roti was soft.');
+
+    view.rerender(
+      <RateVisitCard live visit={VISIT} initialRating={4.5} onSubmit={jest.fn()} submitted />,
+    );
+
+    expect(screen.getByText('Rating submitted · Thanks for the feedback!')).toBeTruthy();
+    expect(screen.getByText('Rekha will see your rating and note after the visit.')).toBeTruthy();
+    expect(screen.getByText('What stood out')).toBeTruthy();
+    expect(screen.getByTestId('rate-visit-card-chip-taste')).toBeTruthy();
+    expect(screen.queryByTestId('rate-visit-card-chip-onTime')).toBeNull();
+    expect(screen.getByText('Your note to Rekha')).toBeTruthy();
+    expect(screen.getByText('Roti was soft.')).toBeTruthy();
+    expect(screen.queryByTestId('rate-visit-card-submit')).toBeNull();
+    expect(screen.queryByTestId('rate-visit-card-feedback-write')).toBeNull();
+    // The stars take no taps.
+    fireEvent.press(screen.getByTestId('rate-visit-card-stars-star-2'));
+    expect(screen.getByText('4.5')).toBeTruthy();
+  });
+
+  it('reads the same once sent at any score — a low one too', () => {
+    render(
+      <RateVisitCard live visit={VISIT} initialRating={2} submitted initialChips={['slow']} />,
+    );
+    expect(screen.getByText('We’re so sorry')).toBeTruthy();
+    expect(screen.getByText('Rekha will see your rating and note after the visit.')).toBeTruthy();
+    expect(screen.getByText('What went wrong')).toBeTruthy();
+    expect(screen.getByTestId('rate-visit-card-chip-slow')).toBeTruthy();
+    // Nothing left to answer: no "a different cook" toggle once sent.
+    expect(screen.queryByTestId('rate-visit-card-support')).toBeNull();
+  });
+
+  it('draws no note block when nothing was added, and no chips label without chips', () => {
+    render(<RateVisitCard live visit={VISIT} initialRating={4} submitted initialChips={[]} />);
+    expect(screen.getByText('Rating submitted · Thanks for the feedback!')).toBeTruthy();
+    expect(screen.queryByText('What stood out')).toBeNull();
+    expect(screen.queryByText('Your note to Rekha')).toBeNull();
+  });
+
   it('offers only Write on a build without the camera, microphone and picker', () => {
     render(<RateVisitCard live visit={VISIT} initialRating={4} />);
     expect(screen.getByTestId('rate-visit-card-feedback-write')).toBeTruthy();

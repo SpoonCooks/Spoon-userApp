@@ -330,6 +330,77 @@ describe('Saved addresses back target follows its entry point', () => {
  * from Home — but replacing to Home unconditionally made "back" from a booking opened via My
  * bookings behave as if the list behind it did not exist (the reported bug this closes).
  */
+/**
+ * `Rate card / Submitted` (`2306:929`) on a reopened visit: a completed booking the customer
+ * already rated draws the card read-only from the server's copy — the score, the chips and the
+ * words on the booking, the voice note and photo from `GET /v1/bookings/:id/rating/media`.
+ */
+describe('booking host — a rated visit reopened', () => {
+  const RATED = {
+    ...BOOKING,
+    id: 'bk-7',
+    status: 'completed',
+    timing: {
+      arrivedAt: '2026-08-20T07:25:00.000Z',
+      actualStart: '2026-08-20T07:30:00.000Z',
+      expectedEnd: '2026-08-20T08:30:00.000Z',
+      actualEnd: '2026-08-20T08:30:00.000Z',
+    },
+    ratingStars: 4.5,
+    ratingExceptional: false,
+    ratingFeedback: 'Roti was soft.',
+    ratingChips: ['taste', 'onTime'],
+    allowedActions: { ...BOOKING.allowedActions, canCancel: false, canReschedule: false },
+  };
+
+  it('draws the submitted card read-only, with what was sent', async () => {
+    mockSearchParams = { id: 'bk-7' };
+    renderWithRuntime(<BookingRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...NAV_STUBS,
+          'GET /v1/bookings/bk-7': () => ({ booking: RATED }),
+          'GET /v1/bookings/bk-7/rating/media': () => ({
+            media: [
+              {
+                mediaId: 'm-voice',
+                kind: 'voice',
+                contentType: 'audio/mp4',
+                sizeBytes: 240_000,
+                durationMs: 23_000,
+                url: 'https://bucket.example/voice.m4a?sig=1',
+              },
+              {
+                mediaId: 'm-photo',
+                kind: 'photo',
+                contentType: 'image/jpeg',
+                sizeBytes: 220_000,
+                durationMs: null,
+                url: 'https://bucket.example/photo.jpg?sig=2',
+              },
+            ],
+          }),
+        }),
+      }),
+    });
+
+    expect(await screen.findByText('Rating submitted · Thanks for the feedback!')).toBeTruthy();
+    expect(screen.getByText('Loved it!')).toBeTruthy();
+    // Only the picked chips, under the question as a statement; nothing to submit.
+    expect(screen.getByText('What stood out')).toBeTruthy();
+    expect(screen.getByTestId('service-visit-rate-chip-taste')).toBeTruthy();
+    expect(screen.getByTestId('service-visit-rate-chip-onTime')).toBeTruthy();
+    expect(screen.queryByTestId('service-visit-rate-chip-hygiene')).toBeNull();
+    expect(screen.queryByTestId('service-visit-rate-submit')).toBeNull();
+    // The note: the words, the photo, and (with no audio module in tests) the drawn voice note.
+    expect(screen.getByText(/^Your note to/)).toBeTruthy();
+    expect(screen.getByText('Roti was soft.')).toBeTruthy();
+    expect(screen.getByTestId('service-visit-rate-feedback-thumb-m-photo')).toBeTruthy();
+    expect(screen.getByTestId('service-visit-rate-feedback-note')).toBeTruthy();
+    expect(screen.queryByTestId('service-visit-rate-feedback-note-delete')).toBeNull();
+  });
+});
+
 describe('booking host — back follows the stack shape', () => {
   it('backs out to Home when the app was launched straight into a booking', async () => {
     mockRouter = makeRouter(false);

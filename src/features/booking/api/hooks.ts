@@ -29,6 +29,7 @@ import type {
   ExtensionQuoteDto,
   QuoteResponse,
   RatingResultDto,
+  MyRatingMediaDto,
   RefundDto,
   TipOrderDto,
   RescheduleOptionsDto,
@@ -242,6 +243,24 @@ export function useBookingRefunds(bookingId: string | null): ScreenQuery<readonl
     queryKey: bookingKeys.bookingRefunds(validId ?? 'none'),
     queryFn: ({ signal }) => bookings.bookingRefunds(validId ?? '', signal),
     enabled: validId !== null,
+  });
+}
+
+/**
+ * The customer's own voice note, photos and video on their rating of this booking — what a
+ * reopened visit's submitted rate card plays and opens. Only fetched once the booking is rated.
+ * The links last about ten minutes, so they are fresh for five and fetched again after that.
+ */
+export function useMyRatingMedia(bookingId: string | null): ScreenQuery<MyRatingMediaDto> {
+  const { api } = useRuntime();
+  const service = createServiceApi(api);
+  const validId = bookingId !== null && bookingId !== '' ? bookingId : null;
+
+  return useApiQuery<MyRatingMediaDto>({
+    queryKey: bookingKeys.myRatingMedia(validId ?? 'none'),
+    queryFn: ({ signal }) => service.myRatingMedia(validId ?? '', signal),
+    enabled: validId !== null,
+    staleTime: 5 * 60_000,
   });
 }
 

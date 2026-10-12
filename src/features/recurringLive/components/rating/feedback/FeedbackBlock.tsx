@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 import { FEEDBACK_ART, RATING_ART } from '../assets';
 import { MAX_FEEDBACK_TEXT, WAVE_HEIGHT, clipTime } from './model';
 import type { FeedbackDraft, FeedbackMediaItem, FeedbackVoiceNote } from './model';
+import { MediaViewer } from './MediaViewer';
 import { useVoiceNote, useVoicePlayback } from './useVoiceNote';
 import type { ExpoAudioModule } from './useVoiceNote';
 
@@ -299,6 +300,82 @@ function Tile({
   );
 }
 
+/**
+ * Dev note "Submitted" (`2306:929`, `2306:980`): what was added, read-only, under "Your note to
+ * <cook>". The voice note plays, a photo or the video opens full-screen, the words read as
+ * written; there is nothing to add or delete. Draws nothing when nothing was added.
+ */
+export function SubmittedFeedback({
+  title,
+  draft,
+  testID,
+}: {
+  readonly title: string;
+  readonly draft: FeedbackDraft;
+  readonly testID: string;
+}) {
+  const audio = loadExpoAudio();
+  const [open, setOpen] = useState<FeedbackMediaItem | null>(null);
+  const text = draft.text.trim();
+  if (draft.voice === null && draft.media.length === 0 && text === '') return null;
+
+  return (
+    <View style={styles.block} testID={testID}>
+      <LinearGradient
+        colors={[lightTheme.colors.surfaceAccent, lightTheme.colors.surfaceRatingNudge]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <Text variant="spoonBodyStrong" numberOfLines={1}>
+        {title}
+      </Text>
+
+      {draft.voice === null ? null : audio === null || draft.voice.uri === null ? (
+        <RecordedNoteView
+          note={draft.voice}
+          playing={false}
+          positionMs={0}
+          disabled
+          testID={`${testID}-note`}
+        />
+      ) : (
+        <RecordedNote audio={audio} note={draft.voice} disabled={false} testID={`${testID}-note`} />
+      )}
+
+      {draft.media.length === 0 ? null : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.thumbs}
+          style={styles.thumbsRow}
+          testID={`${testID}-attachments`}
+        >
+          {draft.media.map((item) => (
+            <Thumbnail
+              key={item.id}
+              item={item}
+              onOpen={() => setOpen(item)}
+              disabled={false}
+              testID={`${testID}-thumb-${item.id}`}
+            />
+          ))}
+        </ScrollView>
+      )}
+
+      {text === '' ? null : (
+        <Text variant="spoonCaption" testID={`${testID}-text`}>
+          {text}
+        </Text>
+      )}
+
+      {open === null ? null : (
+        <MediaViewer item={open} onClose={() => setOpen(null)} testID={`${testID}-viewer`} />
+      )}
+    </View>
+  );
+}
+
 function RecordedNote({
   audio,
   note,
@@ -306,7 +383,7 @@ function RecordedNote({
 }: {
   readonly audio: ExpoAudioModule;
   readonly note: FeedbackVoiceNote;
-  readonly onDelete: () => void;
+  readonly onDelete?: () => void;
   readonly disabled: boolean;
   readonly testID: string;
 }) {
@@ -336,7 +413,8 @@ function RecordedNoteView({
   readonly playing: boolean;
   readonly positionMs: number;
   readonly onToggle?: () => void;
-  readonly onDelete: () => void;
+  /** Absent once the rating is submitted: the note plays but can't be deleted. */
+  readonly onDelete?: () => void;
   readonly disabled: boolean;
   readonly testID: string;
 }) {
@@ -356,16 +434,18 @@ function RecordedNoteView({
           />
           <Text variant="spoonEmphasis">{clipTime(playing ? positionMs : note.durationMs)}</Text>
         </Pressable>
-        <Pressable
-          onPress={onDelete}
-          disabled={disabled}
-          accessibilityRole="button"
-          accessibilityLabel="Delete voice note"
-          hitSlop={lightTheme.space.sm}
-          testID={`${testID}-delete`}
-        >
-          <Image source={FEEDBACK_ART.trash} style={styles.icon20} />
-        </Pressable>
+        {onDelete === undefined ? null : (
+          <Pressable
+            onPress={onDelete}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityLabel="Delete voice note"
+            hitSlop={lightTheme.space.sm}
+            testID={`${testID}-delete`}
+          >
+            <Image source={FEEDBACK_ART.trash} style={styles.icon20} />
+          </Pressable>
+        )}
       </View>
       <Waveform bars={note.bars} />
     </View>
@@ -387,16 +467,29 @@ function Waveform({ bars }: { readonly bars: readonly number[] }) {
 function Thumbnail({
   item,
   onRemove,
+  onOpen,
   disabled,
   testID,
 }: {
   readonly item: FeedbackMediaItem;
-  readonly onRemove: () => void;
+  /** Absent once the rating is submitted: no remove disc. */
+  readonly onRemove?: () => void;
+  /** Submitted: a tap opens it full-screen. */
+  readonly onOpen?: () => void;
   readonly disabled: boolean;
   readonly testID: string;
 }) {
   return (
-    <View style={styles.thumb} testID={testID}>
+    <Pressable
+      onPress={onOpen}
+      disabled={onOpen === undefined}
+      accessibilityRole={onOpen === undefined ? undefined : 'button'}
+      accessibilityLabel={
+        onOpen === undefined ? undefined : item.kind === 'photo' ? 'Open photo' : 'Play video'
+      }
+      style={styles.thumb}
+      testID={testID}
+    >
       {item.kind === 'photo' ? (
         <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
@@ -410,18 +503,20 @@ function Thumbnail({
           <Text style={styles.thumbTime}>{clipTime(item.durationMs ?? 0)}</Text>
         </>
       ) : null}
-      <Pressable
-        onPress={onRemove}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={item.kind === 'photo' ? 'Remove photo' : 'Remove video'}
-        hitSlop={lightTheme.space.sm}
-        style={styles.remove}
-        testID={`${testID}-remove`}
-      >
-        <Image source={FEEDBACK_ART.remove} style={styles.removeIcon} />
-      </Pressable>
-    </View>
+      {onRemove === undefined ? null : (
+        <Pressable
+          onPress={onRemove}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={item.kind === 'photo' ? 'Remove photo' : 'Remove video'}
+          hitSlop={lightTheme.space.sm}
+          style={styles.remove}
+          testID={`${testID}-remove`}
+        >
+          <Image source={FEEDBACK_ART.remove} style={styles.removeIcon} />
+        </Pressable>
+      )}
+    </Pressable>
   );
 }
 

@@ -18,6 +18,7 @@ export const bookingKeys = {
   history: () => factory.collection('history'),
   refunds: () => factory.collection('refunds'),
   bookingRefunds: (id: string) => factory.collection('bookingRefunds', { id }),
+  myRatingMedia: (id: string) => factory.collection('myRatingMedia', { id }),
   cancellationPreview: (id: string) => factory.collection('cancellationPreview', { id }),
   rescheduleOptions: (id: string) => factory.collection('rescheduleOptions', { id }),
   extensionOptions: (id: string) => factory.collection('extensionOptions', { id }),

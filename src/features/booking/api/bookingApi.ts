@@ -10,6 +10,7 @@ import {
   extensionOptionsResponseSchema,
   extensionQuoteSchema,
   quoteResponseSchema,
+  myRatingMediaSchema,
   ratingMediaUploadSchema,
   ratingResultSchema,
   tipOrderSchema,
@@ -479,6 +480,15 @@ export function createServiceApi(api: ApiClient) {
             : { durationMs: Math.max(1, Math.round(input.durationMs)) }),
         },
         parse: (data) => ratingMediaUploadSchema.parse(data),
+      });
+    },
+
+    /** `GET /v1/bookings/:id/rating/media` — the customer's own media on their rating, to play back. */
+    async myRatingMedia(bookingId: string, signal?: AbortSignal) {
+      return api.request(BOOKING_PATHS.ratingMedia(bookingId), {
+        method: 'GET',
+        ...(signal === undefined ? {} : { signal }),
+        parse: (data) => myRatingMediaSchema.parse(data),
       });
     },
 

@@ -53,6 +53,8 @@ export interface RatingTierCopy {
    */
   readonly differentCook: boolean;
   readonly submit: string;
+  /** Under the headline once the rating is submitted (`2306:942`). */
+  readonly submittedBody: string;
 }
 
 /** `1501:7475` / `1501:7476`. */
@@ -73,6 +75,7 @@ export function ratingTierCopy(
     feedbackBody: 'A 10-sec voice note means more to her than stars',
     differentCook: false,
     submit: 'Submit',
+    submittedBody: `${cookName} will see your rating and note after the visit.`,
   } as const;
   // `1517:9301` — every score below 4 draws the same Poor card.
   const poor: RatingTierCopy = {
@@ -83,6 +86,8 @@ export function ratingTierCopy(
     feedbackBody: 'A photo or quick note helps us fix it better and fast',
     differentCook: true,
     submit: 'Submit',
+    // `2306:942` — one Submitted card for every score, low ones included.
+    submittedBody: `${cookName} will see your rating and note after the visit.`,
   };
   return {
     loved: {

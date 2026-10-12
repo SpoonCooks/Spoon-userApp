@@ -15,6 +15,7 @@ export {
   useCreateExtension,
   useBookingRefunds,
   useExtensionOptions,
+  useMyRatingMedia,
   useQuote,
   ratingScopeFor,
   ratingSubmissionScope,

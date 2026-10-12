@@ -67,6 +67,6 @@ export { VisitToast } from './components/visit/VisitToast';
 export type { VisitToastHandle } from './components/visit/VisitToast';
 export type { VisitCookData, VisitMenuSection } from './data/visit';
 export type { PaymentDetailsSheetData } from './data/sheets';
-export { feedbackFixture } from './components/rating/feedback/model';
+export { feedbackFixture, submittedFeedbackFrom } from './components/rating/feedback/model';
 export type { FeedbackDraft } from './components/rating/feedback/model';
 export { VOICE_NOTE_BARS } from './data/rating';
