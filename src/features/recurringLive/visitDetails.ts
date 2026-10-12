@@ -1,7 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import { formatPaise } from '@core/format';
-import type { CookPoolListDto, CookProfile, PoolCookProfileDto } from '@features/cookPool';
+import type { CookProfile, PoolCookProfileDto } from '@features/cookPool';
 import type {
   RecurringBookingDto,
   VisitCancellationQuoteDto,
@@ -34,7 +34,8 @@ import type {
  *   banner       "Wed, 14 Oct" · "9:00 AM – 10:00 AM · 1 hr"; days to go while the cook is pending
  *   cook         the assigned cook from the visit, with region, languages, visits with you and the
  *                menu from their Cook Pool profile when it has loaded
- *   pending      "Cook confirmed by Mon, 8 PM" (the visit's T−3h) over up to three pool cooks
+ *   pending      "Cook confirmed by Mon, 8:45 AM" (the visit's T−3h); the banner counts down in
+ *                hours on the visit's last day
  *   cancelled    who cancelled and when, and the plan's next visit
  *   checklist    only once the visit has a booking to save it against (`prep`)
  *   charge       the visit's price incl. GST; what Autopay does, or did, with it
@@ -53,11 +54,11 @@ export interface VisitDetailsSources {
   readonly cookProfile: PoolCookProfileDto | null;
   /** `cookProfileFrom(cookProfile)` — the profile as the app draws it, for the menu. */
   readonly cookCard: CookProfile | null;
-  /** The household's pool, for the faces under "Cook confirmed by". */
-  readonly pool: CookPoolListDto | null;
   readonly quote: VisitCancellationQuoteDto | null;
   /** Asia/Kolkata `YYYY-MM-DD`. */
   readonly todayId: string;
+  /** For the pending countdown in hours once the visit is under a day away; omitted: days only. */
+  readonly now?: Date | undefined;
 }
 
 const VARIANTS: Record<VisitDetailDto['displayState'], VisitVariant> = {
@@ -66,6 +67,25 @@ const VARIANTS: Record<VisitDetailDto['displayState'], VisitVariant> = {
   completed: 'completed',
   cancelled: 'cancelled',
 };
+
+/**
+ * The pending banner's countdown (`2165:13861`): "5 HOURS TO GO" once the visit is under a day
+ * away, "10 DAYS TO GO" before that.
+ */
+function countdownTo(
+  start: string,
+  date: string,
+  todayId: string,
+  now: Date | undefined,
+): { readonly daysToGo: string; readonly toGoLabel: string } {
+  const hours = now === undefined ? null : (Date.parse(start) - now.getTime()) / 3_600_000;
+  if (hours !== null && hours < 24) {
+    const whole = Math.max(1, Math.floor(hours));
+    return { daysToGo: String(whole), toGoLabel: whole === 1 ? 'HOUR TO GO' : 'HOURS TO GO' };
+  }
+  const days = Math.max(0, daysBetween(todayId, date));
+  return { daysToGo: String(days), toGoLabel: days === 1 ? 'DAY TO GO' : 'DAYS TO GO' };
+}
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 const MONTHS = [
@@ -132,7 +152,7 @@ const NOTICE_BODY =
   'You’d be notified 27 hrs before & payment is auto-debited 3 hrs before the service time.';
 
 export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsModel {
-  const { visit, booking, cookProfile, cookCard, pool, quote, todayId } = sources;
+  const { visit, booking, cookProfile, cookCard, quote, todayId } = sources;
   const variant = VARIANTS[visit.displayState];
   const start = visit.startTime;
   const end = plusMinutes(start, visit.durationMinutes);
@@ -163,14 +183,9 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
 
   // ─── Pending ───────────────────────────────────────────────────────────────────────────────
   const confirmBy = kolkata(visit.cookConfirmBy);
-  const poolCooks = (pool?.cooks ?? [])
-    .filter((row) => row.available)
-    .slice(0, 3)
-    .map((row) => ({
-      id: row.cook.cookId,
-      name: row.cook.displayName.replace(/^Cook\s+/, ''),
-      ...(row.cook.profileImageUrl === null ? {} : { photo: { uri: row.cook.profileImageUrl } }),
-    }));
+
+  const planVisits =
+    booking?.plans.find((plan) => plan.planNumber === visit.planNumber)?.visits.length ?? null;
 
   // ─── Cancelled ─────────────────────────────────────────────────────────────────────────────
   const cancellation = visit.cancellation;
@@ -267,9 +282,7 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
     banner: {
       date,
       slot: `${clockText(start)} – ${clockText(end)} · ${duration}`,
-      ...(variant === 'pending'
-        ? { daysToGo: String(Math.max(0, daysBetween(todayId, visit.date))) }
-        : {}),
+      ...(variant === 'pending' ? countdownTo(visit.start, visit.date, todayId, sources.now) : {}),
     },
     cook: {
       eyebrow: fixture.cook.eyebrow,
@@ -287,8 +300,6 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
       note: fixture.pending.note,
       eyebrow: fixture.pending.eyebrow,
       title: `Cook confirmed by ${dayLabel(confirmBy.dateId).split(',')[0]}, ${shortClock(confirmBy.hhmm)}`,
-      body: fixture.pending.body,
-      pool: poolCooks,
       cta: fixture.pending.cta,
     },
     cancelled: {
@@ -331,7 +342,11 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
       subtitle: `${date} · ${clockText(start)}`,
       visitLine: {
         label: `Cook visit · ${duration}`,
-        caption: `Recurring · Plan ${visit.planNumber}, Visit ${visit.visitNumber}`,
+        // `2165:14262` — "Plan 1, Visit 1 of 3": of the plan's visits a day, once the booking has
+        // loaded to count them.
+        caption: `Recurring · Plan ${visit.planNumber}, Visit ${visit.visitNumber}${
+          planVisits === null ? '' : ` of ${planVisits}`
+        }`,
         ...(visit.price.basePricePaise > visit.price.pricePaise
           ? { was: formatPaise(visit.price.basePricePaise) }
           : {}),

@@ -1,4 +1,4 @@
-import type { CookPoolListDto, CookProfile, PoolCookProfileDto } from '@features/cookPool';
+import type { CookProfile, PoolCookProfileDto } from '@features/cookPool';
 import type {
   RecurringBookingDto,
   VisitCancellationQuoteDto,
@@ -102,7 +102,6 @@ function sources(overrides: Partial<VisitDetailsSources> = {}): VisitDetailsSour
     booking: null,
     cookProfile: null,
     cookCard: null,
-    pool: null,
     quote: null,
     todayId: TODAY,
     ...overrides,
@@ -117,33 +116,24 @@ describe('visitDetailsFrom', () => {
       date: 'Wed, 14 Oct',
       slot: '9:00 AM – 10:00 AM · 1 hr',
       daysToGo: '6',
+      toGoLabel: 'DAYS TO GO',
     });
   });
 
-  it('confirms the cook by the visit’s T−3h, over pool cooks that are available', () => {
-    const pool = {
-      cooks: [
-        { cook: { cookId: 'a', displayName: 'Cook Asha', profileImageUrl: null }, available: true },
-        {
-          cook: { cookId: 'b', displayName: 'Cook Bina', profileImageUrl: 'https://img/b' },
-          available: false,
-        },
-        {
-          cook: { cookId: 'c', displayName: 'Cook Chitra', profileImageUrl: 'https://img/c' },
-          available: true,
-        },
-      ],
-      count: 3,
-    } as unknown as CookPoolListDto;
-    const { pending } = visitDetailsFrom(sources({ pool }));
+  it('counts the pending visit down in days, then in hours on its last day', () => {
+    const start = Date.parse(visit().start);
+    expect(
+      visitDetailsFrom(sources({ now: new Date(start - 5.5 * 3_600_000) })).banner,
+    ).toMatchObject({ daysToGo: '5', toGoLabel: 'HOURS TO GO' });
+    expect(
+      visitDetailsFrom(sources({ now: new Date(start - 3 * 86_400_000) })).banner.toGoLabel,
+    ).toMatch(/DAYS? TO GO/);
+  });
+
+  it('confirms the cook by the visit’s T−3h', () => {
+    const { pending } = visitDetailsFrom(sources());
     // 00:30 UTC is 6 AM in Kolkata.
     expect(pending.title).toBe('Cook confirmed by Wed, 6 AM');
-    expect(pending.pool).toEqual([
-      { id: 'a', name: 'Asha' },
-      { id: 'c', name: 'Chitra', photo: { uri: 'https://img/c' } },
-    ]);
-    // No "92% match" is invented.
-    expect(pending.pool.every((cook) => cook.match === undefined)).toBe(true);
   });
 
   it('builds the assigned cook from the visit and their Cook Pool profile', () => {
@@ -196,6 +186,15 @@ describe('visitDetailsFrom', () => {
     );
     expect(model.prep?.allSet).toBe('Kitchen’s ready! Meera can start cooking right away.');
     expect(model.prepChecked).toEqual(['entry', 'utensils']);
+  });
+
+  it('counts the plan’s visits in the payment caption once the booking has loaded', () => {
+    const booking = {
+      plans: [{ planNumber: 1, visits: [{}, {}, {}] }],
+    } as unknown as RecurringBookingDto;
+    expect(visitDetailsFrom(sources({ booking })).paymentSheet.visitLine.caption).toBe(
+      'Recurring · Plan 1, Visit 1 of 3',
+    );
   });
 
   it('prices the visit: list price struck when discounted, the total incl. GST', () => {
@@ -321,6 +320,7 @@ describe('visitDetailsFrom', () => {
   it('points "Your plan continues" at the plan’s next visit, or leaves it out', () => {
     const cancelled = visit({ displayState: 'cancelled', status: 'cancelled' });
     const booking = {
+      plans: [],
       upNext: { visitId: 'visit-2', date: '2026-10-16', startTime: '09:00' },
     } as unknown as RecurringBookingDto;
     expect(visitDetailsFrom(sources({ visit: cancelled, booking })).cancelled.nextVisit).toBe(

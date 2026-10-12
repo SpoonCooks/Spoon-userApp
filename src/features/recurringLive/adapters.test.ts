@@ -129,7 +129,10 @@ describe('liveCalendarFrom', () => {
         }),
       ],
     });
-    expect(model.visitsByDay[TODAY]?.visits[0]).toMatchObject({ meta: 'Cook Sanchita' });
+    expect(model.visitsByDay[TODAY]?.visits[0]).toMatchObject({
+      status: 'assigned',
+      meta: 'Upcoming · Cook Sanchita',
+    });
     expect(model.visitsByDay[TODAY]?.visits[0]?.pool).toBeUndefined();
   });
 

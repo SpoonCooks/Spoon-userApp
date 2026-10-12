@@ -39,7 +39,8 @@ export interface CalendarWeek {
   readonly days: readonly (CalendarDay | null)[];
 }
 
-export type VisitStatus = 'completed' | 'cancelled' | 'unassigned';
+/** `assigned` is an upcoming visit whose cook is confirmed (`1735:2654`). */
+export type VisitStatus = 'completed' | 'cancelled' | 'assigned' | 'unassigned';
 
 export interface DayVisit {
   readonly id: string;
@@ -48,6 +49,8 @@ export interface DayVisit {
   readonly title: string;
   /** "Completed · Cook Sanchita". */
   readonly meta: string;
+  /** Assigned visits only — the cook's face in the `Glyph/cook` ring; absent without a photo. */
+  readonly photo?: ImageSourcePropType;
   /** Unassigned visits only — the `1006:740` "Cook pending" card. */
   readonly pool?: {
     readonly title: string;
@@ -87,6 +90,8 @@ export const CALENDAR_DEMO_DATES = {
   past: '2026-10-02',
   today: '2026-10-08',
   upcoming: '2026-10-14',
+  /** `1735:2630` — an upcoming visit whose cook is confirmed. */
+  assigned: '2026-10-15',
 } as const;
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
@@ -232,6 +237,21 @@ const UPCOMING_VISITS: DayVisits = {
   ],
 };
 
+/** `1735:2630` — Date pop-up / upcoming, assigned (Thu, 15 Oct in the fixture). */
+const UPCOMING_ASSIGNED_DAY_ID = CALENDAR_DEMO_DATES.assigned;
+const UPCOMING_ASSIGNED_VISITS: DayVisits = {
+  planLabel: 'Plan 1 · 1 visit',
+  visits: [
+    {
+      id: 'v1',
+      status: 'assigned',
+      title: '1st Visit · 9:00 AM · 1 hr',
+      meta: 'Upcoming · Cook Sanchita',
+      photo: UP_NEXT_COOK_PHOTO,
+    },
+  ],
+};
+
 const VISITS_BY_KIND: Record<Exclude<CalendarDayKind, 'none'>, DayVisits> = {
   past: PAST_VISITS,
   today: TODAY_VISITS,
@@ -250,6 +270,7 @@ export function findCalendarDay(id: string): CalendarDay | undefined {
 
 /** The visits listed in a date's pop-up, or `undefined` for a date with none. */
 export function visitsForDay(day: CalendarDay): DayVisits | undefined {
+  if (day.id === UPCOMING_ASSIGNED_DAY_ID) return UPCOMING_ASSIGNED_VISITS;
   return day.kind === 'none' ? undefined : VISITS_BY_KIND[day.kind];
 }
 

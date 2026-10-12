@@ -9,6 +9,7 @@ import { ActionDock } from '../components/visit/ActionDock';
 import { BeforeArrivalCard } from '../components/visit/BeforeArrivalCard';
 import { CookAssignedCard } from '../components/visit/CookAssignedCard';
 import { CookPendingCard } from '../components/visit/CookPendingCard';
+import { UpiAutopayCard } from '../components/visit/UpiAutopayCard';
 import { RecipeShareRow } from '../components/visit/RecipeShareRow';
 import { RefundSummaryCard } from '../components/visit/RefundSummaryCard';
 import { VisitCancelledCard } from '../components/visit/VisitCancelledCard';
@@ -26,15 +27,16 @@ import type { VisitDetailsModel, VisitPrepKey, VisitPrepReady, VisitVariant } fr
  * Recurring live booking — "Visit details".
  *
  * Source: Figma `cCQlzTeiObQkpVBzwI8mZi` page `1005:131`, one frame per `variant`:
- *   `assigned`  `1008:5398` "Visit details / upcoming · Cook assigned"
- *   `pending`   `1466:8275` "Visit details / upcoming · Cook pending"
+ *   `assigned`  `2165:13847` "Visit details / upcoming · Cook assigned"
+ *   `pending`   `2165:13857` "Visit details / upcoming · Cook pending"
  *   `completed` `1466:8639` "Visit details / upcoming · Completed"
- *   `cancelled` `1466:8446` "Visit details / upcoming · Cancelled"
+ *   `cancelled` `2165:13866` "Visit details / upcoming · Cancelled"
  *
  * Under the `Nav header 2` bar the content runs px 16, pt 8, pb 24 with 24 between blocks:
  * the status banner, then the variant's cook section (`Cook details`, `1466:797` — "the only part
  * of the screen that changes"), and below it:
- *   assigned / pending — recipe share, the before-arrival checklist (`1444:718`), visit charge
+ *   assigned           — recipe share, the before-arrival checklist (`1444:718`)
+ *   pending            — the UPI Autopay explainer (`2165:13863`)
  *   completed          — `ratingSlot` (the rate card, `1517:9295`, built elsewhere), visit charge
  *   cancelled          — the cancelled cook section and the payment & refund summary
  * The `Action dock` (`1444:730`) is the pinned footer; Completed and Cancelled have no "Modify
@@ -56,7 +58,6 @@ export interface VisitDetailsScreenProps {
   readonly onModifyBooking?: (() => void) | undefined;
   /** Per `1434:2205`: one tap straight to WhatsApp, no in-app sheet. */
   readonly onHelp?: (() => void) | undefined;
-  readonly onCall?: (() => void) | undefined;
   readonly onShareRecipe?: (() => void) | undefined;
   readonly onViewCookPool?: (() => void) | undefined;
   readonly onNextVisit?: (() => void) | undefined;
@@ -79,7 +80,7 @@ export interface VisitDetailsScreenProps {
   readonly addingCookToPool?: boolean;
   /** Completed only: tip the cook (only while the server allows it). */
   readonly onTipCook?: (() => void) | undefined;
-  /** The header title; "Visit details" by default, "On-time visit" for a one-time booking. */
+  /** The header title; "Recurring visit" by default, "On-time visit" for a one-time booking. */
   readonly title?: string | undefined;
   readonly testID?: string | undefined;
 }
@@ -91,7 +92,6 @@ export function VisitDetailsScreen({
   onPaymentDetails,
   onModifyBooking,
   onHelp,
-  onCall,
   onShareRecipe,
   onViewCookPool,
   onNextVisit,
@@ -104,7 +104,7 @@ export function VisitDetailsScreen({
   onAddCookToPool,
   addingCookToPool = false,
   onTipCook,
-  title = 'Visit details',
+  title = 'Recurring visit',
   testID = 'visit-details-screen',
 }: VisitDetailsScreenProps) {
   const model = given ?? visitDemoModel(demoVariant, prepState);
@@ -141,19 +141,26 @@ export function VisitDetailsScreen({
       >
         <VisitStatusBanner
           state={
-            variant === 'pending' ? 'upcoming' : variant === 'cancelled' ? 'cancelled' : 'confirmed'
+            variant === 'pending'
+              ? 'upcoming'
+              : variant === 'assigned'
+                ? 'assigned'
+                : variant === 'cancelled'
+                  ? 'cancelled'
+                  : 'confirmed'
           }
           date={model.banner.date}
           slot={model.banner.slot}
           daysToGo={model.banner.daysToGo}
+          toGoLabel={model.banner.toGoLabel}
           testID={`${testID}-banner`}
         />
 
         {variant === 'assigned' ? (
+          // `2165:13847` — no Pool note and no Call before the visit: the card opens on the cook.
           <CookAssignedCard
-            cook={model.cook}
+            cook={{ ...model.cook, note: '' }}
             menu={model.menu}
-            onCall={onCall}
             testID={`${testID}-cook`}
           />
         ) : null}
@@ -164,6 +171,7 @@ export function VisitDetailsScreen({
             testID={`${testID}-cook`}
           />
         ) : null}
+        {variant === 'pending' ? <UpiAutopayCard testID={`${testID}-autopay`} /> : null}
         {variant === 'cancelled' ? (
           <VisitCancelledCard
             cancelled={model.cancelled}
@@ -182,7 +190,7 @@ export function VisitDetailsScreen({
           />
         ) : null}
 
-        {upcoming ? (
+        {variant === 'assigned' ? (
           <>
             {model.recipe === null ? null : (
               <RecipeShareRow
@@ -202,7 +210,10 @@ export function VisitDetailsScreen({
           </>
         ) : null}
 
-        {model.refund !== null && refundSlot !== undefined && refundSlot !== null ? (
+        {/* Upcoming frames carry no charge card: the price is in Payment details. */}
+        {upcoming ? null : model.refund !== null &&
+          refundSlot !== undefined &&
+          refundSlot !== null ? (
           refundSlot
         ) : model.refund !== null ? (
           <RefundSummaryCard refund={model.refund} testID={`${testID}-refund`} />

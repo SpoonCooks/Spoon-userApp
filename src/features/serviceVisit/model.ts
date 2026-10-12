@@ -1,6 +1,7 @@
 import { formatPaise } from '@core/format';
 import { bookingStrikeOf } from '@features/booking';
 import type { BookingDetailDto, ExtensionOptionDto, TrackingDto } from '@features/booking';
+import type { PaymentDetailsSheetData } from '@features/recurringLive';
 
 /**
  * Visit details through the service — Figma "Service flow" (`2165:11841`), dev notes
@@ -254,6 +255,32 @@ export function paymentSheetFrom(booking: BookingDetailDto, cookName: string | n
     methodDetail: method?.detail ?? '',
     manageLabel: '',
     reminder: '',
+  };
+}
+
+/**
+ * The Payment details sheet for a Recurring visit's booking (Figma `2165:14262`): what the booking
+ * itself charged — the visit, any extensions, GST and a tip — under the plan's caption ("Recurring
+ * · Plan 1, Visit 1") and paid by the plan's UPI Autopay, with its Manage link and debit reminder.
+ * `plan` is the recurring visit's own sheet (`visitDetailsFrom(...).paymentSheet`).
+ */
+export function recurringPaymentSheetFrom(
+  booking: BookingDetailDto,
+  cookName: string | null,
+  plan: PaymentDetailsSheetData,
+): PaymentDetailsSheetData {
+  const sheet = paymentSheetFrom(booking, cookName);
+  return {
+    ...sheet,
+    visitLine: {
+      ...sheet.visitLine,
+      ...(plan.visitLine.caption === undefined ? {} : { caption: plan.visitLine.caption }),
+    },
+    methodType: 'upi',
+    methodName: plan.methodName,
+    methodDetail: plan.methodDetail,
+    manageLabel: plan.manageLabel,
+    reminder: plan.reminder,
   };
 }
 

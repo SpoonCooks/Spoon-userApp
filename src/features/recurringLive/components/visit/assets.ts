@@ -17,6 +17,9 @@ export const VISIT_SKY_AFTERNOON =
 /** `1461:6168` — the 36pt white "confirmed" tick disc. */
 export const VISIT_BADGE_CONFIRMED =
   require('../../../../../assets/figma/recurring/visit/badge-confirmed.webp') as ImageSourcePropType;
+/** `2165:11848` state glyph — the 20pt person-with-tick on the white "ASSIGNED" disc. */
+export const VISIT_BADGE_ASSIGNED_GLYPH =
+  require('../../../../../assets/figma/recurring/visit/badge-assigned-glyph.webp') as ImageSourcePropType;
 /** `1461:6237` — the 36pt dashed "cancelled" cross. */
 export const VISIT_BADGE_CANCELLED =
   require('../../../../../assets/figma/recurring/visit/badge-cancelled.webp') as ImageSourcePropType;
@@ -51,19 +54,23 @@ export const VISIT_CHEVRON_16 =
 /** `1466:700` — the 20pt bell. */
 export const VISIT_BELL_PENDING =
   require('../../../../../assets/figma/recurring/visit/bell-pending.webp') as ImageSourcePropType;
-/** `1466:721` — the yellow thread the pool hangs on, 344×16.04 (its stroke-inclusive box). */
-export const VISIT_POOL_THREAD =
-  require('../../../../../assets/figma/recurring/visit/pool-thread.webp') as ImageSourcePropType;
-/** `1466:710` / `1466:714` / `1466:718` — the 64pt pool photos with their inside 3pt yellow ring; the square render is clipped to a circle in RN. */
-export const VISIT_POOL_SANCHITA =
-  require('../../../../../assets/figma/recurring/visit/pool-sanchita.webp') as ImageSourcePropType;
-export const VISIT_POOL_JYOTI =
-  require('../../../../../assets/figma/recurring/visit/pool-jyoti.webp') as ImageSourcePropType;
-export const VISIT_POOL_REKHA =
-  require('../../../../../assets/figma/recurring/visit/pool-rekha.webp') as ImageSourcePropType;
-/** `1466:724` — the 18pt chevron on "View Cook Pool". */
-export const VISIT_CHEVRON_18 =
-  require('../../../../../assets/figma/recurring/visit/chevron-right-18.webp') as ImageSourcePropType;
+
+// --- UPI Autopay explainer (`2165:13863`) --------------------------------------------------------
+/** `827:119` — the 24pt Icon/Recurring beside "How UPI Autopay works". */
+export const VISIT_AUTOPAY_RECURRING =
+  require('../../../../../assets/figma/recurring/visit/autopay-recurring.webp') as ImageSourcePropType;
+/** `1346:455` — the 24pt Icon/Touch on "Approve once". */
+export const VISIT_AUTOPAY_TOUCH =
+  require('../../../../../assets/figma/recurring/visit/autopay-touch.webp') as ImageSourcePropType;
+/** `1306:464` — the 24pt Icon/Bell on "Reminder 27 hrs before". */
+export const VISIT_AUTOPAY_BELL =
+  require('../../../../../assets/figma/recurring/visit/autopay-bell.webp') as ImageSourcePropType;
+/** `819:115` — the 24pt Icon/Money on "Auto-debit 3 hrs before". */
+export const VISIT_AUTOPAY_MONEY =
+  require('../../../../../assets/figma/recurring/visit/autopay-money.webp') as ImageSourcePropType;
+/** `1951:14318` — the dashed 2×18 `#FFD600` thread between steps (4 on, 4 off). */
+export const VISIT_AUTOPAY_THREAD =
+  require('../../../../../assets/figma/recurring/visit/autopay-thread.webp') as ImageSourcePropType;
 
 // --- Cook details · cancelled -------------------------------------------------------------------
 /** `547:2537` — the 24pt calendar-with-cross. */
