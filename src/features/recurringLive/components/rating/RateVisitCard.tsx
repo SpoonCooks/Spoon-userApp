@@ -158,11 +158,15 @@ export function RateVisitCard({
     setFeedback((current) => ({ ...current, media: [...current.media, ...items] }));
   const onPickSource = (source: MediaSource) => {
     setSourceOpen(false);
-    if (source === 'gallery') {
-      void pickFromGallery(photosLeft(feedback), videoAllowed(feedback)).then(addMedia);
-    } else {
-      setCapture(source);
-    }
+    // iOS presents nothing while another modal is still going away: wait for the sheet to finish
+    // closing before the camera screen or the system picker comes up.
+    setTimeout(() => {
+      if (source === 'gallery') {
+        void pickFromGallery(photosLeft(feedback), videoAllowed(feedback)).then(addMedia);
+      } else {
+        setCapture(source);
+      }
+    }, SHEET_DISMISS_MS);
   };
 
   const tapRef = useRef<StarTap | null>(null);
@@ -385,7 +389,7 @@ function FirstLook({
       </View>
 
       {/* `1501:6689` — the 5+ nudge. */}
-      <View style={[styles.nudge, service && styles.nudgePlain]}>
+      <View style={styles.nudge}>
         <View style={styles.nudgeDisc}>
           <Animated.Image
             source={RATING_ART.nudgeSparkle}
@@ -565,6 +569,9 @@ function RatedBody({
   );
 }
 
+/** The source sheet's slide-out (220 ms) and the modal dismissal behind it. */
+const SHEET_DISMISS_MS = 450;
+
 const CARD_RADIUS = 28;
 
 const styles = StyleSheet.create({
@@ -620,7 +627,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  /** `1501:6689` — pl12 / pr14 / py10, r16, 10pt gap. */
+  /** `1501:6689` — pl12 / pr14 / py10, r16, 10pt gap; no fill on the Ratings page (`1517:9293`). */
   nudge: {
     alignSelf: 'stretch',
     flexDirection: 'row',
@@ -630,10 +637,7 @@ const styles = StyleSheet.create({
     paddingRight: 14,
     paddingVertical: lightTheme.space.s10,
     borderRadius: lightTheme.radius.md,
-    backgroundColor: lightTheme.colors.surfaceRatingNudge,
   },
-  /** `2165:12076` — the Service flow's nudge has no fill. */
-  nudgePlain: { backgroundColor: 'transparent' },
   /** `1501:6690` — 28pt lime disc; the 14pt sparkle at 7,7. */
   nudgeDisc: {
     width: 28,

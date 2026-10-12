@@ -9,6 +9,25 @@ import type { FeedbackVoiceNote } from './model';
 /** `expo-audio`, as `loadExpoAudio` hands it over on a build that has it. */
 export type ExpoAudioModule = NonNullable<ReturnType<typeof loadExpoAudio>>;
 
+/** How long the microphone may take to open before recording gives up. */
+const PREPARE_TIMEOUT_MS = 8_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('The microphone didn’t respond.')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+}
+
 /** How often the live waveform takes a reading. */
 const SAMPLE_MS = 120;
 
@@ -74,9 +93,20 @@ export function useVoiceNote(
       );
       return;
     }
-    await audio.setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-    await recorder.prepareToRecordAsync();
-    recorder.record();
+    try {
+      await audio.setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      // Preparing can stall rather than fail when there is no input to open (seen on a
+      // simulator without microphone access); give up and say so instead of waiting forever.
+      await withTimeout(recorder.prepareToRecordAsync(), PREPARE_TIMEOUT_MS);
+      recorder.record();
+    } catch (error) {
+      // No microphone to open (another app holds it, or a simulator without input): say so.
+      Alert.alert(
+        'Couldn’t start recording',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+      return;
+    }
     samples.current = [];
     setLiveBars([]);
     setElapsedMs(0);
