@@ -53,6 +53,13 @@ import type { OtpViewModel } from '../types';
  * The boxes are a DISPLAY of one hidden input — that keeps paste, autofill and the platform SMS
  * suggestion working, which six separate inputs would break.
  *
+ * SMS AUTOFILL. The input is focused as the screen opens, so the keyboard is already up when the
+ * SMS lands — the platform only offers the code above a keyboard that is showing: iOS's "From
+ * Messages" suggestion (`textContentType="oneTimeCode"`) and Android's autofill suggestion
+ * (`autoComplete="sms-otp"`). Before, the boxes had to be tapped first, by which point the
+ * customer had usually opened Messages to read the code. Tapping the suggestion fills all the
+ * digits in one change, and the last digit submits, so one tap signs in.
+ *
  * BOUNDARY: nothing here verifies a code, counts down, decides when resend unlocks, or knows the
  * expiry. `digitCount`, `resendLabel` and `resendEnabled` are supplied; `onVerify` hands the code
  * to the host and stops.
@@ -300,6 +307,7 @@ export function OtpScreen({
                   keyboardType="number-pad"
                   textContentType="oneTimeCode"
                   autoComplete="sms-otp"
+                  autoFocus
                   maxLength={otp.digitCount}
                   caretHidden
                   onFocus={() => {
