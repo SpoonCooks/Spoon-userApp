@@ -6,7 +6,14 @@ import { priceForSlot, type Catalogue } from '@features/catalogue';
 import type { CookPoolListDto } from '@features/cookPool';
 import type { RecurringEligibilityDto } from '@features/recurringSetup';
 
-import type { DurationOption, HomeModel, LiveHub, PoolCook, DurationTilePrice } from './types';
+import type {
+  ActiveBookingCard,
+  DurationOption,
+  DurationTilePrice,
+  HomeModel,
+  LiveHub,
+  PoolCook,
+} from './types';
 
 /**
  * Real responses → `HomeModel`. Pure, so every rule below is testable without a network.
@@ -23,6 +30,7 @@ import type { DurationOption, HomeModel, LiveHub, PoolCook, DurationTilePrice } 
  *                      (the pool's count is what unlocks Recurring, available or not)
  *   activeRecurringPlan / recurringChip
  *                      GET /v1/recurring/eligibility `liveBookings` and `chip`
+ *   activeBookings     built by `activeBookingCardsFrom` (`activeBookings.ts`)
  *
  * TODO(backend-contract) — not available yet, so deliberately empty:
  *   mostBooked (no flag), serves (no field), waitlist count/threshold (no endpoint).
@@ -80,6 +88,8 @@ export interface HomeSources {
   readonly pool?: CookPoolListDto | undefined;
   /** `undefined` while loading or failed — the chip then counts the pool itself. */
   readonly recurring?: RecurringEligibilityDto | undefined;
+  /** The Active bookings carousel, already built (`activeBookingCardsFrom`). */
+  readonly activeBookings?: readonly ActiveBookingCard[];
 }
 
 /** The carousel's tiles, from the catalogue and whatever instant reads have landed. */
@@ -166,6 +176,7 @@ export function homeModelFrom(sources: HomeSources): HomeModel {
     cookPool: (sources.pool?.cooks ?? []).map(poolCookOf),
     activeRecurringPlan: liveBooking === undefined ? null : { id: liveBooking.recurringBookingId },
     ...(sources.recurring === undefined ? {} : { recurringChip: sources.recurring.chip }),
+    activeBookings: sources.activeBookings ?? [],
     liveHubs: live ? [] : STATIC_LIVE_HUBS,
     waitlist: live
       ? null

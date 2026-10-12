@@ -3,6 +3,7 @@ import { Image, LayoutAnimation, ScrollView, StyleSheet, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ART } from '../assets';
+import { ActiveBookings } from '../components/ActiveBookings';
 import { BookSection } from '../components/BookSection';
 import { CooksTrust } from '../components/CooksTrust';
 import { DaySorted } from '../components/DaySorted';
@@ -29,7 +30,7 @@ import { poolBeads, recurringChipFor } from '../state/recurring';
 import type { RecurringTarget } from '../state/recurring';
 import { resolveHomeVariant } from '../state/variant';
 import { C } from '../theme';
-import type { DurationOption, HomeModel, PoolCook } from '../types';
+import type { ActiveBookingCard, DurationOption, HomeModel, PoolCook } from '../types';
 
 /** What the customer chose, handed to the booking flow. */
 export interface BookingRequest {
@@ -47,6 +48,10 @@ export interface HomeRedesignActions {
   readonly onPressAddress: () => void;
   /** Avatar → profile. */
   readonly onPressProfile: () => void;
+  /** An Active bookings card → that booking's details. */
+  readonly onPressActiveBooking?: (card: ActiveBookingCard) => void;
+  /** Active bookings "View all ›" → My bookings, Upcoming. */
+  readonly onPressViewAllBookings?: () => void;
   /** Lime "Book now" (Now, instant available) → Razorpay for the payable total. */
   readonly onBookNow: (request: BookingRequest) => void;
   /**
@@ -99,6 +104,8 @@ export interface HomeRedesignViewProps extends HomeRedesignActions {
  *   default    `941:4884`   live pincode, no booking history
  *   returning  `1255:2973`  default + the pool / recurring block under the CTA;
  *              `1290:1280`  on Recurring the duration strip and CTA give way to that block
+ *              `2240:6334`  + the Active bookings carousel between the hero and the Book section
+ *                           (any variant, whenever the customer has an active booking)
  *   inactive   `1302:3539`  not live — waitlist + referral, no booking path, read-only dial
  */
 export function HomeRedesignView({
@@ -304,6 +311,12 @@ export function HomeRedesignView({
         >
           {/* Decorative. */}
           <HeroBanner />
+
+          <ActiveBookings
+            cards={model.activeBookings ?? []}
+            onPressCard={actions.onPressActiveBooking ?? comingSoon}
+            onPressViewAll={actions.onPressViewAllBookings ?? comingSoon}
+          />
 
           {variant === 'inactive' && model.waitlist !== null ? (
             <NotLiveCard

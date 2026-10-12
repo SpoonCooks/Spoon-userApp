@@ -67,6 +67,26 @@ export const ART = {
 } as const;
 
 /**
+ * `2240:5822` Home banner — each time of day's 266 × 73 backdrop (its own gradient, sun / clouds /
+ * moon and stars), and the card's icons, rasterised at 3×.
+ */
+export const BANNER = {
+  backdrop: {
+    morning: img(require('../../../assets/figma/home2/banner/backdrop-morning.png')),
+    afternoon: img(require('../../../assets/figma/home2/banner/backdrop-afternoon.png')),
+    evening: img(require('../../../assets/figma/home2/banner/backdrop-evening.png')),
+  },
+  /** `167:23` Icon/Chevron right — 20pt in the card's Go button, 16pt beside "View all". */
+  chevronRight: img(require('../../../assets/figma/home2/banner/icon-chevron-right.png')),
+  /** Icon/Not started — the Upcoming pill's 8pt ring. */
+  notStarted: img(require('../../../assets/figma/home2/banner/icon-not-started.png')),
+  /** Icon/Live dot — the In progress pill's 6pt dot. */
+  liveDot: img(require('../../../assets/figma/home2/banner/icon-live-dot.png')),
+  /** Icon/Check — the Completed pill's tick, exported with its stroke's overhang. */
+  check: img(require('../../../assets/figma/home2/banner/icon-check.png')),
+} as const;
+
+/**
  * `1255:2991` — the hero scene's layers, rasterised at 3× from its vectors, each with a 20pt
  * transparent margin round its Figma box (see `HeroBanner`). `bg` is the still backdrop: tiles,
  * counter and stove with the burners off.

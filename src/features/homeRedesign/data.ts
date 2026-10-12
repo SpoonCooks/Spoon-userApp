@@ -6,11 +6,13 @@ import { useRuntime } from '@core/runtimeContext';
 import { currentAddressOf, useAddresses } from '@features/address';
 import { availabilityKeys, createAvailabilityApi } from '@features/availability';
 import type { InstantAvailabilityDto } from '@features/availability';
-import { useBookingHistory } from '@features/booking';
+import { useActiveBookings, useBookingDetails, useBookingHistory } from '@features/booking';
+import type { BookingDetailDto } from '@features/booking';
 import { useCatalogue } from '@features/catalogue';
 import { useCookPoolList } from '@features/cookPool';
-import { useRecurringEligibility } from '@features/recurringSetup';
+import { useRecurringBookings, useRecurringEligibility } from '@features/recurringSetup';
 
+import { activeBookingCardsFrom, activeBookingIdsNeedingDetail } from './activeBookings';
 import { guestHomeModelFrom, homeModelFrom } from './adapters';
 import type { InstantReads } from './adapters';
 import type { HomeModel } from './types';
@@ -42,6 +44,16 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
   // are no beads and the chip counts the (empty) pool.
   const pool = useCookPoolList();
   const recurring = useRecurringEligibility();
+  // Active bookings: the list polls while Home is mounted; in-progress and completed cards also
+  // read their detail (the service window and an extended duration), and the Recurring plans
+  // say which bookings are visits and which visit is next.
+  const active = useActiveBookings();
+  const detailIds = useMemo(
+    () => (active.state.status === 'ready' ? activeBookingIdsNeedingDetail(active.state.data) : []),
+    [active.state],
+  );
+  const detailReads = useBookingDetails(detailIds, { poll: true });
+  const recurringBookings = useRecurringBookings();
 
   const address =
     addresses.state.status === 'ready' ? currentAddressOf(addresses.state.data) : null;
@@ -77,6 +89,26 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
       }),
     );
 
+    const details = new Map<string, BookingDetailDto>();
+    detailIds.forEach((id, i) => {
+      const read = detailReads[i]?.state;
+      if (read?.status === 'ready') details.set(id, read.data);
+    });
+    const activeBookings =
+      active.state.status === 'ready'
+        ? activeBookingCardsFrom({
+            bookings: active.state.data,
+            details,
+            recurring:
+              recurringBookings.state.status === 'ready' ? recurringBookings.state.data : undefined,
+            timeZone:
+              catalogue.state.status === 'ready'
+                ? catalogue.state.data.operatingWindow.timeZone
+                : undefined,
+            now: new Date(),
+          })
+        : [];
+
     return ready(
       homeModelFrom({
         address,
@@ -87,6 +119,7 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
         waitlistJoined: options.waitlistJoined,
         pool: pool.state.status === 'ready' ? pool.state.data : undefined,
         recurring: recurring.state.status === 'ready' ? recurring.state.data : undefined,
+        activeBookings,
       }),
     );
   }, [
@@ -99,15 +132,39 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
     options.waitlistJoined,
     pool.state,
     recurring.state,
+    active.state,
+    detailIds,
+    detailReads,
+    recurringBookings.state,
   ]);
 
   // ONE identity for the life of Home. The route calls this from `useFocusEffect`, which re-runs
   // whenever its callback changes; a `refetch` that changed with the reads (every failed fetch is
   // a new error, so a new state) re-fired on every render and flooded the API until it rate
   // limited us. The ref always holds the latest reads.
-  const reads = useRef({ addresses, catalogue, history, pool, recurring, instantReads });
+  const reads = useRef({
+    addresses,
+    catalogue,
+    history,
+    pool,
+    recurring,
+    instantReads,
+    active,
+    detailReads,
+    recurringBookings,
+  });
   useEffect(() => {
-    reads.current = { addresses, catalogue, history, pool, recurring, instantReads };
+    reads.current = {
+      addresses,
+      catalogue,
+      history,
+      pool,
+      recurring,
+      instantReads,
+      active,
+      detailReads,
+      recurringBookings,
+    };
   });
   const refetch = useCallback(() => {
     const latest = reads.current;
@@ -116,7 +173,10 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
     latest.history.refetch();
     latest.pool.refetch();
     latest.recurring.refetch();
+    latest.active.refetch();
+    latest.recurringBookings.refetch();
     for (const read of latest.instantReads) read.refetch();
+    for (const read of latest.detailReads) read.refetch();
   }, []);
 
   return {

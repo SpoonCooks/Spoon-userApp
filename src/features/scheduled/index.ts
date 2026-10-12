@@ -25,7 +25,14 @@ export { useScheduleData } from './data';
  * different dates on two devices. `formatServiceTime` is the same rule for a clock TIME, not just
  * a calendar day — My bookings' "Scheduled • 4:00 PM" line reads it for the same reason.
  */
-export { formatServiceDate, formatServiceTime, serviceDateIn } from './serviceTime';
+export {
+  addServiceDays,
+  formatServiceDate,
+  formatServiceTime,
+  localMinuteIn,
+  serviceDateAnchor,
+  serviceDateIn,
+} from './serviceTime';
 export { devScheduleSelection } from './devSteps';
 export { ScheduleView } from './screens/ScheduleScreen';
 export type { ScheduleActions, ScheduleViewProps } from './screens/ScheduleScreen';

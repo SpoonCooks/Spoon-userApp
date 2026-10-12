@@ -34,6 +34,9 @@ const logger = getLogger('home');
  * The pool block: "Check Recurring" opens the Recurring landing (explainer + "Make your Cook
  * Pool"), "Book Recurring" the plan flow, the pool card the Cook Pool, and a bead that cook's
  * profile. "Recurring · Live" opens that booking's Live booking tab (`/recurring/[bookingId]`).
+ *
+ * Active bookings (`2243:1120`): a card opens its booking (`/booking/[id]`); "View all" opens My
+ * bookings on Upcoming.
  */
 export default function HomeRoute() {
   const status = useSessionStore((state) => state.status);
@@ -163,6 +166,10 @@ function SignedInHomeRoute() {
           notice={shownNotice}
           onPressAddress={() => router.push('/address?from=home')}
           onPressProfile={() => router.push('/profile')}
+          onPressActiveBooking={(card) =>
+            router.push({ pathname: '/booking/[id]', params: { id: card.bookingId } })
+          }
+          onPressViewAllBookings={() => router.push('/history')}
           onDurationSelected={(event) => {
             setDurationId(durationIdFor(event.durationMin));
             logger.info('duration_selected', event);

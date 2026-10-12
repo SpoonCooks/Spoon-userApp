@@ -8,6 +8,9 @@ import { formatPaise } from '@core/format';
 import { getLogger } from '@core/logging';
 import { RouteScaffold } from '@ui';
 import {
+  DEMO_HOME_ACTIVE,
+  DEMO_HOME_ACTIVE_ONE,
+  DEMO_HOME_ACTIVE_STATES,
   DEMO_HOME_FIRST_TIME,
   DEMO_HOME_NO_INSTANT,
   DEMO_HOME_NOT_LIVE,
@@ -31,6 +34,9 @@ const FIXTURES: Record<string, HomeModel> = {
   unavailable: DEMO_HOME_SOME_UNAVAILABLE,
   pricingLoading: DEMO_HOME_PRICING_LOADING,
   pricingError: DEMO_HOME_PRICING_ERROR,
+  active: DEMO_HOME_ACTIVE,
+  activeOne: DEMO_HOME_ACTIVE_ONE,
+  activeStates: DEMO_HOME_ACTIVE_STATES,
 };
 
 /** Destinations that do not exist yet say so instead of doing nothing. */
@@ -54,6 +60,8 @@ const pending = (destination: string, detail?: string) =>
  *   notLiveJoined    already on the waitlist
  *   unavailable      Now can't fit 2 / 2.5 hrs; Later has no 30-min slots
  *   pricingLoading   six skeleton tiles      pricingError   retry, CTA off
+ *   active           `2240:6334` — three Active bookings cards (`2243:1120`)
+ *   activeOne        one card (`2243:973`)   activeStates   Completed / evening In progress
  *
  * `?tab=recurring` opens the Recurring tab (`1290:1280`, with `state=returning`).
  * `?returning=1` and `?notLive=1` are kept as shorthands.
@@ -88,6 +96,8 @@ export default function HomeRedesignDevRoute() {
       {...(mode === undefined ? {} : { initialMode: mode })}
       onPressAddress={() => router.push('/address?from=home')}
       onPressProfile={() => router.push('/profile')}
+      onPressActiveBooking={(card) => pending('Booking details', card.whenLabel)}
+      onPressViewAllBookings={() => pending('My bookings · Upcoming')}
       onBookNow={(r) =>
         pending(
           'Razorpay checkout',
