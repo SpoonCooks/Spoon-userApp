@@ -64,10 +64,11 @@ export interface VisitDetailsScreenProps {
   /** Completed only — rendered where the rate card sits, 24 under the banner and above the charge. */
   readonly ratingSlot?: ReactNode | undefined;
   /**
-   * Cancelled and charged only — the refund tracker (DEC-090), drawn in place of the payment
-   * summary once the host has the visit's refund. The summary stands until then.
+   * Cancelled and charged only — the Refund tracker (`2303:4231`, DEC-090) inside Payment &
+   * refund, under the breakdown, once the host has the visit's refund. The card's older timeline
+   * stands until then.
    */
-  readonly refundSlot?: ReactNode | undefined;
+  readonly refundProgress?: ReactNode | undefined;
   /** How many prep checks start ticked: 0 (`1441:1808`), 1 (`1441:1853`) or 3 (`1441:1898`). */
   readonly prepState?: VisitPrepReady | undefined;
   readonly onPrepChange?: ((checked: readonly VisitPrepKey[]) => void) | undefined;
@@ -96,7 +97,7 @@ export function VisitDetailsScreen({
   onViewCookPool,
   onNextVisit,
   ratingSlot,
-  refundSlot,
+  refundProgress,
   prepState = 0,
   onPrepChange,
   onBookAgain,
@@ -211,12 +212,12 @@ export function VisitDetailsScreen({
         ) : null}
 
         {/* Upcoming frames carry no charge card: the price is in Payment details. */}
-        {upcoming ? null : model.refund !== null &&
-          refundSlot !== undefined &&
-          refundSlot !== null ? (
-          refundSlot
-        ) : model.refund !== null ? (
-          <RefundSummaryCard refund={model.refund} testID={`${testID}-refund`} />
+        {upcoming ? null : model.refund !== null ? (
+          <RefundSummaryCard
+            refund={model.refund}
+            progress={refundProgress}
+            testID={`${testID}-refund`}
+          />
         ) : (
           <VisitChargeCard charge={model.charge} testID={`${testID}-charge`} />
         )}

@@ -18,6 +18,8 @@ import { AddressToast } from '@ui/v2/Toast';
 import type { ToastNotice } from '@ui/v2/Toast';
 import { C, SHADOW_1, SHADOW_2, T } from '@ui/v2/theme';
 
+import { RefundProgressCard } from '@features/refunds';
+
 import { CANCEL_ART } from './art';
 import {
   FEE_BOUNDARY_MINUTES,
@@ -37,10 +39,10 @@ import {
   minutesToStart,
   outcomeLines,
   refundCaption,
+  refundProgressFrom,
   rupees,
   slotRange,
   visitSubtitle,
-  whenLabel,
 } from './model';
 import type { CancelQuote, CancelReason, CancelRefund, CancelVisit, FeeZone } from './model';
 
@@ -967,7 +969,6 @@ function DoneStep({
 }) {
   const refundPaise = refund?.amountPaise ?? quote?.refundPaise ?? 0;
   const now = new Date();
-  const method = visit.paidWith ?? methodLabel(refund?.method);
   return (
     <>
       <CancelledBanner visit={visit} testID={`${testID}-banner`} />
@@ -980,63 +981,11 @@ function DoneStep({
         )}
       </View>
       {refundPaise > 0 ? (
-        <View style={styles.tracker} testID={`${testID}-refund`}>
-          <View style={styles.summaryHeader}>
-            <Well icon={CANCEL_ART.lock} tone="base" />
-            <View style={styles.flexText}>
-              <Text style={styles.emphasis}>{rupees(refundPaise)} refund</Text>
-              <Text style={styles.caption}>
-                {method === null ? 'To your original payment method' : `To ${method}`}
-              </Text>
-            </View>
-            <View style={[styles.badge, refund?.refunded === true && styles.badgePositive]}>
-              <Text style={styles.captionStrong}>
-                {refund?.refunded === true ? 'Refunded' : 'Processing'}
-              </Text>
-            </View>
-          </View>
-          <View>
-            <View style={styles.stepRow}>
-              <View style={styles.stepNode}>
-                <View style={styles.stepDotDone}>
-                  <Image source={CANCEL_ART.checkTiny} style={styles.icon12} />
-                </View>
-                <View style={styles.stepConnector} />
-              </View>
-              <View style={[styles.flexText, styles.stepText]}>
-                <Text style={styles.bodyStrong}>Refund initiated</Text>
-                <Text style={styles.caption}>
-                  {whenLabel(refund?.initiatedAt ?? now.toISOString(), now)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.stepRow}>
-              <View style={styles.stepNode}>
-                {refund?.refunded === true ? (
-                  <View style={styles.stepDotDone}>
-                    <Image source={CANCEL_ART.checkTiny} style={styles.icon12} />
-                  </View>
-                ) : (
-                  <Image source={CANCEL_ART.dotPending} style={styles.stepDotPending} />
-                )}
-              </View>
-              <View style={styles.flexText}>
-                {/* The method's kind only ("UPI"); the masked id sits on the "To …" line above. */}
-                <Text style={styles.bodyStrong}>
-                  {method === null
-                    ? 'Credit to your account'
-                    : `Credit to your ${method.split(' · ')[0] ?? method} account`}
-                </Text>
-                {/* No expected date: Razorpay gives none, so the window is stated instead. */}
-                <Text style={styles.caption}>
-                  {refund?.refunded === true && refund.creditedAt !== null
-                    ? `Credited ${whenLabel(refund.creditedAt, now)}`
-                    : 'Expected within 5-7 working days'}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
+        // `2303:4231` — the same Refund tracker as Visit details → Payment & refund.
+        <RefundProgressCard
+          view={refundProgressFrom(refund, refundPaise, now)}
+          testID={`${testID}-refund`}
+        />
       ) : (
         <View style={styles.tracker} testID={`${testID}-no-refund`}>
           <View style={styles.summaryHeader}>
@@ -1290,22 +1239,6 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     backgroundColor: C.subtle,
   },
-  badgePositive: { backgroundColor: C.positive },
-  stepRow: { flexDirection: 'row', gap: 12 },
-  stepNode: { alignItems: 'center', gap: 2 },
-  stepDotDone: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: C.textSecondary,
-    backgroundColor: C.base,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDotPending: { width: 20, height: 20 },
-  stepConnector: { width: 2, height: 22, backgroundColor: C.textDisabled },
-  stepText: { paddingBottom: 8 },
   banner: { padding: 16, borderRadius: 24, overflow: 'hidden' },
   halo3: { position: 'absolute', left: 214, top: 14, width: 208, height: 208 },
   halo2: { position: 'absolute', left: 238, top: 38, width: 160, height: 160 },

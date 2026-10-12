@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
 import { Text } from '@ui';
@@ -14,10 +15,16 @@ import { VISIT_MONEY_24, VISIT_REFUND_NODE, VISIT_STITCH_HORIZONTAL } from './as
  * "Payment & refund", the lime `Refunded` badge `90:182`); the `#FFF7CC` breakdown (amount paid,
  * the Caption GST and cancellation-fee lines, a yellow stitch, the refund total in
  * `Spoon/Display`); then where the refund went and its timeline, ending on the 5–7 days note.
+ *
+ * `progress` — the Refund tracker (`2303:4231`, dev note: "the same card on the cancel sheet (C5)
+ * and Visit details → Payment & refund") in place of that last part, once the host has the
+ * refund's tracker. The older mode / id / timeline stands in only until then.
  */
 export interface RefundSummaryCardProps {
   /** Defaults to the frame's. A value the backend does not give (refund id, mode) is left out. */
   readonly refund?: VisitRefundData;
+  /** The refund's tracker card, drawn under the breakdown in place of the older timeline. */
+  readonly progress?: ReactNode | undefined;
   readonly testID?: string | undefined;
 }
 
@@ -26,6 +33,7 @@ const DEMO_REFUND = DEMO.refund!;
 
 export function RefundSummaryCard({
   refund = DEMO_REFUND,
+  progress,
   testID = 'visit-refund-summary',
 }: RefundSummaryCardProps) {
   return (
@@ -78,47 +86,51 @@ export function RefundSummaryCard({
         </View>
       </View>
 
-      <View style={styles.status}>
-        <View style={styles.mode}>
-          {refund.mode === undefined ? null : (
-            <View style={styles.modeText}>
-              <Text variant="spoonMicroStrong" color="textSecondarySoft">
-                {refund.modeEyebrow}
-              </Text>
-              <Text variant="spoonBodyStrong" color="textPrimary">
-                {refund.mode}
-              </Text>
-            </View>
-          )}
-          {refund.refundId === undefined ? null : (
-            <View style={styles.refundId}>
-              <Text variant="spoonMicroStrong" color="textSecondarySoft">
-                {refund.idEyebrow}
-              </Text>
-              <Text variant="spoonCaptionStrong" color="textPrimary">
-                {refund.refundId}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.timeline}>
-          {refund.steps.map((step) => (
-            <View key={step.title} style={styles.step}>
-              <Image source={VISIT_REFUND_NODE} style={styles.node} />
-              <View style={styles.stepText}>
-                <Text variant={step.note ? 'spoonBody' : 'spoonBodyStrong'} color="textPrimary">
-                  {step.title}
+      {progress !== undefined && progress !== null ? (
+        progress
+      ) : (
+        <View style={styles.status}>
+          <View style={styles.mode}>
+            {refund.mode === undefined ? null : (
+              <View style={styles.modeText}>
+                <Text variant="spoonMicroStrong" color="textSecondarySoft">
+                  {refund.modeEyebrow}
                 </Text>
-                {step.when === undefined ? null : (
-                  <Text variant="spoonCaption" color="textSecondarySoft">
-                    {step.when}
-                  </Text>
-                )}
+                <Text variant="spoonBodyStrong" color="textPrimary">
+                  {refund.mode}
+                </Text>
               </View>
-            </View>
-          ))}
+            )}
+            {refund.refundId === undefined ? null : (
+              <View style={styles.refundId}>
+                <Text variant="spoonMicroStrong" color="textSecondarySoft">
+                  {refund.idEyebrow}
+                </Text>
+                <Text variant="spoonCaptionStrong" color="textPrimary">
+                  {refund.refundId}
+                </Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.timeline}>
+            {refund.steps.map((step) => (
+              <View key={step.title} style={styles.step}>
+                <Image source={VISIT_REFUND_NODE} style={styles.node} />
+                <View style={styles.stepText}>
+                  <Text variant={step.note ? 'spoonBody' : 'spoonBodyStrong'} color="textPrimary">
+                    {step.title}
+                  </Text>
+                  {step.when === undefined ? null : (
+                    <Text variant="spoonCaption" color="textSecondarySoft">
+                      {step.when}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }

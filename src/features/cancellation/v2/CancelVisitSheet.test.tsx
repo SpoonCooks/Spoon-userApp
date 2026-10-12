@@ -227,8 +227,10 @@ describe('C5 · Visit cancelled (2055:20787, 2055:20432)', () => {
         creditedAt: null,
       },
     });
-    expect(screen.getByText('₹299 refund')).toBeTruthy();
-    expect(screen.getByText('Processing')).toBeTruthy();
+    // `2303:4231` — the same Refund tracker as Visit details, at Initiated.
+    expect(screen.getByText('Booking refund ₹299')).toBeTruthy();
+    expect(screen.getByText('In progress')).toBeTruthy();
+    expect(screen.getByText('Refund initiated')).toBeTruthy();
     expect(screen.getByText('CANCELLED')).toBeTruthy();
     fireEvent.press(screen.getByTestId('cancel-visit-finish'));
     fireEvent.press(screen.getByTestId('cancel-visit-book'));
