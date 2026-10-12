@@ -341,6 +341,29 @@ describe('OtpScreen — 275:4289 / 250:2439 / 275:4349', () => {
     expect(verified).toEqual(['333333']);
   });
 
+  /**
+   * The platform offers an SMS code only above a keyboard that is already showing, and only for
+   * an input marked as a one-time code. Losing any of these three silently brings back "read the
+   * SMS, remember it, type it".
+   */
+  it('opens focused and marked as an SMS one-time code', () => {
+    renderOtp();
+
+    const input = screen.getByTestId('otp-screen-input');
+    expect(input.props.autoFocus).toBe(true);
+    expect(input.props.textContentType).toBe('oneTimeCode');
+    expect(input.props.autoComplete).toBe('sms-otp');
+  });
+
+  it('submits a code that arrives in one piece, as an SMS suggestion delivers it', () => {
+    const verified: string[] = [];
+    renderOtp(DEMO_OTP, (code) => verified.push(code));
+
+    // Some keyboards insert the code with a space in the middle ("123 456").
+    fireEvent.changeText(screen.getByTestId('otp-screen-input'), '123 456');
+    expect(verified).toEqual(['123456']);
+  });
+
   it('never submits more digits than the payload asks for', () => {
     const verified: string[] = [];
     renderOtp(DEMO_OTP, (code) => verified.push(code));
