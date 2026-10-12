@@ -380,6 +380,33 @@ describe('booking host — back follows the stack shape', () => {
     expect(mockRouter.replace).toHaveBeenCalledWith('/history');
   });
 
+  // A finished Recurring visit tapped on its plan's calendar is handed over here
+  // (`?from=recurring`): back returns to that calendar, not Home.
+  it('pops back to the Recurring plan when a finished visit was opened from its calendar', async () => {
+    mockRouter = makeRouter(true);
+    mockSearchParams = { id: 'bk-1', from: 'recurring' };
+
+    render(<BookingRoute />);
+
+    fireEvent.press(await screen.findByTestId('service-visit-header-back'));
+
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(mockRouter.dismissAll).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the Recurring plans when opened from a calendar with no history to pop', async () => {
+    mockRouter = makeRouter(false);
+    mockSearchParams = { id: 'bk-1', from: 'recurring' };
+
+    render(<BookingRoute />);
+
+    fireEvent.press(await screen.findByTestId('service-visit-header-back'));
+
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/recurring');
+  });
+
   it('is the route a notification targets, and falls back to Home without an id', () => {
     // A uuid, because routing checks the SHAPE of a booking id rather than merely that a string
     // is non-empty — see `deepLink.ts`. Every id Spoon issues is one.

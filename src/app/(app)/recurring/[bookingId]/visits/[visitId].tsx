@@ -1,29 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { idempotency } from '@core/api';
 import { ready } from '@core/data';
 import type { DataState } from '@core/data';
-import { getUserMessage, isAppError } from '@core/errors';
 import { useNavigationGuard, useSafeBack } from '@core/navigation';
-import { ratingSubmissionScope, useBookingDetail, useRateBooking } from '@features/booking';
+import { useBookingDetail } from '@features/booking';
 import { CancelVisitSheet, cancelReasonsFrom } from '@features/cancellation';
 import type { CancelQuote, CancelStep, CancelVisit } from '@features/cancellation';
 import { useCatalogue } from '@features/catalogue';
-import { cookProfileFrom, useAddCookToPool, useCookPoolProfile } from '@features/cookPool';
+import { cookProfileFrom, useCookPoolProfile } from '@features/cookPool';
 import {
   PaymentDetailsSheet,
-  RateVisitCard,
   VisitDetailsScreen,
-  rateVisitInfo,
   useCancelWholeBooking,
-  ratingRequestFor,
   todayInKolkata,
   visitDetailsFrom,
   visitWhatsAppLink,
 } from '@features/recurringLive';
-import type { RateVisitSubmission, VisitDetailsModel, VisitPrepKey } from '@features/recurringLive';
+import type { VisitDetailsModel, VisitPrepKey } from '@features/recurringLive';
 import {
   useCancelRecurringVisit,
   useRecurringBooking,
@@ -37,23 +33,23 @@ import { QueryBoundary } from '@ui';
 
 /**
  * Recurring — one visit's "Visit details" (Figma `1005:131`: `1008:5398` assigned, `1466:8275`
- * pending, `1466:8639` completed, `1466:8446` cancelled), on the visit itself.
+ * pending, `1466:8446` cancelled), on the visit itself.
+ *
+ *   completed     goes to the visit's own booking (`/booking/[id]`), as Figma draws it: the
+ *                 Service flow's Completed screen with the rate card and the tip (`2165:14082`,
+ *                 `2216:6600`) — the same screen Today / Up next open. Back returns to the plan.
+ *                 The older Completed frame (`1466:8639`) and its "Add to Cook Pool" / tip / Book
+ *                 again are not drawn for it any more (owner's call, 2026-10-12: follow Figma).
  *
  *   checklist     saved to the visit's booking as it is ticked (only once it has one)
  *   Modify        the cancellation timeline from the visit's quote; "Cancel this visit" asks for a
  *                 reason with the app's own cancellation sheet (opened at the reason step — its fee
  *                 table is the one-time booking's, not Recurring's) and cancels the visit
  *   Payment       the price, GST and Autopay mandate; "Manage" cancels the whole booking
- *   Cook          a completed visit offers adding its cook to the Pool (while not in it) and a
- *                 tip, which opens the visit's booking on the V0 tip sheet
  *   Rebook        a past visit's "Book again" starts a new Recurring plan; one whose debit failed
  *                 also books a one-time visit for the same day and length
  *   Help, Share   WhatsApp with Spoon (`1434:2205`), when the backend gives the link
  *   Cook Pool     the pool landing; the next-visit row that visit's own details
- *   Rate          a completed visit's own booking, while the server still allows it
- *                 (`allowedActions.canRate`): stars, 5+, the chips, a written note, the
- *                 different-cook answer and the voice note / photos / video (uploaded first)
- *                 go to `PUT /v1/bookings/:id/rating`
  *   modify=1      "Modify booking" on the visit's live booking page lands here with the sheet open
  */
 export default function RecurringVisitRoute() {
@@ -215,75 +211,11 @@ export default function RecurringVisitRoute() {
     }
   };
 
-  // ─── Rating ────────────────────────────────────────────────────────────────────────────────
+  // ─── Completed: the visit's own booking (Figma `2165:14082` / `2216:6600`) ──────────────────
   const completedBookingId =
     detail !== null && detail.displayState === 'completed'
       ? (detail.payment?.bookingId ?? detail.bookingId)
       : null;
-  const ratedBooking = useBookingDetail(completedBookingId);
-  const canRate =
-    ratedBooking.state.status === 'ready' && ratedBooking.state.data.allowedActions.canRate;
-  const rateInfo = detail === null ? null : rateVisitInfo(detail);
-  const rate = useRateBooking();
-  const [rateHidden, setRateHidden] = useState(false);
-
-  const submitRating = (submission: RateVisitSubmission) => {
-    if (completedBookingId === null) return;
-    const request = ratingRequestFor(submission);
-    const scope = ratingSubmissionScope(completedBookingId, request);
-    rate.mutate(
-      { bookingId: completedBookingId, ...request, scope },
-      {
-        onSuccess: () => {
-          setRateHidden(true);
-          Alert.alert('Thanks for rating', 'It helps us send you the right cooks.');
-        },
-        onError: (error) => {
-          idempotency.release(scope);
-          Alert.alert(
-            'Couldn’t send your rating',
-            isAppError(error) ? getUserMessage(error) : 'Please try again.',
-          );
-        },
-      },
-    );
-  };
-  const ratingSlot =
-    canRate && rateInfo !== null && !rateHidden ? (
-      <RateVisitCard
-        live
-        visit={rateInfo}
-        submitting={rate.isPending}
-        onLater={() => setRateHidden(true)}
-        onSubmit={submitRating}
-      />
-    ) : undefined;
-
-  // ─── A completed visit's cook: add to Pool, tip (spec, "Rating") ─────────────────────────────
-  const addToPool = useAddCookToPool();
-  const cookInPool =
-    cookId !== null && profile.state.status === 'ready' ? profile.state.data.inPool : null;
-  const canTip =
-    ratedBooking.state.status === 'ready' && ratedBooking.state.data.allowedActions.canTip;
-  const offerAddToPool =
-    detail?.displayState === 'completed' && cookId !== null && cookInPool === false;
-  const addCookToPool = () => {
-    if (cookId === null) return;
-    addToPool.mutate(
-      { cookId },
-      {
-        onSuccess: () => {
-          profile.refetch();
-          Alert.alert('Added to your Cook Pool', 'They can now cook your Recurring visits.');
-        },
-        onError: (error) =>
-          Alert.alert(
-            'Couldn’t add to your Cook Pool',
-            isAppError(error) ? getUserMessage(error) : 'Please try again.',
-          ),
-      },
-    );
-  };
 
   // ─── Payment details → Manage: cancel the whole booking (spec, "Per-visit payment record") ───
   const bookingActive = booking.state.status === 'ready' && booking.state.data.status === 'active';
@@ -300,6 +232,15 @@ export default function RecurringVisitRoute() {
 
   const nextVisitId =
     booking.state.status === 'ready' ? (booking.state.data.upNext?.visitId ?? null) : null;
+
+  // Every hook above runs first; only then does a finished visit hand over to its booking.
+  if (completedBookingId !== null) {
+    return (
+      <Redirect
+        href={{ pathname: '/booking/[id]', params: { id: completedBookingId, from: 'recurring' } }}
+      />
+    );
+  }
 
   return (
     <QueryBoundary state={state} onRetry={visit.refetch}>
@@ -327,18 +268,6 @@ export default function RecurringVisitRoute() {
                 })}
             onPrepChange={savePrep}
             onBookAgain={guard(() => router.push('/recurring-setup/days'))}
-            {...(offerAddToPool ? { onAddCookToPool: addCookToPool } : {})}
-            addingCookToPool={addToPool.isPending}
-            {...(canTip && completedBookingId !== null
-              ? {
-                  onTipCook: guard(() =>
-                    router.push({
-                      pathname: '/booking/[id]',
-                      params: { id: completedBookingId, tip: '1' },
-                    }),
-                  ),
-                }
-              : {})}
             onBookOneTime={guard(() =>
               detail === null
                 ? undefined
@@ -347,7 +276,6 @@ export default function RecurringVisitRoute() {
                     params: { date: detail.date, durationId: `dur-${detail.durationMinutes}` },
                   }),
             )}
-            ratingSlot={ratingSlot}
             refundSlot={refundSlot}
           />
           <PaymentDetailsSheet
