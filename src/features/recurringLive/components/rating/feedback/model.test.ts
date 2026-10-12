@@ -1,11 +1,13 @@
 import {
   EMPTY_FEEDBACK,
+  MAX_MEDIA_BYTES,
   WAVE_BAR_COUNT,
   WAVE_HEIGHT,
   attachmentsOf,
   barFromMetering,
   clipTime,
   foldBars,
+  galleryVideoProblem,
   hasFeedback,
   photosLeft,
   videoAllowed,
@@ -57,5 +59,21 @@ describe('feedback block model (Figma 2093:6050)', () => {
       voice: { uri: null, durationMs: 23_000, sizeBytes: 0, bars: [] },
     };
     expect(attachmentsOf(drawn)).toEqual([]);
+  });
+
+  it('takes a gallery video of up to 30 s, and turns away a longer one or one of unknown length', () => {
+    expect(galleryVideoProblem(12_000)).toBeNull();
+    expect(galleryVideoProblem(30_900)).toBeNull();
+    expect(galleryVideoProblem(31_500)).toBe('tooLong');
+    expect(galleryVideoProblem(4 * 60_000)).toBe('tooLong');
+    expect(galleryVideoProblem(null)).toBe('unknownLength');
+    expect(galleryVideoProblem(undefined)).toBe('unknownLength');
+    expect(galleryVideoProblem(0)).toBe('unknownLength');
+    expect(galleryVideoProblem(Number.NaN)).toBe('unknownLength');
+  });
+
+  it('holds each file to the server’s limit: 5 MB a photo, 25 MB the video', () => {
+    expect(MAX_MEDIA_BYTES.photo).toBe(5 * 1024 * 1024);
+    expect(MAX_MEDIA_BYTES.video).toBe(25 * 1024 * 1024);
   });
 });

@@ -9,14 +9,25 @@ import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { FEEDBACK_ART, RATING_ART } from '../assets';
-import { MAX_VIDEO_MS, clipTime } from './model';
+import { MAX_MEDIA_BYTES, MAX_VIDEO_MS, clipTime } from './model';
 import type { FeedbackMediaItem } from './model';
+import { shrinkPhoto } from './shrinkPhoto';
 
 export type CaptureMode = 'photo' | 'video';
 
 /** `expo-camera`, as `loadExpoCamera` hands it over on a build that has it. */
 export type ExpoCameraModule = NonNullable<ReturnType<typeof loadExpoCamera>>;
 type CameraFacing = 'back' | 'front';
+
+/**
+ * Videos record at the camera's lowest setting: 480p (640×480 on iPhone) at 1.5 Mbps, so the 30 s
+ * clip is about 5–6 MB rather than the 50–70 MB a phone's default 1080p leaves. Enough to show a
+ * dish; small enough to upload on a mobile connection.
+ */
+const VIDEO_QUALITY = '480p';
+const VIDEO_BITRATE = 1_500_000;
+/** iOS only applies the bitrate when the codec is named; H.264 plays everywhere. */
+const VIDEO_CODEC = 'avc1';
 
 interface Captured {
   readonly kind: CaptureMode;
@@ -31,6 +42,7 @@ interface Captured {
  *   - the camera fills the screen under a black 55 % control panel (pt20 / pb48, 16 apart): the
  *     PHOTO / VIDEO pill, then close (44pt white disc), the 76pt shutter (4pt white ring round a
  *     60pt white disc; recording, a 28pt red r6 stop) and flip (48pt white disc), then the hint
+ *   - video records at 480p / 1.5 Mbps ({@link VIDEO_QUALITY}), photos are shrunk on Use
  *   - video counts to 0:30 in a pill at the top and stops itself there; tap to stop early
  *   - review shows the capture over a white panel: Retake (discards it) and Use photo / Use video
  *     (attaches it to the rating card and returns there)
@@ -121,7 +133,10 @@ export function MediaCaptureModal({
     setRecording(true);
     ticker.current = setInterval(() => setElapsedMs(Date.now() - startedAt.current), 250);
     try {
-      const result = await camera.current?.recordAsync({ maxDuration: MAX_VIDEO_MS / 1000 });
+      const result = await camera.current?.recordAsync({
+        maxDuration: MAX_VIDEO_MS / 1000,
+        codec: VIDEO_CODEC,
+      });
       const durationMs = Math.min(MAX_VIDEO_MS, Date.now() - startedAt.current);
       if (result?.uri !== undefined) setCaptured({ kind: 'video', uri: result.uri, durationMs });
     } finally {
@@ -145,16 +160,26 @@ export function MediaCaptureModal({
     if (captured === null || busy) return;
     setBusy(true);
     try {
-      const sizeBytes = await localFileSize(captured.uri);
-      const mimeType = ratingMimeTypeOf(captured.uri);
+      // A photo goes up shrunk; without the manipulator (or if it fails) the original still fits.
+      const shrunk = captured.kind === 'photo' ? await shrinkPhoto(captured.uri) : null;
+      const uri = shrunk?.uri ?? captured.uri;
+      const sizeBytes = shrunk?.sizeBytes ?? (await localFileSize(uri));
+      const mimeType = shrunk?.mimeType ?? ratingMimeTypeOf(uri);
       if (sizeBytes === null || mimeType === null) {
         Alert.alert('Couldn’t add that', 'Please try again.');
+        return;
+      }
+      if (sizeBytes > MAX_MEDIA_BYTES[captured.kind]) {
+        Alert.alert(
+          'That’s too large to send',
+          captured.kind === 'video' ? 'Please record a shorter video.' : 'Please retake the photo.',
+        );
         return;
       }
       onUse({
         id: `${captured.kind}-${String(Date.now())}`,
         kind: captured.kind,
-        uri: captured.uri,
+        uri,
         mimeType,
         sizeBytes,
         durationMs: captured.durationMs,
@@ -196,6 +221,8 @@ export function MediaCaptureModal({
                 facing={facing}
                 mode={mode === 'photo' ? 'picture' : 'video'}
                 mute={false}
+                videoQuality={VIDEO_QUALITY}
+                videoBitrate={VIDEO_BITRATE}
               />
             ) : (
               <View style={styles.permission}>

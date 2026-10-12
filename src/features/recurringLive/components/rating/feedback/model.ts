@@ -37,10 +37,32 @@ export const MAX_FEEDBACK_PHOTOS = 5;
 /** One video, auto-stopped at 30 s. */
 export const MAX_FEEDBACK_VIDEOS = 1;
 export const MAX_VIDEO_MS = 30_000;
+/** A gallery video's reported length may run a little over a 30 s clip's. */
+const VIDEO_LENGTH_SLACK_MS = 1_000;
+
+/**
+ * Why a video picked from the gallery can't go on the rating, or `null` when it can. The gallery
+ * lets the customer pick a video of any length, so the length it reports is checked here; one it
+ * cannot report is turned away too, since nothing else would stop a long one.
+ */
+export function galleryVideoProblem(
+  durationMs: number | null | undefined,
+): 'tooLong' | 'unknownLength' | null {
+  if (durationMs === null || durationMs === undefined || !(durationMs > 0)) return 'unknownLength';
+  return durationMs > MAX_VIDEO_MS + VIDEO_LENGTH_SLACK_MS ? 'tooLong' : null;
+}
 /** The voice note stops itself at two minutes; the card asks for ten seconds. */
 export const MAX_VOICE_MS = 120_000;
-/** M1 `1796:3302` — "Maximum size for media is 500 MB". */
-export const MAX_FEEDBACK_BYTES = 500 * 1024 * 1024;
+const MB = 1024 * 1024;
+/**
+ * The server's size limit per file (V0 `RATING_MEDIA_RULES`), a few times what the app sends: a
+ * shrunk photo is ~0.3 MB and a compressed 30 s video ~5–6 MB (an iPhone's export up to ~18 MB).
+ * Checked as each item is added, so an oversized one is turned away there, not at Submit.
+ */
+export const MAX_MEDIA_BYTES: Readonly<Record<FeedbackMediaItem['kind'], number>> = {
+  photo: 5 * MB,
+  video: 25 * MB,
+};
 /** The server's limit on a written note. */
 export const MAX_FEEDBACK_TEXT = 2000;
 

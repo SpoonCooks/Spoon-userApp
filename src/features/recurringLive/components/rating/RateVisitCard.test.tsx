@@ -8,8 +8,10 @@ jest.mock('@core/native', () => ({
   loadExpoAudio: () => null,
   loadExpoCamera: () => null,
   loadExpoFileSystem: () => null,
+  loadExpoImageManipulator: () => null,
   loadExpoImagePicker: () => null,
   loadExpoVideo: () => null,
+  loadVideoCompressor: () => null,
 }));
 
 const VISIT = {
