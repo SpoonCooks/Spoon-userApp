@@ -32,7 +32,7 @@ export type { RecurringPlansScreenProps } from './screens/RecurringPlansScreen';
 export { VisitDetailsScreen } from './screens/VisitDetailsScreen';
 export type { VisitDetailsScreenProps } from './screens/VisitDetailsScreen';
 export type { VisitDetailsModel, VisitPrepKey, VisitPrepReady, VisitVariant } from './data/visit';
-export { REFUND_CREDIT_NOTE, visitDemoModel } from './data/visit';
+export { visitDemoModel } from './data/visit';
 export type { VisitRefundData } from './data/visit';
 export {
   rateVisitInfo,

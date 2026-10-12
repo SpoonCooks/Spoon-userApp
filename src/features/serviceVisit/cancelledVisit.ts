@@ -1,7 +1,7 @@
 import { formatPaise } from '@core/format';
 import { bookingStrikeOf } from '@features/booking';
 import type { BookingDetailDto, RefundDto } from '@features/booking';
-import { REFUND_CREDIT_NOTE, visitDemoModel } from '@features/recurringLive';
+import { visitDemoModel } from '@features/recurringLive';
 import type { VisitDetailsModel, VisitRefundData } from '@features/recurringLive';
 
 import { clock, day, duration, paymentSheetFrom } from './model';
@@ -21,6 +21,9 @@ import { clock, day, duration, paymentSheetFrom } from './model';
  * A booking cancelled before it was ever paid has nothing to refund: the charge card then says
  * nothing was charged.
  */
+/** `2165:11890` — the one-time refund's last step; the Recurring summary no longer draws it. */
+const REFUND_CREDIT_NOTE = 'It takes 5-7 working days for the amount to get credited to source';
+
 export function cancelledVisitModelFrom(
   booking: BookingDetailDto,
   refund: RefundDto | null,
