@@ -144,7 +144,13 @@ export default function BookingRoute() {
    */
   const goHome = useDeterministicBack('/home');
   const goToHistory = useSafeBack('/history');
-  const goBack = guard(from === 'history' ? goToHistory : goHome);
+  /*
+   * The same reasoning for a finished Recurring visit tapped on its plan's calendar: the visit
+   * route hands it over here (`?from=recurring`), and back returns to that calendar rather than
+   * Home. A finished visit cannot advance, so popping cannot show a stale state.
+   */
+  const goToPlan = useSafeBack('/recurring');
+  const goBack = guard(from === 'history' ? goToHistory : from === 'recurring' ? goToPlan : goHome);
 
   /**
    * The redesigned visit details (Figma "Service flow") for the phases it draws — assigned, on the
