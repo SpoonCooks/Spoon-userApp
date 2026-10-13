@@ -11,6 +11,7 @@ export {
 } from './adapters';
 export {
   useAddresses,
+  usePrefetchAddresses,
   useCreateAddress,
   useDeleteAddress,
   useServiceabilityCheck,

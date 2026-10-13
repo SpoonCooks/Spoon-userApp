@@ -49,6 +49,7 @@ export {
   updateProfileResponseSchema,
   useContinueAsGuest,
   useMe,
+  usePrefetchMe,
   useSendOtp,
   useSignOut,
   useUpdateProfile,

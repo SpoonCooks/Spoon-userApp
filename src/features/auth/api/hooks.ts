@@ -99,6 +99,27 @@ export function useMe(options: { enabled?: boolean } = {}): ScreenQuery<MeRespon
 }
 
 /**
+ * Fetches `/me` into the cache `useMe` reads, and resolves once it is there (or has failed).
+ *
+ * For the OTP screen: it warms the boot gate's reads while its own spinner is still up, so `/`
+ * can redirect on its first render instead of holding the splash for the round trip. A failure
+ * is swallowed — the gate then reads exactly as it would have without the warm-up.
+ */
+export function usePrefetchMe(): () => Promise<void> {
+  const { api } = useRuntime();
+  const queryClient = useQueryClient();
+  const auth = createAuthApi(api);
+
+  return () =>
+    queryClient
+      .fetchQuery({ queryKey: authKeys.me(), queryFn: ({ signal }) => auth.getMe(signal) })
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+}
+
+/**
  * `PUT /v1/me/profile` — all eight answers.
  *
  * ## Why the response is written into the cache AND the key invalidated

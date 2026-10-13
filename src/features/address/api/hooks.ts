@@ -39,6 +39,24 @@ export function useAddresses(
 }
 
 /**
+ * Fetches the saved addresses into the cache `useAddresses` reads, and resolves once they are
+ * there (or the read failed). The OTP screen's warm-up for the boot gate — see `usePrefetchMe`.
+ */
+export function usePrefetchAddresses(): () => Promise<void> {
+  const { api } = useRuntime();
+  const queryClient = useQueryClient();
+  const addresses = createAddressApi(api);
+
+  return () =>
+    queryClient
+      .fetchQuery({ queryKey: addressKeys.list(), queryFn: ({ signal }) => addresses.list(signal) })
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+}
+
+/**
  * `POST /v1/serviceability/check`, as a mutation rather than a query.
  *
  * It is a POST with a body and it is fired by an explicit user action (dropping a pin), not by a
