@@ -216,7 +216,7 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
   const charged = cancellation !== null && !cancellation.nothingCharged;
   const chargeBody =
     variant === 'cancelled'
-      ? 'Cancelled before the charge — nothing was charged for this visit.'
+      ? 'Cancelled before the charge, so nothing was charged for this visit.'
       : chargedAt !== null
         ? `Charged via UPI Autopay on ${dayLabel(chargedAt.dateId)}, ${clockText(chargedAt.hhmm)}.`
         : NOTICE_BODY;

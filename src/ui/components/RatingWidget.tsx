@@ -129,7 +129,7 @@ export function RatingWidget({
           onPress={() => onChange(RATING_EXCEPTIONAL)}
           disabled={disabled}
           accessibilityRole="radio"
-          accessibilityLabel="5 plus — exceptional service"
+          accessibilityLabel="5 plus, exceptional service"
           accessibilityState={{ selected: exceptional, disabled, checked: exceptional }}
           style={({ pressed }) => [styles.prompt, pressed && !disabled ? styles.pressed : null]}
           testID={`${testID}-prompt`}

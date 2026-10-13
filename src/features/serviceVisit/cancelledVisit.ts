@@ -216,7 +216,7 @@ export function cancelledVisitModelFrom(
       ...base.charge,
       amount: formatPaise(0),
       title: 'Nothing charged',
-      body: 'This visit was cancelled before payment — nothing was charged.',
+      body: 'This visit was cancelled before payment, so nothing was charged.',
     },
     refund: shownRefund,
     paymentSheet: paymentSheetFrom(booking, cookName),

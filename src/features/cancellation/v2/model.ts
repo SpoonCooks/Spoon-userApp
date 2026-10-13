@@ -168,21 +168,6 @@ export function slotRange(visit: CancelVisit): string {
   return `${clockLabel(visit.startsAt)} – ${clockLabel(end)} · ${durationLabel(visit.durationMinutes)}`;
 }
 
-/**
- * C1's hint (dev note `2071:2857`): only the fee tiers still ahead. "Free until 6:00 AM" is the
- * slot start less the published 3 hrs.
- */
-export function feeHint(visit: CancelVisit, now: Date): string | null {
-  if (visit.cookOnTheWay) return 'Your cook is on the way, so cancelling now costs the full amount';
-  const left = minutesToStart(visit.startsAt, now);
-  const at = (minutesBefore: number) =>
-    clockLabel(new Date(Date.parse(visit.startsAt) - minutesBefore * 60_000).toISOString());
-  if (left > 180) return `Free to cancel until ${at(180)} · 25% fee after, 50% in the last hour`;
-  if (left > 60) return `25% fee to cancel until ${at(60)} · 50% in the last hour`;
-  if (left > 0) return '50% fee to cancel now';
-  return null;
-}
-
 /** The outcome card's two lines (`2055:20641`, `2055:20971`). */
 export function outcomeLines(
   quote: CancelQuote,
@@ -207,7 +192,7 @@ export function outcomeLines(
 export function refundCaption(quote: CancelQuote, visit: CancelVisit): string {
   if (quote.refundPaise === 0) {
     return visit.cookOnTheWay
-      ? 'No refund — cook was already on her way'
+      ? 'No refund, cook was already on her way'
       : 'No refund for this cancellation';
   }
   if (quote.feePaise === 0) return 'Full refund, inclusive of taxes';

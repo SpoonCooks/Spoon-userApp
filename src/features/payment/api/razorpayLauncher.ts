@@ -119,7 +119,7 @@ export class CheckoutSdkMissingError extends Error {
   constructor(cause: unknown) {
     super(
       'Razorpay checkout is unavailable in this build: the native module is not linked. ' +
-        'A development or release build is required — Expo Go cannot load it.',
+        'A development or release build is required. Expo Go cannot load it.',
     );
     this.name = 'CheckoutSdkMissingError';
     this.cause = cause;

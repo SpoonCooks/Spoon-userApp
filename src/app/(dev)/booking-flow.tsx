@@ -542,7 +542,9 @@ function BookingFlowPreview({ view, recurring }: { view: string; recurring: bool
           visit={{ ...VISIT, cookOnTheWay: cancel.onTheWay === true, etaMinutes: 12 }}
           quote={quote(cancel.fee)}
           reasons={REASONS}
-          canReschedule={cancel.fee < 50}
+          // As the server answers for a booking not yet rescheduled (V0 allows it up to the cook
+          // arriving): C2 hides it from 50% itself, C3/C4 offer it whenever it is allowed.
+          canReschedule
           onReschedule={() => undefined}
           onClose={() => router.back()}
           onConfirm={async () => true}

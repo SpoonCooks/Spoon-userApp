@@ -72,7 +72,7 @@ import type { PlaceSuggestion } from './googlePlaces';
 const FAILURE_MESSAGE: Record<DeviceLocationFailure, string> = {
   permission_denied: 'Allow location, or search above',
   services_disabled: 'Turn on location, or search above',
-  unavailable: 'No location fix — search above',
+  unavailable: 'No location fix. Search above',
 };
 
 /**
@@ -82,7 +82,7 @@ const FAILURE_MESSAGE: Record<DeviceLocationFailure, string> = {
  * useful next action is to press it again. Reporting it as "unserviceable" would be this client
  * asserting coverage it was never told about.
  */
-const CONFIRM_ERROR_MESSAGE = 'Couldn’t check just now — try again';
+const CONFIRM_ERROR_MESSAGE = 'Couldn’t check just now. Try again';
 
 /** What the search field is currently able to say. */
 export type AddressSearchState =

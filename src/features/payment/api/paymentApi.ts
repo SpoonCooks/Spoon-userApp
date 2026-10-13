@@ -118,7 +118,7 @@ export class CheckoutUnavailableError extends Error {
   constructor() {
     super(
       'Razorpay checkout is not available in this build: no payment SDK is installed. ' +
-        'See docs/BACKEND_INTEGRATION_MAP.md — FRONTEND_GAP: payment SDK.',
+        'See docs/BACKEND_INTEGRATION_MAP.md. FRONTEND_GAP: payment SDK.',
     );
     this.name = 'CheckoutUnavailableError';
   }
