@@ -24,6 +24,7 @@ export { authKeys } from './keys';
 export {
   useContinueAsGuest,
   useMe,
+  usePrefetchMe,
   useSendOtp,
   useSignOut,
   useUpdateProfile,

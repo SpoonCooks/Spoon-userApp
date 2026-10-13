@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 
 import { ready } from '@core/data';
-import { getLogger } from '@core/logging';
 import type { ScreenQuery } from '@core/data';
 
 import { EMPTY_ADDRESS_DRAFT, useAddressDraftStore } from '@core/store/addressDraftStore';
@@ -459,8 +458,6 @@ export function isAddressUsable(address: AddressDto): boolean {
 export type AddressGate = 'resolving' | 'required' | 'satisfied';
 
 export function useAddressGate(options: { enabled?: boolean } = {}): AddressGate {
-  // TEMP PROBE — remove before commit
-  getLogger('probe').warn('gate:enter', { enabled: options.enabled ?? true });
   /**
    * `enabled` exists for the BOOT gate, which asks this question at `/` before the session has
    * been proved. A `GET /v1/me/addresses` fired while signed out 401s and burns a refresh, so the

@@ -5,12 +5,14 @@ import * as Haptics from 'expo-haptics';
 
 import { isAppError } from '@core/errors';
 import { useAndroidBackHandler, useNavigationGuard, useSafeBack } from '@core/navigation';
+import { usePrefetchAddresses } from '@features/address';
 import {
   displayPhone,
   LoginOtpScreen,
   loginVerifyFailure,
   requestPhoneEdit,
   resendCountdownLabel,
+  usePrefetchMe,
   useSendOtp,
   useVerifyOtp,
 } from '@features/auth';
@@ -28,12 +30,24 @@ import { DEMO_LOGIN, DEMO_LOGIN_OTP } from '@/demo/fixtures/screens';
  * Back and Edit both return to Login "with the number prefilled and the keyboard open", and are
  * blocked — swipe-back and Android back included — while a verify call is running.
  */
+/** How long the OTP spinner waits for the boot gate's reads before handing over anyway. */
+const BOOT_PREFETCH_CAP_MS = 6_000;
+
 export default function OtpRoute() {
   const router = useRouter();
   const params = useLocalSearchParams<{ phone?: string; retryAfter?: string; devOtp?: string }>();
   const phone = params.phone ?? '';
   const verify = useVerifyOtp();
   const resend = useSendOtp();
+  const prefetchMe = usePrefetchMe();
+  const prefetchAddresses = usePrefetchAddresses();
+  /**
+   * Signed in, and fetching what the boot gate at `/` asks before it can redirect. The cells stay
+   * locked with the spinner under them until then, so the next screen is Home (or the address
+   * step) straight away instead of the launch splash.
+   */
+  const [finishing, setFinishing] = useState(false);
+  const busy = verify.isPending || finishing;
 
   const [resendAt, setResendAt] = useState(
     () => Date.now() + (Number(params.retryAfter ?? 0) || 0) * 1000,
@@ -58,12 +72,12 @@ export default function OtpRoute() {
   // One pop per tap: a quick double tap on "edit number" must not pop Login too.
   const guard = useNavigationGuard();
   const back = useCallback(() => {
-    if (verify.isPending) return;
+    if (busy) return;
     requestPhoneEdit();
     goBack();
-  }, [goBack, verify.isPending]);
+  }, [goBack, busy]);
   useAndroidBackHandler(() => {
-    if (verify.isPending) return true;
+    if (busy) return true;
     back();
     return true;
   });
@@ -81,11 +95,11 @@ export default function OtpRoute() {
 
   return (
     <>
-      <Stack.Screen options={{ gestureEnabled: !verify.isPending }} />
+      <Stack.Screen options={{ gestureEnabled: !busy }} />
       <LoginOtpScreen
         otp={DEMO_LOGIN_OTP}
         phoneLabel={phoneLabel}
-        verifying={verify.isPending}
+        verifying={busy}
         {...(failure?.kind === 'rejected' ? { errorMessage: failure.message } : {})}
         resend={resendState}
         notice={notice}
@@ -95,7 +109,7 @@ export default function OtpRoute() {
         }}
         onVerify={(code) => {
           // A code verifies once: a second submit while the first is out would race it.
-          if (phone.length === 0 || verify.isPending) return;
+          if (phone.length === 0 || busy) return;
           verify.mutate(
             { phone, otp: code },
             {
@@ -104,15 +118,21 @@ export default function OtpRoute() {
                 /*
                  * `onboardingRequired` is the SERVER's answer to "does this account still owe the
                  * profile page". A new customer goes straight there; everyone else falls through
-                 * to the boot gate at `/`, which owns the address-versus-Home question.
+                 * to the boot gate at `/`, which owns the address-versus-Home question — with its
+                 * two reads already cached, so it redirects without showing the splash.
                  *
                  * Replacing rather than pushing, so Back cannot return to a spent OTP screen.
                  */
-                router.replace(
-                  (result.user.onboardingRequired
-                    ? '/profile/details?context=onboarding'
-                    : '/') as Href,
-                );
+                if (result.user.onboardingRequired) {
+                  router.replace('/profile/details?context=onboarding' as Href);
+                  return;
+                }
+                // Capped: a slow read hands over to the gate, which holds the splash as before.
+                setFinishing(true);
+                void Promise.race([
+                  Promise.all([prefetchMe(), prefetchAddresses()]),
+                  new Promise((resolve) => setTimeout(resolve, BOOT_PREFETCH_CAP_MS)),
+                ]).then(() => router.replace('/' as Href));
               },
               onError(error) {
                 // "Network error: toast 'No connection. Try again.', boxes unlock, digits are kept."
