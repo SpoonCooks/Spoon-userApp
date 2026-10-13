@@ -28,7 +28,8 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
  *   ?screen=visit   &variant=assigned|pending|completed|cancelled [&prep=0|1|3]
  *                   [&sheet=modify|payment]            `1008:5398`, `1466:*`, `1441:*`, `1433:1537`,
  *                                                      `1434:1678`
- *   ?screen=rating  [&rating=4.5|5plus|2.5] [&feedback=voice|write|uploaded]   "Ratings" `1603:50`
+ *   ?screen=rating  [&rating=4.5|5plus|2.5] [&feedback=voice|write|uploaded] [&submitted=1]
+ *                                                      "Ratings" `1603:50`; Submit shows `2306:929`
  *
  * The tabs, the pop-ups and the dock buttons are live within the preview so the flow can be
  * clicked through; none of it is the real navigation.
@@ -66,6 +67,7 @@ type PreviewParams = {
   sheet?: string;
   rating?: string;
   feedback?: string;
+  submitted?: string;
 };
 
 /**
@@ -87,6 +89,7 @@ function RecurringLivePreview({ params }: { readonly params: PreviewParams }) {
       : 'live',
   );
   const [sheet, setSheet] = useState<string | undefined>(params.sheet);
+  const [ratingSubmitted, setRatingSubmitted] = useState(params.submitted === '1');
 
   if (!__DEV__) {
     return (
@@ -151,6 +154,9 @@ function RecurringLivePreview({ params }: { readonly params: PreviewParams }) {
           <ScrollView contentContainerStyle={styles.ratingContent}>
             <RateVisitCard
               initialRating={parseRating(params.rating)}
+              // Submit draws the read-only card (`2306:929`); nothing is sent from the preview.
+              submitted={ratingSubmitted}
+              onSubmit={() => setRatingSubmitted(true)}
               {...(feedback === undefined
                 ? {}
                 : {
