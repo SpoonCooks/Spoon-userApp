@@ -316,8 +316,6 @@ export const palette = {
   // ---------------------------------------------------------------------------
   /** `848:7809` — a dish card's name. */
   grey333: '#333333',
-  /** `755:2362` — a menu section's title on the deck card. */
-  navy142: '#142C44',
   /** `848:7809` — a dish card's idle heart. */
   grey217: '#D9D9D9',
   /** `848:6318` — black at 6 %: the skip tab and a card dragged toward it. */
@@ -575,7 +573,7 @@ export const elevations = {
   subtle: elevation(0, 1, 1, 0.15, 2),
   /** `1:821` the primary CTA bar — a 3pt blur, tighter than the 4pt used by surfaces. */
   cta: elevation(0, 0, 3, 0.15, 3),
-  /** `983:6074` — Spoon — User `Elevation/2`: the Recurring landing's "Schedule Now" tag. */
+  /** `983:6074` — Spoon — User `Elevation/2`: the Recurring landing's "Book Recurring" tag. */
   tag: elevation(0, 0, 12, 0.1, 4),
 } as const;
 

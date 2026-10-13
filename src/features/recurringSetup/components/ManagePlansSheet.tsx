@@ -14,10 +14,10 @@ import { CALENDAR_REMOVE_ICON, COOK_VISIT_ICON, RESTART_ROW_ICON } from '../art'
  * says exactly what it would take away. "Delete visit" only shows while the plan has another
  * visit — removing a plan's only visit is deleting the plan.
  *
- * The frame dims the Summary with `Scrim` (`542:1499`): `color/surface/inverse` at 40 % under a
- * 6pt background blur. The shared `Overlay` is a flat 80 % black — drawn for the photo-heavy
- * sheets — so this sheet hosts its own `Modal`. The blur is not drawn: there is no blur in React
- * Native's core and no blur package in the app.
+ * The frame dims the Summary with `Scrim` (`542:1499`, and the same on `542:1534`, `542:1611`,
+ * `542:1688`): black at 40 % under a 12pt `BACKGROUND_BLUR`. The shared `Overlay` is a flat 80 %
+ * black — drawn for the photo-heavy sheets — so this sheet hosts its own `Modal`. The blur is not
+ * drawn: there is no blur in React Native's core and no blur package (`expo-blur`) in the app.
  */
 export interface ManagePlansSheetProps {
   readonly visible: boolean;

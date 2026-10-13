@@ -5,7 +5,9 @@ import { RecurringLandingScreen, useExplainerVideoSource } from '@features/recur
 import { useRecurringEligibility } from '@features/recurringSetup';
 
 /**
- * Recurring — the landing. "Make your Cook Pool" opens the Cook Pool landing. Both "schedule"
+ * Recurring — the landing. The Cook Pool button opens the Cook Pool landing; it reads "Check your
+ * Cook Pool" once eligibility reports at least one cook in the pool (`poolCount > 0`, the same
+ * line the Account hub's Cook Pool card draws), "Make your Cook Pool" otherwise or while loading. Both "schedule"
  * buttons open the plan flow's day picker once Recurring is unlocked (DEC-086: 2 pool Cooks);
  * until then they open the Cook Pool too — the spec's locked action — rather than a flow whose
  * every read would refuse the household. While eligibility has not answered, the flow opens as
@@ -24,12 +26,14 @@ export default function RecurringRoute() {
   const videoSource = useExplainerVideoSource();
   const eligibility = useRecurringEligibility();
   const locked = eligibility.state.status === 'ready' && !eligibility.state.data.unlocked;
+  const hasCookPool = eligibility.state.status === 'ready' && eligibility.state.data.poolCount > 0;
 
   return (
     <RecurringLandingScreen
       onBack={guard(goBack)}
       onSchedule={guard(() => router.push(locked ? '/cook-pool' : '/recurring-setup/days'))}
       onMakeCookPool={guard(() => router.push('/cook-pool'))}
+      hasCookPool={hasCookPool}
       {...(videoSource === undefined ? {} : { videoSource })}
     />
   );

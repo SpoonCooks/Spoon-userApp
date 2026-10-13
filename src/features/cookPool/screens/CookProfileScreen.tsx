@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 
 import { getUserMessage, normalizeError } from '@core/errors';
 import { QueryBoundary, ScreenHeader } from '@ui';
@@ -29,7 +30,7 @@ import {
  * favourites it, on this device only (`favourites.ts`). For a cook in the pool, the bin asks
  * before taking them out; "Remove" sends the DELETE and leaves (`onRemoved`) once it has gone
  * through — a failure keeps the dialog open with the reason, to try again or keep — and "Keep"
- * stays.
+ * stays. Leaving the profile while the dialog is up closes it.
  *
  * A cook Operations has paused (`available: false`) is drawn like any other: how to show one is
  * an open product question (DEC-085), and nothing in the frames marks it.
@@ -64,6 +65,18 @@ export function CookProfileScreen({
     setConfirmingRemove(false);
     setRemoveError(null);
   };
+
+  // The remove dialog is a native modal, above every screen: leaving the profile (a push, a deep
+  // link) closes it, so it never stays up over the screen that opened on top.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        setConfirmingRemove(false);
+        setRemoveError(null);
+      },
+      [],
+    ),
+  );
 
   const remove = (removeCookId: string) => {
     if (removing) return;
@@ -116,7 +129,6 @@ export function CookProfileScreen({
               <CookProfileHeader profile={profile} onLayout={onHeaderLayout} />
               <CookMenu
                 sections={profile.menu}
-                tone="page"
                 favourites={favourites}
                 onToggleFavourite={toggleFavouriteDish}
                 testID={`${testID}-menu`}

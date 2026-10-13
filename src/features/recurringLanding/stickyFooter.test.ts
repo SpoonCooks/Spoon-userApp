@@ -9,7 +9,7 @@ import {
 } from './stickyFooter';
 
 describe('the sticky footer rule', () => {
-  it('is parked at the top, where the Schedule Now tag is on screen', () => {
+  it('is parked at the top, where the Book Recurring tag is on screen', () => {
     expect(footerVisibleAt(false, 0)).toBe(false);
     expect(footerVisibleAt(false, 120)).toBe(false);
   });

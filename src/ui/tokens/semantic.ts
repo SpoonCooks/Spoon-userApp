@@ -335,7 +335,6 @@ export const lightColors = {
 
   // Cook Pool (`755:2333` … `848:7809`).
   textDish: palette.grey333,
-  textMenuSection: palette.navy142,
   iconIdle: palette.grey217,
   surfaceSkipTab: palette.black06,
   surfaceSkipTabActive: palette.black14,
@@ -1644,7 +1643,7 @@ export const elevation = {
   glow: elevations.glow,
   sheet: elevations.raised,
   cta: elevations.cta,
-  /** `983:6074` — the Recurring landing's "Schedule Now" tag. */
+  /** `983:6074` — the Recurring landing's "Book Recurring" tag. */
   tag: elevations.tag,
 } as const satisfies Record<string, Elevation>;
 

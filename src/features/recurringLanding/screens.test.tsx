@@ -34,7 +34,7 @@ describe('Recurring landing', () => {
     expect(screen.getByText('Recurring')).toBeTruthy();
     expect(screen.getByText('Book for multiple days at once!')).toBeTruthy();
     expect(screen.getByText(/Effortless · Reliable/)).toBeTruthy();
-    expect(screen.getByText('Schedule Now')).toBeTruthy();
+    expect(screen.getByText('Book Recurring')).toBeTruthy();
     expect(screen.getByText('Unlock by creating your Cook Pool')).toBeTruthy();
     expect(screen.getByText('10:00 AM')).toBeTruthy();
     expect(screen.getByText('7:00 PM')).toBeTruthy();
@@ -47,7 +47,37 @@ describe('Recurring landing', () => {
     expect(screen.getByText('Understand Recurring')).toBeTruthy();
     expect(screen.getByText('Tap to watch!')).toBeTruthy();
     // The footer is on the page, parked out of sight and out of reach.
-    expect(screen.getByText('Schedule Recurring', HIDDEN)).toBeTruthy();
+    expect(screen.getAllByText('Book Recurring', HIDDEN)).toHaveLength(2);
+  });
+
+  it('describes paying and changing plans as the design does', () => {
+    renderLanding();
+    expect(
+      screen.getByText(
+        'No upfront payment. Charged 3 hours before your first visit of the day through UPI AutoPay',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Change of plans while Recurring is live? Cancel and book a ‘one-time’ service anytime',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('offers to make the Cook Pool while it is empty, and to check it once it has a cook', () => {
+    renderLanding();
+    expect(screen.getByText('Make your Cook Pool')).toBeTruthy();
+    expect(screen.queryByText('Check your Cook Pool')).toBeNull();
+    screen.rerender(
+      <RecurringLandingScreen
+        onBack={jest.fn()}
+        onSchedule={jest.fn()}
+        onMakeCookPool={jest.fn()}
+        hasCookPool
+      />,
+    );
+    expect(screen.getByText('Check your Cook Pool')).toBeTruthy();
+    expect(screen.queryByText('Make your Cook Pool')).toBeNull();
   });
 
   it('goes back', () => {
