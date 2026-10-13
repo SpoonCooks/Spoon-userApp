@@ -53,7 +53,8 @@ export const poolCookCardSchema = z.object({
   visitsWithYou: z.number().int().nonnegative(),
   /**
    * This customer's OWN ratings of the cook — "Your rating" (dev note `2226:4211`). Never the
-   * overall `rating` above. Absent from a backend that predates it.
+   * overall `rating` above. Null while this household has not rated the cook; absent from a
+   * backend that predates it.
    */
   yourRating: z.object({ average: z.number(), count: z.number().int().nonnegative() }).nullish(),
 });

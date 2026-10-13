@@ -33,6 +33,7 @@ function card(overrides: Partial<PoolCookCardDto> = {}): PoolCookCardDto {
     profileVariant: 'mixed',
     rating: { average: 4.46, count: 12 },
     visitsWithYou: 45,
+    yourRating: { average: 4.75, count: 2 },
     ...overrides,
   };
 }
@@ -87,8 +88,15 @@ describe('Cook Pool adapters', () => {
     ]);
     expect(profile?.stats).toEqual([
       { id: 'visits', label: 'Visits with you', value: '45' },
-      { id: 'rating', label: 'Rating', value: '4.5', icon: 'star' },
+      { id: 'rating', label: 'Your rating', value: '4.8', icon: 'star' },
     ]);
+  });
+
+  it('never shows the cook’s overall rating as the household’s own', () => {
+    for (const yourRating of [null, undefined, { average: 0, count: 0 }]) {
+      const [profile] = deckCooksFrom([card({ yourRating })]);
+      expect(profile?.stats.map((line) => line.id)).toEqual(['visits']);
+    }
   });
 
   it('leaves out a region, languages, marks and a rating it was not given', () => {
@@ -99,6 +107,7 @@ describe('Cook Pool adapters', () => {
         spoonTrained: false,
         backgroundVerified: false,
         rating: { average: 0, count: 0 },
+        yourRating: null,
       }),
     ]);
     expect(profile?.badges).toEqual([]);
