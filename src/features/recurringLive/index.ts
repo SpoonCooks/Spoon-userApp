@@ -33,7 +33,7 @@ export { VisitDetailsScreen } from './screens/VisitDetailsScreen';
 export type { VisitDetailsScreenProps } from './screens/VisitDetailsScreen';
 export type { VisitDetailsModel, VisitPrepKey, VisitPrepReady, VisitVariant } from './data/visit';
 export { visitDemoModel } from './data/visit';
-export type { VisitRefundData } from './data/visit';
+export type { VisitRefundData, VisitRefundTracker } from './data/visit';
 export {
   rateVisitInfo,
   ratingRequestFor,

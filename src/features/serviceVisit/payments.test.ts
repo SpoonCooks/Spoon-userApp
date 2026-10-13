@@ -201,7 +201,11 @@ describe('Visit details · Cancelled for a one-time booking (2165:11853, dev not
     expect(struck?.total.was).toBe('₹354');
   });
 
-  it('reads "Refund initiated" until the refund lands, and "By Spoon" for a Spoon cancellation', () => {
+  it('reads "Refund initiated" until the refund lands; a Spoon cancellation reads "Refund started" (2342:4201)', () => {
+    expect(
+      cancelledVisitModelFrom(booking(cancelled), { ...refund, state: 'provider_pending' }, null)
+        .refund?.badge,
+    ).toBe('Refund initiated');
     const model = cancelledVisitModelFrom(
       booking({
         ...cancelled,
@@ -210,7 +214,7 @@ describe('Visit details · Cancelled for a one-time booking (2165:11853, dev not
       { ...refund, state: 'provider_pending' },
       null,
     );
-    expect(model.refund?.badge).toBe('Refund initiated');
+    expect(model.refund?.badge).toBe('Refund started');
     expect(model.cancelled.byline.startsWith('By Spoon')).toBe(true);
   });
 

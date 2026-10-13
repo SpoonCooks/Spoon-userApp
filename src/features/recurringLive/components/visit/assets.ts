@@ -109,6 +109,16 @@ export const VISIT_STITCH_HORIZONTAL =
 export const VISIT_REFUND_NODE =
   require('../../../../../assets/figma/recurring/visit/refund-node.webp') as ImageSourcePropType;
 
+/** `827:115` Icon/Lock — the refund tracker's 24pt glyph on its white well (`2342:4234`). */
+export const VISIT_REFUND_LOCK =
+  require('../../../../../assets/figma/recurring/visit/refund-lock.webp') as ImageSourcePropType;
+/** `2000:1099` Icon/Check at 12pt — a done step on the refund tracker's lime dot. */
+export const VISIT_REFUND_CHECK =
+  require('../../../../../assets/figma/recurring/visit/refund-check.webp') as ImageSourcePropType;
+/** `I2342:4234;2303:4084` — the status pill's 8×4 chevron (stroke-inclusive 9.5×5.5). */
+export const VISIT_REFUND_CHEVRON_UP =
+  require('../../../../../assets/figma/recurring/visit/refund-chevron-up.webp') as ImageSourcePropType;
+
 // --- Recipe share, prep checklist, dock ---------------------------------------------------------
 /** `1390:448` — the 24pt dish bowl (recipe share and the all-set banner). */
 export const VISIT_DISH_GLYPH =

@@ -35,6 +35,7 @@ import type { BriefKey } from './components';
 import {
   arrivalOf,
   clock,
+  cookStatLines,
   day,
   duration,
   endsAt,
@@ -46,6 +47,7 @@ import {
   otpDigits,
   paidTipOf,
   paymentSheetFrom,
+  reassignedOneTime,
   recurringPaymentSheetFrom,
   servicePhaseOf,
 } from './model';
@@ -168,12 +170,20 @@ export function ServiceVisitHost({
   ]
     .filter((part): part is string => part !== null)
     .join(' · ');
-  // "Your rating" is this customer's own average for the cook (dev note `2226:4211`) — never the
-  // cook's overall average, which the card also carries. No own rating yet: no rating line.
-  const cookRating = card?.yourRating ?? null;
+  // "Your rating" is this customer's own average (dev note `2226:4211`); a cook on her first visit
+  // here shows the overall average instead (dev note `2353:17578`). See `cookStatLines`.
+  const stats = cookStatLines(card);
+  /*
+   * `2353:17562` — a ONE-TIME visit whose cook ops/system swapped before the trip: the
+   * "Sorry, we have assigned you another cook" note sits above the (new) cook's card until she
+   * starts the trip, then the screen moves on to Cook on the way as usual. A Recurring visit
+   * never shows it (dev note `2353:17578`).
+   */
+  const reassigned = reassignedOneTime(booking);
 
   const model: ServiceVisitModel = {
     phase,
+    reassigned,
     title:
       link !== null
         ? 'Recurring visit'
@@ -200,10 +210,7 @@ export function ServiceVisitHost({
           : '',
       name: cookName === null ? 'Your cook' : `Cook ${firstName(cookName) ?? cookName}`,
       ...(origin === '' ? {} : { origin }),
-      ...(card === null ? {} : { visits: `Visits with you: ${String(card.visitsWithYou)}` }),
-      ...(cookRating === null || cookRating.count === 0
-        ? {}
-        : { rating: `Your rating: ${cookRating.average.toFixed(1)}` }),
+      ...stats,
       note: '',
       ...(photoUrl === null ? {} : { photo: { uri: photoUrl } }),
     },

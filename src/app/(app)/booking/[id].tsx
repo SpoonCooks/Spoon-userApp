@@ -16,7 +16,13 @@ import {
 } from '@features/booking';
 import type { PaymentOutcome } from '@features/booking';
 import { useBookingCancelVisit } from '@features/cancellation';
-import { CancelledVisitHost, ServiceVisitHost, servicePhaseOf } from '@features/serviceVisit';
+import {
+  CancelledVisitHost,
+  ServiceVisitHost,
+  servicePhaseOf,
+  spoonCancelHelpMessage,
+} from '@features/serviceVisit';
+import type { SpoonCancelledData } from '@features/serviceVisit';
 import { paymentErrorMessage } from '@features/payment';
 import { useWhatsAppHelp } from '@features/support';
 import { ErrorBoundary, isNumericRating } from '@ui';
@@ -154,15 +160,14 @@ export default function BookingRoute() {
 
   /**
    * The redesigned visit details (Figma "Service flow") for the phases it draws — assigned, on the
-   * way, arrived, cooking, time's up, completed. Every other state (payment pending, a
-   * reassignment, cancelled) keeps the established screen and its flows unchanged.
+   * way, arrived, cooking, time's up, completed — a reassigned booking included: a one-time visit
+   * whose cook was swapped before the trip shows "Sorry, we have assigned you another cook" above
+   * the new cook while it is still `assigned` (Figma `2353:17562`, dev note `2353:17578`). Payment
+   * pending keeps the established screen; cancelled has its own Visit details below.
    */
   const detail = useBookingDetail(bookingId === '' ? null : bookingId, { poll: true });
   const booking = detail.state.status === 'ready' ? detail.state.data : null;
-  // The API sends `reassignment` on every booking (`{ occurred: false, … }` when the cook never
-  // changed), so only one that actually happened sends the booking to the established screen.
-  const reassigned = booking?.reassignment?.occurred === true;
-  const phase = booking === null || reassigned ? null : servicePhaseOf(booking, new Date());
+  const phase = booking === null ? null : servicePhaseOf(booking, new Date());
 
   /*
    * A Recurring visit's booking (`booking.recurring`) is drawn by the same screens, titled
@@ -242,16 +247,28 @@ export default function BookingRoute() {
   }
 
   /*
-   * Cancelled (Figma `2165:11853`, dev note `2226:4224`) — by the customer or by Spoon. The cancel
-   * sheet stays mounted so its "Visit cancelled" step can still be read over the screen.
+   * Cancelled (Figma `2165:11853`, dev note `2226:4224`) — by the customer or by Spoon, whether or
+   * not its cook had been reassigned first: it is cancelled either way. The cancel sheet stays
+   * mounted so its "Visit cancelled" step can still be read over the screen.
+   *
+   * Cancelled by Spoon (`2342:4195`): "Rebook a visit" opens Schedule on the same day and length
+   * (all `/scheduled` reads — it takes no slot or address), and "Talk to us" opens the Help chat
+   * naming this booking.
    */
-  if (booking !== null && booking.status === 'cancelled' && !reassigned) {
+  if (booking !== null && booking.status === 'cancelled') {
     return (
       <ErrorBoundary scope="booking-host">
         <CancelledVisitHost
           booking={booking}
           onBack={goBack}
           onHelp={guard(() => openHelp('Hi Spoon, I need help with my cancelled booking.'))}
+          onRebook={guard(({ date, durationId }: SpoonCancelledData['rebook']) =>
+            router.push({
+              pathname: '/scheduled',
+              params: { durationId, ...(date === null ? {} : { date }) },
+            }),
+          )}
+          onTalkToUs={guard(() => openHelp(spoonCancelHelpMessage(booking)))}
         />
         {cancelVisit.sheet}
       </ErrorBoundary>

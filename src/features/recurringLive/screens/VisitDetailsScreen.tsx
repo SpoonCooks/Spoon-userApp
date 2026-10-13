@@ -68,6 +68,11 @@ export interface VisitDetailsScreenProps {
    * summary once the host has the visit's refund. The summary stands until then.
    */
   readonly refundSlot?: ReactNode | undefined;
+  /**
+   * Cancelled only — drawn in place of the "Visit cancelled" card: a one-time visit cancelled by
+   * Spoon shows its apology card there (`2342:4343`, `@features/serviceVisit`).
+   */
+  readonly cancelledSlot?: ReactNode | undefined;
   /** How many prep checks start ticked: 0 (`1441:1808`), 1 (`1441:1853`) or 3 (`1441:1898`). */
   readonly prepState?: VisitPrepReady | undefined;
   readonly onPrepChange?: ((checked: readonly VisitPrepKey[]) => void) | undefined;
@@ -97,6 +102,7 @@ export function VisitDetailsScreen({
   onNextVisit,
   ratingSlot,
   refundSlot,
+  cancelledSlot,
   prepState = 0,
   onPrepChange,
   onBookAgain,
@@ -172,7 +178,9 @@ export function VisitDetailsScreen({
           />
         ) : null}
         {variant === 'pending' ? <UpiAutopayCard testID={`${testID}-autopay`} /> : null}
-        {variant === 'cancelled' ? (
+        {variant === 'cancelled' && cancelledSlot !== undefined && cancelledSlot !== null ? (
+          cancelledSlot
+        ) : variant === 'cancelled' ? (
           <VisitCancelledCard
             cancelled={model.cancelled}
             onNextVisit={onNextVisit}
