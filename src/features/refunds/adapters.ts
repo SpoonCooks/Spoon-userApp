@@ -96,15 +96,15 @@ export function refundStepLabel(timeZone: string | undefined, at: string): strin
   return stepLabel(timeZone, at);
 }
 
-/** `en-IN` writes "am" / "pm"; the frames (`2303:4094`) write them in capitals. */
+/**
+ * "12 Oct, 11:21 PM" (`2303:4094`), assembled from its parts: the platforms join a date and a time
+ * differently ("13 Oct, 1:32 pm" on Android and Node, "13 Oct at 1:32 PM" on iOS), and `en-IN`
+ * writes "am" / "pm" where the frames use capitals.
+ */
 function stepLabel(timeZone: string | undefined, at: string): string {
-  return formatOn(timeZone, at, {
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).replace(/\b(am|pm)\b/, (meridiem) => meridiem.toUpperCase());
+  const date = formatOn(timeZone, at, { day: 'numeric', month: 'short' });
+  const time = formatOn(timeZone, at, { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${date}, ${time.replace(/\b(am|pm)\b/i, (meridiem) => meridiem.toUpperCase())}`;
 }
 
 function durationLabel(minutes: number): string {

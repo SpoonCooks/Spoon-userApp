@@ -6,7 +6,6 @@ import type { CancelStep, CancelVisitSheetProps } from './CancelVisitSheet';
 import {
   countdownLabel,
   durationLabel,
-  feeHint,
   feeZoneOf,
   outcomeLines,
   refundCaption,
@@ -93,15 +92,8 @@ describe('model', () => {
     });
     expect(refundCaption(quote(0), VISIT)).toBe('Full refund, inclusive of taxes');
     expect(refundCaption(quote(100), { ...VISIT, cookOnTheWay: true })).toBe(
-      'No refund — cook was already on her way',
+      'No refund, cook was already on her way',
     );
-  });
-
-  it('hints only the fee tiers still ahead (C1)', () => {
-    expect(feeHint(VISIT, NOW)).toBe(
-      'Free to cancel until 6:00 AM · 25% fee after, 50% in the last hour',
-    );
-    expect(feeHint(VISIT, new Date('2026-10-14T02:50:00.000Z'))).toBe('50% fee to cancel now');
   });
 });
 

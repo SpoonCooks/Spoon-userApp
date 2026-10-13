@@ -116,7 +116,7 @@ export function RatingStars({ value, onChange, clock, testID }: RatingStarsProps
         onPress={() => onChange?.(VISIT_RATING_PLUS)}
         disabled={onChange === undefined}
         accessibilityRole="radio"
-        accessibilityLabel="5 plus — went above and beyond"
+        accessibilityLabel="5 plus, went above and beyond"
         accessibilityState={{ selected: tier === 'magic' }}
         style={[styles.plus, low ? styles.plusDimmed : null]}
         testID={`${testID}-plus`}

@@ -105,13 +105,13 @@ describe('Map location (1870:2379)', () => {
   });
 
   it('keeps a message in the hint row even after a drag', () => {
-    render(<AddressMapScreen {...props({ message: 'Couldn’t check just now — try again' })} />);
+    render(<AddressMapScreen {...props({ message: 'Couldn’t check just now. Try again' })} />);
     fireEvent(screen.getByTestId('address-map-canvas'), 'regionChangeStart', regionAt(12.9, 77.6), {
       isGesture: true,
     });
 
     expect(screen.getByTestId('address-message')).toBeTruthy();
-    expect(screen.getByText('Couldn’t check just now — try again')).toBeTruthy();
+    expect(screen.getByText('Couldn’t check just now. Try again')).toBeTruthy();
   });
 
   /** Dev note: "Confirm disabled until address resolves" (skeleton while loading). */

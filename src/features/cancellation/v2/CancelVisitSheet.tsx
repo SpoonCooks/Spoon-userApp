@@ -32,7 +32,6 @@ import {
   dateTile,
   dayLabel,
   durationLabel,
-  feeHint,
   feeZoneOf,
   isHighLoss,
   methodLabel,
@@ -154,7 +153,6 @@ export function CancelVisitSheet({
       {step === 'modify' ? (
         <ModifyStep
           visit={visit}
-          now={now}
           canReschedule={canReschedule}
           onClose={onClose}
           onReschedule={onReschedule}
@@ -325,7 +323,6 @@ function Loading({ testID }: { testID: string }) {
 
 function ModifyStep({
   visit,
-  now,
   canReschedule,
   onClose,
   onReschedule,
@@ -333,7 +330,6 @@ function ModifyStep({
   testID,
 }: {
   visit: CancelVisit;
-  now: Date;
   canReschedule: boolean;
   onClose: () => void;
   onReschedule: () => void;
@@ -341,7 +337,6 @@ function ModifyStep({
   testID: string;
 }) {
   const tile = dateTile(visit.startsAt);
-  const hint = feeHint(visit, now);
   return (
     <>
       <Header title="Modify visit" onClose={onClose} testID={testID} />
@@ -385,11 +380,6 @@ function ModifyStep({
           testID={`${testID}-option-cancel`}
         />
       </View>
-      {hint === null ? null : (
-        <Text style={[styles.caption, styles.center]} testID={`${testID}-hint`}>
-          {hint}
-        </Text>
-      )}
     </>
   );
 }
@@ -890,7 +880,7 @@ function ReviewStep({
                 <Text style={styles.bodyStrong}>
                   {refundMethod ?? 'Your original payment method'}
                 </Text>
-                <Text style={styles.caption}>Back in 5-7 working days</Text>
+                <Text style={styles.caption}>Expected within 5-7 working days</Text>
               </View>
             </View>
           )}
