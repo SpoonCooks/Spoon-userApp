@@ -46,7 +46,7 @@ export function foodSummaryOf(me: MeResponse): readonly string[] {
   return [first.join(' · '), grewUp.join(' · ')].filter((line) => line.length > 0);
 }
 
-export type PoolCardState = 'pool' | 'empty' | 'new';
+export type PoolCardState = 'pool' | 'empty' | 'new' | 'pending';
 
 /**
  * Which Cook Pool card to draw: the pool itself while it has cooks; the "Make your Cook Pool"
@@ -56,7 +56,10 @@ export type PoolCardState = 'pool' | 'empty' | 'new';
 export function poolCardStateOf(input: {
   readonly poolCount: number | null;
   readonly hasBooked: boolean | null;
+  /** Still loading: draw the card's shell rather than guess a variant and swap it later. */
+  readonly pending?: boolean;
 }): PoolCardState {
+  if (input.pending === true) return 'pending';
   if (input.poolCount === null || input.poolCount > 0) return 'pool';
   return input.hasBooked === false ? 'new' : 'empty';
 }

@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ACCOUNTS_ART } from '@ui/v2/accountsArt';
-import { C, SHADOW_1, T, gradientAngle } from '@ui/v2/theme';
+import { C, SHADOW_1, T, figmaGradient } from '@ui/v2/theme';
 
 import type { PoolCardState } from './model';
 
@@ -37,8 +37,12 @@ export interface AccountHubScreenProps {
   readonly onManageAccount: () => void;
 }
 
-const FOOD = gradientAngle(151.75);
-const POOL = gradientAngle(143.16);
+/** `2202:4323` / `2202:4338` — both heroes carry the same gradient transform. */
+const FOOD = figmaGradient([
+  [0.7, 0.5, 0],
+  [-0.5, 0.7, 0.4],
+]);
+const POOL = FOOD;
 const TEST_ID = 'profile-screen';
 
 /**
@@ -164,6 +168,21 @@ function PoolCard({
   onBook,
 }: Pick<AccountHubScreenProps, 'model' | 'onViewPool' | 'onAddCook' | 'onBook'>) {
   const state = model.pool;
+  if (state === 'pending') {
+    // The card's own gradient and height, empty, until the pool and bookings have answered.
+    return (
+      <LinearGradient
+        colors={['#ECFF9B', '#CFFF04']}
+        locations={[0, 0.8333]}
+        start={POOL.start}
+        end={POOL.end}
+        style={[styles.hero, styles.poolPending]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        testID="profile-pool-pending"
+      />
+    );
+  }
   const copy =
     state === 'pool'
       ? {
@@ -390,7 +409,10 @@ const styles = StyleSheet.create({
   overlapPlus: { marginRight: -12 },
   face: { width: 40, height: 40, borderRadius: 20 },
   overlap: { marginRight: -12 },
-  facePhoto: { borderWidth: 1.5, borderColor: C.base, backgroundColor: C.subtle },
+  /** `2202:4338` — the pool cooks' 40pt photos carry no outline. */
+  facePhoto: { backgroundColor: C.subtle },
+  /** `2202:4338` is 198 tall; the empty shell holds that space while the pool loads. */
+  poolPending: { height: 198 },
   faceInitials: {
     borderWidth: 1.5,
     borderColor: C.base,

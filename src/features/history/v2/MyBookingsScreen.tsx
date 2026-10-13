@@ -16,7 +16,7 @@ import type { DataState } from '@core/data';
 import { ACCOUNTS_ART } from '@ui/v2/accountsArt';
 import { QueryBoundary } from '@ui';
 import { PrimaryButton } from '@ui/v2/Buttons';
-import { C, SHADOW_1, T, gradientAngle } from '@ui/v2/theme';
+import { C, SHADOW_1, T, figmaGradient } from '@ui/v2/theme';
 
 import { countLabel, monthGroupsFrom } from './model';
 import type { BookingKind, BookingRow, NextVisit } from './model';
@@ -115,7 +115,9 @@ export function MyBookingsScreen(props: MyBookingsScreenProps) {
               <RowList
                 rows={data.later.map((row) => ({ type: 'row' as const, row }))}
                 header={
-                  <>
+                  // One View, so the body's 16pt gap also separates the label, the card and LATER:
+                  // FlatList wraps its header in a single cell, and `gap` only reaches between cells.
+                  <View style={styles.listHeader}>
                     {data.next === null ? null : (
                       <>
                         <Text style={styles.sectionLabel}>NEXT VISIT</Text>
@@ -128,7 +130,7 @@ export function MyBookingsScreen(props: MyBookingsScreenProps) {
                     {data.later.length === 0 ? null : (
                       <Text style={styles.sectionLabel}>LATER</Text>
                     )}
-                  </>
+                  </View>
                 }
                 paging={upcoming}
                 onOpen={props.onOpen}
@@ -310,7 +312,11 @@ function BookingCard({ row, onPress }: { row: BookingRow; onPress: () => void })
   );
 }
 
-const SKY = gradientAngle(157);
+/** `2192:4392` — the Status banner's gradient transform. */
+const SKY = figmaGradient([
+  [0.6, 0.4, 0],
+  [-0.4, 0.6, 0.4],
+]);
 
 function NextVisitCard({ visit, onPress }: { visit: NextVisit; onPress: () => void }) {
   return (
@@ -372,8 +378,13 @@ function EmptyBookings({
   onBook: () => void;
   testID: string;
 }) {
+  const { bottom } = useSafeAreaInsets();
   return (
-    <ScrollView contentContainerStyle={styles.empty} testID={testID}>
+    <ScrollView
+      // Centred in the space above the home indicator, as the frames draw it.
+      contentContainerStyle={[styles.empty, { paddingBottom: 48 + bottom }]}
+      testID={testID}
+    >
       <Image source={art} style={styles.flower} />
       <View style={styles.emptyText}>
         <Text style={[T.title, styles.center]}>{title}</Text>
@@ -382,7 +393,8 @@ function EmptyBookings({
       <PrimaryButton
         label="Book Now"
         onPress={onBook}
-        style={styles.emptyButton}
+        // `2192:4504` / `2192:4534` draw Book Now with Elevation/1, over the Button's hairline.
+        style={[styles.emptyButton, SHADOW_1]}
         testID={`${testID}-book`}
       />
     </ScrollView>
@@ -436,6 +448,7 @@ const styles = StyleSheet.create({
   secondary: { color: C.textSecondary },
   underline: { textDecorationLine: 'underline' },
   body: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 48, gap: 16 },
+  listHeader: { gap: 16 },
   sectionLabel: {
     fontFamily: T.microStrong.fontFamily,
     fontSize: 10,
@@ -520,9 +533,15 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
   },
-  empty: { alignItems: 'center', paddingTop: 122, paddingHorizontal: 32, paddingBottom: 48 },
+  /** `2192:4504` / `2192:4534` — the body centred in the space under the header, padded 0/32/48. */
+  empty: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
   flower: { width: 180, height: 170 },
   emptyText: { gap: 8, alignSelf: 'stretch', marginTop: 28 },
   center: { textAlign: 'center' },
-  emptyButton: { alignSelf: 'stretch', marginTop: 24 },
+  emptyButton: { alignSelf: 'stretch', marginTop: 28 },
 });

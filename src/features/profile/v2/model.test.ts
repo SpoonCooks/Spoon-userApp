@@ -48,5 +48,6 @@ describe('Account hub (dev note 2084:2770)', () => {
     expect(poolCardStateOf({ poolCount: 0, hasBooked: true })).toBe('empty');
     expect(poolCardStateOf({ poolCount: 0, hasBooked: null })).toBe('empty');
     expect(poolCardStateOf({ poolCount: 0, hasBooked: false })).toBe('new');
+    expect(poolCardStateOf({ poolCount: null, hasBooked: null, pending: true })).toBe('pending');
   });
 });

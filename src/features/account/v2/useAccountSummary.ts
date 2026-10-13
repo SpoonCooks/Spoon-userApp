@@ -23,6 +23,11 @@ export interface AccountSummary {
   readonly hasBooked: boolean | null;
   readonly addressLabels: readonly string[] | null;
   readonly poolCount: number | null;
+  /**
+   * The pool, or the bookings that decide which empty card to draw, are still loading. A failed
+   * read is not pending: it settles, and the card falls back as before.
+   */
+  readonly poolPending: boolean;
   readonly poolFaces: readonly PoolFace[];
 }
 
@@ -64,6 +69,11 @@ export function useAccountSummary(): AccountSummary {
           ? addresses.state.data.map((address) => address.label)
           : null,
       poolCount: poolData?.count ?? null,
+      poolPending:
+        pool.state.status === 'loading' ||
+        (poolData?.count === 0 &&
+          (bookings.upcoming.state.status === 'loading' ||
+            bookings.past.state.status === 'loading')),
       poolFaces: (poolData?.cooks ?? []).slice(0, 3).map(({ cook }) => ({
         id: cook.cookId,
         photo: cook.profileImageUrl ?? cookCardContentFor(cook.profileCode)?.photoUrl ?? null,

@@ -43,7 +43,11 @@ export default function ProfileRoute() {
             phone: phoneLabelOf(identity.phone),
             profileComplete: identity.profileComplete,
             foodSummary: foodSummaryOf(identity),
-            pool: poolCardStateOf({ poolCount: summary.poolCount, hasBooked: summary.hasBooked }),
+            pool: poolCardStateOf({
+              poolCount: summary.poolCount,
+              hasBooked: summary.hasBooked,
+              pending: summary.poolPending,
+            }),
             poolFaces: summary.poolFaces,
             version: Constants.expoConfig?.version ?? '1.0.0',
           }}

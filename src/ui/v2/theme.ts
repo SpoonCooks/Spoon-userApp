@@ -86,6 +86,25 @@ export const T = {
 } as const;
 
 /**
+ * A Figma linear gradient's `gradientTransform` (`[[a, b, c], [d, e, f]]`, node box → gradient
+ * space) as `expo-linear-gradient` start/end points. Both are fractions of the box, so this is
+ * exact on a card of any shape — unlike an angle, which only holds for a square: Figma's gradient
+ * line runs from (0, 0.5) to (1, 0.5) in gradient space, mapped back into the box here.
+ */
+export function figmaGradient(transform: readonly [readonly number[], readonly number[]]): {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+} {
+  const [[a = 1, b = 0, c = 0], [d = 0, e = 1, f = 0]] = transform;
+  const det = a * e - b * d;
+  const point = (u: number, v: number) => ({
+    x: (e * (u - c) - b * (v - f)) / det,
+    y: (a * (v - f) - d * (u - c)) / det,
+  });
+  return { start: point(0, 0.5), end: point(1, 0.5) };
+}
+
+/**
  * A CSS `linear-gradient(<deg>)` as `expo-linear-gradient` start/end points (unit square): 0° runs
  * bottom → top, 90° left → right, clockwise from there.
  */

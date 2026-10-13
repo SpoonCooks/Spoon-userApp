@@ -1,4 +1,14 @@
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  findNodeHandle,
+} from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import { OutlineButton, PrimaryButton } from '@ui/v2/Buttons';
@@ -50,12 +60,24 @@ export function DeleteAccountSheetV2(props: DeleteAccountSheetV2Props) {
   const losses = LOSS_ROWS.filter((row) => props.losses[row.key]);
   const requesting = props.requesting === true;
 
+  // Dev note `2084:2786`: "Keep my account" is the default focus — a screen reader lands on it
+  // once the sheet has slid in (220 ms), not on the destructive action below it.
+  const keepRef = useRef<View>(null);
+  useEffect(() => {
+    if (!props.visible) return undefined;
+    const timer = setTimeout(() => {
+      const node = keepRef.current === null ? null : findNodeHandle(keepRef.current);
+      if (node !== null) AccessibilityInfo.setAccessibilityFocus(node);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [props.visible]);
+
   return (
     <Sheet
       visible={props.visible}
       onClose={props.onKeep}
       dismissible={!requesting}
-      handle="soft"
+      look="account"
       testID="delete-account-sheet"
     >
       <View style={styles.content}>
@@ -95,7 +117,8 @@ export function DeleteAccountSheetV2(props: DeleteAccountSheetV2Props) {
           label="Keep my account"
           onPress={props.onKeep}
           disabled={requesting}
-          style={styles.button}
+          style={[styles.button, styles.flat]}
+          ref={keepRef}
           testID="delete-account-no"
         />
         {requesting ? (
@@ -106,7 +129,7 @@ export function DeleteAccountSheetV2(props: DeleteAccountSheetV2Props) {
           <OutlineButton
             label="Delete permanently"
             onPress={props.onDelete}
-            style={styles.button}
+            style={[styles.button, styles.flat, styles.outlineThin]}
             testID="delete-account-yes"
           />
         )}
@@ -129,7 +152,7 @@ export function DeleteAccountSheetV2(props: DeleteAccountSheetV2Props) {
 }
 
 const styles = StyleSheet.create({
-  content: { alignItems: 'center', gap: 16, paddingHorizontal: 8, paddingBottom: 16 },
+  content: { alignItems: 'center', gap: 16, paddingHorizontal: 8 },
   trashDisc: {
     width: 64,
     height: 64,
@@ -159,6 +182,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /** `1517:10413` — neither button carries a shadow; the outline is 1pt. */
+  flat: { boxShadow: [] },
+  outlineThin: { borderWidth: 1 },
   breakRow: { flexDirection: 'row', gap: 4 },
   underline: { textDecorationLine: 'underline' },
 });
