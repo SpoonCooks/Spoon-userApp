@@ -35,7 +35,8 @@ export interface SavedAddressItem {
  */
 export function savedListFrom(
   addresses: readonly AddressDto[],
-  context: SavedListContext,
+  // Kept so callers say how the list was opened; the tag no longer depends on it.
+  _context: SavedListContext,
 ): readonly SavedAddressItem[] {
   const sorted = addresses
     .map((address, index) => ({ address, index }))
