@@ -165,7 +165,7 @@ describe('RecurringAutopayScreen', () => {
     expect(await screen.findByText('₹135.45')).toBeTruthy();
     expect(screen.getByText('₹677.25')).toBeTruthy();
     expect(screen.getByText(/5 days · 5 visits/)).toBeTruthy();
-    expect(screen.getByText(/charged 3 hours before it starts/)).toBeTruthy();
+    expect(screen.getByText(/Charged 3 hrs before your first visit of the day/)).toBeTruthy();
     expect(screen.getByText(/about 27 hours before each charge/)).toBeTruthy();
     expect(screen.getByText(/more than ₹1000/)).toBeTruthy();
     expect(screen.getByText('Cancelled visits are never charged.')).toBeTruthy();
@@ -242,5 +242,25 @@ describe('RecurringAutopayScreen', () => {
     expect(await screen.findByText('Some times were just taken')).toBeTruthy();
     fireEvent.press(screen.getByTestId('recurring-autopay-screen-change-times'));
     expect([...(onChangeTimes.mock.calls[0]?.[0] as Set<string>)]).toEqual(['plan-1#2026-10-07']);
+  });
+
+  it('names the days over the Autopay limit instead of saying a time was taken', async () => {
+    const { onChangeTimes } = setup({
+      quote: {
+        ...QUOTE,
+        bookable: false,
+        dayTotals: [
+          { date: '2026-10-07', visitsCount: 2, totalPaise: 120000, overLimit: true },
+          { date: '2026-10-08', visitsCount: 1, totalPaise: 35400, overLimit: false },
+        ],
+      },
+    });
+
+    expect(await screen.findByText('Over the Autopay limit on some days')).toBeTruthy();
+    expect(screen.getByText(/up to ₹1,000 a day/)).toBeTruthy();
+    expect(screen.getByText(/\(₹1,200\)/)).toBeTruthy();
+    expect(screen.queryByText('Some times were just taken')).toBeNull();
+    fireEvent.press(screen.getByTestId('recurring-autopay-screen-change-times'));
+    expect(onChangeTimes).toHaveBeenCalledTimes(1);
   });
 });

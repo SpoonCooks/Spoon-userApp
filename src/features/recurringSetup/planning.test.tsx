@@ -44,7 +44,12 @@ const ELIGIBILITY: RecurringEligibilityDto = {
       pricingVersion: 'p',
     },
   ],
-  charging: { notifyLeadHours: 27, debitLeadHours: 3, mandateMaxChargePaise: 100000 },
+  charging: {
+    notifyLeadHours: 27,
+    debitLeadHours: 3,
+    mandateMaxChargePaise: 100000,
+    mandateFlow: 'checkout',
+  },
 };
 
 describe('planningFrom', () => {

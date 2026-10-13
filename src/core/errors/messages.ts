@@ -61,6 +61,8 @@ const CODE_COPY: Readonly<Record<string, string>> = {
 
 const BOUNDED_REASON_COPY: Readonly<Record<string, string>> = {
   CUSTOMER_BOOKING_OVERLAP: 'You already have another booking at that time. Pick another slot.',
+  DAY_TOTAL_OVER_AUTOPAY_LIMIT:
+    'UPI Autopay can charge up to ₹1,000 a day. Remove a visit or pick a shorter duration on the busiest days.',
   NO_ELIGIBLE_COOK: 'No cook is available for that time right now.',
   SOCIETY_NOT_SUPPORTED: 'Spoon is not live in this society yet.',
 };

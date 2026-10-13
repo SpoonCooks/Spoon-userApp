@@ -4,6 +4,7 @@ export { getDeviceId, resetDeviceIdCache } from './deviceId';
 export { readLastPhone, writeLastPhone } from './lastPhoneStore';
 export { readTriedPlace, writeTriedPlace } from './triedPlaceStore';
 export { readLastPushToken, writeLastPushToken } from './pushTokenStore';
+export { readLastUpiApp, writeLastUpiApp } from './lastUpiAppStore';
 export { unimplementedSessionGateway } from './sessionGateway';
 export type { SessionGateway } from './sessionGateway';
 export { secureGuestFlagStore } from './guestFlagStore';
