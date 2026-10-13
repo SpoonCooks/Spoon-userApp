@@ -219,6 +219,15 @@ export const lightColors = {
   borderPlanTile: palette.yellow200,
   /** `1219:4271` — the focused duration card's 1pt edge: the file's `--disabled`, black at 25 %. */
   borderDurationFocus: palette.black25,
+  /** `340:7539` — a start time: white, a 1.5pt `#FFEF99` edge. */
+  borderStartTime: palette.yellow300,
+  /** `340:7539` — a start time no pool Cook can take: black at 3 %, no edge. */
+  surfaceStartTimeUnavailable: palette.black3,
+  /** `340:7539` — the picked start time: `#E2FF68` with a 1.5pt black-25 % edge. */
+  surfaceStartTimeSelected: palette.canary,
+  /** `340:7539` — the time-of-day tabs' rule (1pt, black 25 %) and the chosen tab's 2pt underline. */
+  borderTimeTabs: palette.black25,
+  borderTimeTabSelected: palette.yellow500,
   /** Spoon — User `color/border/strong` — the outlined "Delete date" button (`586:4386`). */
   borderInk: palette.black,
   /** Spoon — User `--disabled` (`#00000040`) as a fill: the undo banner's tick badge (`567:1031`). */
@@ -472,6 +481,12 @@ export const gradients = {
   /** `1219:4274` — the liquid in the focused duration card: `#FFD600` → `#FFDE33` (60 %) → `#FFE666`. */
   durationLevelFocused: {
     colors: [palette.yellow500, palette.yellow33, palette.yellow400],
+    locations: [0, 0.6, 1],
+    angleDeg: 180,
+  },
+  /** `340:7539` — the CHOSEN duration card's liquid: `#CFFF04` → `#E2FF68` (60 %) → `#ECFF9B`. */
+  durationLevelSelected: {
+    colors: [palette.lime500, palette.canary, palette.lime300],
     locations: [0, 0.6, 1],
     angleDeg: 180,
   },

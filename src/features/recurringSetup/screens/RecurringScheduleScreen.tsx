@@ -19,13 +19,13 @@ import type { RecurringVisitChoice } from '../types';
  * Source: Figma `cCQlzTeiObQkpVBzwI8mZi` (Spoon — User): `229:1802` / `288:401` / `288:516` (Plan 1)
  * and `340:7110` / `340:7455` / `340:7539` (the last plan).
  *
- * The Plan banner names the plan and its visit, then the plan's days, then the three choices
- * (`VisitChoices`): Duration (the carousel), Time of the day, Start time, each opening once the one
- * before it is chosen. The CTA unlocks once a start time is picked.
+ * The Plan banner names the plan and its visit, then the plan's days, then "Pick duration & time"
+ * (`VisitChoices`): the Duration carousel, and once a duration is chosen the time-of-day tabs and
+ * their start times. The CTA unlocks once a start time is picked.
  *
- * Spacing follows the frames: 24 between blocks while the first two choices are open
- * (`340:7110`, `288:401`), tightening to 16 once the Start time grid shows (`288:516`, whose
- * content runs past the fold and fades into the footer).
+ * Spacing follows the frames: 24 between blocks while only the carousel shows (`340:7110`),
+ * tightening to 16 once the times open (`340:7539`, whose content runs past the fold and fades
+ * into the footer).
  *
  * CTA copy is the frames': "Save & Schedule Plan N+1" while plans remain, "Save & Continue" on the
  * last. (The notes under `340:7539` / `485:391` word them "Move to Plan (i+1)" / "Continue", and
@@ -35,7 +35,7 @@ import type { RecurringVisitChoice } from '../types';
  * ones no pool Cook can take on all of them are greyed (`VisitChoices`).
  *
  * Adding a further visit to a plan (`addingVisit`) — `332:5921` / `332:5681` / `332:5718`: the
- * Plan card and its visits replace the banner, the time section is titled "Time", and anything
+ * Plan card and its visits replace the banner, and anything
  * that would overlap the plan's other visits on these days is greyed out — a 1 hr 9 AM 1st visit
  * takes 9 to 10 AM away from the 2nd. A duration with no start time left in the band greys too.
  */
@@ -134,7 +134,6 @@ export function RecurringScheduleScreen({
           initial={initial}
           busy={busy}
           dayIds={dayIds}
-          timeLabel={addingVisit === undefined ? 'Time of the day' : 'Time'}
           onChange={setChoice}
           onStartTimesShown={setStartShown}
         />

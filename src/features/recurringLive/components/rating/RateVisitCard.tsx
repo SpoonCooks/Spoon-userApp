@@ -309,12 +309,12 @@ export function RateVisitCard({
         <View style={styles.cook}>
           {live ? (
             visit.photoUri ? (
-              <Image source={{ uri: visit.photoUri }} style={styles.cookPhotoLive} />
+              <Image source={{ uri: visit.photoUri }} style={styles.cookPhoto} resizeMode="cover" />
             ) : (
-              <View style={styles.cookPhotoLive} />
+              <View style={styles.cookPhoto} />
             )
           ) : (
-            <Image source={RATING_ART.cookPhoto} style={styles.cookPhoto} />
+            <Image source={RATING_ART.cookPhoto} style={styles.cookPhoto} resizeMode="cover" />
           )}
           <View style={styles.cookText}>
             <Text variant="spoonBodyStrong" numberOfLines={1}>
@@ -799,14 +799,12 @@ const styles = StyleSheet.create({
   },
   /** `2306:1139` — Livvic SemiBold 13. */
   bannerText: { flex: 1, fontSize: 13, lineHeight: 16 },
-  cookPhoto: { width: 44, height: 44 },
-  /** A real cook's photo in the frame's 44pt ring (`1501:6632`). */
-  cookPhotoLive: {
+  /** `1501:6632` — the photo fills a 44pt `#FFF7CC` circle; no ring. */
+  cookPhoto: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: lightTheme.colors.borderNotice,
+    overflow: 'hidden',
     backgroundColor: lightTheme.colors.surfaceAccent,
   },
   cookText: { flex: 1, gap: lightTheme.space.xxs },
