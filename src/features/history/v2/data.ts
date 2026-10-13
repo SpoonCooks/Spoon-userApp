@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useActiveBookingPages, useBookingHistoryPages } from '@features/booking';
 import { ready } from '@core/data';
 import type { DataState } from '@core/data';
-import { currentSkewMs } from '@core/time';
+import { currentSkewMs, slotHasEnded } from '@core/time';
+import type { BookingSummaryDto } from '@features/booking';
 
 import { byMostRecentFirst, bySoonestFirst } from '../adapters';
 import { isStillUpcoming } from '../data';
@@ -33,11 +34,45 @@ export interface PastTab extends BookingTabPaging {
 }
 
 /**
+ * A finished booking (from `GET /v1/me/bookings`) whose booked slot is still ahead — a visit
+ * cancelled for a later date, or one completed before its window closed. Dev note `2192:4489`:
+ * "Cancelled … stays here until its date passes, then moves to Past", so it is drawn on Upcoming,
+ * not Past, until then. `/me/bookings/active` cannot carry it: it lists a cancelled booking only
+ * while Spoon's own cancellation notice is unread. An instant booking has no slot, so it is Past.
+ */
+function slotStillAhead(booking: BookingSummaryDto, now: Date): boolean {
+  return (
+    booking.scheduledStart !== null &&
+    !slotHasEnded(booking.scheduledStart, booking.durationMinutes, now)
+  );
+}
+
+/** The live list's still-upcoming rows plus history rows whose slot is ahead, soonest first. */
+export function upcomingBookingsFrom(
+  active: readonly BookingSummaryDto[],
+  history: readonly BookingSummaryDto[],
+  now: Date,
+): readonly BookingSummaryDto[] {
+  const live = active.filter((booking) => isStillUpcoming(booking, now));
+  const ids = new Set(live.map((booking) => booking.id));
+  const ahead = history.filter((booking) => !ids.has(booking.id) && slotStillAhead(booking, now));
+  return [...live, ...ahead].sort(bySoonestFirst);
+}
+
+/** History rows whose slot has passed (or that never had one) — the Past tab. */
+export function pastBookingsFrom(
+  history: readonly BookingSummaryDto[],
+  now: Date,
+): readonly BookingSummaryDto[] {
+  return history.filter((booking) => !slotStillAhead(booking, now));
+}
+
+/**
  * Both tabs of the redesigned My bookings, from the same two endpoints the old list read:
  * `GET /v1/me/bookings/active` (Upcoming, soonest first — the server's order) and
- * `GET /v1/me/bookings` (Past, newest first). The Upcoming filter is the old one, unchanged
- * (`isStillUpcoming`): a finished booking whose slot has passed belongs to Past only — which is
- * also the dev note's "Cancelled stays here until its date passes, then moves to Past".
+ * `GET /v1/me/bookings` (Past, newest first). A finished booking sits on Upcoming while its slot is
+ * still ahead and on Past once it has passed — never both (`upcomingBookingsFrom`,
+ * `pastBookingsFrom`).
  */
 export function useMyBookingsV2(): { readonly upcoming: UpcomingTab; readonly past: PastTab } {
   const active = useActiveBookingPages();
@@ -45,15 +80,18 @@ export function useMyBookingsV2(): { readonly upcoming: UpcomingTab; readonly pa
   // Read once on open, skew-corrected — see `useUpcomingBookingsData`.
   const [nowMs] = useState(() => Date.now() - currentSkewMs());
 
+  const historyRows = history.state.status === 'ready' ? history.state.data : undefined;
+  const pastRows = useMemo(
+    () => (historyRows === undefined ? undefined : pastBookingsFrom(historyRows, new Date(nowMs))),
+    [historyRows, nowMs],
+  );
+
   const visible = useMemo(
     () =>
       active.state.status === 'ready'
-        ? active.state.data
-            .filter((booking) => isStillUpcoming(booking, new Date(nowMs)))
-            .slice()
-            .sort(bySoonestFirst)
+        ? upcomingBookingsFrom(active.state.data, historyRows ?? [], new Date(nowMs))
         : undefined,
-    [active.state, nowMs],
+    [active.state, historyRows, nowMs],
   );
 
   const upcomingState = useMemo(() => {
@@ -64,12 +102,12 @@ export function useMyBookingsV2(): { readonly upcoming: UpcomingTab; readonly pa
   const pastState = useMemo(() => {
     if (history.state.status !== 'ready') return history.state;
     return ready(
-      history.state.data
+      (pastRows ?? [])
         .slice()
         .sort(byMostRecentFirst)
         .map((dto) => bookingRowFrom(dto, new Date(nowMs))),
     );
-  }, [history.state, nowMs]);
+  }, [history.state, pastRows, nowMs]);
 
   // Every row loaded so far filtered out, with more behind them: nothing draws a scroll area to
   // ask for the next page, so ask here (as the old list did).
@@ -78,6 +116,13 @@ export function useMyBookingsV2(): { readonly upcoming: UpcomingTab; readonly pa
   useEffect(() => {
     if (nothingVisibleYet && hasMore && !loadingMore) loadMore();
   }, [nothingVisibleYet, hasMore, loadingMore, loadMore]);
+
+  // The same for Past, whose loaded rows can all be visits still ahead of their slot.
+  const noPastYet = pastRows !== undefined && pastRows.length === 0;
+  const { hasMore: pastHasMore, loadingMore: pastLoadingMore, loadMore: loadMorePast } = history;
+  useEffect(() => {
+    if (noPastYet && pastHasMore && !pastLoadingMore) loadMorePast();
+  }, [noPastYet, pastHasMore, pastLoadingMore, loadMorePast]);
 
   return {
     upcoming: {
@@ -92,7 +137,7 @@ export function useMyBookingsV2(): { readonly upcoming: UpcomingTab; readonly pa
     },
     past: {
       state: pastState,
-      count: history.state.status === 'ready' ? history.state.data.length : 0,
+      count: pastRows?.length ?? 0,
       hasMore: history.hasMore,
       loadingMore: history.loadingMore,
       loadMoreError: history.loadMoreError !== null,

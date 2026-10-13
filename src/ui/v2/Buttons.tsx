@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import type { StyleProp, ViewStyle } from 'react-native';
+import type { Ref } from 'react';
+import type { StyleProp, View, ViewStyle } from 'react-native';
 
 import { C, SHADOW_HAIRLINE, T } from './theme';
 
@@ -10,6 +11,7 @@ export function PrimaryButton({
   disabled = false,
   loading = false,
   style,
+  ref,
   testID,
 }: {
   label: string;
@@ -17,11 +19,14 @@ export function PrimaryButton({
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** For a caller that moves screen-reader focus to it (a sheet's default action). */
+  ref?: Ref<View>;
   testID: string;
 }) {
   const inert = disabled || loading;
   return (
     <Pressable
+      ref={ref}
       onPress={() => {
         if (!inert) onPress();
       }}
