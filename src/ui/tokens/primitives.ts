@@ -235,6 +235,8 @@ export const palette = {
   amber700: '#BB4D00',
   /** `3:1151` — "Cancel Booking & Refund"; also the destructive ink across the file. */
   rose600: '#EC003F',
+  /** Spoon — User `color/status/negative-subtle`: the Autopay "Didn't go through" well. */
+  coral50: '#FFE8E3',
   /** The delete-account confirmation prompt's rose block — `rose600` at 30%, Figma inspector. */
   rose600Surface: 'rgba(236,0,63,0.3)',
   /** `6:22` — the "Free" fee value on the cancellation policy, NEW in the current Figma file. */
@@ -379,6 +381,10 @@ export const space = {
   s22: 22,
   /** Duration-matrix inter-column gap (`135:95`). */
   s40: 40,
+  /** The Autopay "Last used" tag's vertical padding (`2316:3597`). */
+  s3: 3,
+  /** The Autopay app rows' leading inset and the info card's padding (`2316:3593`, `2316:3630`). */
+  s14: 14,
 } as const;
 
 /**

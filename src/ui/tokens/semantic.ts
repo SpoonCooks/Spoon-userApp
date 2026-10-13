@@ -352,6 +352,10 @@ export const lightColors = {
   surfaceVideoScene: palette.yellow100,
   /** `970:5600` — the wash over the landing while the video plays. */
   scrimPlayer: palette.scrimPlayer,
+
+  // Recurring UPI Autopay sheets (`2316:3558` … `2317:4009`).
+  /** `2317:3826` — `color/status/negative-subtle`, the "Didn't go through" status well. */
+  surfaceNegativeSubtle: palette.coral50,
 } as const;
 
 /** TODO(designer): no dark theme exists in Figma. Mirrors light until one does. */
@@ -1646,6 +1650,8 @@ export const elevation = {
   cta: elevations.cta,
   /** `983:6074` — the Recurring landing's "Schedule Now" tag. */
   tag: elevations.tag,
+  /** `2316:3575` — Spoon — User `Elevation/2` (`0 0 12 #0000001A`) on the Autopay sheets. */
+  sheetSoft: elevations.tag,
 } as const satisfies Record<string, Elevation>;
 
 export type ElevationRole = keyof typeof elevation;

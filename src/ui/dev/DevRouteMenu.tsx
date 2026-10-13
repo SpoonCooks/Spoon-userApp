@@ -137,6 +137,56 @@ export const DEV_ROUTES: readonly DevRoute[] = [
     note: 'IN PROGRESS · dev preview, no session needed',
   },
   {
+    path: '/recurring-autopay?state=choose',
+    label: 'Recurring Autopay · Choose UPI app (preview)',
+    note: 'DEV PREVIEW · 2316:3558',
+  },
+  {
+    path: '/recurring-autopay?state=more',
+    label: 'Recurring Autopay · Choose UPI app · all apps (preview)',
+    note: 'DEV PREVIEW · 2316:3558',
+  },
+  {
+    path: '/recurring-autopay?state=creating',
+    label: 'Recurring Autopay · Choose UPI app · starting (preview)',
+    note: 'DEV PREVIEW · no frame',
+  },
+  {
+    path: '/recurring-autopay?state=waiting',
+    label: 'Recurring Autopay · Waiting for approval (preview)',
+    note: 'DEV PREVIEW · 2317:3577',
+  },
+  {
+    path: '/recurring-autopay?state=left',
+    label: 'Recurring Autopay · Left without approving (preview)',
+    note: 'DEV PREVIEW · 2317:3667',
+  },
+  {
+    path: '/recurring-autopay?state=failed',
+    label: 'Recurring Autopay · Didn’t go through (preview)',
+    note: 'DEV PREVIEW · 2317:3753',
+  },
+  {
+    path: '/recurring-autopay?state=confirming',
+    label: 'Recurring Autopay · Still confirming (preview)',
+    note: 'DEV PREVIEW · 2317:3839',
+  },
+  {
+    path: '/recurring-autopay?state=active',
+    label: 'Recurring Autopay · Active (preview)',
+    note: 'DEV PREVIEW · 2317:4009',
+  },
+  {
+    path: '/recurring-autopay?state=noApp',
+    label: 'Recurring Autopay · No UPI app found (preview)',
+    note: 'DEV PREVIEW · no frame',
+  },
+  {
+    path: '/recurring-autopay?state=banner',
+    label: 'Recurring Autopay · Home · Confirming Autopay banner (preview)',
+    note: 'DEV PREVIEW · no frame',
+  },
+  {
     path: '/booking-flow?view=assigned',
     label: 'Booking flow · assigned',
     note: 'IN PROGRESS · redesign preview — Figma cCQlzTeiObQkpVBzwI8mZi page 1385:3275',

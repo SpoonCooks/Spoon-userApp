@@ -7,10 +7,11 @@ import { useRouter } from 'expo-router';
 import { useSessionStore } from '@core/store';
 import { useRuntime } from '@core/runtimeContext';
 import { bookingKeys } from '@features/booking';
+import { recurringKeys } from '@features/recurringSetup';
 
 import { createExpoPushTokenProvider } from './api/expoPushProvider';
 import { useRegisterPushToken } from './api';
-import { routeForNotification } from './deepLink';
+import { isRecurringMandateEvent, routeForNotification } from './deepLink';
 
 /**
  * Push, end to end on the client: register, receive, tap, route.
@@ -176,11 +177,16 @@ export function usePushNotifications(): void {
 
   // A notification that ARRIVES refreshes the booking reads rather than applying its contents.
   useEffect(() => {
-    const received = Notifications.addNotificationReceivedListener(() => {
+    const received = Notifications.addNotificationReceivedListener((notification) => {
       // The feature's own key factory, not an inline array (§6): the blast radius of a push has
       // to be the same thing every booking mutation invalidates, or a notification refreshes a
       // cache entry the rest of the app has already moved on from.
       void queryClient.invalidateQueries({ queryKey: bookingKeys.all() });
+      // An Autopay outcome: the approval sheet, Home's "Confirming Autopay" banner and the
+      // booking re-read at once rather than at their next poll.
+      if (isRecurringMandateEvent(notification.request.content.data)) {
+        void queryClient.invalidateQueries({ queryKey: recurringKeys.all() });
+      }
     });
 
     const tapped = Notifications.addNotificationResponseReceivedListener((response) => {

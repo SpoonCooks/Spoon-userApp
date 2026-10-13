@@ -17,6 +17,7 @@ import {
   useJoinWaitlist,
 } from '@features/homeRedesign';
 import type { BookingRequest, RecurringTarget } from '@features/homeRedesign';
+import { ConfirmingAutopayBanner, useConfirmingAutopay } from '@features/recurringSetup';
 import { QueryBoundary } from '@ui';
 
 const logger = getLogger('home');
@@ -99,6 +100,8 @@ function SignedInHomeRoute() {
   /** No saved address: the header's address opens the map to add one, not the empty list. */
   const hasAddress = home.addressId !== null;
   const join = useJoinWaitlist();
+  /** A Recurring booking whose Autopay the bank is still confirming (note 2317:13605). */
+  const confirmingAutopay = useConfirmingAutopay();
 
   // The duration the submission prices and books. Kept in step with every new selection.
   const [durationId, setDurationId] = useState<string | null>(null);
@@ -178,6 +181,18 @@ function SignedInHomeRoute() {
           model={model}
           bookingBusy={submission.submitting}
           notice={shownNotice}
+          banner={
+            confirmingAutopay === null ? null : (
+              <ConfirmingAutopayBanner
+                onPress={guard(() =>
+                  router.push({
+                    pathname: '/recurring/[bookingId]',
+                    params: { bookingId: confirmingAutopay.recurringBookingId },
+                  }),
+                )}
+              />
+            )
+          }
           onPressAddress={guard(() =>
             router.push(hasAddress ? '/address?from=home' : '/address/location?from=home'),
           )}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Image, LayoutAnimation, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -90,6 +91,11 @@ export interface HomeRedesignViewProps extends HomeRedesignActions {
   readonly bookingBusy?: boolean;
   /** One-line messages from the route (a refused booking, say). A new `id` shows it again. */
   readonly notice?: { readonly id: number; readonly message: string } | null;
+  /**
+   * A status banner the route puts at the top of the body: Recurring's "Confirming Autopay"
+   * while the bank confirms a mandate (Autopay note 2317:13605). No Home frame draws one.
+   */
+  readonly banner?: ReactNode;
 }
 
 /**
@@ -106,6 +112,7 @@ export function HomeRedesignView({
   initialMode,
   bookingBusy = false,
   notice = null,
+  banner = null,
   ...actions
 }: HomeRedesignViewProps) {
   const { top, bottom } = useSafeAreaInsets();
@@ -302,6 +309,8 @@ export function HomeRedesignView({
             bodyY.current = e.nativeEvent.layout.y;
           }}
         >
+          {banner}
+
           {/* Decorative. */}
           <HeroBanner />
 

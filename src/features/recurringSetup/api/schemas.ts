@@ -75,6 +75,12 @@ export const recurringEligibilitySchema = z.object({
     notifyLeadHours: z.number().int().positive(),
     debitLeadHours: z.number().int().positive(),
     mandateMaxChargePaise: paise,
+    /**
+     * How Autopay approval is taken (V0 `RECURRING_UPI_INTENT_ENABLED`): Razorpay's Checkout sheet,
+     * or UPI Intent in the UPI app the customer picks (Figma 2316:3558). A backend that predates
+     * the field, or an unknown value, is Checkout.
+     */
+    mandateFlow: z.enum(['checkout', 'upi_intent']).default('checkout').catch('checkout'),
   }),
 });
 export type RecurringEligibilityDto = z.infer<typeof recurringEligibilitySchema>;
@@ -149,6 +155,21 @@ export const recurringQuoteSchema = z.object({
   /** Every visit's debit added up, GST included, if every visit runs. */
   totalPaise: paise,
   mandateMaxChargePaise: paise,
+  /**
+   * Each date's visits added up: one UPI Autopay debit pays a whole day (DEC-091). A day over the
+   * mandate's per-debit cap is `overLimit` and makes the quote not `bookable`. Absent from a
+   * backend that predates it.
+   */
+  dayTotals: z
+    .array(
+      z.object({
+        date: localDate,
+        visitsCount: count,
+        totalPaise: paise,
+        overLimit: z.boolean(),
+      }),
+    )
+    .optional(),
 });
 export type RecurringQuoteDto = z.infer<typeof recurringQuoteSchema>;
 
@@ -349,8 +370,40 @@ export const mandateCheckoutSchema = z.object({
   approveBy: instant.nullable(),
   /** Null when the backend has no Razorpay key configured — checkout cannot open. */
   keyId: z.string().nullable(),
+  /** UPI Intent only: Razorpay's `upi://mandate` link, opened unmodified on Android. */
+  intentLink: z.string().startsWith('upi://').optional(),
+  /** UPI Intent only: the attempt's payment. */
+  providerPaymentId: z.string().optional(),
+  /** UPI Intent only: when the app stops waiting on this attempt (5 minutes). */
+  attemptExpiresAt: instant.optional(),
 });
 export type MandateCheckoutDto = z.infer<typeof mandateCheckoutSchema>;
+
+export const intentAttemptStateSchema = z.enum(['waiting', 'failed', 'expired', 'authorized']);
+export type IntentAttemptState = z.infer<typeof intentAttemptStateSchema>;
+
+/**
+ * `GET .../mandate` — the booking's latest mandate and its UPI Intent attempt, polled while the
+ * approval is open. `failureReason` tells "did not approve" (`NOT_APPROVED`, Figma 2317:3667)
+ * from "declined" (`DECLINED`, 2317:3753).
+ */
+export const mandateStatusViewSchema = z.object({
+  mandateId: z.string(),
+  recurringBookingId: z.string(),
+  status: mandateStatusSchema,
+  bookingStatus: bookingStatusSchema,
+  attempt: z
+    .object({
+      state: intentAttemptStateSchema,
+      failureReason: z.enum(['NOT_APPROVED', 'DECLINED']).nullable(),
+      expiresAt: instant.nullable(),
+    })
+    .nullable(),
+  approveBy: instant.nullable(),
+  handleMasked: z.string().nullable(),
+  maxAmountPaise: paise,
+});
+export type MandateStatusViewDto = z.infer<typeof mandateStatusViewSchema>;
 
 /** `POST .../mandate/verify`. `initiated` is normal for UPI: the bank confirms by webhook. */
 export const mandateVerifySchema = z.object({

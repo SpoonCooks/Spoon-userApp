@@ -1,1 +1,1 @@
-export { formatPaise } from './money';
+export { formatPaise, formatPaiseGrouped } from './money';
