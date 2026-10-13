@@ -21,9 +21,8 @@ import { InfoDialog, QueryBoundary } from '@ui';
  * ## Choosing versus browsing
  *
  * Home's address switcher opens this list to CHOOSE the address bookings use (`from=home`): the
- * row is the choice, and the address in use carries "Current selection". The profile opens it to
- * BROWSE (`from=profile`): a row tap does nothing (dev note), and the address of the latest order
- * carries "Last used". Choosing is still `PUT … { isDefault: true }`, the server's own flag — the
+ * row is the choice. The profile opens it to BROWSE (`from=profile`): a row tap does nothing (dev
+ * note). Either way the address in use carries "Current selection". Choosing is still `PUT … { isDefault: true }`, the server's own flag — the
  * kebab is the only way into Edit (`d51f326`).
  *
  * ## Removing

@@ -206,7 +206,13 @@ describe.each(HEIGHTS)('on a %s viewport', (_label, height) => {
       render(
         <SavedAddressesScreen
           addresses={[
-            { id: 'a', label: 'Home', kind: 'home', line: 'Flat 402, B, Purva', tag: 'Last used' },
+            {
+              id: 'a',
+              label: 'Home',
+              kind: 'home',
+              line: 'Flat 402, B, Purva',
+              tag: 'Current selection',
+            },
           ]}
           onBack={noop}
           onAdd={noop}

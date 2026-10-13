@@ -6,6 +6,7 @@ import { isGuest } from '@core/auth';
 import { useNavigationGuard } from '@core/navigation';
 import { getLogger } from '@core/logging';
 import { useSessionStore } from '@core/store';
+import { useTriedPlace } from '@features/address';
 import { useMe } from '@features/auth';
 import { destinationForPayment, durationIdFor, useBookingSubmission } from '@features/booking';
 import {
@@ -86,8 +87,17 @@ function GuestHomeRoute() {
 function SignedInHomeRoute() {
   const router = useRouter();
   const [waitlistJoined, setWaitlistJoined] = useState(false);
-  const home = useHomeRedesignData({ waitlistJoined });
   const me = useMe();
+  const userId = me.state.status === 'ready' ? me.state.data.id : null;
+  /**
+   * The place this customer was last refused at, read from the device once their id is known. A
+   * customer with no saved address sees the inactive-pincode Home for it (`1302:3539`) instead of
+   * being sent back to the map — the loop the Not serviceable redirect used to land in.
+   */
+  const triedPlace = useTriedPlace(userId);
+  const home = useHomeRedesignData({ waitlistJoined, triedPlace });
+  /** No saved address: the header's address opens the map to add one, not the empty list. */
+  const hasAddress = home.addressId !== null;
   const join = useJoinWaitlist();
 
   // The duration the submission prices and books. Kept in step with every new selection.
@@ -168,7 +178,9 @@ function SignedInHomeRoute() {
           model={model}
           bookingBusy={submission.submitting}
           notice={shownNotice}
-          onPressAddress={guard(() => router.push('/address?from=home'))}
+          onPressAddress={guard(() =>
+            router.push(hasAddress ? '/address?from=home' : '/address/location?from=home'),
+          )}
           onPressProfile={guard(() => router.push('/profile'))}
           onDurationSelected={(event) => {
             setDurationId(durationIdFor(event.durationMin));

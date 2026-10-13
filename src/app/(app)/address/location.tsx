@@ -6,9 +6,11 @@ import {
   AddressMapScreen,
   currentAddressOf,
   useAddresses,
+  rememberTriedPlace,
   useAddressLocation,
   useNotServiceableStore,
 } from '@features/address';
+import { useMe } from '@features/auth';
 import { useAddressDraftStore } from '@core/store/addressDraftStore';
 import { useAndroidBackHandler, useNavigationGuard, useSafeBack } from '@core/navigation';
 
@@ -58,6 +60,8 @@ export default function AddressLocationRoute() {
   const addresses = useAddresses({ enabled: !firstRun });
   const setPoint = useAddressDraftStore((store) => store.setPoint);
   const setNotServiceable = useNotServiceableStore((store) => store.set);
+  const me = useMe();
+  const userId = me.state.status === 'ready' ? me.state.data.id : null;
   const [searchOpen, setSearchOpen] = useState(false);
   /** The device failure the fallback point was chosen for, kept until the customer moves the map. */
   const [fallbackNotice, setFallbackNotice] = useState<string | undefined>(undefined);
@@ -127,7 +131,7 @@ export default function AddressLocationRoute() {
         // PUSH, not replace: coming back returns to exactly the point they were looking at.
         if (outcome.status === 'outside_service_area') {
           // What the Not serviceable screen names (`2214:4260`): the server's answer first.
-          setNotServiceable({
+          const place = {
             title: outcome.geocoded?.title ?? 'Selected location',
             line: outcome.geocoded?.line ?? '',
             locality:
@@ -137,7 +141,11 @@ export default function AddressLocationRoute() {
               null,
             liveAreas: outcome.verdict.liveAreas ?? [],
             neighbours: outcome.verdict.demand?.neighbours ?? 0,
-          });
+          };
+          setNotServiceable(place);
+          // Remembered on the device, so a customer with no saved address lands on the
+          // inactive-pincode Home for it rather than back on this map (`1302:3539`).
+          if (userId !== null) void rememberTriedPlace(userId, place);
           router.push(
             (query === '' ? '/address/out-of-service' : `/address/out-of-service?${query}`) as Href,
           );

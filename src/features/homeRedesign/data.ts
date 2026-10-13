@@ -11,13 +11,16 @@ import { useCatalogue } from '@features/catalogue';
 import { useCookPoolList } from '@features/cookPool';
 import { useRecurringEligibility } from '@features/recurringSetup';
 
-import { guestHomeModelFrom, homeModelFrom } from './adapters';
+import { guestHomeModelFrom, homeModelFrom, triedPlaceHomeModelFrom } from './adapters';
 import type { InstantReads } from './adapters';
 import type { HomeModel } from './types';
 
 export interface HomeRedesignData {
   readonly state: DataState<HomeModel>;
-  /** The customer has no saved address at all — the route sends them to add one. */
+  /**
+   * The customer has no saved address at all, and no refused place to show — the route sends
+   * them to add one.
+   */
   readonly needsAddress: boolean;
   /** The address every read (and the waitlist) is made against. */
   readonly addressId: string | null;
@@ -33,7 +36,15 @@ export interface HomeRedesignData {
  * catalogue surfaces as the carousel's skeleton / retry instead of blanking Home, and history or
  * instant reads still in flight fall back to "first-time" and "bookable".
  */
-export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeRedesignData {
+export function useHomeRedesignData(options: {
+  waitlistJoined: boolean;
+  /**
+   * The place this customer was last refused at (`rememberTriedPlace`). With no saved address,
+   * Home is the inactive-pincode variant for it (`1302:3539`) rather than a redirect to the map.
+   * `undefined` while it is still being read from the device.
+   */
+  triedPlace?: { title: string; line: string; locality: string | null } | null | undefined;
+}): HomeRedesignData {
   const { api } = useRuntime();
   const addresses = useAddresses();
   const catalogue = useCatalogue();
@@ -68,7 +79,18 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
   const state = useMemo<DataState<HomeModel>>(() => {
     if (addresses.state.status === 'loading') return LOADING;
     if (addresses.state.status === 'error') return failed(addresses.state.error);
-    if (address === null) return LOADING;
+    if (address === null) {
+      const place = options.triedPlace;
+      if (addresses.state.data.length > 0 || place === undefined || place === null) return LOADING;
+      return ready(
+        triedPlaceHomeModelFrom({
+          place,
+          catalogue: catalogue.state.status === 'ready' ? catalogue.state.data : undefined,
+          catalogueStatus: catalogue.state.status,
+          waitlistJoined: options.waitlistJoined,
+        }),
+      );
+    }
 
     const instant: InstantReads = new Map(
       minutes.map((m, i) => {
@@ -97,6 +119,7 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
     instantReads,
     minutes,
     options.waitlistJoined,
+    options.triedPlace,
     pool.state,
     recurring.state,
   ]);
@@ -121,7 +144,10 @@ export function useHomeRedesignData(options: { waitlistJoined: boolean }): HomeR
 
   return {
     state,
-    needsAddress: addresses.state.status === 'ready' && addresses.state.data.length === 0,
+    needsAddress:
+      addresses.state.status === 'ready' &&
+      addresses.state.data.length === 0 &&
+      options.triedPlace === null,
     addressId,
     refetch,
   };

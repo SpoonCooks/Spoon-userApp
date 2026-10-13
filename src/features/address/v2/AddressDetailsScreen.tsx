@@ -283,16 +283,15 @@ export function AddressDetailsScreen({
 
           <Step number={4} title="Someone else receiving the service?" last>
             <View style={styles.receiver} testID={`${testID}-receiver`}>
+              {/*
+                Dev note `2075:11932`: tapping the row expands the receiver; once open, only the X
+                collapses it and clears the values — the row itself no longer does anything.
+              */}
               <Pressable
-                onPress={() =>
-                  form.receiverOpen
-                    ? set({ receiverOpen: false, receiverName: '', receiverPhone: '' })
-                    : set({ receiverOpen: true })
-                }
-                accessibilityRole="button"
-                accessibilityLabel={
-                  form.receiverOpen ? 'Remove receiver' : 'Add a receiver (optional)'
-                }
+                onPress={form.receiverOpen ? undefined : () => set({ receiverOpen: true })}
+                disabled={form.receiverOpen}
+                accessibilityRole={form.receiverOpen ? undefined : 'button'}
+                accessibilityLabel={form.receiverOpen ? undefined : 'Add a receiver (optional)'}
                 style={styles.receiverRow}
                 testID={`${testID}-receiver-toggle`}
               >
@@ -310,9 +309,18 @@ export function AddressDetailsScreen({
                   </Text>
                 </View>
                 {form.receiverOpen ? (
-                  <View style={[styles.toggleWell, styles.toggleClose]}>
+                  <Pressable
+                    onPress={() =>
+                      set({ receiverOpen: false, receiverName: '', receiverPhone: '' })
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove receiver"
+                    hitSlop={8}
+                    style={[styles.toggleWell, styles.toggleClose]}
+                    testID={`${testID}-receiver-remove`}
+                  >
                     <Image source={ADDRESS_ART.close} style={styles.icon24} />
-                  </View>
+                  </Pressable>
                 ) : (
                   <View style={[styles.toggleWell, styles.toggleAdd]}>
                     <AddIcon />
@@ -347,7 +355,8 @@ export function AddressDetailsScreen({
         </View>
       </ScrollView>
 
-      <View style={[styles.dock, { paddingBottom: Math.max(8, bottom) }]}>
+      {/* `1870:2672` — the dock is padded 16/16/8 above the home indicator. */}
+      <View style={[styles.dock, { paddingBottom: 8 + bottom }]}>
         <PrimaryButton
           label={mode === 'edit' ? 'Save changes' : 'Save address'}
           onPress={() => onSave(form)}
@@ -361,6 +370,7 @@ export function AddressDetailsScreen({
             onPress={onRemove}
             accessibilityRole="button"
             hitSlop={8}
+            style={styles.removeLink}
             testID={`${testID}-remove`}
           >
             <Text style={styles.captionStrong}>Remove this address</Text>
@@ -596,6 +606,8 @@ const styles = StyleSheet.create({
   dock: { paddingHorizontal: 16, paddingTop: 16, gap: 12, alignItems: 'center' },
   /** The dock centres the "Remove" link; the button itself spans the width. */
   save: { alignSelf: 'stretch' },
+  /** `1870:2672` — the link sits in 4pt of padding above and below. */
+  removeLink: { paddingVertical: 4 },
   emphasis: { ...T.emphasis, color: C.text },
   bodyStrong: { ...T.bodyStrong, color: C.text },
   caption: { ...T.caption, color: C.textSecondary },

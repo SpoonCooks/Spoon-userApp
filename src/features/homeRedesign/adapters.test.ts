@@ -11,6 +11,8 @@ import {
   guestHomeModelFrom,
   homeDurationLabel,
   homeModelFrom,
+  STATIC_LIVE_HUBS,
+  triedPlaceHomeModelFrom,
 } from './adapters';
 import type { HomeSources } from './adapters';
 
@@ -283,5 +285,36 @@ describe('guestHomeModelFrom', () => {
     expect(
       guestHomeModelFrom({ catalogue: undefined, catalogueStatus: 'error' }).durations,
     ).toEqual([]);
+  });
+});
+
+describe('triedPlaceHomeModelFrom (no saved address, refused at a place — 1302:3539)', () => {
+  it('is the inactive Home for the place tried, named by its area, with the waitlist', () => {
+    const model = triedPlaceHomeModelFrom({
+      place: { title: '100 Feet Road', line: 'Indiranagar, Bengaluru', locality: 'Indiranagar' },
+      catalogue: undefined,
+      catalogueStatus: 'loading',
+      waitlistJoined: false,
+    });
+    expect(model.serviceability).toBe('not_live');
+    expect(model.address).toEqual({
+      label: '100 Feet Road',
+      detail: 'Indiranagar, Bengaluru',
+      pincode: 'Indiranagar',
+    });
+    expect(model.liveHubs).toBe(STATIC_LIVE_HUBS);
+    expect(model.waitlist).toEqual({ countForPincode: null, launchThreshold: null, joined: false });
+  });
+
+  it('falls back to the place title when the area is unknown', () => {
+    const model = triedPlaceHomeModelFrom({
+      place: { title: 'Selected location', line: '', locality: null },
+      catalogue: undefined,
+      catalogueStatus: 'loading',
+      waitlistJoined: true,
+    });
+    expect(model.address.detail).toBeNull();
+    expect(model.address.pincode).toBe('Selected location');
+    expect(model.waitlist?.joined).toBe(true);
   });
 });

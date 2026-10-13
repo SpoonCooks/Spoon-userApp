@@ -2,6 +2,7 @@ export { createSessionController } from './sessionController';
 export type { SessionController, SessionControllerOptions } from './sessionController';
 export { getDeviceId, resetDeviceIdCache } from './deviceId';
 export { readLastPhone, writeLastPhone } from './lastPhoneStore';
+export { readTriedPlace, writeTriedPlace } from './triedPlaceStore';
 export { unimplementedSessionGateway } from './sessionGateway';
 export type { SessionGateway } from './sessionGateway';
 export { secureGuestFlagStore } from './guestFlagStore';

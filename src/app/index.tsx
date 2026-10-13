@@ -3,7 +3,8 @@ import type { Href } from 'expo-router';
 
 import { canAccessApp, isGuest, isResolving } from '@core/auth';
 import { useSessionStore } from '@core/store';
-import { useAddressGate } from '@features/address';
+import { useAddressGate, useTriedPlace } from '@features/address';
+import { useMe } from '@features/auth';
 import { SplashLoading } from '@features/loading';
 import { useProfileGate } from '@features/profile';
 
@@ -58,6 +59,10 @@ export default function Index() {
   // signed out 401s and burns a refresh against the token family.
   const profileGate = useProfileGate({ enabled: authenticated });
   const addressGate = useAddressGate({ enabled: authenticated });
+  // A customer refused at a place, with no saved address, belongs on Home's inactive-pincode
+  // variant for it (`1302:3539`), not on the map they were refused from.
+  const me = useMe({ enabled: authenticated });
+  const triedPlace = useTriedPlace(me.state.status === 'ready' ? me.state.data.id : null);
 
   if (isResolving(status)) {
     return <SplashLoading />;
@@ -82,6 +87,9 @@ export default function Index() {
   }
 
   if (addressGate === 'required') {
+    // The remembered place is read from the device: hold the splash for that one read.
+    if (me.state.status === 'ready' && triedPlace === undefined) return <SplashLoading />;
+    if (triedPlace !== undefined && triedPlace !== null) return <Redirect href="/home" />;
     // `onboarding=1` is what tells `53:31` to draw no back control and to end at Home.
     return <Redirect href={'/address/location?onboarding=1' as Href} />;
   }
