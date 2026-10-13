@@ -1,6 +1,7 @@
 import { act, render, waitFor } from '@testing-library/react-native';
 import { AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as SecureStore from 'expo-secure-store';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
@@ -52,7 +53,18 @@ describe('usePushNotifications — registers when it becomes possible, not only 
     return render(<Probe />, { wrapper: Wrapper });
   }
 
+  /*
+   * A registration settles a beat after its PUT (the token is stored afterwards), and React
+   * Query batches that update on a timer: let it land inside act before the next test mounts.
+   */
+  afterEach(async () => {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+  });
+
   beforeEach(() => {
+    (SecureStore as unknown as { __reset(): void }).__reset();
     foregrounded = [];
     jest.spyOn(AppState, 'addEventListener').mockImplementation(((
       _type: string,
@@ -103,6 +115,7 @@ describe('usePushNotifications — registers when it becomes possible, not only 
     expect(registered[0]).toEqual({
       token: Platform.OS === 'ios' ? 'fcm-ios-token' : 'fcm-token-value',
       platform: Platform.OS,
+      notificationsEnabled: true,
     });
   });
 
@@ -123,5 +136,116 @@ describe('usePushNotifications — registers when it becomes possible, not only 
 
     // Foregrounding is not a reason to re-register a token the backend already holds.
     expect(registered).toHaveLength(1);
+  });
+
+  /**
+   * The backend sends the "Spoon is now live in your area" notice by SMS instead of a silent push
+   * when the phone has notifications off — which it can only know if the app keeps saying so,
+   * including after the customer switches them off and the provider stops producing a token.
+   */
+  describe('tells the server whether notifications are on', () => {
+    const TOKEN = Platform.OS === 'ios' ? 'fcm-ios-token' : 'fcm-token-value';
+    const granted = { granted: true, status: 'granted' } as never;
+    const denied = { granted: false, status: 'denied', canAskAgain: false } as never;
+
+    function mountRecording() {
+      const registered: unknown[] = [];
+      mount({
+        'PUT /v1/me/push-token': (body) => {
+          registered.push(body);
+          return {};
+        },
+      });
+      return registered;
+    }
+
+    it('sends notificationsEnabled: true when the permission is granted', async () => {
+      notifications.getPermissionsAsync.mockResolvedValue(granted);
+
+      const registered = mountRecording();
+
+      await waitFor(() => expect(registered).toHaveLength(1));
+      expect(registered[0]).toEqual({
+        token: TOKEN,
+        platform: Platform.OS,
+        notificationsEnabled: true,
+      });
+    });
+
+    it('re-sends a token registered on an earlier launch with false once notifications are off', async () => {
+      // An earlier launch registered this token; since then the customer switched notifications
+      // off in Settings with the app closed.
+      await SecureStore.setItemAsync('spoon.notifications.lastPushToken', 'earlier-token');
+      notifications.getPermissionsAsync.mockResolvedValue(denied);
+
+      const registered = mountRecording();
+
+      await waitFor(() => expect(registered).toHaveLength(1));
+      expect(registered[0]).toEqual({
+        token: 'earlier-token',
+        platform: Platform.OS,
+        notificationsEnabled: false,
+      });
+      // Read, never requested: switching notifications off must not earn a prompt.
+      expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing when notifications are off and no token was ever registered', async () => {
+      notifications.getPermissionsAsync.mockResolvedValue(denied);
+
+      const registered = mountRecording();
+
+      await waitFor(() => expect(notifications.getPermissionsAsync).toHaveBeenCalled());
+      await foreground();
+      expect(registered).toHaveLength(0);
+    });
+
+    it('re-sends on the next foreground whenever the flag changes', async () => {
+      notifications.getPermissionsAsync.mockResolvedValue(granted);
+      const registered = mountRecording();
+      await waitFor(() => expect(registered).toHaveLength(1));
+
+      // Switched off in Settings: the same token, now marked disabled.
+      notifications.getPermissionsAsync.mockResolvedValue(denied);
+      await foreground();
+      await waitFor(() => expect(registered).toHaveLength(2));
+      expect(registered[1]).toEqual({
+        token: TOKEN,
+        platform: Platform.OS,
+        notificationsEnabled: false,
+      });
+
+      // And back on.
+      notifications.getPermissionsAsync.mockResolvedValue(granted);
+      await foreground();
+      await waitFor(() => expect(registered).toHaveLength(3));
+      expect(registered[2]).toEqual({
+        token: TOKEN,
+        platform: Platform.OS,
+        notificationsEnabled: true,
+      });
+    });
+
+    it('does not re-send while the token and the flag are unchanged', async () => {
+      await SecureStore.setItemAsync('spoon.notifications.lastPushToken', 'earlier-token');
+      notifications.getPermissionsAsync.mockResolvedValue(denied);
+      const registered = mountRecording();
+      await waitFor(() => expect(registered).toHaveLength(1));
+
+      await foreground();
+      await foreground();
+
+      expect(registered).toHaveLength(1);
+    });
+
+    it('remembers the registered token for the next launch', async () => {
+      notifications.getPermissionsAsync.mockResolvedValue(granted);
+      const registered = mountRecording();
+      await waitFor(() => expect(registered).toHaveLength(1));
+
+      await waitFor(async () =>
+        expect(await SecureStore.getItemAsync('spoon.notifications.lastPushToken')).toBe(TOKEN),
+      );
+    });
   });
 });

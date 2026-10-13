@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 import type { ApiClient } from '@core/api';
+import { isAppError } from '@core/errors';
 
 /**
  * Push-token registration — `PUT /v1/me/push-token`.
@@ -30,12 +31,38 @@ export function createPushApi(api: ApiClient) {
      * behaviour and the correct one: a shared handset must not keep delivering the previous
      * customer's booking notifications.
      */
-    async registerToken(input: { token: string; platform: PushPlatform }): Promise<unknown> {
-      return api.request(PUSH_PATHS.token, {
-        method: 'PUT',
-        body: { token: input.token, platform: input.platform },
-        parse: (data) => data,
-      });
+    async registerToken(input: {
+      token: string;
+      platform: PushPlatform;
+      /**
+       * Whether the phone shows notifications at all (see `isNotificationsEnabled`). Sent every
+       * time, `false` included, because `false` is the value the backend acts on: SMS instead of
+       * a push nobody sees.
+       *
+       * An API that predates the field REJECTS it (V0 validates with `removeAdditional: false`),
+       * so a refusal is retried once without it: a build that ships before that API is deployed
+       * still registers its token, just without the flag.
+       */
+      notificationsEnabled: boolean;
+    }): Promise<unknown> {
+      const send = (withFlag: boolean) =>
+        api.request(PUSH_PATHS.token, {
+          method: 'PUT',
+          body: {
+            token: input.token,
+            platform: input.platform,
+            ...(withFlag ? { notificationsEnabled: input.notificationsEnabled } : {}),
+          },
+          parse: (data) => data,
+        });
+      try {
+        return await send(true);
+      } catch (error) {
+        if (!(isAppError(error) && error.kind === 'validation' && error.code !== 'RATE_LIMITED')) {
+          throw error;
+        }
+        return send(false);
+      }
     },
   };
 }
