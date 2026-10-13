@@ -52,7 +52,7 @@ export function RefundSummaryCard({
             </Text>
           )}
         </View>
-        <View style={styles.badge}>
+        <View style={[styles.badge, refund.badgeTone === 'neutral' && styles.badgeNeutral]}>
           <Text variant="spoonCaptionStrong" color="textPrimary">
             {refund.badge}
           </Text>
@@ -205,6 +205,8 @@ const styles = StyleSheet.create({
     borderRadius: lightTheme.radius.pill,
     backgroundColor: lightTheme.colors.surfacePositiveBright,
   },
+  /** `90:187` — Badge · Neutral: the same pill on `#FFF7CC`. */
+  badgeNeutral: { backgroundColor: lightTheme.colors.surfaceAccent },
   /** `1468:817` — p 16 / 12 gap on `#FFF7CC`, 16pt corners. */
   breakdown: {
     gap: lightTheme.space.md,
@@ -234,4 +236,7 @@ const styles = StyleSheet.create({
   step: { flexDirection: 'row', alignItems: 'flex-start', gap: lightTheme.space.md },
   node: { width: 20, height: 20 },
   stepText: { flex: 1, gap: lightTheme.space.xxs },
+  glyph12: { width: 12, height: 12 },
+  trackerText: { flex: 1, gap: lightTheme.space.xxs },
+  trackerTextSpaced: { paddingBottom: 14 },
 });

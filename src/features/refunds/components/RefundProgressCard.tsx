@@ -110,8 +110,16 @@ export function RefundProgressCard({
           <Image source={ART.lock} style={styles.icon24} />
         </View>
         <View style={styles.headerText}>
-          {/* Wraps rather than dropping the amount where the card sits narrower than 370. */}
-          <Text variant="spoonEmphasis">{`Booking refund ${view.amount}`}</Text>
+          {/*
+            One line, as the frame draws it: where the card sits narrower than 370 (Livvic sets a
+            little wider than Figma) it shrinks up to 15% rather than wrapping or cutting the amount.
+          */}
+          <Text
+            variant="spoonEmphasis"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+          >{`Booking refund ${view.amount}`}</Text>
           <Text variant="spoonCaption" color="textSecondarySoft" numberOfLines={1}>
             {`To: ${view.destination}`}
           </Text>

@@ -224,6 +224,8 @@ export interface VisitRefundData {
   readonly title: string;
   readonly booking?: string | undefined;
   readonly badge: string;
+  /** The badge's `90:189` type: lime Positive (the default) or `#FFF7CC` Neutral. */
+  readonly badgeTone?: 'positive' | 'neutral' | undefined;
   readonly lines: readonly VisitRefundLine[];
   readonly total: VisitRefundLine;
   readonly modeEyebrow: string;

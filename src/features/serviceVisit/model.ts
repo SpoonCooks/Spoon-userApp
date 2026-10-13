@@ -67,6 +67,69 @@ export function day(iso: string): string {
   return `${parts.weekday ?? ''}, ${parts.day ?? ''} ${parts.month ?? ''}`;
 }
 
+/** "2026-10-14" — the service day in Kolkata, as `/scheduled?date=` reads it. */
+export function isoDay(iso: string): string {
+  const parts: Record<string, string> = {};
+  for (const part of new Intl.DateTimeFormat('en-IN', {
+    timeZone: TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(iso))) {
+    parts[part.type] = part.value;
+  }
+  return `${parts.year ?? ''}-${parts.month ?? ''}-${parts.day ?? ''}`;
+}
+
+/**
+ * A one-time visit whose cook ops/system swapped (Figma `2353:17562`, dev note `2353:17578`). The
+ * API sends `reassignment` on every booking (`{ occurred: false, … }` when the cook never
+ * changed); a Recurring visit never shows the note.
+ */
+export function reassignedOneTime(booking: BookingDetailDto): boolean {
+  return booking.reassignment?.occurred === true && (booking.recurring ?? null) === null;
+}
+
+/** The pool cook card's figures the cook card's stat lines are read from. */
+export interface CookCardStats {
+  readonly visitsWithYou: number;
+  /** Every customer's ratings of the cook. `average` is 0 while `count` is 0. */
+  readonly rating: { readonly average: number; readonly count: number };
+  /** This customer's own ratings of the cook. */
+  readonly yourRating?: { readonly average: number; readonly count: number } | null | undefined;
+}
+
+/**
+ * The cook card's two stat lines (`Cook profile card`, `1380:3210`).
+ *
+ *   been here before   "Visits with you: N" · "Your rating: 4.5" — this customer's own average
+ *                      (dev note `2226:4211`), left out until they have rated her.
+ *   first visit        "First visit with you" · "Rated 4.7 by Spoon users" — the overall
+ *                      average (Figma `2353:17573`, dev note `2353:17578`), left out while
+ *                      nobody has rated her.
+ */
+export function cookStatLines(card: CookCardStats | null): {
+  readonly visits?: string;
+  readonly rating?: string;
+} {
+  if (card === null) return {};
+  if (card.visitsWithYou === 0) {
+    return {
+      visits: 'First visit with you',
+      ...(card.rating.count > 0
+        ? { rating: `Rated ${card.rating.average.toFixed(1)} by Spoon users` }
+        : {}),
+    };
+  }
+  const own = card.yourRating ?? null;
+  return {
+    visits: `Visits with you: ${String(card.visitsWithYou)}`,
+    ...(own === null || own.count === 0
+      ? {}
+      : { rating: `Your rating: ${own.average.toFixed(1)}` }),
+  };
+}
+
 /** "1 hr", "1.5 hrs", "45 min". */
 export function duration(minutes: number): string {
   if (minutes < 60) return `${String(minutes)} min`;

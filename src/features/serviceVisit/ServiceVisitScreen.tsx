@@ -33,6 +33,7 @@ import {
   TipCard,
 } from './components';
 import type { BriefKey } from './components';
+import { CookReassignedNote } from './notices';
 import { MOST_TIPPED_PAISE } from './model';
 import type { ExtendChoice, ServicePhase } from './model';
 
@@ -40,7 +41,8 @@ import type { ExtendChoice, ServicePhase } from './model';
  * Visit details through the service — Figma "Service flow" (`2165:11841`). One screen whose
  * blocks change with the phase (see `model.ts`); everything shown comes from `model`.
  *
- *   assigned   banner (date, slot) · cook card · recipe share · before-arrival checklist
+ *   assigned   banner (date, slot) · [cook reassigned note] · cook card · recipe share ·
+ *              before-arrival checklist
  *   onTheWay   banner (time, length) · arrival tile · cook card with Call · checklist · recipe
  *   arrived    banner · Start OTP · "Brief your cook" · cook card with Call · recipe
  *   cooking    hero wave · banner · countdown · Extend · clean-up scope · End OTP
@@ -52,6 +54,11 @@ import type { ExtendChoice, ServicePhase } from './model';
  */
 export interface ServiceVisitModel {
   readonly phase: ServicePhase;
+  /**
+   * A one-time visit whose cook was swapped before the trip (`2353:17562`): while `assigned`, the
+   * "Sorry, we have assigned you another cook" note sits above the cook card.
+   */
+  readonly reassigned?: boolean | undefined;
   readonly title: string;
   /** Assigned/completed: "Wed, 14 Oct"; live: "9:00 AM · 1 hr". */
   readonly bannerTitle: string;
@@ -229,6 +236,9 @@ export function ServiceVisitScreen({
 
         {phase === 'assigned' ? (
           <>
+            {model.reassigned === true ? (
+              <CookReassignedNote testID={`${testID}-reassigned`} />
+            ) : null}
             {cookCard(false)}
             {recipe}
             {prep}

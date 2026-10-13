@@ -4,7 +4,83 @@ import type { BookingDetailDto, RefundDto } from '@features/booking';
 import { visitDemoModel } from '@features/recurringLive';
 import type { VisitDetailsModel, VisitRefundData } from '@features/recurringLive';
 
-import { clock, day, duration, paymentSheetFrom } from './model';
+import { clock, day, duration, isoDay, paymentSheetFrom } from './model';
+
+/*
+ * ------------------------------------------------------------------ Cancelled by Spoon (one-time)
+ *
+ * Figma `2342:4195`, dev note `2342:4405`: ops or the system cancelled a ONE-TIME visit before the
+ * cook marked arrived. The apology card replaces "Visit cancelled"; the refund is always 100%,
+ * auto-initiated at cancel, so its tracker starts at Initiated.
+ *
+ * The reason line is Figma's own copy, whatever the cancel reason: the frame draws one line and
+ * product has not written others. The operator's free-text `reasonDetail` is never shown — it is
+ * their own words and may name the cook.
+ */
+export const SPOON_CANCEL_REASON = 'None of our cooks could make it to your booked slot.';
+
+/**
+ * Cancelled by `operations` / `system`, yet not Spoon's doing — the apology would be untrue:
+ * the customer's own abandoned or expired checkout (nothing was paid), and Ops cancelling at the
+ * customer's request.
+ */
+const NOT_SPOONS_DOING: ReadonlySet<string> = new Set([
+  'ABANDONED_CHECKOUT',
+  'CHECKOUT_EXPIRED',
+  'CUSTOMER_REQUEST',
+]);
+
+/** The refund a cancellation owes, as the server states it. */
+function refundPaiseOf(booking: BookingDetailDto, refund: RefundDto | null): number | null {
+  return refund?.amountPaise ?? booking.cancellation?.refundAmountPaise ?? null;
+}
+
+/** A one-time, paid visit that ops or the system cancelled for a reason of Spoon's own. */
+export function isSpoonCancellation(booking: BookingDetailDto, refund: RefundDto | null): boolean {
+  const cancellation = booking.cancellation;
+  if ((booking.recurring ?? null) !== null || cancellation === null) return false;
+  const by = cancellation.cancelledBy ?? null;
+  if (by === null || by === 'customer') return false;
+  if (NOT_SPOONS_DOING.has(cancellation.reasonCode ?? '')) return false;
+  const refundPaise = refundPaiseOf(booking, refund);
+  return refund !== null || (refundPaise !== null && refundPaise > 0);
+}
+
+export interface SpoonCancelledData {
+  /** "Thu, 1 Oct, 6:40 PM". */
+  readonly when: string | null;
+  readonly reason: string;
+  /** "Full ₹299 refund started, no deductions". */
+  readonly refundLine: string;
+  /** What "Rebook a visit" prefills on `/scheduled`: the same day and length. */
+  readonly rebook: { readonly date: string | null; readonly durationId: string };
+}
+
+export function spoonCancelledFrom(
+  booking: BookingDetailDto,
+  refund: RefundDto | null,
+): SpoonCancelledData | null {
+  if (!isSpoonCancellation(booking, refund)) return null;
+  const at = booking.cancellation?.cancelledAt ?? null;
+  const start = booking.scheduledStart ?? booking.timing.actualStart;
+  const refundPaise = refundPaiseOf(booking, refund) ?? booking.price.totalAmountPaise;
+  return {
+    when: at === null ? null : `${day(at)}, ${clock(at)}`,
+    reason: SPOON_CANCEL_REASON,
+    refundLine: `Full ${formatPaise(refundPaise)} refund started, no deductions`,
+    rebook: {
+      date: start === null ? null : isoDay(start),
+      durationId: `dur-${String(booking.durationMinutes)}`,
+    },
+  };
+}
+
+/** "Talk to us" (`2342:4368`) — the Help chat opens on this booking: its id and its slot. */
+export function spoonCancelHelpMessage(booking: BookingDetailDto): string {
+  const start = booking.scheduledStart ?? booking.timing.actualStart;
+  const visit = start === null ? 'my visit' : `my visit on ${day(start)}, ${clock(start)}`;
+  return `Hi Spoon, ${visit} (booking ${booking.id}) was cancelled by Spoon. Can you help me?`;
+}
 
 /**
  * Visit details / upcoming · Cancelled for a ONE-TIME booking — Figma `2165:11853`, dev note
@@ -52,6 +128,8 @@ export function cancelledVisitModelFrom(
   const method = booking.paymentMethod ?? null;
   const was = bookingStrikeOf(booking.price)?.totalPaise ?? null;
 
+  const spoon = isSpoonCancellation(booking, refund);
+  const refundAmount = formatPaise(refundPaise ?? Math.max(0, paid - feePaise));
   const refundData: VisitRefundData | null = charged
     ? {
         title: 'Payment & refund',
@@ -76,7 +154,7 @@ export function cancelledVisitModelFrom(
           detail: feePaise === 0 ? 'Full refund, inclusive of taxes' : 'Inclusive of taxes',
           // `2165:11890` — a full refund strikes the same "was" price.
           ...(was === null || feePaise > 0 ? {} : { was: formatPaise(was) }),
-          amount: formatPaise(refundPaise ?? Math.max(0, paid - feePaise)),
+          amount: refundAmount,
         },
         modeEyebrow: 'REFUND TO',
         ...(method === null
@@ -101,6 +179,22 @@ export function cancelledVisitModelFrom(
         ],
       }
     : null;
+  // `2342:4201` — cancelled by Spoon: "Refund started" on the Neutral badge, "Full refund, no
+  // deductions", and the refund tracker in place of the mode and timeline.
+  const shownRefund: VisitRefundData | null =
+    refundData === null || !spoon
+      ? refundData
+      : {
+          ...refundData,
+          badge:
+            refund?.state === 'succeeded'
+              ? 'Refunded'
+              : refund?.state === 'failed_terminal'
+                ? 'Refund failed'
+                : 'Refund started',
+          badgeTone: refund?.state === 'succeeded' ? 'positive' : 'neutral',
+          total: { ...refundData.total, detail: 'Full refund, no deductions' },
+        };
 
   return {
     ...base,
@@ -124,7 +218,7 @@ export function cancelledVisitModelFrom(
       title: 'Nothing charged',
       body: 'This visit was cancelled before payment — nothing was charged.',
     },
-    refund: refundData,
+    refund: shownRefund,
     paymentSheet: paymentSheetFrom(booking, cookName),
     modifySheet: null,
     paymentFailed: false,

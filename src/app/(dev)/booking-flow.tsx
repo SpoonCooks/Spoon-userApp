@@ -8,6 +8,7 @@ import { NotServiceableScreen } from '@features/address';
 import { MyBookingsScreen, bookingRowFrom, upcomingFrom } from '@features/history';
 import type { BookingDetailDto, BookingSummaryDto, RefundDto } from '@features/booking';
 import { AccountHubScreen } from '@features/profile';
+import { RefundProgressCard } from '@features/refunds';
 import type { AccountHubModel } from '@features/profile';
 import {
   PaymentDetailsSheet,
@@ -18,8 +19,10 @@ import {
 import type { VisitRatingValue } from '@features/recurringLive';
 import {
   ServiceVisitScreen,
+  SpoonCancelledCard,
   cancelledVisitModelFrom,
   paymentSheetFrom,
+  spoonCancelledFrom,
 } from '@features/serviceVisit';
 import type { ServicePhase, ServiceVisitModel } from '@features/serviceVisit';
 import { RouteScaffold } from '@ui';
@@ -38,6 +41,8 @@ import { RouteScaffold } from '@ui';
  *          account | account-complete | pool-empty | pool-new | manage | data | delete
  *          bookings | bookings-past | bookings-empty                              (Accounts)
  *          cancelled-visit | payment-sheet                    (Visit details, cancelled / payment)
+ *          reassigned                       (`2353:17562` cook reassigned, a first visit with her)
+ *          cancelled-by-spoon               (`2342:4195` cancelled by Spoon, refund just started)
  */
 const SERVICE: Record<ServicePhase, Partial<ServiceVisitModel>> = {
   assigned: {},
@@ -288,7 +293,8 @@ const DETAIL: BookingDetailDto = {
     totalAmountPaise: 29900,
     currency: 'INR',
     pricingVersion: 'dev',
-    strikeAmountPaise: 33814,
+    // V0's published 1-hour list price (₹300 before tax) — GST on it is exact, so it reads ₹354.
+    strikeAmountPaise: 30000,
   },
   timing: { arrivedAt: null, actualStart: null, expectedEnd: null, actualEnd: null },
   cancellation: {
@@ -307,6 +313,16 @@ const DETAIL: BookingDetailDto = {
   paymentMethod: { type: 'upi', label: 'UPI', detail: '••••@okhdfcbank' },
 } as BookingDetailDto;
 
+/** `2342:4195` — the system gave up finding a cook; the full refund has only been raised. */
+const SPOON_DETAIL = {
+  ...DETAIL,
+  cancellation: {
+    ...DETAIL.cancellation,
+    cancelledBy: 'system',
+    reasonCode: 'RECOVERY_NOT_POSSIBLE',
+  },
+} as BookingDetailDto;
+
 const REFUND = {
   refundId: 'rfnd_8Hq2kLm',
   bookingId: 'bk-dev',
@@ -321,7 +337,13 @@ const REFUND = {
 function VisitPreview({ view }: { view: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(view.startsWith('payment-sheet'));
-  const model = cancelledVisitModelFrom(DETAIL, REFUND, 'Cook Sanchita');
+  const bySpoon = view === 'cancelled-by-spoon';
+  const detail = bySpoon ? SPOON_DETAIL : DETAIL;
+  const refund = bySpoon
+    ? ({ ...REFUND, reason: 'spoon_cancel', state: 'requested' } as RefundDto)
+    : REFUND;
+  const model = cancelledVisitModelFrom(detail, refund, 'Cook Sanchita');
+  const spoon = spoonCancelledFrom(detail, refund);
   return (
     <>
       <VisitDetailsScreen
@@ -330,6 +352,50 @@ function VisitPreview({ view }: { view: string }) {
         onBack={() => router.back()}
         onPaymentDetails={() => setOpen(true)}
         onHelp={() => undefined}
+        cancelledSlot={
+          spoon === null ? undefined : (
+            <SpoonCancelledCard
+              when={spoon.when}
+              reason={spoon.reason}
+              refundLine={spoon.refundLine}
+              onRebook={() => undefined}
+              onTalkToUs={() => undefined}
+              testID="preview-spoon-cancelled"
+            />
+          )
+        }
+        // The shared Refund tracker (`2303:4231`) the host draws once the refund's tracker loads.
+        refundProgress={
+          <RefundProgressCard
+            view={{
+              amount: '₹299',
+              destination: 'Original source',
+              status: bySpoon ? 'in_progress' : 'completed',
+              steps: [
+                {
+                  key: 'initiated',
+                  title: 'Refund initiated',
+                  when: '11 Oct, 1:09 PM',
+                  done: true,
+                },
+                {
+                  key: 'processed',
+                  title: 'Refund processed',
+                  when: bySpoon ? undefined : '11 Oct, 1:30 PM',
+                  done: !bySpoon,
+                },
+                {
+                  key: 'completed',
+                  title: 'Refund completed',
+                  when: bySpoon ? undefined : '12 Oct, 10:02 AM',
+                  done: !bySpoon,
+                },
+              ],
+              ...(bySpoon ? {} : { reference: 'RRN: 664320396937' }),
+            }}
+            testID="preview-refund-tracker"
+          />
+        }
       />
       <PaymentDetailsSheet
         visible={open}
@@ -384,7 +450,11 @@ function BookingFlowPreview({ view, recurring }: { view: string; recurring: bool
   }
 
   if (ACCOUNT_VIEWS.has(view)) return <AccountsPreview view={view} />;
-  if (view === 'cancelled-visit' || view.startsWith('payment-sheet'))
+  if (
+    view === 'cancelled-visit' ||
+    view === 'cancelled-by-spoon' ||
+    view.startsWith('payment-sheet')
+  )
     return <VisitPreview view={view} />;
 
   if (view === 'not-serviceable') {
@@ -405,6 +475,8 @@ function BookingFlowPreview({ view, recurring }: { view: string; recurring: bool
   }
 
   const phase = (view in SERVICE ? view : 'assigned') as ServicePhase;
+  // `2353:17562` — the new cook, on her first visit here: the overall rating, not "Your rating".
+  const reassigned = view === 'reassigned';
   return (
     <>
       <ServiceVisitScreen
@@ -414,6 +486,16 @@ function BookingFlowPreview({ view, recurring }: { view: string; recurring: bool
           ...SERVICE[phase],
           phase,
           ...(recurring ? { title: 'Recurring visit' } : {}),
+          ...(reassigned
+            ? {
+                reassigned: true,
+                cook: {
+                  ...MODEL.cook,
+                  visits: 'First visit with you',
+                  rating: 'Rated 4.7 by Spoon users',
+                },
+              }
+            : {}),
         }}
         onBack={() => router.back()}
         onPaymentDetails={() => undefined}

@@ -30,6 +30,10 @@ export const SERVICE_ART = {
   close: img(require('../../../assets/figma/service-v2/close.png')),
   tipDeco: img(require('../../../assets/figma/service-v2/tip-deco.png')),
   favoriteFill: img(require('../../../assets/figma/service-v2/favorite-fill.png')),
+  /** `2349:846` Icon/Cook changed — the reassigned note's 24pt glyph (`2353:17570`). */
+  cookChanged: img(require('../../../assets/figma/service-v2/cook-changed.png')),
+  /** `2342:4344` — the apology card's 260pt warm glow (radial `#FFED99` 90% → clear). */
+  apologyGlow: img(require('../../../assets/figma/service-v2/apology-glow.png')),
   skyHalo3: img(require('../../../assets/figma/cancel-v2/banner-halo-3.png')),
   skyHalo2: img(require('../../../assets/figma/cancel-v2/banner-halo-2.png')),
   skySun: img(require('../../../assets/figma/cancel-v2/banner-sun.png')),

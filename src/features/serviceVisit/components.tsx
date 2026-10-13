@@ -66,7 +66,12 @@ export function ServiceBanner({
             <Text style={styles.bodyStrong}>{slot}</Text>
           )}
         </View>
-        <View style={styles.badgeBox}>
+        <View
+          style={[
+            styles.badgeBox,
+            slot === undefined || slot === null ? null : styles.badgeBoxTall,
+          ]}
+        >
           <View style={styles.badgeDisc}>
             <Image source={badge.icon} style={styles.icon20} />
           </View>
@@ -194,7 +199,7 @@ export function EndOtpCard({
 }) {
   if (!wrapUp) {
     return (
-      <View style={styles.otpCard} testID={testID}>
+      <View style={[styles.otpCard, styles.endOtpCard]} testID={testID}>
         <OtpBand eyebrow="END OTP" title="Share to end" digits={digits} />
       </View>
     );
@@ -775,6 +780,8 @@ const styles = StyleSheet.create({
   cloudB: { position: 'absolute', left: 244, top: 42.8, width: 32.4, height: 15.6 },
   bannerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   badgeBox: { minWidth: 72, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  /** `2165:11847` — with a slot line under the date the badge column is 72 tall (banner 104). */
+  badgeBoxTall: { height: 72 },
   badgeDisc: {
     width: 36,
     height: 36,
@@ -816,6 +823,8 @@ const styles = StyleSheet.create({
     color: C.text,
   },
   otpCard: { padding: 8, borderRadius: 24, backgroundColor: C.base },
+  /** `2165:11957` — the End OTP band sits 24pt under the card above: the screen's gap alone. */
+  endOtpCard: { paddingTop: 0 },
   arrivedRow: { padding: 12, gap: 4 },
   otpBand: {
     flexDirection: 'row',
@@ -901,7 +910,8 @@ const styles = StyleSheet.create({
   heroHaloA: { position: 'absolute', left: 242, top: 29, width: 260, height: 260 },
   heroHaloB: { position: 'absolute', left: 287, top: 74, width: 170, height: 170 },
   heroHaloC: { position: 'absolute', left: -21, top: 270, width: 90, height: 90 },
-  timer: { alignItems: 'center', gap: 8, paddingVertical: 8 },
+  /** `2165:11967` — 8pt above; below, the screen's 24pt gap is the whole space to the next card. */
+  timer: { alignItems: 'center', gap: 8, paddingTop: 8 },
   clock: { flexDirection: 'row', gap: 8 },
   clockUnit: { alignItems: 'center', gap: 6 },
   tilePair: { flexDirection: 'row', gap: 6 },
@@ -1002,7 +1012,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textDecorationLine: 'underline',
   },
-  cleanup: { paddingTop: 16, gap: 12 },
+  /** `2165:11957` — 24pt from the card above to the heading: the screen's gap alone. */
+  cleanup: { gap: 12 },
   scope: {
     padding: 16,
     gap: 16,
