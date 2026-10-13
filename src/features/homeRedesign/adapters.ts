@@ -212,3 +212,41 @@ export function guestHomeModelFrom(sources: {
     waitlist: null,
   };
 }
+
+/**
+ * Home for a customer with NO saved address who was refused at a place (`1302:3539`, dev note
+ * `2214:4364`: Not serviceable redirects to "Home page/ inactive pincode"). Nothing was saved, so
+ * the header names the place they tried, the variant is `inactive`, and Notify me joins the
+ * waitlist with no address. The lower sections render read-only, as for any inactive Home.
+ */
+export function triedPlaceHomeModelFrom(sources: {
+  readonly place: {
+    readonly title: string;
+    readonly line: string;
+    readonly locality: string | null;
+  };
+  readonly catalogue: Catalogue | undefined;
+  readonly catalogueStatus: 'ready' | 'loading' | 'error';
+  readonly waitlistJoined: boolean;
+}): HomeModel {
+  const durations = durationsFrom(sources.catalogue, new Map());
+  return {
+    serviceability: 'not_live',
+    address: {
+      label: sources.place.title,
+      detail: sources.place.line === '' ? null : sources.place.line,
+      // No saved row, so no pincode: the card names the area instead ("You · Indiranagar").
+      pincode: sources.place.locality ?? sources.place.title,
+    },
+    user: { hasCompletedBooking: false },
+    instant: { available: false, etaMins: null },
+    durations,
+    pricingStatus: sources.catalogueStatus,
+    tax: { gstPercent: (sources.catalogue?.taxRateBps ?? 0) / 100 },
+    focusedDurationId: focusIdOf(durations),
+    cookPool: [],
+    activeRecurringPlan: null,
+    liveHubs: STATIC_LIVE_HUBS,
+    waitlist: { countForPincode: null, launchThreshold: null, joined: sources.waitlistJoined },
+  };
+}

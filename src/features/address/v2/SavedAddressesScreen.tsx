@@ -425,7 +425,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 12,
+    /** `1870:2770` — 8/16. */
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 24,
   },
@@ -478,7 +479,8 @@ const styles = StyleSheet.create({
   },
   menuItemPressed: { backgroundColor: C.subtle },
   captionStrong: { ...T.captionStrong, color: C.text },
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  /** `1870:2857` — the scrim is `color/surface/inverse` at full strength, as drawn. */
+  scrim: { flex: 1, backgroundColor: C.text },
   sheet: {
     marginTop: 'auto',
     backgroundColor: C.base,

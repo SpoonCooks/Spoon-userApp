@@ -181,7 +181,7 @@ export function NotServiceableScreen({
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(8, bottom) }]}>
+      <View style={[styles.footer, { paddingBottom: 8 + bottom }]}>
         <View style={styles.redirect}>
           <View style={styles.track}>
             <Animated.View
@@ -248,7 +248,8 @@ const styles = StyleSheet.create({
   haloA: { position: 'absolute', left: -90, top: -60, width: 260, height: 260 },
   haloB: { position: 'absolute', left: 260, top: 120, width: 180, height: 180 },
   scroll: { paddingBottom: 24 },
-  topBar: { paddingHorizontal: 16, paddingVertical: 2 },
+  /** `2214:4260` — a 44pt bar: the Back disc with no vertical padding. */
+  topBar: { paddingHorizontal: 16 },
   back: {
     width: 44,
     height: 44,
@@ -304,7 +305,8 @@ const styles = StyleSheet.create({
   },
   youLabel: {
     position: 'absolute',
-    right: 4,
+    /** `2214:4260` — x 264, 96 wide in the 370 hero: 10pt from its right edge. */
+    right: 10,
     top: 114,
     maxWidth: 160,
     paddingHorizontal: 8,
@@ -326,10 +328,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: C.brand,
   },
+  /**
+   * `2214:4260` "Sticker · Coming soon" — 125 × 36, rotated 6° about its top-left corner, so its
+   * rotated box starts at (14, 6.4). React Native rotates about the centre, so the unrotated box
+   * sits where that centre lands: (78, 30.8) less half its size.
+   */
   sticker: {
     position: 'absolute',
-    left: 22,
-    top: 19,
+    left: 15.5,
+    top: 12.8,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,

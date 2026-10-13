@@ -59,25 +59,16 @@ describe('savedListFrom (1870:2770, dev note 2075:11950)', () => {
     expect(savedListFrom(list, 'browse').map((item) => item.id)).toEqual(['b', 'a', 'c', 'd']);
   });
 
-  it('tags the address in use "Current selection" when choosing', () => {
-    const tags = savedListFrom(list, 'choose').map((item) => [item.id, item.tag]);
-    expect(tags).toEqual([
-      ['b', null],
-      ['a', 'Current selection'],
-      ['c', null],
-      ['d', null],
-    ]);
-  });
-
-  it('tags the latest order’s address "Last used" when browsing', () => {
-    expect(savedListFrom(list, 'browse').find((item) => item.tag !== null)).toEqual(
-      expect.objectContaining({ id: 'b', tag: 'Last used' }),
-    );
-  });
-
-  it('tags nothing "Last used" when no address has been ordered at', () => {
-    const fresh = list.map((item) => ({ ...item, lastUsedAt: null }));
-    expect(savedListFrom(fresh, 'browse').every((item) => item.tag === null)).toBe(true);
+  it('tags the address in use "Current selection", whether choosing or browsing', () => {
+    for (const context of ['choose', 'browse'] as const) {
+      const tags = savedListFrom(list, context).map((item) => [item.id, item.tag]);
+      expect(tags).toEqual([
+        ['b', null],
+        ['a', 'Current selection'],
+        ['c', null],
+        ['d', null],
+      ]);
+    }
   });
 
   it('reads a label that is not a drawn chip as Others', () => {

@@ -57,7 +57,14 @@ export default function ProfileRoute() {
           onAddCook={guard(() => router.push('/cook-pool/add' as Href))}
           onBook={guard(() => router.push('/scheduled'))}
           onBookings={guard(() => router.push('/history'))}
-          onAddresses={guard(() => router.push('/address?from=profile'))}
+          // No saved address yet: the tile opens the map to add one, not an empty list.
+          onAddresses={guard(() =>
+            router.push(
+              summary.addressLabels !== null && summary.addressLabels.length === 0
+                ? '/address/location?from=profile'
+                : '/address?from=profile',
+            ),
+          )}
           // Every Help control in the app opens Spoon's WhatsApp line (founder, task §15).
           onHelp={guard(() => openHelp('Hi Spoon, I need help with my account.'))}
           onManageAccount={guard(() => router.push('/account' as Href))}

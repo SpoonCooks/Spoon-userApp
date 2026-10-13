@@ -15,60 +15,50 @@ import type { MapStyleElement } from 'react-native-maps';
  * "usually light": every element listed below is drawn in the colour named here whatever the SDK's
  * chosen scheme, so a device flipping to dark mode mid-session cannot repaint the canvas.
  *
- * WHERE THE COLOURS COME FROM. `63:803` (the "Change area" thumbnail, `change-area.png`) is the
- * only approved Figma artwork that renders a real map, and it is a light warm canvas. Sampled off
- * that export:
+ * WHERE THE COLOURS COME FROM. `1870:2379` (Address/map location) draws the canvas in the brand's
+ * own palette, read off its layers:
  *
- *   land        `#FBF7E1`  45.9 % of the thumbnail
- *   local road  `#FFFFFF`  14.0 %
- *   built-up    `#EBEAD8`   4.7 %  (blocks / POI / transit)
- *   arterial    `#FBF3D4`   3.6 %
- *   park        `#E1F4D0`
- *   water       `#C8E8DC`
+ *   land          `#FFF7CC`  color/surface/subtle
+ *   parks         `#FFE666`  color/brand/primary-tint
+ *   blocks        `#FFEF99`  color/border/default — built-up areas, transit, road casing
+ *   roads         `#FFFFFF`  with a `#FFEF99` casing
+ *   labels        black at 60 % (`#666666` on the land; Google styles take no alpha), land halo
  *
- * Label ink is NOT in that sample — the thumbnail's only dark pixels are its "Change" caption — so
- * it is set to a warm dark grey that carries Google's own light-map contrast against `#FBF7E1`,
- * with the land colour as the halo. Leaving labels unstyled is the one thing that must not happen:
- * under the night scheme they would stay white and vanish into the light geometry.
+ * The frame draws no place markers, so POI icons and business labels are switched off: the pin is
+ * the one marker on this map. Water is not in the frame; it keeps a pale tint so lakes still read.
  *
  * The first entry is deliberately unqualified. It floors EVERY geometry element at the land
  * colour, so any feature Google adds later that this list does not name can still never come
  * through dark; the qualified entries below it are overrides, not the whole map.
  */
 export const LIGHT_MAP_STYLE: MapStyleElement[] = [
-  { elementType: 'geometry', stylers: [{ color: '#fbf7e1' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#5a5647' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#fbf7e1' }] },
+  { elementType: 'geometry', stylers: [{ color: '#fff7cc' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#666666' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#fff7cc' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
 
   {
     featureType: 'administrative',
     elementType: 'geometry.stroke',
-    stylers: [{ color: '#ded9c0' }],
+    stylers: [{ color: '#ffef99' }],
   },
   { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
 
-  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#f6f2d8' }] },
-  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#fbf7e1' }] },
+  { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#fff7cc' }] },
+  { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#fff7cc' }] },
 
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#ebead8' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#7d7862' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#e1f4d0' }] },
-  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6b8f52' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#ffef99' }] },
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#ffe666' }] },
 
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#ebead8' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#6f6a58' }] },
-  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#fbf3d4' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#fbf3d4' }] },
-  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#e8dfae' }] },
+  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#ffef99' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#666666' }] },
 
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#ebead8' }] },
-  {
-    featureType: 'transit.station',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#7d7862' }],
-  },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#ffef99' }] },
+  { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
 
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c8e8dc' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#6f9488' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#d6ecff' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#666666' }] },
 ];

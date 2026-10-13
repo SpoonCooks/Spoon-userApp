@@ -9,9 +9,11 @@ import type { AddressLabelKind } from './components';
  * How the Saved addresses list was opened.
  *
  * `choose` — from somewhere that is picking the address for a booking (Home's address switcher):
- *            tapping a row selects it, and the address in use carries "Current selection".
- * `browse` — from the profile: tapping a row does nothing (dev note `2075:11950`), and the
- *            address of the latest order carries "Last used".
+ *            tapping a row selects it.
+ * `browse` — from the profile: tapping a row does nothing (dev note `2075:11950`).
+ *
+ * Either way the address in use carries "Current selection", as `1870:2770` draws it (product's
+ * call, over the dev note's "Last used").
  */
 export type SavedListContext = 'choose' | 'browse';
 
@@ -21,7 +23,7 @@ export interface SavedAddressItem {
   readonly kind: AddressLabelKind;
   /** One line; the card truncates it. */
   readonly line: string;
-  readonly tag: 'Current selection' | 'Last used' | null;
+  readonly tag: 'Current selection' | null;
 }
 
 /**
@@ -33,7 +35,8 @@ export interface SavedAddressItem {
  */
 export function savedListFrom(
   addresses: readonly AddressDto[],
-  context: SavedListContext,
+  // Kept so callers say how the list was opened; the tag no longer depends on it.
+  _context: SavedListContext,
 ): readonly SavedAddressItem[] {
   const sorted = addresses
     .map((address, index) => ({ address, index }))
@@ -47,17 +50,14 @@ export function savedListFrom(
     })
     .map(({ address }) => address);
 
-  const tagged =
-    context === 'choose'
-      ? currentAddressOf(addresses)?.id
-      : sorted.find((address) => address.lastUsedAt !== null)?.id;
+  const tagged = currentAddressOf(addresses)?.id;
 
   return sorted.map((address) => ({
     id: address.id,
     label: address.label,
     kind: labelKindOf(address.label),
     line: cardLineOf(address),
-    tag: address.id === tagged ? (context === 'choose' ? 'Current selection' : 'Last used') : null,
+    tag: address.id === tagged ? 'Current selection' : null,
   }));
 }
 

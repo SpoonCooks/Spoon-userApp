@@ -51,7 +51,12 @@ export { RemoveAddressSheet, SavedAddressesScreen } from './v2/SavedAddressesScr
 export { labelKindOf } from './v2/components';
 export { AddressMapScreen } from './v2/AddressMapScreen';
 export { NotServiceableScreen, joinAreas } from './v2/NotServiceableScreen';
-export { useNotServiceableStore } from './v2/notServiceableStore';
+export {
+  hydrateTriedPlace,
+  rememberTriedPlace,
+  useNotServiceableStore,
+  useTriedPlace,
+} from './v2/notServiceableStore';
 export type { NotServiceablePlace } from './v2/notServiceableStore';
 export type { AddressMapScreenProps, AddressSearchProps } from './v2/AddressMapScreen';
 export type { SavedAddressesScreenProps } from './v2/SavedAddressesScreen';
