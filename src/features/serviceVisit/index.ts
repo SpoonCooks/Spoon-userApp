@@ -16,7 +16,6 @@ export {
   cancelledVisitModelFrom,
   isSpoonCancellation,
   spoonCancelHelpMessage,
-  spoonCancelReason,
   spoonCancelledFrom,
 } from './cancelledVisit';
 export type { SpoonCancelledData } from './cancelledVisit';

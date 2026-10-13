@@ -13,33 +13,11 @@ import { clock, day, duration, isoDay, paymentSheetFrom } from './model';
  * cook marked arrived. The apology card replaces "Visit cancelled"; the refund is always 100%,
  * auto-initiated at cancel, so its tracker starts at Initiated.
  *
- * The reason line is read from the cancellation's `reasonCode` — never its free-text
- * `reasonDetail`, which is the operator's own words and may name the cook. The codes are V0's:
- * the system paths (`cancelForServiceFailure` callers) and the Admin/Ops cancel's
- * `adminReasonCodes`. Every line is about Spoon, never about a named cook.
+ * The reason line is Figma's own copy, whatever the cancel reason: the frame draws one line and
+ * product has not written others. The operator's free-text `reasonDetail` is never shown — it is
+ * their own words and may name the cook.
  */
-export const SPOON_CANCEL_REASONS: Readonly<Record<string, string>> = {
-  // System — recovery after a cook dropped out found nobody (`fulfilment/resolution-service`).
-  RECOVERY_NOT_POSSIBLE: 'None of our cooks could make it to your booked slot.',
-  // System — paid, but no cook was ever assigned (`captured-without-assignment-recovery`).
-  CAPTURED_WITHOUT_ASSIGNMENT: 'None of our cooks could make it to your booked slot.',
-  // System — the slot passed with no cook at the door (`overdue-reconciliation-service`).
-  SERVICE_WINDOW_ELAPSED_UNSERVED: 'We couldn’t get a cook to you within your booked slot.',
-  // Ops (`adminReasonCodes`).
-  COOK_UNAVAILABLE: 'None of our cooks could make it to your booked slot.',
-  COOK_EMERGENCY:
-    'Your cook had an emergency, and we couldn’t find another cook for your booked slot in time.',
-  OPERATIONAL_RECOVERY: 'None of our cooks could make it to your booked slot.',
-  CAPACITY_CONFLICT: 'We didn’t have a cook free for your booked slot.',
-  SOCIETY_ACCESS_ISSUE: 'We couldn’t arrange entry to your society for this visit.',
-  SERVICEABILITY_CHANGE: 'We’re no longer able to serve your address in this slot.',
-  PAYMENT_RESOLUTION: 'We had to cancel this visit while we sort out an issue with its payment.',
-  DUPLICATE_PAYMENT: 'This visit was booked twice, so we cancelled the extra one.',
-  TECHNICAL_FAILURE: 'A technical problem on our side stopped this visit from going ahead.',
-};
-
-/** `OPS_CORRECTION`, `OTHER`, no code, or one this build does not know. */
-export const SPOON_CANCEL_DEFAULT_REASON = 'We couldn’t keep your booked slot this time.';
+export const SPOON_CANCEL_REASON = 'None of our cooks could make it to your booked slot.';
 
 /**
  * Cancelled by `operations` / `system`, yet not Spoon's doing — the apology would be untrue:
@@ -51,11 +29,6 @@ const NOT_SPOONS_DOING: ReadonlySet<string> = new Set([
   'CHECKOUT_EXPIRED',
   'CUSTOMER_REQUEST',
 ]);
-
-export function spoonCancelReason(reasonCode: string | null | undefined): string {
-  if (reasonCode === null || reasonCode === undefined) return SPOON_CANCEL_DEFAULT_REASON;
-  return SPOON_CANCEL_REASONS[reasonCode] ?? SPOON_CANCEL_DEFAULT_REASON;
-}
 
 /** The refund a cancellation owes, as the server states it. */
 function refundPaiseOf(booking: BookingDetailDto, refund: RefundDto | null): number | null {
@@ -93,7 +66,7 @@ export function spoonCancelledFrom(
   const refundPaise = refundPaiseOf(booking, refund) ?? booking.price.totalAmountPaise;
   return {
     when: at === null ? null : `${day(at)}, ${clock(at)}`,
-    reason: spoonCancelReason(booking.cancellation?.reasonCode),
+    reason: SPOON_CANCEL_REASON,
     refundLine: `Full ${formatPaise(refundPaise)} refund started, no deductions`,
     rebook: {
       date: start === null ? null : isoDay(start),

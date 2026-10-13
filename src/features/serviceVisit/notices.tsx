@@ -43,7 +43,7 @@ export function CookReassignedNote({ testID }: { testID: string }) {
 export interface SpoonCancelledCardProps {
   /** "Thu, 1 Oct, 6:40 PM" — when Spoon cancelled. */
   readonly when: string | null;
-  /** The customer-facing reason (`spoonCancelReason`); never names the cook. */
+  /** The customer-facing reason (`SPOON_CANCEL_REASON`); never names the cook. */
   readonly reason: string;
   /** "Full ₹299 refund started, no deductions". */
   readonly refundLine: string;

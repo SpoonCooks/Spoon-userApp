@@ -293,7 +293,8 @@ const DETAIL: BookingDetailDto = {
     totalAmountPaise: 29900,
     currency: 'INR',
     pricingVersion: 'dev',
-    strikeAmountPaise: 33814,
+    // V0's published 1-hour list price (₹300 before tax) — GST on it is exact, so it reads ₹354.
+    strikeAmountPaise: 30000,
   },
   timing: { arrivedAt: null, actualStart: null, expectedEnd: null, actualEnd: null },
   cancellation: {

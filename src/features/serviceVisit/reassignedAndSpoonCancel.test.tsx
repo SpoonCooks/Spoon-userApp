@@ -6,12 +6,10 @@ import { VisitDetailsScreen } from '@features/recurringLive';
 import { ServiceVisitScreen } from './ServiceVisitScreen';
 import type { ServiceVisitModel, ServiceVisitScreenProps } from './ServiceVisitScreen';
 import {
-  SPOON_CANCEL_DEFAULT_REASON,
-  SPOON_CANCEL_REASONS,
+  SPOON_CANCEL_REASON,
   cancelledVisitModelFrom,
   isSpoonCancellation,
   spoonCancelHelpMessage,
-  spoonCancelReason,
   spoonCancelledFrom,
 } from './cancelledVisit';
 import { cookStatLines, reassignedOneTime } from './model';
@@ -215,20 +213,13 @@ describe('Cancelled by Spoon (2342:4195, dev note 2342:4405)', () => {
     ).toBe(false);
   });
 
-  it('maps every reason code to copy that never names the cook, with a neutral default', () => {
-    expect(spoonCancelReason('RECOVERY_NOT_POSSIBLE')).toBe(
-      'None of our cooks could make it to your booked slot.',
-    );
-    expect(spoonCancelReason('OTHER')).toBe(SPOON_CANCEL_DEFAULT_REASON);
-    expect(spoonCancelReason('SOMETHING_NEW')).toBe(SPOON_CANCEL_DEFAULT_REASON);
-    expect(spoonCancelReason(null)).toBe(SPOON_CANCEL_DEFAULT_REASON);
-    for (const line of [...Object.values(SPOON_CANCEL_REASONS), SPOON_CANCEL_DEFAULT_REASON]) {
-      expect(line).not.toMatch(/Sanchita/u);
-      expect(line).toMatch(/[.]$/u);
+  it('shows Figma’s one reason line for every code, never the operator’s words', () => {
+    for (const code of ['RECOVERY_NOT_POSSIBLE', 'COOK_EMERGENCY', 'TECHNICAL_FAILURE', null]) {
+      expect(spoonCancelledFrom(cancelledBy('operations', code), REFUND)?.reason).toBe(
+        SPOON_CANCEL_REASON,
+      );
     }
-    // The operator's free text (which names her) is never what the customer reads.
-    const data = spoonCancelledFrom(cancelledBy('operations', 'COOK_EMERGENCY'), REFUND);
-    expect(data?.reason).not.toMatch(/Sanchita/u);
+    expect(SPOON_CANCEL_REASON).toBe('None of our cooks could make it to your booked slot.');
   });
 
   it('reads the moment, the full refund and the rebook prefill off the booking', () => {
