@@ -322,6 +322,12 @@ export const lightColors = {
   surfaceRatingQuiet: palette.black3,
   /** `1517:9299` — the low-score card wash's lead stop. */
   surfaceRatingPoorTop: palette.linen,
+  /** `2303:4231` Refund tracker — the card: black at 3 %. */
+  surfaceRefund: palette.black3,
+  /** `2303:4085` — the rule under the refund header: black at 12 %. */
+  refundDivider: palette.black12,
+  /** `2303:4098` / `2303:4101` — a pending step's dot and the line into it: black at 15 %. */
+  refundPending: palette.black15,
 
   scrim: palette.scrim,
   /** `47:6615` / `29:1858` — the wash a sheet takes while a dialog is layered over it. */

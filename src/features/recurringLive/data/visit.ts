@@ -220,33 +220,12 @@ export interface VisitChargeData {
   readonly body: string;
 }
 
-/**
- * `Refund tracker` (`2303:4071`, drawn in `2342:4234`) — the grey block a one-time visit cancelled
- * by Spoon shows in place of "Refund to" and the plain timeline.
- */
-export interface VisitRefundTracker {
-  /** "Booking refund ₹299". */
-  readonly title: string;
-  /** "To: Original source". */
-  readonly destination: string;
-  /** "In progress". */
-  readonly status: string;
-  readonly steps: readonly {
-    readonly title: string;
-    /** "1 Oct, 6:40 PM" once the step has happened. */
-    readonly when?: string | undefined;
-    readonly done: boolean;
-  }[];
-}
-
 export interface VisitRefundData {
   readonly title: string;
   readonly booking?: string | undefined;
   readonly badge: string;
   /** The badge's `90:189` type: lime Positive (the default) or `#FFF7CC` Neutral. */
   readonly badgeTone?: 'positive' | 'neutral' | undefined;
-  /** When given, drawn instead of the refund mode, id and `steps`. */
-  readonly tracker?: VisitRefundTracker | undefined;
   readonly lines: readonly VisitRefundLine[];
   readonly total: VisitRefundLine;
   readonly modeEyebrow: string;

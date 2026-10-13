@@ -7,8 +7,10 @@
 export { RefundScreen } from './screens/RefundScreen';
 export type { RefundScreenProps } from './screens/RefundScreen';
 export { RefundTracker } from './components/RefundTracker';
+export { RefundProgressCard, refundProgressViewFrom } from './components/RefundProgressCard';
+export type { RefundProgressView } from './components/RefundProgressCard';
 export type { RefundTrackerProps } from './components/RefundTracker';
-export { refundTrackerFrom } from './adapters';
+export { refundStepLabel, refundTrackerFrom } from './adapters';
 export type {
   RefundBreakdownLine,
   RefundStatus,

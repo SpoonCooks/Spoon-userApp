@@ -8,6 +8,7 @@ import { NotServiceableScreen } from '@features/address';
 import { MyBookingsScreen, bookingRowFrom, upcomingFrom } from '@features/history';
 import type { BookingDetailDto, BookingSummaryDto, RefundDto } from '@features/booking';
 import { AccountHubScreen } from '@features/profile';
+import { RefundProgressCard } from '@features/refunds';
 import type { AccountHubModel } from '@features/profile';
 import {
   PaymentDetailsSheet,
@@ -361,6 +362,38 @@ function VisitPreview({ view }: { view: string }) {
               testID="preview-spoon-cancelled"
             />
           )
+        }
+        // The shared Refund tracker (`2303:4231`) the host draws once the refund's tracker loads.
+        refundProgress={
+          <RefundProgressCard
+            view={{
+              amount: '₹299',
+              destination: 'Original source',
+              status: bySpoon ? 'in_progress' : 'completed',
+              steps: [
+                {
+                  key: 'initiated',
+                  title: 'Refund initiated',
+                  when: '11 Oct, 1:09 PM',
+                  done: true,
+                },
+                {
+                  key: 'processed',
+                  title: 'Refund processed',
+                  when: bySpoon ? undefined : '11 Oct, 1:30 PM',
+                  done: !bySpoon,
+                },
+                {
+                  key: 'completed',
+                  title: 'Refund completed',
+                  when: bySpoon ? undefined : '12 Oct, 10:02 AM',
+                  done: !bySpoon,
+                },
+              ],
+              ...(bySpoon ? {} : { reference: 'RRN: 664320396937' }),
+            }}
+            testID="preview-refund-tracker"
+          />
         }
       />
       <PaymentDetailsSheet

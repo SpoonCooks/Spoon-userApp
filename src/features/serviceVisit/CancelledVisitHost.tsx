@@ -3,6 +3,13 @@ import { useState } from 'react';
 import { useBookingRefunds } from '@features/booking';
 import type { BookingDetailDto } from '@features/booking';
 import { PaymentDetailsSheet, VisitDetailsScreen } from '@features/recurringLive';
+import {
+  RefundProgressCard,
+  refundProgressViewFrom,
+  refundTrackerFrom,
+  useRefund,
+} from '@features/refunds';
+import { useWhatsAppHelp } from '@features/support';
 
 import { cancelledVisitModelFrom, spoonCancelledFrom } from './cancelledVisit';
 import type { SpoonCancelledData } from './cancelledVisit';
@@ -26,9 +33,11 @@ export interface CancelledVisitHostProps {
  * refund (`GET /v1/bookings/:id/refunds`) and the Payment details sheet. Only Payment details and
  * Help remain in the dock (dev note `2226:4224`).
  *
+ * Payment & refund carries the Refund tracker (`2303:4231`) — the refund's own steps, gateway
+ * times and RRN from `GET /v1/me/refunds/:id` — once it has been read.
+ *
  * Cancelled by Spoon (`2342:4195`, dev note `2342:4405`): the apology card takes the place of the
- * plain "Visit cancelled" card and Payment & refund carries the refund tracker. A booking the
- * customer cancelled is unchanged.
+ * plain "Visit cancelled" card. A booking the customer cancelled is unchanged.
  */
 export function CancelledVisitHost({
   booking,
@@ -42,6 +51,12 @@ export function CancelledVisitHost({
   const refund = refunds.state.status === 'ready' ? (refunds.state.data[0] ?? null) : null;
   const model = cancelledVisitModelFrom(booking, refund, booking.cook?.name ?? null);
   const spoon = spoonCancelledFrom(booking, refund);
+  const tracked = useRefund(refund?.refundId ?? null);
+  const contactSupport = useWhatsAppHelp();
+  const tracker =
+    tracked.state.status === 'ready'
+      ? refundTrackerFrom(tracked.state.data, { timeZone: 'Asia/Kolkata' })
+      : null;
 
   return (
     <>
@@ -60,6 +75,15 @@ export function CancelledVisitHost({
               onRebook={() => onRebook(spoon.rebook)}
               onTalkToUs={onTalkToUs}
               testID="cancelled-visit-spoon"
+            />
+          )
+        }
+        refundProgress={
+          tracker === null ? undefined : (
+            <RefundProgressCard
+              view={refundProgressViewFrom(tracker)}
+              onContactSupport={() => contactSupport(tracker.supportMessage)}
+              testID="cancelled-visit-refund-tracker"
             />
           )
         }

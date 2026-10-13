@@ -2,15 +2,9 @@ import { formatPaise } from '@core/format';
 import { bookingStrikeOf } from '@features/booking';
 import type { BookingDetailDto, RefundDto } from '@features/booking';
 import { visitDemoModel } from '@features/recurringLive';
-import type {
-  VisitDetailsModel,
-  VisitRefundData,
-  VisitRefundTracker,
-} from '@features/recurringLive';
-import { refundTrackerFrom } from '@features/refunds';
-import type { RefundStatus } from '@features/refunds';
+import type { VisitDetailsModel, VisitRefundData } from '@features/recurringLive';
 
-import { clock, day, dayMonthClock, duration, isoDay, paymentSheetFrom } from './model';
+import { clock, day, duration, isoDay, paymentSheetFrom } from './model';
 
 /*
  * ------------------------------------------------------------------ Cancelled by Spoon (one-time)
@@ -113,55 +107,6 @@ export function spoonCancelHelpMessage(booking: BookingDetailDto): string {
   const start = booking.scheduledStart ?? booking.timing.actualStart;
   const visit = start === null ? 'my visit' : `my visit on ${day(start)}, ${clock(start)}`;
   return `Hi Spoon, ${visit} (booking ${booking.id}) was cancelled by Spoon. Can you help me?`;
-}
-
-const TRACKER_STATUS: Record<RefundStatus, string> = {
-  in_progress: 'In progress',
-  completed: 'Completed',
-  failed: 'Failed',
-};
-
-/** `2342:4234` — the refund's three steps, from the server's tracker when it sends one. */
-function spoonRefundTracker(
-  booking: BookingDetailDto,
-  refund: RefundDto | null,
-  amount: string,
-): VisitRefundTracker {
-  const tracker = refund?.tracker ?? null;
-  if (refund !== null && tracker !== null) {
-    const view = refundTrackerFrom({ ...refund, tracker }, { timeZone: 'Asia/Kolkata' });
-    return {
-      title: `Booking refund ${amount}`,
-      destination: `To: ${view.destination}`,
-      status: TRACKER_STATUS[view.status],
-      steps: view.steps.map((step) => ({ title: step.title, when: step.when, done: step.done })),
-    };
-  }
-  const settled = refund?.state === 'succeeded';
-  const initiatedAt = refund?.requestedAt ?? booking.cancellation?.cancelledAt ?? null;
-  const completedAt = refund?.completedAt ?? null;
-  return {
-    title: `Booking refund ${amount}`,
-    destination: 'To: Original source',
-    status: settled
-      ? TRACKER_STATUS.completed
-      : refund?.state === 'failed_terminal'
-        ? TRACKER_STATUS.failed
-        : TRACKER_STATUS.in_progress,
-    steps: [
-      {
-        title: 'Refund initiated',
-        ...(initiatedAt === null ? {} : { when: dayMonthClock(initiatedAt) }),
-        done: true,
-      },
-      { title: 'Refund processed', done: settled },
-      {
-        title: 'Refund completed',
-        ...(settled && completedAt !== null ? { when: dayMonthClock(completedAt) } : {}),
-        done: settled,
-      },
-    ],
-  };
 }
 
 /**
@@ -276,7 +221,6 @@ export function cancelledVisitModelFrom(
                 : 'Refund started',
           badgeTone: refund?.state === 'succeeded' ? 'positive' : 'neutral',
           total: { ...refundData.total, detail: 'Full refund, no deductions' },
-          tracker: spoonRefundTracker(booking, refund, refundAmount),
         };
 
   return {

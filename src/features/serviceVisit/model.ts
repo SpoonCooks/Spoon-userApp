@@ -81,19 +81,6 @@ export function isoDay(iso: string): string {
   return `${parts.year ?? ''}-${parts.month ?? ''}-${parts.day ?? ''}`;
 }
 
-/** "1 Oct, 6:40 PM" — a refund step's moment (`2342:4234`). */
-export function dayMonthClock(iso: string): string {
-  const parts: Record<string, string> = {};
-  for (const part of new Intl.DateTimeFormat('en-IN', {
-    timeZone: TIME_ZONE,
-    day: 'numeric',
-    month: 'short',
-  }).formatToParts(new Date(iso))) {
-    parts[part.type] = part.value;
-  }
-  return `${parts.day ?? ''} ${parts.month ?? ''}, ${clock(iso)}`;
-}
-
 /**
  * A one-time visit whose cook ops/system swapped (Figma `2353:17562`, dev note `2353:17578`). The
  * API sends `reassignment` on every booking (`{ occurred: false, … }` when the cook never

@@ -1,20 +1,19 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { Button, Icon, Text } from '@ui';
-import type { ColorToken } from '@ui';
+import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
-import type { RefundBreakdownLine, RefundStatus, RefundTrackerView } from '../adapters';
+import type { RefundBreakdownLine, RefundTrackerView } from '../adapters';
+import { RefundProgressCard, refundProgressViewFrom } from './RefundProgressCard';
 
 /**
  * The refund tracker card (DEC-090, handoff §B) — one card for every refund, one-time or Recurring.
  *
  * Handoff Part 1 A2: header (the visit, its date, who cancelled), the breakdown (one of three
- * versions), then the refund itself — amount, destination and status with a collapse arrow, a
- * dashed line, and the three-step stepper, open by default. The bank's reference is its own line
- * under "Refund completed", only once completed. A failed refund adds "Refund didn't go through"
- * and a Contact support button and nothing else; why it failed is never shown.
+ * versions), then the refund itself — Figma's `Refund tracker` (`2303:4231`, `RefundProgressCard`):
+ * the amount, destination and status pill, the three steps (open by default), the RRN once
+ * completed, and on a failed refund "Refund didn't go through" with Contact support; why it
+ * failed is never shown. Brand colours only — nothing red or green.
  */
 export interface RefundTrackerProps {
   readonly refund: RefundTrackerView;
@@ -23,19 +22,11 @@ export interface RefundTrackerProps {
   readonly testID?: string;
 }
 
-const STATUS_COLOR: Record<RefundStatus, ColorToken> = {
-  in_progress: 'textReschedule',
-  completed: 'textSuccess',
-  failed: 'danger',
-};
-
 export function RefundTracker({
   refund,
   onContactSupport,
   testID = 'refund-tracker',
 }: RefundTrackerProps) {
-  const [open, setOpen] = useState(true);
-
   return (
     <View style={styles.card} testID={testID}>
       <View style={styles.header}>
@@ -76,102 +67,11 @@ export function RefundTracker({
         </View>
       </View>
 
-      <View style={styles.status}>
-        <Pressable
-          onPress={() => setOpen((value) => !value)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: open }}
-          accessibilityLabel={`${refund.statusLabel}, ${open ? 'hide' : 'show'} progress`}
-          style={styles.statusRow}
-          testID={`${testID}-toggle`}
-        >
-          <View style={styles.label}>
-            <Text variant="spoonBodyStrong" color="textPrimary">
-              {`Booking refund ${refund.total.amount}`}
-            </Text>
-            <Text variant="spoonCaption" color="textSecondarySoft">
-              {`To: ${refund.destination}`}
-            </Text>
-          </View>
-          <Text
-            variant="spoonCaptionStrong"
-            color={STATUS_COLOR[refund.status]}
-            testID={`${testID}-status`}
-          >
-            {refund.statusLabel}
-          </Text>
-          <View style={open ? styles.chevronOpen : undefined}>
-            <Icon name="down" size={16} color="textSecondarySoft" />
-          </View>
-        </Pressable>
-
-        {open ? <DashedLine /> : null}
-
-        {open ? (
-          <View style={styles.steps} testID={`${testID}-steps`}>
-            {refund.steps.map((step, index) => (
-              <View key={step.key} style={styles.step}>
-                <View style={styles.rail}>
-                  <View style={[styles.node, step.done ? styles.nodeDone : styles.nodePending]}>
-                    {step.done ? <Icon name="check" size={12} color="textInverse" /> : null}
-                  </View>
-                  {index < refund.steps.length - 1 ? (
-                    <View style={[styles.link, step.done ? styles.linkDone : null]} />
-                  ) : null}
-                </View>
-                <View style={styles.stepText}>
-                  <Text
-                    variant={step.done ? 'spoonBodyStrong' : 'spoonBody'}
-                    color={step.done ? 'textPrimary' : 'textSecondarySoft'}
-                  >
-                    {step.title}
-                  </Text>
-                  {step.when === undefined ? null : (
-                    <Text variant="spoonCaption" color="textSecondarySoft">
-                      {step.when}
-                    </Text>
-                  )}
-                  {step.key === 'completed' && refund.reference !== undefined ? (
-                    <Text
-                      variant="spoonCaptionStrong"
-                      color="textPrimary"
-                      testID={`${testID}-reference`}
-                    >
-                      {refund.reference}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        {refund.status === 'failed' ? (
-          <View style={styles.failed} testID={`${testID}-failed`}>
-            <Text variant="spoonBodyStrong" color="danger">
-              Refund didn&apos;t go through
-            </Text>
-            <Button
-              label="Contact support"
-              variant="secondary"
-              size="md"
-              onPress={() => onContactSupport(refund.supportMessage)}
-              testID={`${testID}-support`}
-            />
-          </View>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-/** A2's dashed line between the refund row and the stepper; clipped to the card's width. */
-function DashedLine() {
-  return (
-    <View style={styles.dashes} testID="refund-tracker-dashes">
-      {Array.from({ length: 60 }, (_, index) => (
-        <View key={index} style={styles.dash} />
-      ))}
+      <RefundProgressCard
+        view={refundProgressViewFrom(refund)}
+        onContactSupport={() => onContactSupport(refund.supportMessage)}
+        testID={`${testID}-progress`}
+      />
     </View>
   );
 }
@@ -189,14 +89,12 @@ function BreakdownLine({ line }: { readonly line: RefundBreakdownLine }) {
       <Text variant="spoonBody" color="textPrimary" style={styles.label}>
         {line.label}
       </Text>
-      <Text variant="spoonBody" color={line.deducted === true ? 'danger' : 'textPrimary'}>
+      <Text variant="spoonBody" color="textPrimary">
         {line.amount}
       </Text>
     </View>
   );
 }
-
-const NODE = 20;
 
 const styles = StyleSheet.create({
   card: {
@@ -229,34 +127,4 @@ const styles = StyleSheet.create({
     gap: lightTheme.space.md,
   },
   label: { flex: 1, gap: lightTheme.space.xxs },
-  status: {
-    gap: lightTheme.space.md,
-    padding: lightTheme.space.lg,
-    borderRadius: lightTheme.radius.md,
-    backgroundColor: lightTheme.colors.surfaceSubtle,
-  },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.sm },
-  chevronOpen: { transform: [{ rotate: '180deg' }] },
-  dashes: { flexDirection: 'row', overflow: 'hidden', gap: 4, height: 1 },
-  dash: { width: 6, height: 1, backgroundColor: lightTheme.colors.border },
-  steps: { gap: 0 },
-  step: { flexDirection: 'row', gap: lightTheme.space.md },
-  rail: { alignItems: 'center', width: NODE },
-  node: {
-    width: NODE,
-    height: NODE,
-    borderRadius: NODE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nodeDone: { backgroundColor: lightTheme.colors.textSuccess },
-  nodePending: {
-    borderWidth: 2,
-    borderColor: lightTheme.colors.borderSubtle,
-    backgroundColor: lightTheme.colors.surface,
-  },
-  link: { flex: 1, width: 2, minHeight: 16, backgroundColor: lightTheme.colors.borderSubtle },
-  linkDone: { backgroundColor: lightTheme.colors.textSuccess },
-  stepText: { flex: 1, gap: lightTheme.space.xxs, paddingBottom: lightTheme.space.md },
-  failed: { gap: lightTheme.space.sm },
 });

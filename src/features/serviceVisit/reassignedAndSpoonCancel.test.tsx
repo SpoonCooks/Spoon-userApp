@@ -244,7 +244,7 @@ describe('Cancelled by Spoon (2342:4195, dev note 2342:4405)', () => {
     );
   });
 
-  it('Payment & refund: Refund started, no deductions, and the tracker at Initiated', () => {
+  it('Payment & refund: Refund started, no deductions, nothing taken', () => {
     const model = cancelledVisitModelFrom(cancelledBy('system'), REFUND, null);
     expect(model.refund?.badge).toBe('Refund started');
     expect(model.refund?.badgeTone).toBe('neutral');
@@ -254,23 +254,12 @@ describe('Cancelled by Spoon (2342:4195, dev note 2342:4405)', () => {
       amount: '– ₹0',
       minor: true,
     });
-    expect(model.refund?.tracker).toEqual({
-      title: 'Booking refund ₹299',
-      destination: 'To: Original source',
-      status: 'In progress',
-      steps: [
-        { title: 'Refund initiated', when: '1 Oct, 6:40 PM', done: true },
-        { title: 'Refund processed', done: false },
-        { title: 'Refund completed', done: false },
-      ],
-    });
   });
 
   it('a customer’s own cancellation keeps the plain card and payment summary', () => {
     const model = cancelledVisitModelFrom(cancelledBy('customer', 'URGENT_CHANGE'), REFUND, null);
     expect(model.refund?.badge).toBe('Refund initiated');
     expect(model.refund?.badgeTone).toBeUndefined();
-    expect(model.refund?.tracker).toBeUndefined();
     expect(model.cancelled.byline).toBe('By you · Thu, 1 Oct, 6:40 PM');
   });
 
@@ -309,7 +298,6 @@ describe('Cancelled by Spoon (2342:4195, dev note 2342:4405)', () => {
     expect(screen.getByText('We’ve flagged this so it doesn’t happen again')).toBeTruthy();
     expect(screen.queryByText('Visit cancelled')).toBeNull();
     expect(screen.getByText('Refund started')).toBeTruthy();
-    expect(screen.getByText('Booking refund ₹299')).toBeTruthy();
     fireEvent.press(screen.getByTestId('spoon-rebook'));
     expect(onRebook).toHaveBeenCalledTimes(1);
     fireEvent.press(screen.getByTestId('spoon-talk'));

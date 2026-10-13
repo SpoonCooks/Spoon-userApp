@@ -91,7 +91,12 @@ function formatOn(
   return new Intl.DateTimeFormat('en-IN', options).format(instant);
 }
 
-/** "8 Oct, 11:00 AM" — a step's date and time (A2). */
+/** "8 Oct, 11:00 AM" — a step's date and time (A2), as the tracker's steps read. */
+export function refundStepLabel(timeZone: string | undefined, at: string): string {
+  return stepLabel(timeZone, at);
+}
+
+/** `en-IN` writes "am" / "pm"; the frames (`2303:4094`) write them in capitals. */
 function stepLabel(timeZone: string | undefined, at: string): string {
   return formatOn(timeZone, at, {
     day: 'numeric',
@@ -99,7 +104,7 @@ function stepLabel(timeZone: string | undefined, at: string): string {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  });
+  }).replace(/\b(am|pm)\b/, (meridiem) => meridiem.toUpperCase());
 }
 
 function durationLabel(minutes: number): string {
