@@ -150,7 +150,7 @@ const PREP_KEYS: readonly {
 ];
 
 const NOTICE_BODY =
-  'You’d be notified 27 hrs before & payment is auto-debited 3 hrs before the service time.';
+  'You’d be notified 27 hrs before & payment is auto-debited 3 hrs before your first visit of the day.';
 
 export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsModel {
   const { visit, booking, cookProfile, cookCard, quote, todayId } = sources;
@@ -361,7 +361,7 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
           : `${mandate.handleMasked ?? 'UPI'} · Mandate ${mandate.status}`,
       manageLabel: 'Manage',
       reminder:
-        'Mandate is shared 27 hrs before & payment is auto-debited 3 hrs before the service time.',
+        'Mandate is shared 27 hrs before & payment is auto-debited 3 hrs before your first visit of the day.',
     },
     paymentFailed:
       variant === 'cancelled' &&

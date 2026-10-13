@@ -112,7 +112,7 @@ export const VISIT_FIXTURE = {
     title: 'Pay per visit',
     /** `1008:5398`, `1466:8294` — every state with the visit still to be charged. */
     bodyNotice:
-      'You’d be notified 27 hrs before & payment is auto-debited 3 hrs before the service time.',
+      'You’d be notified 27 hrs before & payment is auto-debited 3 hrs before your first visit of the day.',
   },
 
   /** `1670:3461` — Payment summary · Cancelled · Refunded. */
