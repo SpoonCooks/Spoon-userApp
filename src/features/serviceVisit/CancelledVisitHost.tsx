@@ -3,6 +3,13 @@ import { useState } from 'react';
 import { useBookingRefunds } from '@features/booking';
 import type { BookingDetailDto } from '@features/booking';
 import { PaymentDetailsSheet, VisitDetailsScreen } from '@features/recurringLive';
+import {
+  RefundProgressCard,
+  refundProgressViewFrom,
+  refundTrackerFrom,
+  useRefund,
+} from '@features/refunds';
+import { useWhatsAppHelp } from '@features/support';
 
 import { cancelledVisitModelFrom } from './cancelledVisit';
 
@@ -16,12 +23,21 @@ export interface CancelledVisitHostProps {
  * A cancelled one-time booking's Visit details (Figma `2165:11853`): the booking, its latest
  * refund (`GET /v1/bookings/:id/refunds`) and the Payment details sheet. Only Payment details and
  * Help remain in the dock (dev note `2226:4224`).
+ *
+ * Payment & refund carries the Refund tracker (`2303:4231`) — the refund's own steps, gateway
+ * times and RRN from `GET /v1/me/refunds/:id` — once it has been read.
  */
 export function CancelledVisitHost({ booking, onBack, onHelp }: CancelledVisitHostProps) {
   const refunds = useBookingRefunds(booking.id);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const refund = refunds.state.status === 'ready' ? (refunds.state.data[0] ?? null) : null;
   const model = cancelledVisitModelFrom(booking, refund, booking.cook?.name ?? null);
+  const tracked = useRefund(refund?.refundId ?? null);
+  const contactSupport = useWhatsAppHelp();
+  const tracker =
+    tracked.state.status === 'ready'
+      ? refundTrackerFrom(tracked.state.data, { timeZone: 'Asia/Kolkata' })
+      : null;
 
   return (
     <>
@@ -31,6 +47,15 @@ export function CancelledVisitHost({ booking, onBack, onHelp }: CancelledVisitHo
         onBack={onBack}
         onPaymentDetails={() => setPaymentOpen(true)}
         onHelp={onHelp}
+        refundProgress={
+          tracker === null ? undefined : (
+            <RefundProgressCard
+              view={refundProgressViewFrom(tracker)}
+              onContactSupport={() => contactSupport(tracker.supportMessage)}
+              testID="cancelled-visit-refund-tracker"
+            />
+          )
+        }
         testID="cancelled-visit"
       />
       <PaymentDetailsSheet

@@ -1,4 +1,6 @@
 import { formatPaise } from '@core/format';
+import { refundStepLabel } from '@features/refunds';
+import type { RefundProgressView } from '@features/refunds';
 
 /**
  * The cancel-visit flow's model — Figma "Cancellation flow" (C1 `2055:20524` … C5b `2055:20432`),
@@ -243,6 +245,38 @@ export interface CancelRefund {
   readonly initiatedAt: string | null;
   /** When it reached the customer, ISO. */
   readonly creditedAt: string | null;
+}
+
+/**
+ * C5's refund as Figma's `Refund tracker` (`2303:4231`) draws it — the same card as Visit details →
+ * Payment & refund. The cancellation knows when the refund was raised and whether it has reached
+ * the customer: raised is step 1; credited ticks steps 2 and 3 at the time it was credited.
+ */
+export function refundProgressFrom(
+  refund: CancelRefund | null,
+  refundPaise: number,
+  now: Date,
+): RefundProgressView {
+  const credited = refund?.refunded === true;
+  const creditedWhen =
+    refund?.creditedAt === null || refund?.creditedAt === undefined
+      ? undefined
+      : refundStepLabel(TIME_ZONE, refund.creditedAt);
+  return {
+    amount: rupees(refundPaise),
+    destination: 'Original source',
+    status: credited ? 'completed' : 'in_progress',
+    steps: [
+      {
+        key: 'initiated',
+        title: 'Refund initiated',
+        when: refundStepLabel(TIME_ZONE, refund?.initiatedAt ?? now.toISOString()),
+        done: true,
+      },
+      { key: 'processed', title: 'Refund processed', when: creditedWhen, done: credited },
+      { key: 'completed', title: 'Refund completed', when: creditedWhen, done: credited },
+    ],
+  };
 }
 
 /** "Today · 6:40 PM" / "Mon, 19 Oct · 6:40 PM". */

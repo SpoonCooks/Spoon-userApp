@@ -27,7 +27,12 @@ import {
   useRecurringVisitCancellationQuote,
   useUpdateBookingPrep,
 } from '@features/recurringSetup';
-import { RefundTracker, refundTrackerFrom, useRefund } from '@features/refunds';
+import {
+  RefundProgressCard,
+  refundProgressViewFrom,
+  refundTrackerFrom,
+  useRefund,
+} from '@features/refunds';
 import { useWhatsAppHelp } from '@features/support';
 import { QueryBoundary } from '@ui';
 
@@ -106,14 +111,18 @@ export default function RecurringVisitRoute() {
   const refundId = detail?.cancellation?.refundId ?? null;
   const refund = useRefund(refundId);
   const contactSupport = useWhatsAppHelp();
-  // The tracker replaces the payment summary (handoff A1). While it loads, nothing is drawn in its
-  // place rather than the summary's older statuses; the summary stands in only when the visit has
-  // no refund linked yet or the tracker cannot be read.
-  const refundSlot =
-    refund.state.status === 'ready' ? (
-      <RefundTracker
-        refund={refundTrackerFrom(refund.state.data, { timeZone: 'Asia/Kolkata' })}
-        onContactSupport={contactSupport}
+  // The Refund tracker (`2303:4231`) inside Payment & refund. While it loads, nothing is drawn
+  // there rather than the card's older statuses; those stand in only when the visit has no refund
+  // linked yet or the tracker cannot be read.
+  const tracker =
+    refund.state.status === 'ready'
+      ? refundTrackerFrom(refund.state.data, { timeZone: 'Asia/Kolkata' })
+      : null;
+  const refundProgress =
+    tracker !== null ? (
+      <RefundProgressCard
+        view={refundProgressViewFrom(tracker)}
+        onContactSupport={() => contactSupport(tracker.supportMessage)}
         testID="visit-refund-tracker"
       />
     ) : refundId !== null && refund.state.status === 'loading' ? (
@@ -276,7 +285,7 @@ export default function RecurringVisitRoute() {
                     params: { date: detail.date, durationId: `dur-${detail.durationMinutes}` },
                   }),
             )}
-            refundSlot={refundSlot}
+            refundProgress={refundProgress}
           />
           <PaymentDetailsSheet
             visible={paymentOpen}
