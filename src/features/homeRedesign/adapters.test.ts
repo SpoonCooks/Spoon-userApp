@@ -13,6 +13,7 @@ import {
   homeModelFrom,
   STATIC_LIVE_HUBS,
   triedPlaceHomeModelFrom,
+  waitlistFrom,
 } from './adapters';
 import type { HomeSources } from './adapters';
 
@@ -316,5 +317,31 @@ describe('triedPlaceHomeModelFrom (no saved address, refused at a place — 1302
     expect(model.address.detail).toBeNull();
     expect(model.address.pincode).toBe('Selected location');
     expect(model.waitlist?.joined).toBe(true);
+  });
+});
+
+describe('waitlistFrom (GET /v1/me/waitlist, 1302:3539)', () => {
+  it('counts the others waiting, never the customer themself', () => {
+    expect(waitlistFrom(false, { joined: true, countForArea: 129, launchThreshold: 500 })).toEqual({
+      countForPincode: 128,
+      launchThreshold: 500,
+      joined: true,
+    });
+  });
+
+  it('hides the meter while nobody else is waiting, or before the state loads', () => {
+    expect(waitlistFrom(false, { joined: false, countForArea: 1, launchThreshold: null })).toEqual({
+      countForPincode: null,
+      launchThreshold: null,
+      joined: false,
+    });
+    expect(waitlistFrom(false, undefined).countForPincode).toBeNull();
+  });
+
+  it('shows "You’re on the list" from a tap here or from the server', () => {
+    expect(waitlistFrom(true, undefined).joined).toBe(true);
+    expect(
+      waitlistFrom(false, { joined: true, countForArea: null, launchThreshold: null }).joined,
+    ).toBe(true);
   });
 });

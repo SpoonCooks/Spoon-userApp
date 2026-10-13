@@ -74,7 +74,7 @@ export function NotLiveCard({
             </Text>
           </View>
 
-          {/* Hidden until the backend publishes the pincode's demand count. */}
+          {/* The others waiting in this pincode (`GET /v1/me/waitlist`); hidden while nobody else is. */}
           {waitlist.countForPincode === null ? null : (
             <View style={styles.meter}>
               <View style={styles.waiting}>
@@ -84,7 +84,9 @@ export function NotLiveCard({
                   <Avatar letter="S" color="#D6EDFF" />
                 </View>
                 <Text style={styles.waitingText}>
-                  {`${waitlist.countForPincode} neighbours near you are waiting`}
+                  {waitlist.countForPincode === 1
+                    ? '1 neighbour near you is waiting'
+                    : `${waitlist.countForPincode} neighbours near you are waiting`}
                 </Text>
               </View>
               <View style={styles.track}>

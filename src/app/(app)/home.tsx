@@ -15,6 +15,7 @@ import {
   useGuestHomeRedesignData,
   useHomeRedesignData,
   useJoinWaitlist,
+  useWaitlistState,
 } from '@features/homeRedesign';
 import type { BookingRequest, RecurringTarget } from '@features/homeRedesign';
 import { QueryBoundary } from '@ui';
@@ -36,6 +37,9 @@ const logger = getLogger('home');
  * The pool block: "Check Recurring" opens the Recurring landing (explainer + "Make your Cook
  * Pool"), "Book Recurring" the plan flow, the pool card the Cook Pool, and a bead that cook's
  * profile. "Recurring · Live" opens that booking's Live booking tab (`/recurring/[bookingId]`).
+ *
+ * Active bookings (`2243:1120`): a card opens its booking (`/booking/[id]`); "View all" opens My
+ * bookings on Upcoming.
  */
 export default function HomeRoute() {
   const status = useSessionStore((state) => state.status);
@@ -95,7 +99,14 @@ function SignedInHomeRoute() {
    * being sent back to the map — the loop the Not serviceable redirect used to land in.
    */
   const triedPlace = useTriedPlace(userId);
-  const home = useHomeRedesignData({ waitlistJoined, triedPlace });
+  // The server's waitlist state: joined (so "You're on the list" survives a relaunch) and how many
+  // others are waiting in this pincode, for the meter.
+  const waitlistState = useWaitlistState();
+  const home = useHomeRedesignData({
+    waitlistJoined,
+    waitlistState: waitlistState.state.status === 'ready' ? waitlistState.state.data : undefined,
+    triedPlace,
+  });
   /** No saved address: the header's address opens the map to add one, not the empty list. */
   const hasAddress = home.addressId !== null;
   const join = useJoinWaitlist();
@@ -182,6 +193,10 @@ function SignedInHomeRoute() {
             router.push(hasAddress ? '/address?from=home' : '/address/location?from=home'),
           )}
           onPressProfile={guard(() => router.push('/profile'))}
+          onPressActiveBooking={guard((card) =>
+            router.push({ pathname: '/booking/[id]', params: { id: card.bookingId } }),
+          )}
+          onPressViewAllBookings={guard(() => router.push('/history'))}
           onDurationSelected={(event) => {
             setDurationId(durationIdFor(event.durationMin));
             logger.info('duration_selected', event);
@@ -206,7 +221,7 @@ function SignedInHomeRoute() {
             const meData = me.state.status === 'ready' ? me.state.data : null;
             const name = meData?.name?.trim() || meData?.phone || 'Spoon customer';
             await joinWaitlist(
-              { pincode: model.address.pincode, alreadyJoined: waitlistJoined },
+              { pincode: model.address.pincode, alreadyJoined: model.waitlist?.joined === true },
               {
                 requestPushPermission: async () => {
                   const existing = await Notifications.getPermissionsAsync();
