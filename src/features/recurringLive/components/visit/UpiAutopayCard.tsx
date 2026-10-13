@@ -37,13 +37,13 @@ const STEPS: readonly {
     key: 'reminder',
     icon: VISIT_AUTOPAY_BELL,
     title: 'Reminder 27 hrs before',
-    body: 'We notify you ahead of every visit’s payment.',
+    body: 'We notify you ahead of each day’s payment.',
   },
   {
     key: 'debit',
     icon: VISIT_AUTOPAY_MONEY,
     title: 'Auto-debit 3 hrs before',
-    body: 'That visit’s payment is debited automatically. Nothing to pay manually.',
+    body: 'Your visits that day are paid together, 3 hrs before the first one. Nothing to pay manually.',
   },
 ];
 

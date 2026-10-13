@@ -226,11 +226,11 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
     variant === 'cancelled' && cancellation !== null && charged
       ? {
           title: 'Payment & refund',
-          // The tracker's words (handoff A4). This card stands in only until the visit's refund
-          // tracker loads (DEC-090).
+          // `2165:13866`: "Refunded" once the money is back. The steps stand in only until the
+          // visit's refund tracker loads (DEC-090).
           badge:
             cancellation.refundStatus === 'refunded'
-              ? 'Refund completed'
+              ? 'Refunded'
               : cancellation.refundStatus === 'failed'
                 ? 'Refund failed'
                 : 'Refund in progress',
@@ -241,20 +241,22 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
               ...(was === undefined ? {} : { was }),
               amount: formatPaise(total),
             },
-            // No fee line on a free cancellation: "– ₹0" says nothing the total does not.
-            ...(cancellation.feePaise === 0
-              ? []
-              : [
-                  {
-                    label: `Cancellation fee (${cancellation.feePercent}%)`,
-                    amount: `– ${formatPaise(cancellation.feePaise)}`,
-                    minor: true,
-                  },
-                ]),
+            // Drawn on a free cancellation too, as "– ₹0" (`2165:13866`).
+            {
+              label:
+                cancellation.feePaise === 0
+                  ? 'Cancellation fee'
+                  : `Cancellation fee (${cancellation.feePercent}%)`,
+              amount: `– ${formatPaise(cancellation.feePaise)}`,
+              minor: true,
+            },
           ],
           total: {
             label: 'Refund amount',
-            detail: 'Inclusive of taxes',
+            detail:
+              cancellation.feePaise === 0
+                ? 'Full refund, inclusive of taxes'
+                : 'Inclusive of taxes',
             amount: formatPaise(cancellation.refundPaise),
           },
           modeEyebrow: 'REFUND TO',
@@ -266,6 +268,10 @@ export function visitDetailsFrom(sources: VisitDetailsSources): VisitDetailsMode
             {
               title: 'Refund initiated',
               ...(cancelledAt === null ? {} : { when: dayLabel(cancelledAt.dateId) }),
+            },
+            {
+              title: 'It takes 5-7 working days for the amount to get credited to source',
+              note: true,
             },
           ],
         }

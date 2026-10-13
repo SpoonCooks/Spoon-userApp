@@ -124,8 +124,9 @@ export const CALENDAR_FIXTURE: CalendarFixture = {
   // `1461:6324` — Up next banner / recurring / assigned, "Late evening".
   upNext: {
     label: 'UP NEXT · TODAY',
-    title: '2nd Visit, 7:00 PM',
-    meta: '1 hr • Cook Sanchita',
+    // Today's 2nd visit in the pop-up (`1006:527`), so the preview tells one story.
+    title: '2nd Visit, 8:00 PM',
+    meta: '2.5 hrs • Cook Sanchita',
     photo: UP_NEXT_COOK_PHOTO,
   },
   progressLabel: '3 done · 1 cancelled · 3 to go',
@@ -217,7 +218,7 @@ const TODAY_VISITS: DayVisits = {
       id: 'v2',
       status: 'unassigned',
       title: '2nd Visit · 8:00 PM · 2.5 hrs',
-      meta: '1.5 hrs',
+      meta: 'Upcoming · 1.5 hrs',
       pool: POOL,
     },
   ],
@@ -231,7 +232,7 @@ const UPCOMING_VISITS: DayVisits = {
       id: 'v1',
       status: 'unassigned',
       title: '1st Visit · 8:00 PM · 2.5 hrs',
-      meta: '1.5 hrs',
+      meta: 'Upcoming · 1.5 hrs',
       pool: POOL,
     },
   ],

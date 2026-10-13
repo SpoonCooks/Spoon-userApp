@@ -19,8 +19,8 @@ import {
  * The Visit details booking header — two Figma components:
  *
  * - `Status banner/ recurring/ past` (`1461:6083`): the MORNING sky, a `#FFF9DB → #FFD9A8` wash
- *   top to bottom under halos, sun and clouds. State `Confirmed` (`1461:6149`) puts the lime tick
- *   and "CONFIRMED" in the 72pt countdown slot; `Cancelled` (`1461:6217`) lays an
+ *   top to bottom under halos, sun and clouds. A completed visit (`2165:14082`) puts the tick
+ *   disc and "COMPLETED" in the 72pt countdown slot; `Cancelled` (`1461:6217`) lays an
  *   `rgba(244,243,239,0.8)` mute over the sky, drops the ink to 45 % black, strikes the slot and
  *   swaps in the dashed cross.
  * - `Status banner/ recurring/ future` (`1444:8837`): the AFTERNOON sky, `#FFF3A6 → #FFD600` at
@@ -31,7 +31,7 @@ import {
  * the countdown.
  */
 /** `assigned` — the cook is confirmed (`2165:13861` in `2165:13847`): a person glyph, "ASSIGNED". */
-export type VisitBannerState = 'upcoming' | 'assigned' | 'confirmed' | 'cancelled';
+export type VisitBannerState = 'upcoming' | 'assigned' | 'completed' | 'cancelled';
 
 export interface VisitStatusBannerProps {
   readonly state: VisitBannerState;
@@ -132,7 +132,7 @@ export function VisitStatusBanner({
                 />
               )}
               <Text variant="visitBannerBadge" color={ink} align="center" numberOfLines={1}>
-                {cancelled ? 'CANCELLED' : state === 'assigned' ? 'ASSIGNED' : 'CONFIRMED'}
+                {cancelled ? 'CANCELLED' : state === 'assigned' ? 'ASSIGNED' : 'COMPLETED'}
               </Text>
             </View>
           )}
