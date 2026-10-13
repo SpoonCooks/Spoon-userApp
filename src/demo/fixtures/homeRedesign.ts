@@ -166,3 +166,107 @@ export const DEMO_HOME_PRICING_ERROR: HomeModel = {
   ...DEMO_HOME_FIRST_TIME,
   pricingStatus: 'error',
 };
+
+/** `2243:1120`'s in-progress card: 131 of 370pt filled — 35 % of a two-hour visit. */
+const SERVICE_START = Date.now() - Math.round(0.354 * 120) * 60_000;
+
+/** `2243:973` — one booking: a single static card, no count, no "View all", no dots. */
+export const DEMO_HOME_ACTIVE_ONE: HomeModel = {
+  ...DEMO_HOME_RETURNING,
+  activeBookings: [
+    {
+      key: 'booking:b-1',
+      bookingId: 'b-1',
+      type: 'recurring',
+      state: 'upcoming',
+      timeOfDay: 'morning',
+      whenLabel: 'Wed, 14 Oct · 9:00 AM',
+      duration: { value: '2', unit: 'HRS' },
+      service: null,
+    },
+  ],
+};
+
+/** `2243:1120` / `2240:6334` — three bookings: In progress, then Upcoming soonest first. */
+export const DEMO_HOME_ACTIVE: HomeModel = {
+  ...DEMO_HOME_RETURNING,
+  activeBookings: [
+    {
+      key: 'booking:b-1',
+      bookingId: 'b-1',
+      type: 'one_time',
+      state: 'in_progress',
+      timeOfDay: 'morning',
+      whenLabel: 'Today · 9:00 AM',
+      duration: { value: '2', unit: 'HRS' },
+      service: { startMs: SERVICE_START, endMs: SERVICE_START + 120 * 60_000 },
+    },
+    {
+      key: 'booking:b-2',
+      bookingId: 'b-2',
+      type: 'one_time',
+      state: 'upcoming',
+      timeOfDay: 'afternoon',
+      whenLabel: 'Wed, 14 Oct · 1:00 PM',
+      duration: { value: '2', unit: 'HRS' },
+      service: null,
+    },
+    {
+      key: 'booking:b-7',
+      bookingId: 'b-7',
+      type: 'recurring',
+      state: 'upcoming',
+      timeOfDay: 'evening',
+      whenLabel: 'Wed, 14 Oct · 7:00 PM',
+      duration: { value: '2', unit: 'HRS' },
+      service: null,
+    },
+  ],
+};
+
+/** Every card state on every backdrop: Completed, and In progress on the dark evening card. */
+export const DEMO_HOME_ACTIVE_STATES: HomeModel = {
+  ...DEMO_HOME_RETURNING,
+  activeBookings: [
+    {
+      key: 'booking:b-3',
+      bookingId: 'b-3',
+      type: 'recurring',
+      state: 'in_progress',
+      timeOfDay: 'evening',
+      whenLabel: 'Today · 7:00 PM',
+      duration: { value: '2', unit: 'HRS' },
+      service: { startMs: SERVICE_START, endMs: SERVICE_START + 120 * 60_000 },
+    },
+    {
+      key: 'booking:b-4',
+      bookingId: 'b-4',
+      type: 'one_time',
+      state: 'completed',
+      timeOfDay: 'morning',
+      whenLabel: 'Mon, 12 Oct · 9:00 AM',
+      duration: { value: '45', unit: 'MINS' },
+      service: null,
+    },
+    {
+      key: 'booking:b-5',
+      bookingId: 'b-5',
+      type: 'recurring',
+      state: 'completed',
+      timeOfDay: 'afternoon',
+      whenLabel: 'Mon, 12 Oct · 1:00 PM',
+      duration: { value: '1.5', unit: 'HRS' },
+      service: null,
+    },
+    {
+      key: 'booking:b-6',
+      bookingId: 'b-6',
+      type: 'one_time',
+      state: 'completed',
+      timeOfDay: 'evening',
+      whenLabel: 'Mon, 12 Oct · 7:00 PM',
+      duration: { value: '1', unit: 'HR' },
+      service: null,
+    },
+  ],
+};

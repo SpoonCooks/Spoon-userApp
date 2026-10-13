@@ -81,7 +81,7 @@ export function BookSection({
     <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.titles}>
-          <Text style={styles.title}>Select a duration to book</Text>
+          <Text style={styles.title}>Select duration to book</Text>
           <View style={styles.eta}>
             <Image source={etaMins === null ? ART.flashOff : ART.flash} style={styles.flash} />
             {etaMins === null ? (

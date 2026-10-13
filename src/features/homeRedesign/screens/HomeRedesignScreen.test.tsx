@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import {
+  DEMO_HOME_ACTIVE,
+  DEMO_HOME_ACTIVE_ONE,
   DEMO_HOME_FIRST_TIME,
   DEMO_HOME_PRICING_ERROR,
   DEMO_HOME_PRICING_LOADING,
@@ -53,7 +55,7 @@ describe('Duration carousel', () => {
     // `1222:23640` — the selected SKU, then the GST-inclusive total. (The accessible name collapses
     // the label's double spaces; the drawn text keeps them.)
     expect(screen.getByRole('button', { name: 'Book Now · 1 hr · ₹75' })).toBeEnabled();
-    expect(screen.getByText('Select a duration to book')).toBeTruthy();
+    expect(screen.getByText('Select duration to book')).toBeTruthy();
 
     fireEvent.press(screen.getByRole('radio', { name: 'Later' }));
     // `1222:24666` — no SKU, no payment link.
@@ -240,5 +242,48 @@ describe('Header', () => {
       />,
     );
     expect(screen.queryByText('Building_name · Flat/House #')).toBeNull();
+  });
+});
+
+describe('Active bookings', () => {
+  it('hides the section when there is no active booking', () => {
+    render(<HomeRedesignView model={DEMO_HOME_FIRST_TIME} {...actions()} />);
+    expect(screen.queryByText('Active bookings')).toBeNull();
+  });
+
+  it('draws one booking as a single card — no count, no "View all"', () => {
+    const onPressActiveBooking = jest.fn();
+    render(
+      <HomeRedesignView
+        model={DEMO_HOME_ACTIVE_ONE}
+        {...actions()}
+        onPressActiveBooking={onPressActiveBooking}
+      />,
+    );
+    expect(screen.getByText('Active bookings')).toBeTruthy();
+    expect(screen.queryByText('View all')).toBeNull();
+    expect(screen.getByText('RECURRING')).toBeTruthy();
+    expect(screen.getByText('Upcoming')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('home-active-booking-booking:b-1'));
+    expect(onPressActiveBooking).toHaveBeenCalledWith(
+      expect.objectContaining({ bookingId: 'b-1' }),
+    );
+  });
+
+  it('adds the count and "View all" from two bookings on', () => {
+    const onPressViewAllBookings = jest.fn();
+    render(
+      <HomeRedesignView
+        model={DEMO_HOME_ACTIVE}
+        {...actions()}
+        onPressViewAllBookings={onPressViewAllBookings}
+      />,
+    );
+    expect(screen.getByText('3')).toBeTruthy();
+    expect(screen.getByText('In progress')).toBeTruthy();
+    expect(screen.getAllByText('Upcoming')).toHaveLength(2);
+    fireEvent.press(screen.getByRole('link', { name: 'View all bookings' }));
+    expect(onPressViewAllBookings).toHaveBeenCalled();
   });
 });
