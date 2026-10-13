@@ -40,7 +40,7 @@ function lines(region: string, languages: string, visits: number, rating: string
     ],
     stats: [
       { id: 'visits', label: 'Visits with you', value: String(visits) },
-      { id: 'rating', label: 'Rating', value: rating, icon: 'star' },
+      { id: 'rating', label: 'Your rating', value: rating, icon: 'star' },
     ],
   };
 }

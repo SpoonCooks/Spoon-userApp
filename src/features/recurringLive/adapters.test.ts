@@ -142,7 +142,7 @@ describe('liveCalendarFrom', () => {
     expect(pending).toMatchObject({
       status: 'unassigned',
       title: '1st Visit · 8:00 PM · 2.5 hrs',
-      meta: 'Cook pending',
+      meta: 'Upcoming · Cook pending',
       // 10:30 UTC is 4 PM in Kolkata.
       pool: { title: 'Cook confirmed by 4 PM', subtitle: 'Familiar cooks from your Pool' },
     });

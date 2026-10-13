@@ -154,7 +154,7 @@ export function VisitDetailsScreen({
                 ? 'assigned'
                 : variant === 'cancelled'
                   ? 'cancelled'
-                  : 'confirmed'
+                  : 'completed'
           }
           date={model.banner.date}
           slot={model.banner.slot}

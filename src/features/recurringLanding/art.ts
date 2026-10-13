@@ -29,7 +29,7 @@ export const LOCK_OPEN_ICON =
 export const LIKE_ICON =
   require('../../../assets/figma/recurringLanding/like.png') as ImageSourcePropType;
 
-/** `547:2533` — the "Schedule Now" tag's 24pt calendar with a plus. */
+/** `547:2533` — the "Book Recurring" tag's 24pt calendar with a plus. */
 export const CALENDAR_ADD_ICON =
   require('../../../assets/figma/recurringLanding/calendar-add.png') as ImageSourcePropType;
 

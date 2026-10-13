@@ -77,8 +77,9 @@ export function cookPoolSummaryFrom(pool: CookPoolListDto, minimumSize: number):
  * `1380:3196` — the trust marks over the name, the region and languages under it, and the visits
  * and the rating as the emphasised stats.
  *
- * The rating is the cook's OVERALL average: the card carries no rating of this household's own,
- * so it reads "Rating", not the design's "Your rating", until the backend sends one.
+ * "Your rating" is the average of THIS household's own ratings of the cook (`yourRating`), never
+ * the cook's overall average. A household that has not rated the cook yet (null, a zero count, or
+ * a backend that predates the field) gets no rating line rather than someone else's average.
  */
 function linesFor(card: PoolCookCardDto): {
   readonly badges: readonly string[];
@@ -98,14 +99,13 @@ function linesFor(card: PoolCookCardDto): {
     ],
     stats: [
       { id: 'visits', label: 'Visits with you', value: String(card.visitsWithYou) },
-      // An unrated cook's `average` is 0 — no rating yet, which is not "Rating: 0".
-      ...(card.rating.count === 0
+      ...(card.yourRating == null || card.yourRating.count === 0
         ? []
         : [
             {
               id: 'rating',
-              label: 'Rating',
-              value: card.rating.average.toFixed(1),
+              label: 'Your rating',
+              value: card.yourRating.average.toFixed(1),
               icon: 'star',
             },
           ]),

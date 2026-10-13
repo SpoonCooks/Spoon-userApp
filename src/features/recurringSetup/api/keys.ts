@@ -28,5 +28,6 @@ export const recurringKeys = {
   visitCancellationQuote: (id: string, visitId: string) =>
     factory.collection('visitCancellationQuote', { id, visitId }),
   cancellationQuote: (id: string) => factory.collection('cancellationQuote', { id }),
+  mandateStatus: (id: string) => factory.collection('mandateStatus', { id }),
   prep: (bookingId: string) => factory.collection('prep', { bookingId }),
 } as const;

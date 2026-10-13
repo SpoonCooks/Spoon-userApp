@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { loadExpoCamera, loadExpoImagePicker } from '@core/native';
@@ -122,7 +122,7 @@ export interface RateVisitCardProps {
   /**
    * Whose copy the first look reads. `visit` (the Recurring frames, `1501:6628`) or `service` — the
    * one-time Service flow's Completed frame (`2165:12076`): "How was the service today?", its own
-   * subtitle and scale hint, no "Later", and the 5+ nudge without a fill.
+   * scale hint, no "Later", and the 5+ nudge without a fill. Both read the Ratings page's subtitle.
    */
   readonly variant?: 'visit' | 'service';
   /** The rating has been sent: draw it read-only (`2306:929`). */
@@ -221,6 +221,7 @@ export function RateVisitCard({
   // The card's look follows the score once it has settled; until then it is still the first look.
   const tier = settled ? ratingTier(rating) : 'idle';
   const low = LOW_TIERS.includes(tier);
+  const compact = useCompactCard();
   // Replays on each new score once the rated layout is up (not while it waits to settle).
   const entrance = useTimeline({
     durationMs: RATING_TIMELINE_MS,
@@ -229,7 +230,13 @@ export function RateVisitCard({
 
   return (
     <View style={styles.shadow} testID={testID}>
-      <View style={[styles.card, tier === 'idle' ? styles.cardIdle : null]}>
+      <View
+        style={[
+          styles.card,
+          compact ? styles.cardCompact : null,
+          tier === 'idle' ? styles.cardIdle : null,
+        ]}
+      >
         {tier === 'magic' ? (
           <LinearGradient
             colors={[
@@ -285,7 +292,14 @@ export function RateVisitCard({
             <View style={styles.bannerWell}>
               <Image source={RATING_ART.check} style={styles.chipCheck} />
             </View>
-            <Text variant="spoonCaptionStrong" style={styles.bannerText}>
+            {/* One line as drawn (`2306:1139`); a narrow phone shrinks it a step. */}
+            <Text
+              variant="spoonCaptionStrong"
+              style={styles.bannerText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               Rating submitted · Thanks for the feedback!
             </Text>
           </View>
@@ -295,12 +309,12 @@ export function RateVisitCard({
         <View style={styles.cook}>
           {live ? (
             visit.photoUri ? (
-              <Image source={{ uri: visit.photoUri }} style={styles.cookPhotoLive} />
+              <Image source={{ uri: visit.photoUri }} style={styles.cookPhoto} resizeMode="cover" />
             ) : (
-              <View style={styles.cookPhotoLive} />
+              <View style={styles.cookPhoto} />
             )
           ) : (
-            <Image source={RATING_ART.cookPhoto} style={styles.cookPhoto} />
+            <Image source={RATING_ART.cookPhoto} style={styles.cookPhoto} resizeMode="cover" />
           )}
           <View style={styles.cookText}>
             <Text variant="spoonBodyStrong" numberOfLines={1}>
@@ -422,9 +436,8 @@ function FirstLook({
           How was the service today?
         </Text>
         <Text variant="spoonCaption" color="textRatingSubtle" align="center">
-          {service
-            ? 'Your rating helps us assign appropriate cooks to you'
-            : 'One tap! Your rating helps us assign you better cooks'}
+          {/* The Ratings page's line (`1517:9293`), on every card. */}
+          One tap! Your rating helps us assign you better cooks
         </Text>
       </View>
 
@@ -514,6 +527,7 @@ function RatedBody({
   const motion = STICKER_MOTION[tier];
   const copy = ratingTierCopy(cookName)[tier];
   const low = LOW_TIERS.includes(tier);
+  const compact = useCompactCard();
   const chips = low ? RATING_CHIPS_NEGATIVE : RATING_CHIPS_POSITIVE;
 
   return (
@@ -557,7 +571,7 @@ function RatedBody({
             <Text variant="spoonCaptionStrong" color="textSecondary">
               {copy.chipsLabel}
             </Text>
-            <View style={styles.chips}>
+            <View style={[styles.chips, compact ? styles.chipsCompact : null]}>
               {chips.map((chip) => {
                 const on = picked.includes(chip.key);
                 return (
@@ -570,10 +584,16 @@ function RatedBody({
                       styles.chip,
                       on ? styles.chipOn : styles.chipOff,
                       on && low ? styles.chipOnLow : null,
+                      compact ? (on ? styles.chipOnCompact : styles.chipOffCompact) : null,
                     ]}
                     testID={`${testID}-chip-${chip.key}`}
                   >
-                    {on ? <Image source={RATING_ART.check} style={styles.chipCheck} /> : null}
+                    {on ? (
+                      <Image
+                        source={RATING_ART.check}
+                        style={compact ? styles.chipCheckCompact : styles.chipCheck}
+                      />
+                    ) : null}
                     <Text variant="spoonCaptionStrong" numberOfLines={1}>
                       {chip.label}
                     </Text>
@@ -609,8 +629,15 @@ function RatedBody({
                 <Image source={RATING_ART.restart} style={styles.icon} />
               </View>
               <View style={styles.supportText}>
-                {/* Wraps rather than truncating on a narrow phone (a 384dp Android leaves ~182pt). */}
-                <Text variant="spoonCaptionStrong">{RATING_DIFFERENT_COOK.title}</Text>
+                {/* One line as drawn; a narrow phone (a 360dp S21 leaves ~166pt) shrinks it a step. */}
+                <Text
+                  variant="spoonCaptionStrong"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                >
+                  {RATING_DIFFERENT_COOK.title}
+                </Text>
                 <Text variant="spoonMicro" color="textRatingSubtle">
                   {RATING_DIFFERENT_COOK.body}
                 </Text>
@@ -706,6 +733,13 @@ const FIRST_PICK_SETTLE_MS = 350;
 
 const CARD_RADIUS = 28;
 
+/** Phones narrower than the frames' 402pt by more than a few points get the compact card. */
+const COMPACT_BELOW = 390;
+
+function useCompactCard(): boolean {
+  return useWindowDimensions().width < COMPACT_BELOW;
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   /** `1517:9293` — `0 8 24 rgba(0,0,0,0.08)`, outside the clip so iOS keeps it. */
@@ -726,6 +760,8 @@ const styles = StyleSheet.create({
     gap: 20,
     alignItems: 'center',
   },
+  /** Under 390pt wide (a 360dp Android): 16 in, so the frames' rows still fit on one line. */
+  cardCompact: { padding: lightTheme.space.lg },
   /** `1517:9293` — the first look pads 24 at the bottom. */
   cardIdle: { paddingBottom: lightTheme.space.xl },
   /** `1501:6849` — 370 × 226 from the card's corner. */
@@ -763,14 +799,12 @@ const styles = StyleSheet.create({
   },
   /** `2306:1139` — Livvic SemiBold 13. */
   bannerText: { flex: 1, fontSize: 13, lineHeight: 16 },
-  cookPhoto: { width: 44, height: 44 },
-  /** A real cook's photo in the frame's 44pt ring (`1501:6632`). */
-  cookPhotoLive: {
+  /** `1501:6632` — the photo fills a 44pt `#FFF7CC` circle; no ring. */
+  cookPhoto: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: lightTheme.colors.borderNotice,
+    overflow: 'hidden',
     backgroundColor: lightTheme.colors.surfaceAccent,
   },
   cookText: { flex: 1, gap: lightTheme.space.xxs },
@@ -839,6 +873,11 @@ const styles = StyleSheet.create({
     backgroundColor: lightTheme.colors.surface,
   },
   chipCheck: { width: 18, height: 18 },
+  /** Compact: 6 apart, 2pt less padding each side and a 16pt tick, so a frame's row stays a row. */
+  chipsCompact: { gap: lightTheme.space.s6 },
+  chipOnCompact: { paddingLeft: lightTheme.space.sm, paddingRight: lightTheme.space.s10 },
+  chipOffCompact: { paddingHorizontal: lightTheme.space.s10 },
+  chipCheckCompact: { width: 16, height: 16 },
   icon: { width: 24, height: 24 },
   /** `1501:7471` — pl12 / pr14 / py12, r18, 12pt gap. */
   support: {

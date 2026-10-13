@@ -1,8 +1,8 @@
 /**
- * The sticky "Schedule Recurring" footer's show/hide rule — design notes `983:6006` … `983:6019`
+ * The sticky "Book Recurring" footer's show/hide rule — design notes `983:6006` … `983:6019`
  * on the Recurring booking page.
  *
- * Only one "schedule" CTA is on screen at a time. At the top the "Schedule Now" tag hangs off the
+ * Only one "schedule" CTA is on screen at a time. At the top the "Book Recurring" tag hangs off the
  * thread and the footer is parked below the screen; the moment the tag's bottom edge scrolls past
  * the top of the viewport (scrollY > 254) the footer slides in, and as soon as the tag comes back
  * it slides out again. An 8pt buffer keeps it from bouncing at the threshold: it comes in above

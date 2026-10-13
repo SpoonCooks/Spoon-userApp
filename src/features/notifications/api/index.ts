@@ -6,6 +6,12 @@ export {
 } from './pushApi';
 export type { PushPlatform, PushTokenProvider } from './pushApi';
 export { useRegisterPushToken } from './hooks';
+export type {
+  PushRegistration,
+  PushRegistrationOutcome,
+  RegisterPushTokenVariables,
+} from './hooks';
+export { isNotificationsEnabled, readNotificationsEnabled } from './permission';
 export {
   createExpoPushTokenProvider,
   ensureAndroidChannel,

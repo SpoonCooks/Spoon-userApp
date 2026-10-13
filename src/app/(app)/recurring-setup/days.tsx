@@ -1,14 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 
+import { useMe } from '@features/auth';
 import {
+  AutopayFlowSheet,
+  draftFromPlans,
   RecurringAutopayScreen,
   RecurringBookedScreen,
   RecurringPlanFlow,
   RecurringPlanningProvider,
+  summaryFromPlans,
+  useAutopayIntentEnabled,
+  useRecurringEligibility,
   useRecurringPlanningSource,
 } from '@features/recurringSetup';
 import type {
+  AutopaySource,
   MandateVerifyDto,
   RecurringBookingDto,
   RecurringPlanDraft,
@@ -26,9 +33,13 @@ import { useNavigationGuard, useSafeBack } from '@core/navigation';
  * and start times per visit by time of day (`useRecurringPlanningSource`). Each falls back to the
  * local rules until it has answered.
  *
- * "Book Now" opens the Autopay step with the plans; its back (and "Change times", after a time was
- * taken) returns to the Summary with the plans as they were. The Autopay step and the
- * confirmation have no Figma frames yet (see their headers).
+ * "Book Now" opens UPI Autopay. Two ways, chosen by the server (`useAutopayIntentEnabled`, V0
+ * `RECURRING_UPI_INTENT_ENABLED`):
+ *   - UPI Intent: the Figma sheet over the Summary (`2316:3558` … `2317:4009`, note 2317:13580:
+ *     "Back closes the sheet and returns to Summary"). "Back to home" while the bank confirms goes
+ *     Home; "View my plan" opens the live booking.
+ *   - Checkout (the fallback, and the default until Razorpay S2S is confirmed): the Autopay step
+ *     and its confirmation, as before; back (and "Change times") returns to the Summary.
  *
  * The "?" on every screen opens the Recurring landing page (`/recurring`, `1302:2617`).
  *
@@ -51,6 +62,28 @@ export default function RecurringSetupRoute() {
   const goBack = useSafeBack('/home');
   const planning = useRecurringPlanningSource();
   const [stage, setStage] = useState<Stage>({ kind: 'flow', plans: null });
+  const intent = useAutopayIntentEnabled();
+  const eligibility = useRecurringEligibility();
+  const me = useMe();
+  /** The plans the sheet was opened with, and a fresh sheet per "Book Now". */
+  const [sheet, setSheet] = useState<{
+    readonly plans: readonly RecurringPlanDraft[];
+    readonly open: boolean;
+    readonly key: number;
+  } | null>(null);
+  /** The booking the sheet saved, by draft: reopening it for the same plans reuses it. */
+  const [saved, setSaved] = useState<{
+    readonly key: string;
+    readonly booking: RecurringBookingDto;
+  } | null>(null);
+  const addressId = planning.addressId;
+  const sheetSource = useMemo((): AutopaySource | null => {
+    if (sheet === null || addressId === null) return null;
+    const draft = draftFromPlans(addressId, sheet.plans);
+    return saved?.key === JSON.stringify(draft)
+      ? { kind: 'booking', booking: saved.booking }
+      : { kind: 'draft', draft };
+  }, [sheet, addressId, saved]);
 
   if (stage.kind === 'booked') {
     return (
@@ -58,6 +91,12 @@ export default function RecurringSetupRoute() {
         booking={stage.booking}
         mandate={stage.mandate}
         onDone={guard(() => router.dismissTo('/home'))}
+        onViewPlan={guard(() =>
+          router.replace({
+            pathname: '/recurring/[bookingId]',
+            params: { bookingId: stage.booking.recurringBookingId },
+          }),
+        )}
       />
     );
   }
@@ -86,7 +125,11 @@ export default function RecurringSetupRoute() {
         <RecurringPlanFlow
           onExit={guard(goBack)}
           onOpenInfo={guard(() => router.push('/recurring'))}
-          onComplete={(plans) => setStage({ kind: 'autopay', plans })}
+          onComplete={(plans) =>
+            intent && addressId !== null
+              ? setSheet((previous) => ({ plans, open: true, key: (previous?.key ?? 0) + 1 }))
+              : setStage({ kind: 'autopay', plans })
+          }
           {...(stage.plans === null
             ? {}
             : {
@@ -97,6 +140,31 @@ export default function RecurringSetupRoute() {
               })}
         />
       </RecurringPlanningProvider>
+      {sheet === null || sheetSource === null ? null : (
+        <AutopayFlowSheet
+          key={sheet.key}
+          visible={sheet.open}
+          source={sheetSource}
+          summary={summaryFromPlans(
+            sheet.plans,
+            eligibility.state.status === 'ready' ? eligibility.state.data : null,
+          )}
+          userId={me.state.status === 'ready' ? me.state.data.id : null}
+          onClose={() => setSheet({ ...sheet, open: false })}
+          onBookingSaved={(booking) => {
+            if (sheetSource?.kind === 'draft') {
+              setSaved({ key: JSON.stringify(sheetSource.draft), booking });
+            }
+          }}
+          onBackToHome={guard(() => router.dismissTo('/home'))}
+          onViewPlan={guard((recurringBookingId: string) =>
+            router.replace({
+              pathname: '/recurring/[bookingId]',
+              params: { bookingId: recurringBookingId },
+            }),
+          )}
+        />
+      )}
     </>
   );
 }

@@ -17,6 +17,7 @@ import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { BAND_CURVE_CARD, CHEVRON_SMALL } from '../art';
+import { toggleFavouriteDish, useFavouriteDishIds } from '../favourites';
 import type { CookProfile } from '../types';
 import { CookMenu } from './CookMenu';
 import { CookProfileHeader } from './CookProfileHeader';
@@ -29,6 +30,9 @@ import { YellowBand } from './YellowBand';
  * radius and a `0 0 12 #0000001A` lift. A yellow band runs behind the menu from the photo's foot.
  * The scroll cue (`755:2472`) stays pinned to the card's foot — an 88pt fade into `#FFF7CC` with
  * a "Scroll for full menu" pill — until the menu has been scrolled to its end, or when it fits.
+ *
+ * Each dish carries its heart (`I1384:2942;1380:3081;848:7803`), the same session favourites as
+ * the Cook Profile (`favourites.ts`): a dish hearted here is hearted there, and the other way.
  */
 export interface DeckCardProps {
   readonly profile: CookProfile;
@@ -52,6 +56,7 @@ export function DeckCard({
   const [frameHeight, setFrameHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
   const [atEnd, setAtEnd] = useState(false);
+  const favourites = useFavouriteDishIds();
   const fits = frameHeight > 0 && contentHeight > 0 && contentHeight <= frameHeight + 1;
 
   // `755:2348` — the band starts at the photo's foot (116), or under the text if that runs longer.
@@ -80,7 +85,8 @@ export function DeckCard({
         <CookProfileHeader profile={profile} onLayout={onHeaderLayout} />
         <CookMenu
           sections={profile.menu}
-          tone="card"
+          favourites={favourites}
+          onToggleFavourite={toggleFavouriteDish}
           rowGestures={rowGestures}
           testID={`${testID}-menu`}
         />

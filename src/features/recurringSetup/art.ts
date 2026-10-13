@@ -29,6 +29,17 @@ export const TIME_OF_DAY_ICONS: Readonly<Record<RecurringTimeOfDay, ImageSourceP
   evening: require('../../../assets/figma/recurring/evening.png') as ImageSourcePropType,
 };
 
+/** `340:7539` — the 18pt yellow sunrise / noon / sunset on the time-of-day tabs. */
+export const TIME_OF_DAY_TAB_ICONS: Readonly<Record<RecurringTimeOfDay, ImageSourcePropType>> = {
+  morning: require('../../../assets/figma/recurring/tab-morning.png') as ImageSourcePropType,
+  afternoon: require('../../../assets/figma/recurring/tab-afternoon.png') as ImageSourcePropType,
+  evening: require('../../../assets/figma/recurring/tab-evening.png') as ImageSourcePropType,
+};
+
+/** `340:7539` "Selected check" — the chosen duration card's 20pt lime disc and tick. */
+export const DURATION_SELECTED_CHECK =
+  require('../../../assets/figma/recurring/duration-check.png') as ImageSourcePropType;
+
 /**
  * Summary's first tile (`316:4762`) — one photograph per band. They are loose rectangles on the
  * "Recurring flow" page sitting under the `485:399` frame (which holds only the captions):

@@ -1,9 +1,26 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { idempotencyHeader } from '@core/api';
 import type { ApiClient } from '@core/api';
+import { useApiQuery } from '@core/data';
+import type { ScreenQuery } from '@core/data';
+import { createKeyFactory } from '@core/query';
 import { useRuntime } from '@core/runtimeContext';
+
+const waitlistKeys = { state: () => createKeyFactory('waitlist').collection('state') } as const;
+
+/**
+ * `GET /v1/me/waitlist` — whether this customer joined, and how many people are waiting in their
+ * pincode (themselves included; their entry's pincode, else the last place they were refused).
+ * `launchThreshold` is the meter's target; null until Ops configures one.
+ */
+const waitlistStateSchema = z.object({
+  joined: z.boolean(),
+  countForArea: z.number().int().nonnegative().nullable(),
+  launchThreshold: z.number().int().positive().nullable(),
+});
+export type WaitlistStateDto = z.infer<typeof waitlistStateSchema>;
 
 export const WAITLIST_PATHS = { me: '/v1/me/waitlist' } as const;
 
@@ -37,8 +54,28 @@ export function createWaitlistApi(api: ApiClient) {
 
 export function useJoinWaitlist() {
   const { api } = useRuntime();
+  const queryClient = useQueryClient();
   const waitlist = createWaitlistApi(api);
   return useMutation<WaitlistEntryDto, Error, JoinWaitlistInput>({
     mutationFn: (input) => waitlist.join(input),
+    // Joined, and now counted: re-read the state so the meter and the button both move.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: waitlistKeys.state() }),
+  });
+}
+
+/** The customer's waitlist state. `enabled` is false for a guest, who has no waitlist. */
+export function useWaitlistState(
+  options: { enabled?: boolean } = {},
+): ScreenQuery<WaitlistStateDto> {
+  const { api } = useRuntime();
+  return useApiQuery<WaitlistStateDto>({
+    queryKey: waitlistKeys.state(),
+    queryFn: ({ signal }) =>
+      api.request(WAITLIST_PATHS.me, {
+        method: 'GET',
+        signal,
+        parse: (data) => waitlistStateSchema.parse(data),
+      }),
+    enabled: options.enabled ?? true,
   });
 }

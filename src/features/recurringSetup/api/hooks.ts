@@ -18,6 +18,7 @@ import type {
   BookingCancellationQuoteDto,
   BookingPrepDto,
   MandateCheckoutDto,
+  MandateStatusViewDto,
   MandateVerifyDto,
   RecurringBookingDto,
   RecurringCalendarDto,
@@ -127,6 +128,41 @@ export function useRecurringBooking(id: string | null): ScreenQuery<RecurringBoo
     queryKey: recurringKeys.booking(id ?? 'none'),
     queryFn: ({ signal }) => recurring.detail(id ?? '', signal),
     enabled: id !== null,
+  });
+}
+
+/** How often an open UPI Autopay approval is polled (Figma 2317:13587: "every 3s"). */
+export const MANDATE_STATUS_POLL_MS = 3_000;
+
+/**
+ * The booking's latest mandate and its UPI Intent attempt. Polled every 3 seconds while `poll`
+ * (an approval is open in the customer's UPI app, or the bank is confirming); the caller also
+ * refetches when the app comes back to the foreground. Never cached for long: each read is the
+ * server's latest word.
+ */
+export function useRecurringMandateStatus(
+  id: string | null,
+  options: {
+    /** Poll at all, or only while the last answer says so (Home's banner). */
+    readonly poll: boolean | ((latest: MandateStatusViewDto | undefined) => boolean);
+    readonly intervalMs?: number;
+  },
+): ScreenQuery<MandateStatusViewDto> {
+  const { api } = useRuntime();
+  const recurring = createRecurringApi(api);
+  const interval = options.intervalMs ?? MANDATE_STATUS_POLL_MS;
+  const { poll } = options;
+  return useApiQuery<MandateStatusViewDto>({
+    queryKey: recurringKeys.mandateStatus(id ?? 'none'),
+    queryFn: ({ signal }) => recurring.mandateStatus(id ?? '', signal),
+    enabled: id !== null,
+    staleTime: 0,
+    refetchInterval:
+      typeof poll === 'function'
+        ? (latest) => (poll(latest) ? interval : false)
+        : poll
+          ? interval
+          : false,
   });
 }
 
@@ -244,8 +280,12 @@ export function useCancelRecurringBooking() {
 export function useStartRecurringMandate() {
   const { api } = useRuntime();
   const recurring = createRecurringApi(api);
-  return useMutation<MandateCheckoutDto, Error, { id: string; scope: string }>({
-    mutationFn: ({ id, scope }) => recurring.startMandate(id, scope),
+  return useMutation<
+    MandateCheckoutDto,
+    Error,
+    { id: string; scope: string; flow?: 'checkout' | 'intent' }
+  >({
+    mutationFn: ({ id, scope, flow }) => recurring.startMandate(id, scope, flow),
     onSettled(_result, _error, variables) {
       idempotency.release(variables.scope);
     },

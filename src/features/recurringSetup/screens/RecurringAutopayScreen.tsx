@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { getUserMessage, isAppError } from '@core/errors';
 import type { CheckoutLauncher } from '@features/payment';
-import { formatPaise } from '@core/format';
+import { formatPaise, formatPaiseGrouped } from '@core/format';
 import { Button, LoadingState, NoteCard, Screen, ScreenHeader, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
@@ -84,7 +84,13 @@ export function RecurringAutopayScreen({
 
   const quoted = quote.state.status === 'ready' ? quote.state.data : null;
   const charging = eligibility.state.status === 'ready' ? eligibility.state.data.charging : null;
-  const slotTaken = notice.kind === 'slotTaken' || (quoted !== null && !quoted.bookable);
+  // Days whose visits add up past the per-debit cap (one debit pays a whole day, DEC-091): the
+  // Summary has to change, but no time was taken, so it is said apart from `slotTaken`.
+  const overLimitDays = quoted?.dayTotals?.filter((day) => day.overLimit) ?? [];
+  const slotTaken =
+    overLimitDays.length === 0 &&
+    (notice.kind === 'slotTaken' || (quoted !== null && !quoted.bookable));
+  const mustChange = slotTaken || overLimitDays.length > 0;
 
   const approve = async () => {
     setNotice({ kind: 'none' });
@@ -96,6 +102,15 @@ export function RecurringAutopayScreen({
       }
       onBooked(outcome.booking, outcome.mandate);
     } catch (error) {
+      if (
+        isAppError(error) &&
+        error.code === 'SLOT_UNAVAILABLE' &&
+        error.details?.reason === 'DAY_TOTAL_OVER_AUTOPAY_LIMIT'
+      ) {
+        // The re-quote's `dayTotals` names the days.
+        quote.refetch();
+        return;
+      }
       if (isAppError(error) && error.code === 'SLOT_UNAVAILABLE') {
         setNotice({ kind: 'slotTaken' });
         quote.refetch();
@@ -124,7 +139,7 @@ export function RecurringAutopayScreen({
         />
       }
       footer={
-        slotTaken ? (
+        mustChange ? (
           <RecurringFooter
             label="Change times"
             onPress={() =>
@@ -181,8 +196,8 @@ export function RecurringAutopayScreen({
               </Text>
               <Point testID={`${testID}-point-debit`}>
                 {charging === null
-                  ? 'Each visit is charged a few hours before it starts.'
-                  : `Each visit is charged ${String(charging.debitLeadHours)} hours before it starts, and your cook is confirmed then.`}
+                  ? 'Charged a few hours before your first visit of the day.'
+                  : `Charged ${String(charging.debitLeadHours)} hrs before your first visit of the day.`}
               </Point>
               <Point testID={`${testID}-point-notice`}>
                 {charging === null
@@ -202,7 +217,18 @@ export function RecurringAutopayScreen({
           </>
         )}
 
-        {slotTaken ? (
+        {overLimitDays.length > 0 ? (
+          <NoteCard
+            tone="accent"
+            title="Over the Autopay limit on some days"
+            body={`UPI Autopay can charge up to ${formatPaiseGrouped(quoted?.mandateMaxChargePaise ?? 0)} a day, and your visits on ${overLimitDays
+              .map((day) => `${editDateLabel(day.date)} (${formatPaiseGrouped(day.totalPaise)})`)
+              .join(
+                ', ',
+              )} add up to more. Remove a visit or pick a shorter duration on those days.`}
+            testID={`${testID}-over-limit`}
+          />
+        ) : slotTaken ? (
           <NoteCard
             tone="accent"
             title="Some times were just taken"

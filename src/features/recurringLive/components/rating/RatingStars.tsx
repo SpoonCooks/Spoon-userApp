@@ -10,8 +10,9 @@ import { RATING_ART } from './assets';
 import { PLUS_IDLE, PLUS_PICKED, starPops } from './ratingMotion';
 
 /**
- * The rate card's input row — `1501:6661` (idle) / `1501:6759` (rated): five 42pt stars at a 6pt
- * gap, a 1.5 × 30 rule at black 12 %, then the 56pt `5+` burst.
+ * The rate card's input row — `1501:6661` (idle) / `1501:6759` (rated): five 42pt stars, a
+ * 1.5 × 30 rule at black 12 %, then the 56pt `5+` burst, spread across the card's full width
+ * (`1517:9293`: the first star at the card's padding, 5+ at its right edge, ~10.5pt apart).
  *
  * Each star frame draws the 31 × 30 star vector inset 13.87 % / 12.49 % (`inset-[12.49%_13.87%_
  * 17.91%_13.87%]`), i.e. at (5.83, 5.25); a half star (`1501:6799`) is its own 42pt frame. Two
@@ -138,8 +139,14 @@ export function RatingStars({ value, onChange, clock, testID }: RatingStarsProps
 }
 
 const styles = StyleSheet.create({
-  /** `1501:6661` — 6pt gap, centred. */
-  row: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.s6 },
+  /** `1517:9293` — full width, spread; 6pt is the least gap on a narrow phone. */
+  row: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: lightTheme.space.s6,
+  },
   star: { width: STAR_SIZE, height: STAR_SIZE },
   /** The star's 42pt frame, scaled about its centre as it pops. */
   starFrame: { width: STAR_SIZE, height: STAR_SIZE },

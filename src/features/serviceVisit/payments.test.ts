@@ -122,7 +122,7 @@ describe('Payment details for a Recurring visit’s booking (2165:14262)', () =>
         methodDetail: '••••@okhdfcbank · Mandate active',
         manageLabel: 'Manage',
         reminder:
-          'Mandate is shared 27 hrs before & payment is auto-debited 3 hrs before the service time.',
+          'Mandate is shared 27 hrs before & payment is auto-debited 3 hrs before your first visit of the day.',
       },
     );
     expect(sheet.visitLine).toEqual({

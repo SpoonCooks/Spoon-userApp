@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
-import type { StyleProp, ViewStyle } from 'react-native';
 
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
-import { innerShadows } from '@ui/tokens/primitives';
 
-import { TIME_OF_DAY_ICONS } from '../art';
+import { TIME_OF_DAY_TAB_ICONS } from '../art';
 import { useRecurringStartTimes } from '../api';
 import { useRecurringPlanning } from '../planning';
 import {
@@ -22,15 +20,15 @@ import type { RecurringTimeOfDay, RecurringVisitChoice } from '../types';
 import { DurationCarousel } from './DurationCarousel';
 
 /**
- * The three choices that schedule a visit, opening one after another: duration, then time of the
- * day, then start time — Schedule (`340:7110` → `340:7455` → `288:516`), Visit addition
- * (`332:5921` → `332:5718`) and Edit date (`494:676`).
+ * The choices that schedule a visit — Schedule (`229:1802` → `288:401` → `288:516`, and the last
+ * plan's `340:7110` → `340:7455` → `340:7539`), Visit addition (`332:5681` → `332:5921` →
+ * `332:5718`) and Edit date (`494:676`).
  *
- * The frames stack them Duration, Time, Start time (`288:401`, `288:516`, `340:7455`, `332:5921`,
- * `332:5718`; only the older `340:7539` has Time first) and `340:7110` opens on Duration alone.
- * Duration is the carousel (`DurationCarousel`): the card it rests on is the choice, and the next
- * section opens once it has one. A time of day chosen later keeps the duration; a changed one
- * keeps the time of day, and either clears a start time that no longer fits.
+ * One section, "Pick duration & time": the Duration carousel (`DurationCarousel`) alone until a
+ * duration is chosen, then the Morning / Afternoon / Evening tabs and the start times for the tab
+ * in use, three to a row. Choosing a duration opens the first time of day that still has a start
+ * free; a changed duration keeps the tab, a changed tab clears the start, and either clears a
+ * start that no longer fits.
  *
  * Anything that would overlap `busy` is greyed out, a duration with no free start left in the
  * band greys too, and so does a time of day with none left for the chosen duration. Rendered as
@@ -49,13 +47,11 @@ export interface VisitChoicesProps {
   readonly busy: readonly RecurringBusyWindow[];
   /** The days this visit runs on — what its start times are asked about. */
   readonly dayIds: readonly string[];
-  /** "Time of the day", or "Time" on a further visit (`332:5722`). */
-  readonly timeLabel: string;
   /** The complete choice, or null while one is still missing. */
   readonly onChange: (choice: RecurringVisitChoice | null) => void;
   /**
-   * Whether the Start time grid is showing. The frames tighten the screen's spacing from 24 to 16
-   * once it is (`288:516` against `288:401`), so the screen needs to know.
+   * Whether the times (tabs and start times) are showing. The frames tighten the screen's spacing
+   * from 24 to 16 once they are (`288:401` against `229:1802`), so the screen needs to know.
    */
   readonly onStartTimesShown?: ((shown: boolean) => void) | undefined;
 }
@@ -64,7 +60,6 @@ export function VisitChoices({
   initial,
   busy,
   dayIds,
-  timeLabel,
   onChange,
   onStartTimesShown,
 }: VisitChoicesProps) {
@@ -124,9 +119,14 @@ export function VisitChoices({
       ? TIME_OF_DAY_BANDS.some((band) => bandFits(band.id, durationMinutes(id)))
       : bandFits(timeOfDay, durationMinutes(id));
 
+  /** The tab a newly chosen duration opens on: the first with a start still free. */
+  const firstOpenBand = (minutes: number) =>
+    TIME_OF_DAY_BANDS.find((band) => bandFits(band.id, minutes) && !closedBands.has(band.id))?.id ??
+    TIME_OF_DAY_BANDS[0]?.id ??
+    null;
   const pickDuration = (next: string) =>
     commit(
-      timeOfDay,
+      timeOfDay ?? firstOpenBand(durationMinutes(next)),
       next,
       startMinutes !== null && !clashes(startMinutes, durationMinutes(next), busy)
         ? startMinutes
@@ -141,48 +141,38 @@ export function VisitChoices({
   }, [onStartTimesShown, startShown]);
 
   return (
-    <>
-      {/*
-       * The steps open in the order of the frames' names — Time, Duration, Slot (`229:1802`,
-       * `288:401`, `288:516`) — but the Duration carousel is drawn ABOVE the time pills: choosing a
-       * time of the day opens it over them and the pills move down, as `288:401` shows against
-       * `229:1802`.
-       */}
-      {timeOfDay === null ? null : (
-        <Section title="Duration" style={styles.durationSection}>
-          <DurationCarousel
-            options={planning.durations.map((option) => ({
-              ...option,
-              disabled: !durationOpen(option.id),
-            }))}
-            selectedId={durationId}
-            onSelect={pickDuration}
-            bleed={lightTheme.space.lg}
-          />
-        </Section>
-      )}
-
-      <Section title={timeLabel}>
-        <View style={styles.row}>
-          {TIME_OF_DAY_BANDS.map((band) => (
-            <TimePill
-              key={band.id}
-              id={band.id}
-              label={band.label}
-              selected={band.id === timeOfDay}
-              disabled={
-                durationId !== null &&
-                (!bandFits(band.id, durationMinutes(durationId)) || closedBands.has(band.id))
-              }
-              onPress={() => pickTimeOfDay(band.id)}
-            />
-          ))}
-        </View>
-      </Section>
+    <View style={styles.section}>
+      <Text variant="emphasis" color="textPrimary">
+        Pick duration & time
+      </Text>
+      <DurationCarousel
+        options={planning.durations.map((option) => ({
+          ...option,
+          disabled: !durationOpen(option.id),
+        }))}
+        selectedId={durationId}
+        onSelect={pickDuration}
+        bleed={lightTheme.space.lg}
+      />
 
       {timeOfDay === null || durationId === null ? null : (
-        <Section title="Start time">
-          <Grid columns={4} gap={SLOT_GAP}>
+        <View style={styles.times}>
+          {/* `340:7539` "Time of day" — three tabs over a 1pt rule. */}
+          <View style={styles.tabs} accessibilityRole="tablist">
+            {TIME_OF_DAY_BANDS.map((band) => (
+              <TimeTab
+                key={band.id}
+                id={band.id}
+                label={band.label}
+                selected={band.id === timeOfDay}
+                disabled={
+                  !bandFits(band.id, durationMinutes(durationId)) || closedBands.has(band.id)
+                }
+                onPress={() => pickTimeOfDay(band.id)}
+              />
+            ))}
+          </View>
+          <Grid columns={3} gap={SLOT_GAP}>
             {startTimesFor(timeOfDay).map((minutes) => (
               <SlotChip
                 key={minutes}
@@ -196,9 +186,9 @@ export function VisitChoices({
               />
             ))}
           </Grid>
-        </Section>
+        </View>
       )}
-    </>
+    </View>
   );
 }
 
@@ -206,26 +196,6 @@ export function VisitChoices({
 function minutesOf(time: string): number {
   const [hours = 0, minutes = 0] = time.split(':').map(Number);
   return hours * 60 + minutes;
-}
-
-/** `288:520` / `288:550` / `288:583` — a Body 14/20 label, 8 above its options. */
-function Section({
-  title,
-  style,
-  children,
-}: {
-  readonly title: string;
-  readonly style?: StyleProp<ViewStyle>;
-  readonly children: React.ReactNode;
-}) {
-  return (
-    <View style={[styles.section, style]}>
-      <Text variant="bodyLarge" color="textPrimary">
-        {title}
-      </Text>
-      {children}
-    </View>
-  );
 }
 
 /** Rows of `columns` equal cells, `gap` apart both ways; a short last row keeps cell widths. */
@@ -266,11 +236,11 @@ interface ChoiceProps {
 }
 
 /**
- * `288:522` — the time-of-day pill: 36 tall, px 16 (px 12 on "Afternoon"), a 14pt pictogram 4
- * from the label. Selected is `#FFE666` with Elevation/1; unselected `#FFF7CC`. The three share
- * the row in Figma's own widths (118 / 110 / 118).
+ * `340:7539` "Period" — a third of the row: the 18pt yellow pictogram 6 from a 14/20 label,
+ * 4 below. The tab in use is SemiBold black over a 2pt `#FFD600` underline; the rest Regular at
+ * 60 %. A time of day with nothing left is greyed to 25 % and does not respond.
  */
-function TimePill({
+function TimeTab({
   id,
   label,
   selected,
@@ -280,27 +250,29 @@ function TimePill({
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="radio"
+      accessibilityRole="tab"
       disabled={disabled}
       accessibilityState={{ selected, disabled }}
       accessibilityLabel={label}
-      style={[
-        styles.pill,
-        id === 'afternoon' ? styles.pillNarrow : styles.pillWide,
-        choiceTone(selected, disabled),
-        selected && !disabled ? styles.pillLift : null,
-      ]}
+      style={[styles.tab, selected ? styles.tabSelected : null, disabled ? styles.dim : null]}
       testID={`recurring-time-${id}`}
     >
-      <Image source={TIME_OF_DAY_ICONS[id]} style={styles.pillIcon} />
-      <Text variant="bodyLargeStrong" color="textPrimary">
+      <Image source={TIME_OF_DAY_TAB_ICONS[id]} style={styles.tabIcon} />
+      <Text
+        variant={selected ? 'bodyLargeStrong' : 'bodyLarge'}
+        color={selected ? 'textPrimary' : 'textSubdued'}
+      >
         {label}
       </Text>
     </Pressable>
   );
 }
 
-/** `288:585` — the Slot chip: p 8 at an 8pt radius, a SemiBold 14/20 time. */
+/**
+ * `340:7539` "Slot" — 44 tall at a 16pt radius, a 14/20 time. Open: white with a 1.5pt `#FFEF99`
+ * edge. Picked: `#E2FF68`, a 1.5pt black-25 % edge and a soft lift, the time SemiBold. Taken: black
+ * at 3 %, the time at 25 %.
+ */
 function SlotChip({
   label,
   selected,
@@ -314,52 +286,69 @@ function SlotChip({
       disabled={disabled}
       accessibilityState={{ selected, disabled }}
       accessibilityLabel={label}
-      style={[styles.slot, choiceTone(selected, disabled)]}
+      style={[
+        styles.slot,
+        disabled ? styles.slotTaken : selected ? styles.slotPicked : styles.slotOpen,
+      ]}
     >
-      <Text variant="bodyLargeStrong" color="textPrimary">
+      <Text
+        variant={selected && !disabled ? 'bodyLargeStrong' : 'bodyLarge'}
+        color={disabled ? 'textDisabledSoft' : 'textPrimary'}
+      >
         {label}
       </Text>
     </Pressable>
   );
 }
 
-function choiceTone(selected: boolean, disabled: boolean) {
-  if (disabled) return styles.choiceDisabled;
-  return selected ? styles.choiceSelected : styles.choiceIdle;
-}
-
-/** `288:583` — four 86.5 chips across 370: 8 apart, both ways. */
+/** `340:7539` — three 118pt slots across 370: 8 apart, both ways. */
 const SLOT_GAP = 8;
 
 const styles = StyleSheet.create({
-  section: { gap: lightTheme.space.sm },
-  /**
-   * `1242:5390` — a fixed 240: the label, 8, and the carousel's 192 (strip, 12, dots), which the
-   * frame draws on top of the section rather than in it, leaving 20 clear below.
-   */
-  durationSection: { minHeight: 240 },
-  row: { flexDirection: 'row', gap: 12 },
+  /** The title sits right on the carousel, whose cards carry their own 8pt top margin. */
+  section: { gap: 0 },
+  /** The carousel's dots, 16, the tabs, 12, the start times. */
+  times: { gap: lightTheme.space.md, marginTop: lightTheme.space.lg },
+  row: { flexDirection: 'row' },
   cell: { flex: 1 },
-  pill: {
+  tabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: lightTheme.colors.borderTimeTabs,
+  },
+  tab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: lightTheme.space.xs,
-    paddingVertical: lightTheme.space.sm,
-    borderRadius: lightTheme.radius.xs,
+    gap: 6,
+    paddingTop: lightTheme.space.xs,
+    paddingBottom: lightTheme.space.s10,
   },
-  /** 118 : 110 : 118 — grown from a zero basis, they land on Figma's widths at 370. */
-  pillWide: { flexGrow: 118, flexBasis: 0, paddingHorizontal: lightTheme.space.lg },
-  pillNarrow: { flexGrow: 110, flexBasis: 0, paddingHorizontal: lightTheme.space.md },
-  pillLift: { boxShadow: innerShadows.elevation1 },
-  pillIcon: { width: 14, height: 14 },
-  choiceIdle: { backgroundColor: lightTheme.colors.surfaceAccent },
-  choiceSelected: { backgroundColor: lightTheme.colors.surfaceBrandTint },
-  choiceDisabled: { backgroundColor: lightTheme.colors.surfaceDisabledSoft },
+  /** The 2pt underline sits on the 1pt rule: pulled down by 1 so the two overlap. */
+  tabSelected: {
+    borderBottomWidth: 2,
+    borderBottomColor: lightTheme.colors.borderTimeTabSelected,
+    marginBottom: -1,
+  },
+  tabIcon: { width: 18, height: 18 },
+  dim: { opacity: 0.4 },
   slot: {
-    padding: lightTheme.space.sm,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: lightTheme.radius.xs,
+    borderRadius: lightTheme.radius.md,
   },
+  slotOpen: {
+    borderWidth: 1.5,
+    borderColor: lightTheme.colors.borderStartTime,
+    backgroundColor: lightTheme.colors.surface,
+  },
+  slotPicked: {
+    borderWidth: 1.5,
+    borderColor: lightTheme.colors.borderDurationFocus,
+    backgroundColor: lightTheme.colors.surfaceStartTimeSelected,
+    boxShadow: '0 0 12px rgba(0,0,0,0.1)',
+  },
+  slotTaken: { backgroundColor: lightTheme.colors.surfaceStartTimeUnavailable },
 });

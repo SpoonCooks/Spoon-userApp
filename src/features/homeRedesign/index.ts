@@ -12,7 +12,8 @@ export type {
 } from './screens/HomeRedesignScreen';
 export { useGuestHomeRedesignData, useHomeRedesignData } from './data';
 export type { HomeRedesignData } from './data';
-export { useJoinWaitlist } from './api/waitlistApi';
+export { useJoinWaitlist, useWaitlistState } from './api/waitlistApi';
+export type { WaitlistStateDto } from './api/waitlistApi';
 export { GUEST_ADDRESS, guestHomeModelFrom, homeModelFrom } from './adapters';
 export { resolveHomeVariant } from './state/variant';
 export { joinWaitlist } from './state/waitlist';

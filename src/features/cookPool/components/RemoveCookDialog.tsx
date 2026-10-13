@@ -1,6 +1,6 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Dialog, Text } from '@ui';
+import { Button, Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import { innerShadows } from '@ui/tokens/primitives';
 
@@ -17,6 +17,15 @@ import { COOK_ICON } from '../art';
  * While the removal is in flight Remove shows its spinner; a failed one is said under the
  * question, the way the cancel sheet says a failed cancel (`cancel-error`) — the frame draws no
  * error, so the line is the app's convention, not the design's.
+ *
+ * The frame's `Scrim` (`848:7551`) is black at 40 % (`surfaceScrim`) and the card (`848:7552`, 354
+ * wide) sits 287 from the top of the 874 frame, above centre. The shared `Dialog` darkens to 80 %
+ * and centres, so — like the recurring flow's `RecurringDialog` — this dialog hosts its own
+ * `Modal`. The scrim's 12pt `BACKGROUND_BLUR` is not drawn: React Native has no backdrop blur
+ * without `expo-blur`, which the app does not ship, so the profile shows through sharp.
+ *
+ * The native modal sits above every screen, so the profile closes it when it loses focus
+ * (`CookProfileScreen`): a deep link or a push opened while it is up must not land under it.
  */
 export interface RemoveCookDialogProps {
   readonly visible: boolean;
@@ -39,52 +48,78 @@ export function RemoveCookDialog({
   errorMessage = null,
   testID = 'remove-cook-dialog',
 }: RemoveCookDialogProps) {
+  if (!visible) return null;
   return (
-    <Dialog visible={visible} onClose={onKeep} testID={testID}>
-      <View style={styles.card} accessibilityViewIsModal>
-        <View style={styles.badge}>
-          <Image source={COOK_ICON} style={styles.badgeIcon} />
-        </View>
-        <Text variant="emphasis" color="textPrimary" testID={`${testID}-title`}>
-          Remove {cookName} from your Cook Pool?
-        </Text>
-        {errorMessage === null ? null : (
-          <Text
-            variant="body"
-            color="textSecondary"
-            accessibilityRole="alert"
-            testID={`${testID}-error`}
-          >
-            {errorMessage}
-          </Text>
-        )}
-        <View style={styles.actions}>
-          <Button
-            label="Keep"
-            onPress={onKeep}
-            size="pillLg"
-            flat
-            labelColor="textPrimary"
-            style={styles.action}
-            testID={`${testID}-keep`}
-          />
-          <Button
-            label="Remove"
-            onPress={onRemove}
-            loading={removing}
-            variant="secondary"
-            size="pillLg"
-            labelColor="textPrimary"
-            style={[styles.action, styles.destructive]}
-            testID={`${testID}-remove`}
-          />
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={onKeep}
+      testID={`${testID}-modal`}
+    >
+      <View style={styles.scrim} accessibilityViewIsModal>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          onPress={onKeep}
+          testID={`${testID}-backdrop`}
+        />
+        <View style={styles.place} pointerEvents="box-none">
+          <View style={styles.card} accessibilityViewIsModal testID={testID}>
+            <View style={styles.badge}>
+              <Image source={COOK_ICON} style={styles.badgeIcon} />
+            </View>
+            <Text variant="emphasis" color="textPrimary" testID={`${testID}-title`}>
+              Remove {cookName} from your Cook Pool?
+            </Text>
+            {errorMessage === null ? null : (
+              <Text
+                variant="body"
+                color="textSecondary"
+                accessibilityRole="alert"
+                testID={`${testID}-error`}
+              >
+                {errorMessage}
+              </Text>
+            )}
+            <View style={styles.actions}>
+              <Button
+                label="Keep"
+                onPress={onKeep}
+                size="pillLg"
+                flat
+                labelColor="textPrimary"
+                style={styles.action}
+                testID={`${testID}-keep`}
+              />
+              <Button
+                label="Remove"
+                onPress={onRemove}
+                loading={removing}
+                variant="secondary"
+                size="pillLg"
+                labelColor="textPrimary"
+                style={[styles.action, styles.destructive]}
+                testID={`${testID}-remove`}
+              />
+            </View>
+          </View>
         </View>
       </View>
-    </Dialog>
+    </Modal>
   );
 }
 
+/** `848:7552` — the card's top in the 874 frame. */
+const CARD_TOP = 287;
+
 const styles = StyleSheet.create({
+  /** `848:7551` — black at 40 % over the whole screen. */
+  scrim: { flex: 1, backgroundColor: lightTheme.colors.surfaceScrim },
+  /** 24 in from each side (354 of 402), the card's top at 287. */
+  place: { flex: 1, paddingTop: CARD_TOP, paddingHorizontal: lightTheme.space.xl },
   card: {
     padding: lightTheme.space.xl,
     gap: lightTheme.space.lg,

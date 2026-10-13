@@ -112,13 +112,13 @@ export const VISIT_FIXTURE = {
     title: 'Pay per visit',
     /** `1008:5398`, `1466:8294` — every state with the visit still to be charged. */
     bodyNotice:
-      'You’d be notified 27 hrs before & payment is auto-debited 3 hrs before the service time.',
+      'You’d be notified 27 hrs before & payment is auto-debited 3 hrs before your first visit of the day.',
   },
 
-  /** `1670:3461` — Payment summary · Cancelled · Refunded. */
+  /** `2165:13866` — Payment & refund · Cancelled · Refunded. */
   refund: {
     title: 'Payment & refund',
-    badge: 'Refund completed',
+    badge: 'Refunded',
     lines: [
       {
         label: 'Amount paid',
@@ -127,17 +127,21 @@ export const VISIT_FIXTURE = {
         amount: '₹299',
       },
       { label: 'GST', amount: '₹22.81', minor: true },
+      { label: 'Cancellation fee', amount: '– ₹0', minor: true },
     ] as readonly VisitRefundLine[],
     total: {
       label: 'Refund amount',
-      detail: 'Inclusive of taxes',
+      detail: 'Full refund, inclusive of taxes',
       was: '₹399',
       amount: '₹299',
     } as VisitRefundLine,
     modeEyebrow: 'REFUND TO',
     mode: 'UPI · ••••@okhdfcbank',
     idEyebrow: 'REFUND ID',
-    steps: [{ title: 'Refund initiated', when: 'Thu, 1 Oct' }] as readonly VisitRefundStep[],
+    steps: [
+      { title: 'Refund initiated', when: 'Thu, 1 Oct' },
+      { title: 'It takes 5-7 working days for the amount to get credited to source', note: true },
+    ] as readonly VisitRefundStep[],
   },
 } as const;
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Image } from 'react-native';
 
 import { CancelVisitSheet } from '@features/cancellation';
 import type { CancelQuote, CancelStep, CancelVisit } from '@features/cancellation';
@@ -44,6 +45,13 @@ import { RouteScaffold } from '@ui';
  *          reassigned                       (`2353:17562` cook reassigned, a first visit with her)
  *          cancelled-by-spoon               (`2342:4195` cancelled by Spoon, refund just started)
  */
+/** The demo cook's photo as a file URI, for the rate card's ring. */
+const PREVIEW_COOK_PHOTO = visitDemoModel('assigned').cook.photo;
+const PREVIEW_COOK_PHOTO_URI =
+  PREVIEW_COOK_PHOTO === undefined
+    ? null
+    : (Image.resolveAssetSource(PREVIEW_COOK_PHOTO as number)?.uri ?? null);
+
 const SERVICE: Record<ServicePhase, Partial<ServiceVisitModel>> = {
   assigned: {},
   onTheWay: { bannerTitle: '9:00 AM · 1 hr', bannerSlot: null },
@@ -510,7 +518,8 @@ function BookingFlowPreview({ view, recurring }: { view: string; recurring: bool
                 title: 'Cook Sanchita',
                 meta: 'Sun, 12 Apr · 1:15 PM · 1 hr',
                 cookName: 'Sanchita',
-                photoUri: null,
+                // The frames' cook photo (`1517:9293`), so the first look compares like for like.
+                photoUri: PREVIEW_COOK_PHOTO_URI,
               }}
               submitting={false}
               onRatingChange={setRated}

@@ -250,6 +250,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
        * fourteen iOS builds is fourteen interruptions for one unchanging answer.
        */
       ITSAppUsesNonExemptEncryption: false,
+
+      /**
+       * Recurring UPI Autopay by UPI Intent (Figma 2316:3558, "Choose your UPI app"). iOS answers
+       * `canOpenURL` only for schemes listed here, so this is how the app learns which UPI apps
+       * are installed, and how a link reaches the picked one. Must match `IOS_UPI_SCHEMES` in
+       * `src/features/recurringSetup/autopay/upiApps.ts` (a test checks). A build without these
+       * uses Razorpay's Checkout instead.
+       */
+      LSApplicationQueriesSchemes: ['phonepe', 'tez', 'paytmmp', 'credpay', 'bhim'],
     },
 
     /**

@@ -6,7 +6,14 @@ import { priceForSlot, type Catalogue } from '@features/catalogue';
 import type { CookPoolListDto } from '@features/cookPool';
 import type { RecurringEligibilityDto } from '@features/recurringSetup';
 
-import type { DurationOption, HomeModel, LiveHub, PoolCook, DurationTilePrice } from './types';
+import type {
+  ActiveBookingCard,
+  DurationOption,
+  DurationTilePrice,
+  HomeModel,
+  LiveHub,
+  PoolCook,
+} from './types';
 
 /**
  * Real responses → `HomeModel`. Pure, so every rule below is testable without a network.
@@ -23,9 +30,10 @@ import type { DurationOption, HomeModel, LiveHub, PoolCook, DurationTilePrice } 
  *                      (the pool's count is what unlocks Recurring, available or not)
  *   activeRecurringPlan / recurringChip
  *                      GET /v1/recurring/eligibility `liveBookings` and `chip`
+ *   activeBookings     built by `activeBookingCardsFrom` (`activeBookings.ts`)
  *
  * TODO(backend-contract) — not available yet, so deliberately empty:
- *   mostBooked (no flag), serves (no field), waitlist count/threshold (no endpoint).
+ *   mostBooked (no flag), serves (no field). The waitlist count comes from GET /v1/me/waitlist.
  */
 
 function poolCookOf(row: CookPoolListDto['cooks'][number]): PoolCook {
@@ -74,12 +82,16 @@ export interface HomeSources {
   readonly catalogueStatus: 'ready' | 'loading' | 'error';
   readonly instant: InstantReads;
   readonly history: readonly BookingSummaryDto[] | undefined;
-  /** Joined in this session (there is no read of waitlist membership yet). */
+  /** Joined in this session — shown at once, before the server's state is re-read. */
   readonly waitlistJoined: boolean;
+  /** `GET /v1/me/waitlist`, or `undefined` while it loads or if it failed. */
+  readonly waitlistState?: WaitlistServerState | undefined;
   /** `undefined` while loading or failed — Home then shows no beads. */
   readonly pool?: CookPoolListDto | undefined;
   /** `undefined` while loading or failed — the chip then counts the pool itself. */
   readonly recurring?: RecurringEligibilityDto | undefined;
+  /** The Active bookings carousel, already built (`activeBookingCardsFrom`). */
+  readonly activeBookings?: readonly ActiveBookingCard[];
 }
 
 /** The carousel's tiles, from the catalogue and whatever instant reads have landed. */
@@ -166,10 +178,9 @@ export function homeModelFrom(sources: HomeSources): HomeModel {
     cookPool: (sources.pool?.cooks ?? []).map(poolCookOf),
     activeRecurringPlan: liveBooking === undefined ? null : { id: liveBooking.recurringBookingId },
     ...(sources.recurring === undefined ? {} : { recurringChip: sources.recurring.chip }),
+    activeBookings: sources.activeBookings ?? [],
     liveHubs: live ? [] : STATIC_LIVE_HUBS,
-    waitlist: live
-      ? null
-      : { countForPincode: null, launchThreshold: null, joined: sources.waitlistJoined },
+    waitlist: live ? null : waitlistFrom(sources.waitlistJoined, sources.waitlistState),
   };
 }
 
@@ -228,6 +239,7 @@ export function triedPlaceHomeModelFrom(sources: {
   readonly catalogue: Catalogue | undefined;
   readonly catalogueStatus: 'ready' | 'loading' | 'error';
   readonly waitlistJoined: boolean;
+  readonly waitlistState?: WaitlistServerState | undefined;
 }): HomeModel {
   const durations = durationsFrom(sources.catalogue, new Map());
   return {
@@ -247,6 +259,31 @@ export function triedPlaceHomeModelFrom(sources: {
     cookPool: [],
     activeRecurringPlan: null,
     liveHubs: STATIC_LIVE_HUBS,
-    waitlist: { countForPincode: null, launchThreshold: null, joined: sources.waitlistJoined },
+    waitlist: waitlistFrom(sources.waitlistJoined, sources.waitlistState),
+  };
+}
+
+/** The waitlist as `GET /v1/me/waitlist` states it; see `useWaitlistState`. */
+export interface WaitlistServerState {
+  readonly joined: boolean;
+  readonly countForArea: number | null;
+  readonly launchThreshold: number | null;
+}
+
+/**
+ * Home's waitlist (`1302:3539`): joined if the server says so or the customer tapped Notify me in
+ * this session. The meter counts the OTHER people waiting — the server's figure includes the
+ * customer — and stays hidden (null) when nobody else is.
+ */
+export function waitlistFrom(
+  joinedHere: boolean,
+  state: WaitlistServerState | undefined,
+): NonNullable<HomeModel['waitlist']> {
+  const others =
+    state?.countForArea === null || state === undefined ? null : state.countForArea - 1;
+  return {
+    countForPincode: others === null || others < 1 ? null : others,
+    launchThreshold: state?.launchThreshold ?? null,
+    joined: joinedHere || state?.joined === true,
   };
 }

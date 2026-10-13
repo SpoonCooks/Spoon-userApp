@@ -89,4 +89,20 @@ describe('isKnownEventType', () => {
     expect(isKnownEventType('booking.invented_by_a_test')).toBe(false);
     expect(isKnownEventType(undefined)).toBe(false);
   });
+
+  it('opens the Recurring booking for an Autopay outcome', () => {
+    const recurringBookingId = '3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b';
+    expect(
+      routeForNotification({ eventType: 'recurring.mandate.confirmed', recurringBookingId }),
+    ).toBe(`/recurring/${recurringBookingId}`);
+    expect(
+      routeForNotification({ eventType: 'recurring.mandate.failed', recurringBookingId }),
+    ).toBe(`/recurring/${recurringBookingId}`);
+    expect(
+      routeForNotification({
+        eventType: 'recurring.mandate.failed',
+        recurringBookingId: '../../admin',
+      }),
+    ).toBe('/home');
+  });
 });
