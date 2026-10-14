@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { KeyboardTypeOptions, StyleProp, TextInputProps, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -113,6 +113,7 @@ export function FieldInput({
   style,
   leading,
   inputProps,
+  inputRef,
   testID,
 }: {
   value: string;
@@ -123,12 +124,15 @@ export function FieldInput({
   style?: StyleProp<ViewStyle>;
   leading?: ReactNode;
   inputProps?: Omit<TextInputProps, 'value' | 'onChangeText' | 'placeholder' | 'style'>;
+  /** The TextInput, so a form can move focus to it (the keyboard's Next). */
+  inputRef?: Ref<TextInput>;
   testID: string;
 }) {
   return (
     <View style={[styles.field, style]}>
       {leading}
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}

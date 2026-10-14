@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import {
   Image,
   Keyboard,
@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import type { ImageSourcePropType } from 'react-native';
+import type { ImageSourcePropType, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -74,6 +74,18 @@ export const EMPTY_DETAILS_FORM: AddressDetailsForm = {
 };
 
 const OTHER_NAME_MAX = 20;
+/** The form's text fields, in reading order. */
+type FieldKey =
+  | 'number'
+  | 'floor'
+  | 'tower'
+  | 'society'
+  | 'lane'
+  | 'landmark'
+  | 'otherName'
+  | 'receiverName'
+  | 'receiverPhone';
+
 const PHONE_DIGITS = 10;
 
 /** Whether Save may proceed: required fields, a label, and a complete receiver if one is open. */
@@ -148,6 +160,53 @@ export function AddressDetailsScreen({
   const changed = mode === 'add' || pinMoved || detailsFingerprint(form) !== initialPrint;
   const ready = locationReady && isDetailsFormComplete(form) && changed;
   const apartment = form.propertyType === 'apartment';
+
+  /*
+   * The keyboard's return key walks the form: Next on every field moves to the one below it in
+   * reading order, and the last field present says Done. Only the fields on screen take part
+   * (apartment or house, "Save as" only for Others, the receiver only while it is open).
+   */
+  const numberRef = useRef<TextInput>(null);
+  const floorRef = useRef<TextInput>(null);
+  const towerRef = useRef<TextInput>(null);
+  const societyRef = useRef<TextInput>(null);
+  const laneRef = useRef<TextInput>(null);
+  const landmarkRef = useRef<TextInput>(null);
+  const otherNameRef = useRef<TextInput>(null);
+  const receiverNameRef = useRef<TextInput>(null);
+  const receiverPhoneRef = useRef<TextInput>(null);
+  const order: FieldKey[] = [
+    'number',
+    'floor',
+    ...(form.propertyType === 'apartment'
+      ? (['tower', 'society'] as const)
+      : (['lane', 'landmark'] as const)),
+    ...(form.label === 'others' ? (['otherName'] as const) : []),
+    ...(form.receiverOpen ? (['receiverName', 'receiverPhone'] as const) : []),
+  ];
+  // The return key's handler, so the refs are only read on a key press, never while rendering.
+  const focusNext = (key: FieldKey) => {
+    const next = order[order.indexOf(key) + 1];
+    const refs: Record<FieldKey, RefObject<TextInput | null>> = {
+      number: numberRef,
+      floor: floorRef,
+      tower: towerRef,
+      society: societyRef,
+      lane: laneRef,
+      landmark: landmarkRef,
+      otherName: otherNameRef,
+      receiverName: receiverNameRef,
+      receiverPhone: receiverPhoneRef,
+    };
+    if (next !== undefined) refs[next].current?.focus();
+  };
+  const returnKey = (key: FieldKey) => {
+    const last = order.indexOf(key) === order.length - 1;
+    return {
+      returnKeyType: last ? ('done' as const) : ('next' as const),
+      submitBehavior: last ? ('blurAndSubmit' as const) : ('submit' as const),
+    };
+  };
 
   /*
    * The receiver card is the last block of the form. When one of its fields takes focus the form
@@ -249,6 +308,11 @@ export function AddressDetailsScreen({
                   onChangeText={(number) => set({ number })}
                   placeholder={apartment ? 'Flat no. *' : 'House/ Plot no. *'}
                   style={styles.flex}
+                  inputRef={numberRef}
+                  inputProps={{
+                    ...returnKey('number'),
+                    onSubmitEditing: () => focusNext('number'),
+                  }}
                   testID={`${testID}-number`}
                 />
                 <FieldInput
@@ -256,6 +320,11 @@ export function AddressDetailsScreen({
                   onChangeText={(floor) => set({ floor })}
                   placeholder="Floor"
                   style={styles.flex}
+                  inputRef={floorRef}
+                  inputProps={{
+                    ...returnKey('floor'),
+                    onSubmitEditing: () => focusNext('floor'),
+                  }}
                   testID={`${testID}-floor`}
                 />
               </View>
@@ -265,12 +334,22 @@ export function AddressDetailsScreen({
                     value={form.tower}
                     onChangeText={(tower) => set({ tower })}
                     placeholder="Tower / Block"
+                    inputRef={towerRef}
+                    inputProps={{
+                      ...returnKey('tower'),
+                      onSubmitEditing: () => focusNext('tower'),
+                    }}
                     testID={`${testID}-tower`}
                   />
                   <FieldInput
                     value={form.society}
                     onChangeText={(society) => set({ society })}
                     placeholder="Society / Building name *"
+                    inputRef={societyRef}
+                    inputProps={{
+                      ...returnKey('society'),
+                      onSubmitEditing: () => focusNext('society'),
+                    }}
                     testID={`${testID}-society`}
                   />
                 </>
@@ -280,12 +359,22 @@ export function AddressDetailsScreen({
                     value={form.lane}
                     onChangeText={(lane) => set({ lane })}
                     placeholder="Street/ Lane"
+                    inputRef={laneRef}
+                    inputProps={{
+                      ...returnKey('lane'),
+                      onSubmitEditing: () => focusNext('lane'),
+                    }}
                     testID={`${testID}-lane`}
                   />
                   <FieldInput
                     value={form.landmark}
                     onChangeText={(landmark) => set({ landmark })}
                     placeholder="Landmark (optional)"
+                    inputRef={landmarkRef}
+                    inputProps={{
+                      ...returnKey('landmark'),
+                      onSubmitEditing: () => focusNext('landmark'),
+                    }}
                     testID={`${testID}-landmark`}
                   />
                 </>
@@ -312,6 +401,11 @@ export function AddressDetailsScreen({
                 onChangeText={(otherName) => set({ otherName })}
                 placeholder="Save as *"
                 maxLength={OTHER_NAME_MAX}
+                inputRef={otherNameRef}
+                inputProps={{
+                  ...returnKey('otherName'),
+                  onSubmitEditing: () => focusNext('otherName'),
+                }}
                 testID={`${testID}-other-name`}
               />
             ) : null}
@@ -369,7 +463,13 @@ export function AddressDetailsScreen({
                     value={form.receiverName}
                     onChangeText={(receiverName) => set({ receiverName })}
                     placeholder="Receiver’s name"
-                    inputProps={{ onFocus: showReceiver, onBlur: leaveReceiver }}
+                    inputRef={receiverNameRef}
+                    inputProps={{
+                      ...returnKey('receiverName'),
+                      onSubmitEditing: () => focusNext('receiverName'),
+                      onFocus: showReceiver,
+                      onBlur: leaveReceiver,
+                    }}
                     testID={`${testID}-receiver-name`}
                   />
                   <FieldInput
@@ -382,7 +482,10 @@ export function AddressDetailsScreen({
                     leading={
                       form.receiverPhone === '' ? null : <Text style={styles.dial}>+91</Text>
                     }
+                    inputRef={receiverPhoneRef}
                     inputProps={{
+                      ...returnKey('receiverPhone'),
+                      onSubmitEditing: () => focusNext('receiverPhone'),
                       textContentType: 'telephoneNumber',
                       onFocus: showReceiver,
                       onBlur: leaveReceiver,
