@@ -39,8 +39,14 @@ const GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
 /** Spoon operates in India; biasing the query keeps a two-word search from returning the world. */
 const REGION_CODE = 'IN';
 
-/** How far around the customer's own position to prefer results, in metres. */
-const BIAS_RADIUS_M = 50_000;
+/**
+ * How far around the pin to prefer results, in metres. Tight on purpose: the place a customer
+ * types is usually the one they are standing in or beside, and a 50 km circle let Google
+ * spell-correct "Shubha" into every "Subhash Nagar" in the city, Gurugram included, ahead of
+ * "Shubha sagari" 30 m away. A bias is a preference, not a fence: an area across town
+ * ("Indiranagar", 8 km) still comes back first.
+ */
+const BIAS_RADIUS_M = 500;
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -159,6 +165,7 @@ export async function placesAutocomplete(input: {
       ...(input.bias === undefined || input.bias === null
         ? {}
         : {
+            origin: { latitude: input.bias.latitude, longitude: input.bias.longitude },
             locationBias: {
               circle: {
                 center: { latitude: input.bias.latitude, longitude: input.bias.longitude },
@@ -199,7 +206,26 @@ export async function placesAutocomplete(input: {
     }))
     .filter((suggestion) => suggestion.placeId !== '' && suggestion.primary !== '');
 
-  return { ok: true, value: suggestions };
+  return { ok: true, value: namesFirst(suggestions, query) };
+}
+
+/**
+ * The places whose name starts with what was typed come first, in Google's order; Google's
+ * spell-corrected guesses ("Subhash Nagar" for "Shubha") follow. Without this, the place a
+ * customer is typing out letter by letter can drop out of the list as the word completes.
+ */
+export function namesFirst<T extends { readonly primary: string }>(
+  suggestions: readonly T[],
+  query: string,
+): readonly T[] {
+  const typed = query.trim().toLowerCase();
+  const starts = (name: string) =>
+    name
+      .toLowerCase()
+      .split(/[\s,]+/)
+      .some((_, index, words) => words.slice(index).join(' ').startsWith(typed));
+  const matched = suggestions.filter((suggestion) => starts(suggestion.primary));
+  return [...matched, ...suggestions.filter((suggestion) => !matched.includes(suggestion))];
 }
 
 export interface ResolvedPlace {
