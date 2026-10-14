@@ -56,9 +56,16 @@ export function DaySorted() {
   // Until the last row is measured, end where the frame does (`1095:8027`, 409pt from y 179).
   const [spineEnd, setSpineEnd] = useState(SPINE_TOP + 409);
   const [width, setWidth] = useState(W);
+  // The frame is 658pt tall; on a narrow phone the use cases wrap onto more lines, so the section
+  // grows to hold them rather than clipping the last one's copy.
+  const [casesHeight, setCasesHeight] = useState(0);
+  const height = Math.max(SECTION_HEIGHT, CASES_TOP + casesHeight + SECTION_BOTTOM);
   const arc = arcGeometry(width);
   return (
-    <View style={styles.section} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+    <View
+      style={[styles.section, { height }]}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
       {/* `784:116` — the top half of the arc's circle, sized to this width (see `arcGeometry`). */}
       <Image source={ART.dayArc} style={[styles.arc, arc.art]} resizeMode="stretch" />
 
@@ -83,7 +90,10 @@ export function DaySorted() {
 
       <Spine top={SPINE_TOP} bottom={spineEnd} />
 
-      <View style={styles.cases}>
+      <View
+        style={styles.cases}
+        onLayout={(event) => setCasesHeight(event.nativeEvent.layout.height)}
+      >
         {USE_CASES.map((useCase, index) => {
           const glyph = CASE_GLYPHS[index];
           const last = index === LAST_GLYPH;
@@ -130,6 +140,10 @@ export function DaySorted() {
   );
 }
 
+/** `784:115` — the frame's height, and the room it leaves under the last use case. */
+const SECTION_HEIGHT = 658;
+const SECTION_BOTTOM = 24;
+
 /** `1095:8027` — the spine's centre line and where it starts, under the 5 AM sunrise. */
 const SPINE_X = 31;
 const SPINE_TOP = 179;
@@ -167,7 +181,7 @@ function Spine({ top, bottom }: { readonly top: number; readonly bottom: number 
 }
 
 const styles = StyleSheet.create({
-  section: { height: 658, width: '100%', overflow: 'hidden' },
+  section: { width: '100%', overflow: 'hidden' },
   arc: { position: 'absolute' },
   header: {
     position: 'absolute',
