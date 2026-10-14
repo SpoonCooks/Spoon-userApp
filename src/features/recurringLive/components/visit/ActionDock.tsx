@@ -17,13 +17,17 @@ import { VISIT_EDIT, VISIT_MONEY_DOCK, VISIT_WHATSAPP } from './assets';
  * the caller's (`onHelp`); the sheets behind the other two are built elsewhere.
  *
  * Meant for `Screen`'s `footer`: it bleeds over the footer's own 16pt sides and 8pt top so the
- * rule runs edge to edge, as on the recurring setup steps.
+ * rule runs edge to edge, as on the recurring setup steps. `inline` draws just the row of tiles,
+ * as the last block of the scrolling content: a one-time visit scrolls its buttons with the page
+ * (owner, 2026-10-14) rather than pinning them.
  */
 export interface ActionDockProps {
   readonly showModify?: boolean | undefined;
   readonly onPaymentDetails?: (() => void) | undefined;
   readonly onModifyBooking?: (() => void) | undefined;
   readonly onHelp?: (() => void) | undefined;
+  /** The tiles as part of the scrolling content, with no pinned bar around them. */
+  readonly inline?: boolean | undefined;
   readonly testID?: string | undefined;
 }
 
@@ -40,6 +44,7 @@ export function ActionDock({
   onPaymentDetails,
   onModifyBooking,
   onHelp,
+  inline = false,
   testID = 'visit-action-dock',
 }: ActionDockProps) {
   const actions: DockAction[] = [
@@ -65,7 +70,7 @@ export function ActionDock({
   ];
 
   return (
-    <View style={styles.dock} testID={testID}>
+    <View style={inline ? styles.row : styles.dock} testID={testID}>
       {actions.map((action) => (
         <Pressable
           key={action.key}
@@ -96,6 +101,7 @@ const styles = StyleSheet.create({
     borderTopColor: lightTheme.colors.borderAccent,
     backgroundColor: lightTheme.colors.surface,
   },
+  row: { flexDirection: 'row', gap: lightTheme.space.sm },
   /** `1444:738` — a 64pt tile. */
   tile: {
     flex: 1,
