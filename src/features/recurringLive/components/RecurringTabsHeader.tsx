@@ -99,7 +99,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: lightTheme.space.sm,
     paddingHorizontal: lightTheme.space.md,
-    paddingVertical: lightTheme.space.sm,
+    // 12pt more above than below: the toggle sat tight under the status bar. Home's address row
+    // keeps the same 12pt from it (owner, 2026-10-14).
+    paddingTop: lightTheme.space.sm + 12,
+    paddingBottom: lightTheme.space.sm,
     backgroundColor: lightTheme.colors.surface,
   },
   hitArea: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
