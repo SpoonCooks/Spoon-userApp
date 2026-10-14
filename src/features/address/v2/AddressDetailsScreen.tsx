@@ -162,6 +162,11 @@ export function AddressDetailsScreen({
     receiverFocused.current = true;
     setTimeout(toReceiver, 50);
   };
+  const receiverOpening = useRef(false);
+  const openReceiver = () => {
+    receiverOpening.current = true;
+    set({ receiverOpen: true });
+  };
   const leaveReceiver = () => {
     receiverFocused.current = false;
   };
@@ -185,6 +190,13 @@ export function AddressDetailsScreen({
       />
       <ScrollView
         ref={scrollRef}
+        // The receiver card just opened: once its fields have laid out, bring the whole card into
+        // view rather than leaving them below the fold.
+        onContentSizeChange={() => {
+          if (!receiverOpening.current) return;
+          receiverOpening.current = false;
+          toReceiver();
+        }}
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -312,7 +324,7 @@ export function AddressDetailsScreen({
                 collapses it and clears the values — the row itself no longer does anything.
               */}
               <Pressable
-                onPress={form.receiverOpen ? undefined : () => set({ receiverOpen: true })}
+                onPress={form.receiverOpen ? undefined : openReceiver}
                 disabled={form.receiverOpen}
                 accessibilityRole={form.receiverOpen ? undefined : 'button'}
                 accessibilityLabel={form.receiverOpen ? undefined : 'Add a receiver (optional)'}
