@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Image, LayoutAnimation, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Image, LayoutAnimation, StyleSheet, View } from 'react-native';
+import type { ScrollView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ART } from '../assets';
@@ -125,6 +127,19 @@ export function HomeRedesignView({
   const { top, bottom } = useSafeAreaInsets();
   const variant = resolveHomeVariant(model);
   const scroll = useRef<ScrollView>(null);
+  /*
+   * The address header is pinned above the scroll (owner, 2026-10-14). It is see-through at the
+   * top of the page, as Figma draws it, and fills with the screen-header gradient, rounded at the
+   * bottom, once the page moves under it. Its height (status bar included) is measured, so the
+   * page starts below it and jumps within the page stop below it rather than under it.
+   */
+  const [scrollY] = useState(() => new Animated.Value(0));
+  const [headerHeight, setHeaderHeight] = useState(top + HEADER_ROW);
+  const headerFill = scrollY.interpolate({
+    inputRange: [0, HEADER_FILL_DISTANCE],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
   const bodyY = useRef(0);
   const dialY = useRef(0);
   /** The Book section's offset in the body — where "Select duration" brings the customer back. */
@@ -261,7 +276,7 @@ export function HomeRedesignView({
     );
     if (pick === null) return;
     selectDuration(pick.id, 'dial');
-    scroll.current?.scrollTo({ y: bodyY.current + bookY.current - top, animated: true });
+    scroll.current?.scrollTo({ y: bodyY.current + bookY.current - headerHeight, animated: true });
   };
 
   const request = (): BookingRequest | null => {
@@ -298,18 +313,16 @@ export function HomeRedesignView({
 
   return (
     <View style={styles.screen} testID="home-redesign-screen">
-      <ScrollView
+      <Animated.ScrollView
         ref={scroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: top, paddingBottom: bottom }}
+        contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: bottom }}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: true,
+        })}
       >
         <Image source={ART.glows} style={styles.glows} resizeMode="stretch" />
-        <HomeHeader
-          addressLabel={model.address.label}
-          addressDetail={model.address.detail}
-          onPressAddress={actions.onPressAddress}
-          onPressProfile={actions.onPressProfile}
-        />
         <View
           style={styles.body}
           onLayout={(e) => {
@@ -369,7 +382,7 @@ export function HomeRedesignView({
                 onPressBook={book}
                 onPressHelpMePick={() =>
                   scroll.current?.scrollTo({
-                    y: bodyY.current + dialY.current - top,
+                    y: bodyY.current + dialY.current - headerHeight,
                     animated: true,
                   })
                 }
@@ -415,7 +428,23 @@ export function HomeRedesignView({
           {variant === 'inactive' ? <ShareCard onPressShare={share} /> : null}
           <PromiseFooter />
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+      <View
+        style={[styles.header, { paddingTop: top }]}
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+        testID="home-header-bar"
+      >
+        <Animated.View style={[styles.headerFill, { opacity: headerFill }]} pointerEvents="none">
+          <LinearGradient colors={[C.softer, C.tint]} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+        <HomeHeader
+          addressLabel={model.address.label}
+          addressDetail={model.address.detail}
+          onPressAddress={actions.onPressAddress}
+          onPressProfile={actions.onPressProfile}
+          filled={headerFill}
+        />
+      </View>
       <Toast ref={toast} />
       <TaxDetailsDialog
         visible={taxOpen}
@@ -431,4 +460,22 @@ const styles = StyleSheet.create({
   /** `941:4885` — soft yellow glows drawn behind the whole page; they scroll with it. */
   glows: { position: 'absolute', top: 0, left: 0, right: 0, height: 3027 },
   body: { gap: 24 },
+  header: { position: 'absolute', top: 0, left: 0, right: 0 },
+  /** The screen headers' fill (`#FFF7CC` → `#FFE666`), rounded 24 at the bottom like theirs. */
+  headerFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    boxShadow: [{ offsetX: 0, offsetY: 0, blurRadius: 12, color: 'rgba(0,0,0,0.1)' }],
+  },
 });
+
+/** `1255:2983` — the header row: a 44pt pin box with 8pt above and below. */
+const HEADER_ROW = 60;
+/** How far the page scrolls before the header is fully filled. */
+const HEADER_FILL_DISTANCE = 24;
