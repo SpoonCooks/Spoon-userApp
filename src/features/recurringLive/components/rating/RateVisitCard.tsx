@@ -222,6 +222,12 @@ export function RateVisitCard({
   const tier = settled ? ratingTier(rating) : 'idle';
   const low = LOW_TIERS.includes(tier);
   const compact = useCompactCard();
+  // The confetti is drawn on Figma's 370pt card. Its pieces are spread across the card's real width
+  // so none fall off a narrower phone's card, and start below the "Rating submitted" banner when
+  // it leads the card, so they keep to the cook row and title as drawn instead of covering text.
+  const [cardWidth, setCardWidth] = useState(CONFETTI_FRAME_WIDTH);
+  const [bannerBottom, setBannerBottom] = useState(0);
+  const confettiScale = Math.min(1, cardWidth / CONFETTI_FRAME_WIDTH);
   // Replays on each new score once the rated layout is up (not while it waits to settle).
   const entrance = useTimeline({
     durationMs: RATING_TIMELINE_MS,
@@ -236,6 +242,7 @@ export function RateVisitCard({
           compact ? styles.cardCompact : null,
           tier === 'idle' ? styles.cardIdle : null,
         ]}
+        onLayout={(event) => setCardWidth(event.nativeEvent.layout.width)}
       >
         {tier === 'magic' ? (
           <LinearGradient
@@ -260,13 +267,21 @@ export function RateVisitCard({
           />
         ) : null}
         {tier === 'magic' ? (
-          <View style={styles.confetti} pointerEvents="none">
+          <View
+            style={[styles.confetti, { width: cardWidth, top: submitted ? bannerBottom : 0 }]}
+            pointerEvents="none"
+          >
             {CONFETTI.map((piece) => (
               <Animated.View
                 key={piece.key}
                 style={[
                   styles.confettiPiece,
-                  { left: piece.x, top: piece.y, width: piece.width, height: piece.height },
+                  {
+                    left: piece.x * confettiScale,
+                    top: piece.y,
+                    width: piece.width,
+                    height: piece.height,
+                  },
                   keyframedStyle(entrance, piece.motion),
                 ]}
               >
@@ -288,7 +303,14 @@ export function RateVisitCard({
 
         {submitted ? (
           // `2306:1135` — lime banner, 28pt `#CFFF04` well round an 18pt check.
-          <View style={styles.banner} testID={`${testID}-submitted`}>
+          <View
+            style={styles.banner}
+            onLayout={(event) => {
+              const { y, height } = event.nativeEvent.layout;
+              setBannerBottom(y + height);
+            }}
+            testID={`${testID}-submitted`}
+          >
             <View style={styles.bannerWell}>
               <Image source={RATING_ART.check} style={styles.chipCheck} />
             </View>
@@ -740,6 +762,9 @@ function useCompactCard(): boolean {
   return useWindowDimensions().width < COMPACT_BELOW;
 }
 
+/** `1501:6849` — the confetti frame's width: the card as Figma draws it. */
+const CONFETTI_FRAME_WIDTH = 370;
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   /** `1517:9293` — `0 8 24 rgba(0,0,0,0.08)`, outside the clip so iOS keeps it. */
@@ -765,7 +790,7 @@ const styles = StyleSheet.create({
   /** `1517:9293` — the first look pads 24 at the bottom. */
   cardIdle: { paddingBottom: lightTheme.space.xl },
   /** `1501:6849` — 370 × 226 from the card's corner. */
-  confetti: { position: 'absolute', left: 0, top: 0, width: 370, height: 226 },
+  confetti: { position: 'absolute', left: 0, top: 0, width: CONFETTI_FRAME_WIDTH, height: 226 },
   /** A piece at its box; a sparkle's art carries 4pt of margin round it. */
   confettiPiece: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   confettiArt: { position: 'absolute', left: -4, top: -4 },
