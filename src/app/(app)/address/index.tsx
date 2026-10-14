@@ -20,10 +20,11 @@ import { InfoDialog, QueryBoundary } from '@ui';
  *
  * ## Choosing versus browsing
  *
- * Home's address switcher opens this list to CHOOSE the address bookings use (`from=home`): the
- * row is the choice. The profile opens it to BROWSE (`from=profile`): a row tap does nothing (dev
- * note). Either way the address in use carries "Current selection". Choosing is still `PUT … { isDefault: true }`, the server's own flag — the
- * kebab is the only way into Edit (`d51f326`).
+ * Tapping a row makes it the address bookings use, whether the list was opened from Home's
+ * switcher (`from=home`) or the profile (`from=profile`): the owner asked for this on 2026-10-14,
+ * replacing the dev note's "a row tap does nothing" from the profile. The address in use carries
+ * "Current selection", and tapping it again sends nothing. Choosing is `PUT … { isDefault: true }`,
+ * the server's own flag; the kebab is the only way into Edit (`d51f326`).
  *
  * ## Removing
  *
@@ -71,21 +72,17 @@ export default function SavedAddressesRoute() {
                   : `/address/location?from=${from}`) as Href,
               ),
             )}
-            {...(choosing
-              ? {
-                  onSelect: (id: string) => {
-                    if (setDefault.isPending) return;
-                    setDefault.mutateAsync(id).catch((thrown: unknown) => {
-                      setError({
-                        title: 'Couldn’t switch address',
-                        body: isAppError(thrown)
-                          ? getUserMessage(thrown)
-                          : 'We could not switch to this address.',
-                      });
-                    });
-                  },
-                }
-              : {})}
+            onSelect={(id: string) => {
+              if (list.find((address) => address.id === id)?.tag !== null) return;
+              setDefault.mutateAsync(id).catch((thrown: unknown) => {
+                setError({
+                  title: 'Couldn’t switch address',
+                  body: isAppError(thrown)
+                    ? getUserMessage(thrown)
+                    : 'We could not switch to this address.',
+                });
+              });
+            }}
             onEdit={guard((id: string) =>
               router.push(
                 (from === undefined

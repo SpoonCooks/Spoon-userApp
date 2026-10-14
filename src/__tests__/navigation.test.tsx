@@ -319,6 +319,143 @@ describe('Saved addresses back target follows its entry point', () => {
 });
 
 /**
+ * A row tap makes that address the current selection from Home AND the profile (owner,
+ * 2026-10-14; the dev note had the profile's rows do nothing). Tapping the one already current
+ * sends nothing.
+ */
+describe('Saved addresses row tap selects the address', () => {
+  const [home] = (DEFAULT_API_STUBS['GET /v1/me/addresses']?.(undefined) ?? []) as readonly Record<
+    string,
+    unknown
+  >[];
+  const parents = { ...home, id: 'addr-2', label: 'Parents', isDefault: false };
+
+  function renderList(writes: { path: string; body: unknown }[]) {
+    const api = createStubApi({
+      ...NAV_STUBS,
+      'GET /v1/me/addresses': () => [home, parents],
+      'PUT /v1/me/addresses/addr-1': (body) => {
+        writes.push({ path: 'addr-1', body });
+        return { address: home };
+      },
+      'PUT /v1/me/addresses/addr-2': (body) => {
+        writes.push({ path: 'addr-2', body });
+        return { address: { ...parents, isDefault: true } };
+      },
+    });
+    return renderWithRuntime(<SavedAddressesRoute />, {
+      runtime: createTestRuntime({ api }),
+    });
+  }
+
+  it.each(['profile', 'home'])('selects from %s', async (from) => {
+    mockSearchParams = { from };
+    const writes: { path: string; body: unknown }[] = [];
+    renderList(writes);
+
+    fireEvent.press(await screen.findByTestId('saved-addresses-card-addr-2'));
+
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(writes[0]).toEqual({
+      path: 'addr-2',
+      body: expect.objectContaining({ isDefault: true }),
+    });
+  });
+
+  it('sends nothing for the address already in use', async () => {
+    mockSearchParams = { from: 'profile' };
+    const writes: { path: string; body: unknown }[] = [];
+    renderList(writes);
+
+    fireEvent.press(await screen.findByTestId('saved-addresses-card-addr-1'));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(writes).toHaveLength(0);
+  });
+
+  // The tag moves on the tap; it does not wait for the save and the refetch behind it.
+  it('moves the tag while the save is still in flight', async () => {
+    mockSearchParams = { from: 'profile' };
+    const stub = createStubApi({ ...NAV_STUBS, 'GET /v1/me/addresses': () => [home, parents] });
+    const api: typeof stub = {
+      request: (path, options) =>
+        options.method === 'PUT' ? new Promise(() => undefined) : stub.request(path, options),
+    };
+    renderWithRuntime(<SavedAddressesRoute />, { runtime: createTestRuntime({ api }) });
+
+    fireEvent.press(await screen.findByTestId('saved-addresses-card-addr-2'));
+
+    expect(await screen.findByTestId('saved-addresses-card-addr-2-tag')).toBeTruthy();
+    expect(screen.queryByTestId('saved-addresses-card-addr-1-tag')).toBeNull();
+  });
+
+  // Quick taps: each moves the tag at once, the saves go out in tap order, and the last one wins.
+  it('follows quick taps between addresses, and the last tap is the one saved', async () => {
+    mockSearchParams = { from: 'profile' };
+    let current = 'addr-1';
+    const list = () => [
+      { ...home, id: 'addr-1', isDefault: current === 'addr-1' },
+      { ...parents, isDefault: current === 'addr-2' },
+    ];
+    const saves: { id: string; finish: () => void }[] = [];
+    const stub = createStubApi({ ...NAV_STUBS, 'GET /v1/me/addresses': list });
+    const api: typeof stub = {
+      request: (path, options) => {
+        if (options.method !== 'PUT') return stub.request(path, options);
+        const id = path.split('/').pop() ?? '';
+        return new Promise((resolve) => {
+          saves.push({
+            id,
+            finish: () => {
+              current = id;
+              resolve(options.parse({ address: list().find((address) => address.id === id) }));
+            },
+          });
+        });
+      },
+    };
+    renderWithRuntime(<SavedAddressesRoute />, { runtime: createTestRuntime({ api }) });
+
+    fireEvent.press(await screen.findByTestId('saved-addresses-card-addr-2'));
+    expect(await screen.findByTestId('saved-addresses-card-addr-2-tag')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('saved-addresses-card-addr-1'));
+    expect(await screen.findByTestId('saved-addresses-card-addr-1-tag')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('saved-addresses-card-addr-2'));
+    expect(await screen.findByTestId('saved-addresses-card-addr-2-tag')).toBeTruthy();
+
+    // One save at a time, in tap order; the earlier ones settling never move the tag back.
+    for (const expected of ['addr-2', 'addr-1', 'addr-2']) {
+      await waitFor(() => expect(saves).toHaveLength(1));
+      const save = saves.shift();
+      expect(save?.id).toBe(expected);
+      save?.finish();
+      expect(screen.getByTestId('saved-addresses-card-addr-2-tag')).toBeTruthy();
+    }
+    await waitFor(() => expect(current).toBe('addr-2'));
+    expect(await screen.findByTestId('saved-addresses-card-addr-2-tag')).toBeTruthy();
+    expect(screen.queryByTestId('saved-addresses-card-addr-1-tag')).toBeNull();
+  });
+
+  it('puts the tag back when the server refuses the switch', async () => {
+    mockSearchParams = { from: 'profile' };
+    const api = createStubApi({
+      ...NAV_STUBS,
+      'GET /v1/me/addresses': () => [home, parents],
+      'PUT /v1/me/addresses/addr-2': () => {
+        throw new Error('not serviceable');
+      },
+    });
+    renderWithRuntime(<SavedAddressesRoute />, { runtime: createTestRuntime({ api }) });
+
+    fireEvent.press(await screen.findByTestId('saved-addresses-card-addr-2'));
+
+    expect(await screen.findByTestId('address-action-error')).toBeTruthy();
+    expect(screen.getByTestId('saved-addresses-card-addr-1-tag')).toBeTruthy();
+    expect(screen.queryByTestId('saved-addresses-card-addr-2-tag')).toBeNull();
+  });
+});
+
+/**
  * A push notification opens `/booking/:id` DIRECTLY — the app is launched into it — so the
  * booking host is the route most likely to be the only entry on the stack. Every OTHER entry
  * point — a Home banner, a reschedule confirmation, a bare deep link — is deterministically Home

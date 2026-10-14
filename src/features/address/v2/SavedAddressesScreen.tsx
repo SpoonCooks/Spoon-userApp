@@ -34,8 +34,8 @@ import { C, GRADIENT, SHADOW_1, SHADOW_2, SHADOW_3, SHADOW_HAIRLINE, T } from '.
  *
  * Behaviour (dev notes):
  *   - "Add a new address" opens the map. With no addresses, only that banner shows.
- *   - Tapping a row selects it when the list is choosing an address; from the profile it does
- *     nothing (the host passes no `onSelect`).
+ *   - Tapping a row makes it the current selection, from Home and the profile alike (owner,
+ *     2026-10-14). A host that passes no `onSelect` gets rows that are not tappable.
  *   - The kebab opens a menu anchored to it, flipped upward near the bottom of the screen. One
  *     menu at a time; tapping outside closes it.
  *   - Remove opens a confirm sheet. "Keep" or a tap outside closes it. An address on an upcoming
@@ -45,7 +45,7 @@ export interface SavedAddressesScreenProps {
   readonly addresses: readonly SavedAddressItem[];
   readonly onBack: () => void;
   readonly onAdd: () => void;
-  /** Absent when the list is opened from the profile: rows are then not tappable. */
+  /** Makes the tapped address the current selection. Absent: rows are not tappable. */
   readonly onSelect?: (id: string) => void;
   readonly onEdit: (id: string) => void;
   /**
