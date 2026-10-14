@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Image,
+  Keyboard,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -149,18 +149,42 @@ export function AddressDetailsScreen({
   const ready = locationReady && isDetailsFormComplete(form) && changed;
   const apartment = form.propertyType === 'apartment';
 
+  /*
+   * The receiver card is the last block of the form. When one of its fields takes focus the form
+   * scrolls to its end, so the WHOLE card — both fields, not just the one being typed in — sits
+   * above the keyboard. Once on focus (the keyboard is already up when moving between the two
+   * fields) and again when the keyboard finishes opening (the form has only then shrunk).
+   */
+  const scrollRef = useRef<ScrollView>(null);
+  const receiverFocused = useRef(false);
+  const toReceiver = () => scrollRef.current?.scrollToEnd({ animated: true });
+  const showReceiver = () => {
+    receiverFocused.current = true;
+    setTimeout(toReceiver, 50);
+  };
+  const leaveReceiver = () => {
+    receiverFocused.current = false;
+  };
+  useEffect(() => {
+    // After a beat: the keyboard avoider pads the form on this same event, and scrolling before
+    // that layout lands scrolls a form that has not shrunk yet.
+    const shown = Keyboard.addListener('keyboardDidShow', () => {
+      if (receiverFocused.current) setTimeout(toReceiver, 150);
+    });
+    return () => shown.remove();
+  }, []);
+
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      testID={testID}
-    >
+    // `padding` on Android too: the app is edge-to-edge, so the window no longer resizes for the
+    // keyboard (`adjustResize` is a no-op) and the receiver fields sat behind it. As OtpScreen.
+    <KeyboardAvoidingView style={styles.screen} behavior="padding" testID={testID}>
       <GradientHeader
         title={mode === 'edit' ? 'Edit address' : 'Address details'}
         onBack={onBack}
         testID={`${testID}-header`}
       />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -333,6 +357,7 @@ export function AddressDetailsScreen({
                     value={form.receiverName}
                     onChangeText={(receiverName) => set({ receiverName })}
                     placeholder="Receiver’s name"
+                    inputProps={{ onFocus: showReceiver, onBlur: leaveReceiver }}
                     testID={`${testID}-receiver-name`}
                   />
                   <FieldInput
@@ -345,7 +370,11 @@ export function AddressDetailsScreen({
                     leading={
                       form.receiverPhone === '' ? null : <Text style={styles.dial}>+91</Text>
                     }
-                    inputProps={{ textContentType: 'telephoneNumber' }}
+                    inputProps={{
+                      textContentType: 'telephoneNumber',
+                      onFocus: showReceiver,
+                      onBlur: leaveReceiver,
+                    }}
                     testID={`${testID}-receiver-phone`}
                   />
                 </>
