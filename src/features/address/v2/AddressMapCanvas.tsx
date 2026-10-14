@@ -1,10 +1,11 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import type { Details, Region } from 'react-native-maps';
 
 import type { DeviceCoordinates } from '../location/deviceLocation';
-import { LIGHT_MAP_STYLE } from '../location/lightMapStyle';
+import { C, SHADOW_2 } from './theme';
 
 /**
  * `53:33` — the Google surface, and the whole of the camera's behaviour.
@@ -36,6 +37,9 @@ export const AddressMapCanvas = memo(function AddressMapCanvas({
   readonly onGestureStart: () => void;
 }) {
   const mapRef = useRef<MapView>(null);
+  const { top } = useSafeAreaInsets();
+  /** The map's bearing once it has settled; 0 is north up. Drives our compass (see below). */
+  const [heading, setHeading] = useState(0);
 
   /**
    * The region the map OPENS on, evaluated once — `useState`'s initialiser runs on mount only.
@@ -147,6 +151,10 @@ export const AddressMapCanvas = memo(function AddressMapCanvas({
       recentringTimer.current = null;
     }
     gesturing.current = false;
+    void mapRef.current
+      ?.getCamera()
+      .then((camera) => setHeading(Math.round(camera.heading) % 360))
+      .catch(() => undefined);
 
     const centre = { latitude: region.latitude, longitude: region.longitude };
     if (ours) {
@@ -167,52 +175,85 @@ export const AddressMapCanvas = memo(function AddressMapCanvas({
     onSettle(centre);
   };
 
+  const northUp = () => {
+    void mapRef.current?.getCamera().then((camera) => {
+      mapRef.current?.animateCamera({ ...camera, heading: 0 }, { duration: 300 });
+      setHeading(0);
+    });
+  };
+
   return (
-    <MapView
-      ref={mapRef}
-      style={styles.mapCanvas}
-      provider={PROVIDER_GOOGLE}
-      initialRegion={initialRegion}
-      /**
-       * The map moving, and the map coming to rest. NOTHING is read from it in between:
-       * `onRegionChange` fires on every animation frame, and hanging a selection — let alone a
-       * reverse geocode — off it is exactly the per-frame work that stutters a pan. The pin does
-       * not follow those events either; it cannot, because it is not on the map.
-       *
-       * There is deliberately NO `onPress`. Tapping the canvas used to teleport the pin to whatever
-       * the finger landed on — the "pin jumps wherever you touch" defect. A tap is how a pan
-       * BEGINS, not how an address is chosen.
-       */
-      onRegionChangeStart={handleRegionChangeStart}
-      onRegionChangeComplete={handleRegionChangeComplete}
-      /**
-       * Pan and zoom are the whole interaction and stay on. Rotation and tilt are off: a tilted
-       * camera's visible region is a trapezoid whose bounding-box centre is NOT the camera target,
-       * so the settle would report a coordinate a little away from the one under the pin's tip.
-       * Off, the reported centre and the pin agree exactly — and a flat overlay pin could not
-       * honestly represent a rotated ground plane anyway.
-       */
-      scrollEnabled
-      zoomEnabled
-      rotateEnabled={false}
-      pitchEnabled={false}
-      // `53:33` is a LIGHT canvas. The Maps SDK defaults its colour scheme to FOLLOW_SYSTEM, so
-      // this is what stops a handset in Android dark mode from repainting the whole step black —
-      // see `lightMapStyle.ts`.
-      customMapStyle={LIGHT_MAP_STYLE}
-      // The DEVICE's own fix, drawn by the SDK as its standard blue dot. It is not the selected
-      // location — that is the red pin above it — and the two are allowed to sit apart: the
-      // customer may be placing an address they are not standing at.
-      showsUserLocation
-      showsMyLocationButton={false}
-      toolbarEnabled={false}
-      testID="address-map-canvas"
-    />
+    <>
+      <MapView
+        ref={mapRef}
+        style={styles.mapCanvas}
+        provider={PROVIDER_GOOGLE}
+        initialRegion={initialRegion}
+        /**
+         * The map moving, and the map coming to rest. NOTHING is read from it in between:
+         * `onRegionChange` fires on every animation frame, and hanging a selection — let alone a
+         * reverse geocode — off it is exactly the per-frame work that stutters a pan. The pin does
+         * not follow those events either; it cannot, because it is not on the map.
+         *
+         * There is deliberately NO `onPress`. Tapping the canvas used to teleport the pin to whatever
+         * the finger landed on — the "pin jumps wherever you touch" defect. A tap is how a pan
+         * BEGINS, not how an address is chosen.
+         */
+        onRegionChangeStart={handleRegionChangeStart}
+        onRegionChangeComplete={handleRegionChangeComplete}
+        /**
+         * Pan, zoom and rotation are on, as on the delivery apps customers know (owner, 2026-10-14).
+         * Rotation keeps the pin honest: the visible region turns about the camera target, so its
+         * bounding box stays centred on it and the settle still reports the point under the pin's
+         * tip. Tilt stays off: a tilted camera's visible region is a trapezoid whose bounding-box
+         * centre is NOT the camera target. A compass shows once the map is turned, and a tap on it
+         * turns north back up.
+         */
+        scrollEnabled
+        zoomEnabled
+        rotateEnabled
+        // Google's compass sits in the map's top-left corner, under the status bar and the back
+        // button here. Ours (below) sits under the search bar instead.
+        showsCompass={false}
+        pitchEnabled={false}
+        // No custom style: Google's own map, as the delivery apps customers know draw it (owner,
+        // 2026-10-14). A style repaints the building footprints into the land, so a customer could
+        // not tell which building they were putting the pin on.
+        // The DEVICE's own fix, drawn by the SDK as its standard blue dot. It is not the selected
+        // location — that is the red pin above it — and the two are allowed to sit apart: the
+        // customer may be placing an address they are not standing at.
+        showsUserLocation
+        showsMyLocationButton={false}
+        toolbarEnabled={false}
+        testID="address-map-canvas"
+      />
+      {heading === 0 ? null : (
+        // The map is turned: a compass under the search bar (its 48pt row sits 8 below the inset),
+        // pointing north. A tap turns north back up and the compass goes away.
+        <Pressable
+          onPress={northUp}
+          accessibilityRole="button"
+          accessibilityLabel="Turn the map north up"
+          hitSlop={8}
+          style={[styles.compass, SHADOW_2, { top: top + 8 + 48 + 12 }]}
+          testID="address-map-compass"
+        >
+          <View style={[styles.needle, { transform: [{ rotate: `${-heading}deg` }] }]}>
+            <View style={styles.needleNorth} />
+            <View style={styles.needleSouth} />
+          </View>
+        </Pressable>
+      )}
+    </>
   );
 });
 
-/** How much ground the camera shows around the pin. ~600 m across, tight enough to place a door. */
-const MAP_SPAN = 0.006;
+/**
+ * How much ground the camera shows around the pin: ~170 m across, close enough that Google draws
+ * each building as a shape (it stops below zoom ~17), so the customer can put the pin on their
+ * own building, as the delivery apps they use do.
+ */
+const MAP_SPAN = 0.0016;
 
 /** Long enough to read as the map travelling to the new point rather than cutting to it. */
 const MAP_RECENTRE_MS = 350;
@@ -251,4 +292,35 @@ function sameCoordinate(a: DeviceCoordinates, b: DeviceCoordinates): boolean {
 
 const styles = StyleSheet.create({
   mapCanvas: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  compass: {
+    position: 'absolute',
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: C.base,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  needle: { width: 8, height: 26, alignItems: 'center' },
+  needleNorth: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderBottomWidth: 13,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#E53935',
+  },
+  needleSouth: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderTopWidth: 13,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: C.textDisabled,
+  },
 });
