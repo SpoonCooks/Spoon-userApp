@@ -46,6 +46,14 @@ const POOL = FOOD;
 const TEST_ID = 'profile-screen';
 
 /**
+ * Labels the frame draws on one line. Android measures this face a hair narrower than it draws
+ * it, so a pill or tag sized to its text wrapped its last word onto a line its height hides
+ * ("View &", "Your") — `simple` breaking measures the line as it is drawn, and one line is the
+ * frame's intent at every width.
+ */
+const ONE_LINE = { numberOfLines: 1, textBreakStrategy: 'simple' } as const;
+
+/**
  * Account — Figma `2202:4311` (food profile complete: `2209:10932`; Cook Pool empty `2146:6962`
  * and new user `2146:6983`). Dev note `2084:2770`: the name and number come from the login and are
  * read-only; the food profile card resumes the profile while incomplete and reviews it once
@@ -287,7 +295,9 @@ function Tag({ label }: { label: string }) {
   return (
     <View style={styles.tag}>
       <Image source={ACCOUNTS_ART.tagSparkle} style={styles.tagSparkle} />
-      <Text style={T.microStrong}>{label}</Text>
+      <Text style={T.microStrong} {...ONE_LINE}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -314,7 +324,9 @@ function Pill({
       style={[styles.pill, small ? styles.pillSmall : styles.pillLarge, tight && styles.pillTight]}
       testID={testID}
     >
-      <Text style={small ? T.captionStrong : T.button}>{label}</Text>
+      <Text style={small ? T.captionStrong : T.button} {...ONE_LINE}>
+        {label}
+      </Text>
       <Image source={ACCOUNTS_ART.pillChevron} style={styles.pillChevron} />
     </Pressable>
   );
@@ -340,7 +352,9 @@ function Tile({
       testID={testID}
     >
       <Image source={art} style={styles.tileArt} />
-      <Text style={T.bodyStrong} numberOfLines={1}>
+      {/* A third of a narrow phone is less than Figma's 115pt tile: the label shrinks a step
+          rather than truncating ("My bookin…"). */}
+      <Text style={T.bodyStrong} {...ONE_LINE} adjustsFontSizeToFit minimumFontScale={0.8}>
         {title}
       </Text>
     </Pressable>
@@ -393,6 +407,7 @@ const styles = StyleSheet.create({
   foodText: { flexShrink: 1, maxWidth: 190 },
   foodBody: { width: 164 },
   pill: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
