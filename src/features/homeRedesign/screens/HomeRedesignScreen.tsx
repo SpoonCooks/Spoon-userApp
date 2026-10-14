@@ -134,7 +134,7 @@ export function HomeRedesignView({
    * page starts below it and jumps within the page stop below it rather than under it.
    */
   const [scrollY] = useState(() => new Animated.Value(0));
-  const [headerHeight, setHeaderHeight] = useState(top + HEADER_ROW);
+  const [headerHeight, setHeaderHeight] = useState(top + HEADER_TOP_GAP + HEADER_ROW);
   const headerFill = scrollY.interpolate({
     inputRange: [0, HEADER_FILL_DISTANCE],
     outputRange: [0, 1],
@@ -430,7 +430,7 @@ export function HomeRedesignView({
         </View>
       </Animated.ScrollView>
       <View
-        style={[styles.header, { paddingTop: top }]}
+        style={[styles.header, { paddingTop: top + HEADER_TOP_GAP }]}
         onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
         testID="home-header-bar"
       >
@@ -477,5 +477,7 @@ const styles = StyleSheet.create({
 
 /** `1255:2983` — the header row: a 44pt pin box with 8pt above and below. */
 const HEADER_ROW = 60;
+/** Breathing room between the status bar and the address row (owner, 2026-10-14). */
+const HEADER_TOP_GAP = 12;
 /** How far the page scrolls before the header is fully filled. */
 const HEADER_FILL_DISTANCE = 24;
