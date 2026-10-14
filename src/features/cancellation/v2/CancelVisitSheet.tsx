@@ -665,6 +665,13 @@ function ReasonStep({
 }) {
   const tiles = reasons.filter((option) => !option.requiresDetail);
   const other = reasons.find((option) => option.requiresDetail) ?? null;
+  /*
+   * Two tiles per row, sharing the row's width. A percentage width plus the 8pt gap overflowed
+   * on a 360pt phone (2 × 48.9 % + 8 > 100 %) and wrapped every tile onto its own line.
+   */
+  const rows = Array.from({ length: Math.ceil(tiles.length / 2) }, (_, i) =>
+    tiles.slice(i * 2, i * 2 + 2),
+  );
   return (
     <>
       <Header
@@ -675,27 +682,32 @@ function ReasonStep({
         testID={testID}
       />
       <View style={styles.reasons}>
-        {tiles.map((option) => {
-          const selected = option.code === reason;
-          return (
-            <Pressable
-              key={option.code}
-              onPress={() => onPick(option.code)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              style={[styles.reasonTile, selected ? styles.reasonOn : styles.reasonOff]}
-              testID={`${testID}-reason-${option.code}`}
-            >
-              <Well icon={iconOf(option.code)} tone={selected ? 'base' : 'subtle'} />
-              <Text style={styles.bodyStrong}>{option.label}</Text>
-              {selected ? (
-                <View style={styles.reasonCheck}>
-                  <Image source={CANCEL_ART.checkSmall} style={styles.icon16} />
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
+        {rows.map((row) => (
+          <View key={row.map((option) => option.code).join('|')} style={styles.reasonRow}>
+            {row.map((option) => {
+              const selected = option.code === reason;
+              return (
+                <Pressable
+                  key={option.code}
+                  onPress={() => onPick(option.code)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  style={[styles.reasonTile, selected ? styles.reasonOn : styles.reasonOff]}
+                  testID={`${testID}-reason-${option.code}`}
+                >
+                  <Well icon={iconOf(option.code)} tone={selected ? 'base' : 'subtle'} />
+                  <Text style={styles.bodyStrong}>{option.label}</Text>
+                  {selected ? (
+                    <View style={styles.reasonCheck}>
+                      <Image source={CANCEL_ART.checkSmall} style={styles.icon16} />
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+            {row.length === 1 ? <View style={styles.flex} /> : null}
+          </View>
+        ))}
         {other === null ? null : (
           <Pressable
             onPress={() => onPick(other.code)}
@@ -1144,15 +1156,16 @@ const styles = StyleSheet.create({
   goodToKnow: { gap: 16 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   actions: { flexDirection: 'row', gap: 12 },
-  reasons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  reasons: { gap: 8 },
+  reasonRow: { flexDirection: 'row', gap: 8 },
   reasonTile: {
-    width: '48.9%',
+    flex: 1,
     minHeight: 116,
     gap: 8,
     padding: 12,
     borderRadius: 16,
   },
-  reasonWide: { width: '100%', padding: 12, borderRadius: 16, gap: 12 },
+  reasonWide: { padding: 12, borderRadius: 16, gap: 12 },
   reasonWideRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   reasonOn: { backgroundColor: C.tint, borderWidth: 1.5, borderColor: C.brand },
   reasonOff: { backgroundColor: C.base, borderWidth: 1, borderColor: C.border },
