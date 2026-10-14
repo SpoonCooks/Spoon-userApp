@@ -1,6 +1,7 @@
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -83,6 +84,12 @@ export default function RootLayout() {
 
   return (
     <>
+      {/*
+       * Dark clock, battery and network icons on every screen: the app is light only
+       * (`userInterfaceStyle: 'light'`), but left unset Android takes the icon colour from the
+       * phone's own theme, and a phone in dark mode drew them white on the yellow headers.
+       */}
+      <StatusBar style="dark" />
       {fontsPending ? null : <RootProviders runtime={runtime} />}
       {launchSplashDone ? null : (
         <LaunchSplash ready={appReady} onShown={releaseSystemSplash} onDone={finishLaunchSplash} />
