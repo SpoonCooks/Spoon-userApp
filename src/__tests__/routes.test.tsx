@@ -114,7 +114,7 @@ describe('routes render', () => {
     ['profile', ProfileRoute, 'profile-screen'],
     // `338:4508`, V8. Mounted in the EDIT context; the first-run context is covered end to end in
     // `features/profile/profileOnboarding.test.tsx`.
-    ['profile/details', ProfileDetailsRoute, 'profile-details-screen'],
+    ['profile/details', ProfileDetailsRoute, 'taste-profile'],
     ['history', HistoryRoute, 'history-screen'],
     ['refunds', RefundsRoute, 'refunds-screen'],
     ['address', SavedAddressesRoute, 'saved-addresses'],

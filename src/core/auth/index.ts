@@ -3,6 +3,7 @@ export type { SessionController, SessionControllerOptions } from './sessionContr
 export { getDeviceId, resetDeviceIdCache } from './deviceId';
 export { readLastPhone, writeLastPhone } from './lastPhoneStore';
 export { readTriedPlace, writeTriedPlace } from './triedPlaceStore';
+export { clearProfileDraft, readProfileDraft, writeProfileDraft } from './profileDraftStore';
 export { unimplementedSessionGateway } from './sessionGateway';
 export type { SessionGateway } from './sessionGateway';
 export { secureGuestFlagStore } from './guestFlagStore';

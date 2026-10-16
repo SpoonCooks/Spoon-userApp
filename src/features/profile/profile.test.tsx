@@ -42,6 +42,13 @@ const BASE_ME: MeResponse = {
   grownUpEating: null,
   regionPreference: null,
   genderPreference: null,
+  householdAdults: null,
+  householdKids: null,
+  householdElders: null,
+  nonVegPreferences: null,
+  oilLevel: null,
+  gheeOnly: null,
+  mealHassles: null,
   profileComplete: true,
 };
 

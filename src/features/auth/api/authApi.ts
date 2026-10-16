@@ -191,6 +191,18 @@ export function createAuthApi(api: ApiClient) {
       }
       if (patch.regionPreference !== undefined) body.regionPreference = patch.regionPreference;
       if (patch.genderPreference !== undefined) body.genderPreference = patch.genderPreference;
+      if (patch.householdAdults !== undefined) body.householdAdults = patch.householdAdults;
+      if (patch.householdKids !== undefined) body.householdKids = patch.householdKids;
+      if (patch.householdElders !== undefined) body.householdElders = patch.householdElders;
+      if (patch.nonVegPreferences !== undefined) {
+        body.nonVegPreferences =
+          patch.nonVegPreferences === null ? null : [...patch.nonVegPreferences];
+      }
+      if (patch.oilLevel !== undefined) body.oilLevel = patch.oilLevel;
+      if (patch.gheeOnly !== undefined) body.gheeOnly = patch.gheeOnly;
+      if (patch.mealHassles !== undefined) {
+        body.mealHassles = patch.mealHassles === null ? null : [...patch.mealHassles];
+      }
 
       return api.request(AUTH_PATHS.profile, {
         method: 'PUT',
