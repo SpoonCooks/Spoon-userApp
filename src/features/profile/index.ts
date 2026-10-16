@@ -29,48 +29,31 @@ export { useProfileData } from './data';
 export { ProfileView } from './screens/ProfileScreen';
 export type { ProfileActions, ProfileViewProps } from './screens/ProfileScreen';
 
-export { ProfileDetailsView } from './screens/ProfileDetailsScreen';
-export type { ProfileDetailsViewProps } from './screens/ProfileDetailsScreen';
+export { TasteProfileWizard } from './wizard/TasteProfileWizard';
+export type { TasteProfileWizardProps } from './wizard/TasteProfileWizard';
 export { ProfileCompletionCard } from './components/ProfileCompletionCard';
 export type { ProfileCompletionCardProps } from './components/ProfileCompletionCard';
 export {
+  discardProfileDraft,
+  parseDraft,
   profileDetailsFromMe,
+  profileUpdateFrom,
+  saveProfileDraft,
   useProfileDetailsData,
+  useProfileDraft,
   useProfileGate,
   useSaveProfileDetails,
 } from './detailsData';
-export type { ProfileDetailsData, ProfileGate } from './detailsData';
-export {
-  PROFILE_COOK_PREFERENCE_LABEL,
-  PROFILE_DETAILS_CTA,
-  PROFILE_DETAILS_INTRO,
-  PROFILE_DETAILS_TITLE,
-  PROFILE_FIELDS,
-  PROFILE_REQUIRED_FIELDS,
-  profileChoiceField,
-  profileField,
-  profilePromptField,
-} from './fields';
-export type {
-  ProfileChipTone,
-  ProfileChoiceField,
-  ProfileChoiceFieldId,
-  ProfileEntryField,
-  ProfileField,
-  ProfileFieldId,
-  ProfileOption,
-  ProfileTextField,
-} from './fields';
+export type { ProfileDetailsData, ProfileDraft, ProfileGate } from './detailsData';
+export { WIZARD_STEPS, dietLabel, regionLabel } from './fields';
+export type { WizardStep, WizardStepId } from './fields';
 export {
   EMPTY_PROFILE_DETAILS,
-  addGrownUpEating,
+  canContinueStep,
   canSubmitProfileDetails,
-  isProfileDetailsComplete,
-  missingProfileFields,
-  removeGrownUpEating,
-  toggleSingle,
+  firstIncompleteStep,
 } from './validation';
-export type { ProfileDetailsValues, ProfileSubmitGate } from './validation';
+export type { ProfileDetailsValues } from './validation';
 
 export type * from './types';
 export { AccountHubScreen } from './v2/AccountHubScreen';

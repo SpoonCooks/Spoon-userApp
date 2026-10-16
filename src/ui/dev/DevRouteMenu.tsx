@@ -127,6 +127,31 @@ export const DEV_ROUTES: readonly DevRoute[] = [
   { path: '/showcase', label: 'Component showcase', note: 'Design system' },
   { path: '/splash', label: 'Login · Loading page', note: '73:1036' },
   {
+    path: '/taste-profile',
+    label: 'Taste profile · Family (preview)',
+    note: 'IN PROGRESS · 1548:3676 · dev preview, no session needed',
+  },
+  {
+    path: '/taste-profile?step=diet',
+    label: 'Taste profile · Diet (preview)',
+    note: 'IN PROGRESS · 1548:3786',
+  },
+  {
+    path: '/taste-profile?step=taste',
+    label: 'Taste profile · Taste (preview)',
+    note: 'IN PROGRESS · 1548:3922',
+  },
+  {
+    path: '/taste-profile?step=cook',
+    label: 'Taste profile · Cook (preview)',
+    note: 'IN PROGRESS · 1548:4061',
+  },
+  {
+    path: '/taste-profile?step=cook&meal=regular-cook',
+    label: 'Taste profile · Cook, meals picked (preview)',
+    note: 'IN PROGRESS · 2522:1049',
+  },
+  {
     path: '/recurring-setup',
     label: 'Recurring setup · full flow (preview)',
     note: 'IN PROGRESS · dev preview, no session needed',

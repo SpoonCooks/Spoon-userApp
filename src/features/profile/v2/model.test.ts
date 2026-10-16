@@ -15,6 +15,13 @@ const ME: MeResponse = {
   grownUpEating: ['punjabi', 'bengali', 'goan', 'Grandma’s dal'],
   regionPreference: 'north-indian',
   genderPreference: null,
+  householdAdults: null,
+  householdKids: null,
+  householdElders: null,
+  nonVegPreferences: null,
+  oilLevel: null,
+  gheeOnly: null,
+  mealHassles: null,
   profileComplete: true,
 };
 

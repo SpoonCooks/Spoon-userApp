@@ -1,8 +1,7 @@
 import { displayPhone } from '@features/auth';
 import type { MeResponse } from '@features/auth';
 
-import { profileChoiceField, profileField } from '../fields';
-import type { ProfileChoiceFieldId } from '../fields';
+import { canonicalCuisine, dietLabel, regionLabel } from '../fields';
 
 /**
  * The Account hub (Figma `2202:4311`, completed food profile `2209:10920`) — what dev note
@@ -20,28 +19,20 @@ export function phoneLabelOf(phone: string): string {
   return displayPhone(phone, '+91');
 }
 
-function optionLabel(field: ProfileChoiceFieldId, id: string | null): string | null {
-  if (id === null) return null;
-  return profileChoiceField(field).options.find((option) => option.id === id)?.label ?? null;
-}
-
 /**
  * The completed card's "summary of the saved preferences" (`2209:10920` draws two lines, e.g.
  * "Veg · Medium spice" / "North Indian · No mushrooms"). From the answers the profile stores: the
  * diet and region preference, then up to two of the foods they grew up eating.
  */
 export function foodSummaryOf(me: MeResponse): readonly string[] {
-  const first = [
-    optionLabel('dietaryPreference', me.dietaryPreference),
-    optionLabel('regionPreference', me.regionPreference),
-  ].filter((part): part is string => part !== null);
-  const entry = profileField('grownUpEating');
-  const known = entry.kind === 'entry' ? entry.options : [];
-  // An open-entry field: a known id reads as its label, anything typed reads as typed.
+  const first = [dietLabel(me.dietaryPreference), regionLabel(me.regionPreference)].filter(
+    (part): part is string => part !== null,
+  );
+  // An open-entry field: a listed cuisine (by id or old " food" label) reads as today's chip,
+  // anything else reads as stored.
   const grewUp = (me.grownUpEating ?? [])
-    .map((id) => known.find((option) => option.id === id)?.label ?? id)
-    .map((label) => label.replace(/ food$/, ''))
-    .filter((label) => label.trim().length > 0)
+    .map(canonicalCuisine)
+    .filter((label) => label.length > 0)
     .slice(0, 2);
   return [first.join(' · '), grewUp.join(' · ')].filter((line) => line.length > 0);
 }

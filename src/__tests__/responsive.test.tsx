@@ -33,7 +33,7 @@ import {
 } from '@features/address';
 import { LoginScreen, OtpScreen } from '@features/auth';
 import { BookingListView } from '@features/history';
-import { ProfileDetailsView, ProfileView } from '@features/profile';
+import { EMPTY_PROFILE_DETAILS, ProfileView, TasteProfileWizard } from '@features/profile';
 import { ScheduleView } from '@features/scheduled';
 import { ConfirmationLoading, SplashLoading } from '@features/loading';
 import { CookCard } from '@ui';
@@ -65,6 +65,14 @@ import { CookCard } from '@ui';
  */
 
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions');
+/** The taste-profile wizard hands Android's back to the stack, which needs a navigator. */
+jest.mock('expo-router', () => ({
+  __esModule: true,
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('react').useEffect(effect, [effect]);
+  },
+}));
 
 const WIDTHS = [320, 360, 393, 411, 430] as const;
 const HEIGHTS = [
@@ -290,42 +298,44 @@ describe.each(HEIGHTS)('on a %s viewport', (_label, height) => {
     });
 
     /**
-     * `338:4508` — the form-heavy page (task §24).
-     *
-     * It is 1025pt of content against a 568pt viewport at the short end, so EVERYTHING here
-     * depends on the CTA scrolling with the body rather than being pinned: a pinned bar would
-     * cover the Gender chips, which are the last thing above it. What is asserted is that the
-     * first field, the last chip group and the CTA are all mounted at every size — a chip grid
-     * that overflowed its column, or a CTA that fell out of the tree, fails here.
+     * The taste-profile wizard (`1405:448`) — each step at every size. The CTA is pinned in a
+     * footer and the steps scroll above it, so what is asserted is that each step's first and
+     * last control and the CTA are all mounted.
      */
-    it('renders the profile-details form with its first field, last chips and CTA', () => {
-      render(<ProfileDetailsView onSubmit={noop} onBack={noop} />);
+    it.each([
+      ['family', 'taste-profile-name', 'taste-profile-householdElders-plus'],
+      ['diet', 'taste-profile-diet-vegetarian', 'taste-profile-diet-mixed'],
+      ['taste', 'taste-profile-cuisine-search', 'taste-profile-ghee'],
+      ['cook', 'taste-profile-gender-either', 'taste-profile-meal-office-meals'],
+    ] as const)('renders the %s step with its controls and CTA', (step, first, last) => {
+      render(
+        <TasteProfileWizard
+          initialValues={EMPTY_PROFILE_DETAILS}
+          initialStep={step}
+          onSubmit={noop}
+          onExit={noop}
+        />,
+      );
 
-      expect(screen.getByTestId('profile-details-screen')).toBeTruthy();
-      expect(screen.getByTestId('profile-name')).toBeTruthy();
-      expect(screen.getByTestId('profile-grown-up-entry')).toBeTruthy();
-      // The 3-up groups are the ones a 320dp column threatens.
-      expect(screen.getByTestId('profile-region-north-indian')).toBeTruthy();
-      expect(screen.getByTestId('profile-gender-either')).toBeTruthy();
-      expect(screen.getByTestId('profile-details-submit')).toBeTruthy();
+      expect(screen.getByTestId(first)).toBeTruthy();
+      expect(screen.getByTestId(last)).toBeTruthy();
+      expect(screen.getByTestId('taste-profile-continue')).toBeTruthy();
     });
 
-    /**
-     * The longest labels in the file, at the narrowest width.
-     *
-     * "Office meals + food delivery" is 130pt of type in a chip that is ~135pt wide at 320dp. The
-     * chip wraps rather than ellipsizing (the label carries no `numberOfLines`), so the text is
-     * still THERE — which is what this asserts. A one-line clamp would render "Office meals + food
-     * deliv…" and this would still pass on testID alone, so the TEXT is what is queried.
-     */
-    it('keeps the longest chip labels intact', () => {
-      render(<ProfileDetailsView onSubmit={noop} onBack={noop} />);
+    /** The longest copy in the file, at the narrowest width: wrapped, never clipped. */
+    it('keeps the longest labels intact', () => {
+      render(
+        <TasteProfileWizard
+          initialValues={{ ...EMPTY_PROFILE_DETAILS, mealStructure: 'tiffin' }}
+          initialStep="cook"
+          onSubmit={noop}
+          onExit={noop}
+        />,
+      );
 
-      expect(screen.getByText('Office meals + food delivery')).toBeTruthy();
-      expect(screen.getByText('Daily cook with 2x visits')).toBeTruthy();
-      expect(
-        screen.getByText('What is the most pressing issue with your meals today?'),
-      ).toBeTruthy();
+      expect(screen.getByText('Cooks you’re comfortable with')).toBeTruthy();
+      expect(screen.getByText('Neighbourhood tiffin or meal subscription')).toBeTruthy();
+      expect(screen.getByText('Hard to pause, skip or change')).toBeTruthy();
     });
 
     it.each([
