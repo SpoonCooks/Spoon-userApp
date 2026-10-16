@@ -7,6 +7,7 @@ import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 
 import { SHEET_CLOSE_GLYPH } from './assets';
+import { BlurredScrim } from '@ui/v2/Backdrop';
 
 /**
  * Sheet chrome shared by the Visit details sheets — Figma `1433:1625` / `1434:1770` in
@@ -84,6 +85,7 @@ export function RecurringSheet({
       testID={`${testID}-modal`}
     >
       <View style={styles.root} accessibilityViewIsModal>
+        <BlurredScrim dim={0.4} />
         <Pressable
           style={styles.backdrop}
           onPress={onClose}
@@ -128,7 +130,7 @@ export function RecurringSheet({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: lightTheme.colors.scrimRecurringSheet },
+  root: { flex: 1 },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   /** `1433:1625` — r24 top corners, pt 8 / px 16, 16pt gap, children centred. */
   sheet: {

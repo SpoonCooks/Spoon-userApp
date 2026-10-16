@@ -15,6 +15,7 @@ import { RuntimeProvider } from '@core/runtimeContext';
 import { useSessionStore } from '@core/store';
 import { AppUpdateGate } from '@features/appUpdate';
 import { ErrorBoundary, LaunchSplash, ThemeProvider } from '@ui';
+import { BackdropTargetRoot } from '@ui/v2/Backdrop';
 
 /**
  * Root layout: providers, session bootstrap, splash hold.
@@ -108,13 +109,16 @@ function RootProviders({ runtime }: { readonly runtime: ReturnType<typeof create
               <ErrorBoundary scope="root">
                 {/* Over EVERYTHING, signed in or not: an old build is blocked at the login screen too. */}
                 <AppUpdateGate>
-                  <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="index" />
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(app)" />
-                    {/* Legal sits OUTSIDE both groups on purpose — see `app/legal/[doc].tsx`. */}
-                    <Stack.Screen name="legal/[doc]" />
-                  </Stack>
+                  {/* What every sheet's blurred scrim blurs on Android (`@ui/v2/Backdrop`). */}
+                  <BackdropTargetRoot>
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen name="index" />
+                      <Stack.Screen name="(auth)" />
+                      <Stack.Screen name="(app)" />
+                      {/* Legal sits OUTSIDE both groups on purpose — see `app/legal/[doc].tsx`. */}
+                      <Stack.Screen name="legal/[doc]" />
+                    </Stack>
+                  </BackdropTargetRoot>
                 </AppUpdateGate>
               </ErrorBoundary>
             </ThemeProvider>

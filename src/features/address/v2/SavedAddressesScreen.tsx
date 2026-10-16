@@ -19,6 +19,7 @@ import type { SavedAddressItem } from './model';
 import { AddressToast } from '@ui/v2/Toast';
 import type { ToastNotice } from '@ui/v2/Toast';
 import { C, GRADIENT, SHADOW_1, SHADOW_2, SHADOW_3, SHADOW_HAIRLINE, T } from './theme';
+import { BlurredScrim } from '@ui/v2/Backdrop';
 
 /**
  * Saved addresses — Figma `1870:2770`, with the Remove sheet from `1870:2857`, built to dev notes
@@ -341,6 +342,7 @@ export function RemoveAddressSheet({
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={close}>
       <View style={styles.scrim} accessibilityViewIsModal>
+        <BlurredScrim dim={0.4} />
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={close}
@@ -480,7 +482,7 @@ const styles = StyleSheet.create({
   menuItemPressed: { backgroundColor: C.subtle },
   captionStrong: { ...T.captionStrong, color: C.text },
   /** `1870:2857` — the scrim is `color/surface/inverse` at full strength, as drawn. */
-  scrim: { flex: 1, backgroundColor: C.text },
+  scrim: { flex: 1 },
   sheet: {
     marginTop: 'auto',
     backgroundColor: C.base,

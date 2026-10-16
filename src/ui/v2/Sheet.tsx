@@ -14,6 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useKeyboardAwareScroll, useKeyboardHeight } from '../primitives/Screen';
 
+import { BlurredScrim } from './Backdrop';
+
 import { C, SHADOW_3 } from './theme';
 
 /**
@@ -22,7 +24,7 @@ import { C, SHADOW_3 } from './theme';
  * ~90% of the screen. Scrim tap, swipe down on the handle, and Android back all call `onClose` —
  * unless `dismissible` is false (a write in flight, or a step with no way back).
  *
- * The scrim is 40% black: the frames draw a blurred backdrop, and the app has no blur library.
+ * The scrim is the frames' blurred backdrop under 40% black (`BlurredScrim`).
  *
  * `look="account"` is the Accounts sheet (Delete account, `1517:10413`), drawn differently from the
  * cancellation sheets: a 36 × 4 `#FFEF99` grabber 12pt from the top, a 35% scrim, no shadow, and
@@ -99,7 +101,8 @@ export function Sheet({
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={close}>
-      <View style={[styles.scrim, account && styles.scrimAccount]} accessibilityViewIsModal>
+      <View style={styles.scrim} accessibilityViewIsModal>
+        <BlurredScrim dim={account ? 0.35 : 0.4} />
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={close}
@@ -158,8 +161,7 @@ export function Sheet({
 const KEYBOARD_ACTION_ROOM = 136;
 
 const styles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
-  scrimAccount: { backgroundColor: 'rgba(0,0,0,0.35)' },
+  scrim: { flex: 1 },
   sheet: {
     marginTop: 'auto',
     backgroundColor: C.base,
