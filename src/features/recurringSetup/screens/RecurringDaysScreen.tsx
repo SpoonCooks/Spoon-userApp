@@ -479,7 +479,13 @@ function DayCell({ day, selected, locked, edge, onToggle }: DayCellProps) {
       onAccessibilityAction={onToggle}
       testID={`recurring-day-${day.id}`}
     >
+      {/*
+       * Never flattened: an unpicked disc has no background, so Android's renderer folded it into
+       * its column, and the view rebuilt when a pick gave it a fill came back without its radius.
+       * Picked days drew as squares on the vivo I2302 (owner, 2026-10-16).
+       */}
       <View
+        collapsable={false}
         style={[
           styles.disc,
           locked
