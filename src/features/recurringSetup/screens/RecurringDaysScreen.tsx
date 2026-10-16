@@ -204,6 +204,13 @@ export function RecurringDaysScreen({
     [commit, showCapError],
   );
 
+  /** Whether the active plan holds a day right now, read live for a sweep in progress. */
+  const isPicked = useCallback(
+    (id: string) =>
+      plansRef.current.find((plan) => plan.id === activeRef.current)?.days.has(id) ?? false,
+    [],
+  );
+
   const select = (id: string) => {
     activeRef.current = id;
     setActiveId(id);
@@ -293,6 +300,7 @@ export function RecurringDaysScreen({
             startId={startId}
             endId={endId}
             onApply={apply}
+            isPicked={isPicked}
           />
         </View>
 
@@ -336,6 +344,8 @@ interface DayGridProps {
    * that makes it an add or a remove sweep, and returns which — then that mode for every day after.
    */
   readonly onApply: (id: string, intent: SweepIntent) => 'add' | 'remove' | null;
+  /** Whether the active plan holds a day at this moment (not as of the last render). */
+  readonly isPicked: (id: string) => boolean;
 }
 
 type SweepIntent = 'add' | 'remove' | 'toggle';
@@ -343,25 +353,27 @@ type SweepIntent = 'add' | 'remove' | 'toggle';
 /**
  * The date rows, with tap and drag selection.
  *
- * One pan gesture owns the whole grid, so a finger can sweep across rows (`147:1510`) or along one
- * (`132:1568`). The first day touched decides the gesture: an unpicked day starts an add sweep, a
- * picked one a remove sweep, and every further day the finger enters gets the same treatment once.
- * A tap is the same gesture with no movement.
+ * One pan gesture owns the whole grid. The first day touched is the sweep's anchor and decides
+ * it: an unpicked day starts an add sweep, a picked one a remove sweep. From then on every day
+ * BETWEEN the anchor and the finger, in date order, gets that treatment, so a drag down a column
+ * takes in the whole weeks in between rather than one weekday (owner, 2026-10-16). Sliding back
+ * shrinks the range and hands the days it leaves back their state from before the sweep. Days
+ * another plan holds or the server greys out are skipped; with the 14-day cap, the days nearest
+ * the anchor fill first. A tap is the same gesture with no movement.
  */
-function DayGrid({ rows, selected, locked, startId, endId, onApply }: DayGridProps) {
+function DayGrid({ rows, selected, locked, startId, endId, onApply, isPicked }: DayGridProps) {
   // Lazily created and stable for the component's life — the same pattern `BottomSheet` uses for
   // its `Animated.Value` — so the gesture can track a sweep without reading a ref during render.
   const [tracker] = useState(() => new SweepTracker());
 
   // Built once per grid, not per render: a sweep's first day re-renders the screen, and handing
   // the detector a new gesture mid-sweep can reset the one in progress. Everything it reads —
-  // the tracker, the rows and `onApply` — is stable across renders.
+  // the tracker, the rows, `onApply` and `isPicked` — is stable across renders.
   const sweep = useMemo(() => {
+    const order = rows.flatMap((row) => row.days.filter((day) => day !== null).map((d) => d.id));
     const visit = (x: number, y: number) => {
-      const hit = tracker.hit(x, y, rows);
-      if (hit === null) return;
-      const mode = onApply(hit.id, hit.intent);
-      if (hit.intent === 'toggle' && mode !== null) tracker.start(mode);
+      const id = tracker.dayAt(x, y, rows);
+      if (id !== null) tracker.sweepTo(order.indexOf(id), order, onApply, isPicked);
     };
     // `minDistance(0)`: a tap is a pan that never moves, so taps and sweeps share one path.
     return Gesture.Pan()
@@ -373,7 +385,7 @@ function DayGrid({ rows, selected, locked, startId, endId, onApply }: DayGridPro
       })
       .onUpdate((event) => visit(event.x, event.y))
       .onFinalize(() => tracker.reset());
-  }, [tracker, rows, onApply]);
+  }, [tracker, rows, onApply, isPicked]);
 
   return (
     <GestureDetector gesture={sweep}>
@@ -410,12 +422,18 @@ function DayGrid({ rows, selected, locked, startId, endId, onApply }: DayGridPro
 }
 
 /**
- * One sweep across the grid: which way it is going (add or remove, decided by the first day) and
- * which days it has already touched, so a finger lingering on a day applies it once.
+ * One sweep across the grid: its anchor (the first day, as an index in date order), whether it
+ * adds or removes, the day the finger was last over, and the days this sweep actually changed, so
+ * shrinking the range can hand exactly those back.
  */
-class SweepTracker {
+export class SweepTracker {
   private width = 0;
-  private session: { mode: 'add' | 'remove' | null; visited: Set<string> } | null = null;
+  private session: {
+    readonly anchor: number;
+    readonly mode: 'add' | 'remove';
+    last: number;
+    readonly changed: Set<string>;
+  } | null = null;
 
   setWidth(width: number): void {
     this.width = width;
@@ -425,17 +443,56 @@ class SweepTracker {
     this.session = null;
   }
 
-  /** The sweep's direction, once the screen has resolved its first day. */
-  start(mode: 'add' | 'remove'): void {
-    if (this.session !== null) this.session.mode = mode;
+  /**
+   * The finger is over the day at `index` (date order). The first call anchors the sweep and
+   * toggles that day; later ones hand back days the range has left, then apply the sweep's mode
+   * from the anchor out to `index`, nearest first so the cap keeps the days closest to it.
+   */
+  sweepTo(
+    index: number,
+    order: readonly string[],
+    apply: DayGridProps['onApply'],
+    isPicked: DayGridProps['isPicked'],
+  ): void {
+    const id = order[index];
+    if (id === undefined) return;
+    if (this.session === null) {
+      const before = isPicked(id);
+      const mode = apply(id, 'toggle');
+      if (mode === null) return;
+      this.session = {
+        anchor: index,
+        mode,
+        last: index,
+        changed: new Set(isPicked(id) !== before ? [id] : []),
+      };
+      return;
+    }
+    const session = this.session;
+    if (index === session.last) return;
+    session.last = index;
+    const low = Math.min(session.anchor, index);
+    const high = Math.max(session.anchor, index);
+    const undo = session.mode === 'add' ? 'remove' : 'add';
+    for (const changed of [...session.changed]) {
+      const at = order.indexOf(changed);
+      if (at >= low && at <= high) continue;
+      apply(changed, undo);
+      session.changed.delete(changed);
+    }
+    const step = index >= session.anchor ? 1 : -1;
+    for (let at = session.anchor; at !== index + step; at += step) {
+      const dayId = order[at];
+      if (dayId === undefined || session.changed.has(dayId)) continue;
+      const before = isPicked(dayId);
+      if (before === (session.mode === 'add')) continue;
+      apply(dayId, session.mode);
+      if (isPicked(dayId) !== before) session.changed.add(dayId);
+    }
   }
 
-  /** The day under a grid-relative point, and what to do with it — or null for nothing new. */
-  hit(
-    x: number,
-    y: number,
-    rows: DayGridProps['rows'],
-  ): { readonly id: string; readonly intent: SweepIntent } | null {
+  /** The day under a grid-relative point, or null for a gap, the month column or outside. */
+  dayAt(x: number, y: number, rows: DayGridProps['rows']): string | null {
     if (this.width === 0) return null;
     // Seven date columns `CELL_GAP` apart across the width the month column leaves free, so a
     // date column and its gap step by one column's width plus `CELL_GAP`.
@@ -444,15 +501,7 @@ class SweepTracker {
     const column = Math.floor(x / pitch);
     const row = Math.floor(y / (ROW_HEIGHT + CELL_GAP));
     if (column < 0 || column >= DAY_COLUMNS || row < 0) return null;
-    const day = rows[row]?.days[column] ?? null;
-    if (day === null) return null;
-    if (this.session === null) {
-      this.session = { mode: null, visited: new Set([day.id]) };
-      return { id: day.id, intent: 'toggle' };
-    }
-    if (this.session.visited.has(day.id) || this.session.mode === null) return null;
-    this.session.visited.add(day.id);
-    return { id: day.id, intent: this.session.mode };
+    return rows[row]?.days[column]?.id ?? null;
   }
 }
 
