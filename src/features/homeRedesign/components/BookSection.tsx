@@ -1,13 +1,13 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatPaise } from '@core/format';
+import { DurationCarousel } from '@ui/v2/DurationCarousel';
 
 import { ART } from '../assets';
 import type { BookingMode, CtaKind } from '../state/bookingDraft';
 import type { DurationOption } from '../types';
 import { C, F, SHADOW_PILL } from '../theme';
 import { BookingToggle } from './BookingToggle';
-import { DurationCarousel } from './DurationCarousel';
 
 export interface BookSectionProps {
   /** The lowest instant ETA, or `null` when instant is unavailable — regardless of the tab. */

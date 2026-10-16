@@ -10,15 +10,86 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { formatPaise } from '@core/format';
+import type {
+  ImageSourcePropType,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ViewStyle,
+} from 'react-native';
 
-import { ART } from '../assets';
-import { liquidHeight, showsMrp, spokenDuration } from '../state/durations';
-import type { DurationOption } from '../types';
-import { C, F, SHADOW_PILL, SHADOW_SOFT } from '../theme';
+import { formatPaise } from '@core/format';
+import { fontFamily as F } from '@ui/tokens/primitives';
+
+/**
+ * The duration carousel Home's Book section and Recurring's Schedule / Edit date share, so the two
+ * strips cannot drift apart (owner, 2026-10-16: the recurring copy selected on swipe and did not
+ * loop). Moved here from `features/homeRedesign/components`; its look is Home's (`1555:10863`).
+ */
+
+/** What a tile needs. Home's `DurationOption` and Recurring's options both satisfy it. */
+export interface CarouselDuration {
+  readonly id: string;
+  readonly minutes: number;
+  /** "45 mins", "1 hr", "1.5 hrs". */
+  readonly label: string;
+  readonly pricePaise: number;
+  /** The struck original, or null when there is none. */
+  readonly mrpPaise: number | null;
+  readonly mostBooked?: boolean;
+  readonly serves?: { readonly dishes: number; readonly people: number };
+}
+
+/** The Home redesign palette the tiles are drawn in (`features/homeRedesign/theme.ts`). */
+const C = {
+  base: '#FFFFFF',
+  brand: '#FFD600',
+  tint: '#FFE666',
+  soft: '#FFEF99',
+  lime: '#CFFF04',
+  limeSoft: '#ECFF9B',
+  text: '#000000',
+  textSecondary: 'rgba(0,0,0,0.6)',
+  textDisabled: 'rgba(0,0,0,0.25)',
+  surfaceDisabled: 'rgba(0,0,0,0.03)',
+} as const;
+const SHADOW_PILL: ViewStyle = {
+  boxShadow: [{ offsetX: 0, offsetY: 0, blurRadius: 12, color: 'rgba(0,0,0,0.1)' }],
+};
+const SHADOW_SOFT: ViewStyle = {
+  boxShadow: [{ offsetX: 0, offsetY: 0, blurRadius: 3, color: 'rgba(0,0,0,0.08)' }],
+};
+
+const img = (source: number): ImageSourcePropType => source;
+/** The liquid's top edge per tile state. */
+const ART = {
+  tileSurface: img(require('../../../assets/figma/home2/tile-surface.png')),
+  tileSurfaceFocused: img(require('../../../assets/figma/home2/tile-surface-focused.png')),
+  tileSurfaceSelected: img(require('../../../assets/figma/home2/tile-surface-selected.png')),
+  tileSurfaceUnavailable: img(require('../../../assets/figma/home2/tile-surface-unavailable.png')),
+  tileSurfaceFocusedUnavailable: img(
+    require('../../../assets/figma/home2/tile-surface-focused-unavailable.png'),
+  ),
+  selectedCheck: img(require('../../../assets/figma/home2/selected-check.png')),
+};
+
+/** The liquid's height in a tile: proportional to the minutes, taller in the focused tile. */
+export function liquidHeight(minutes: number, focused: boolean): number {
+  return Math.round(minutes * (focused ? 0.888 : 0.7225));
+}
+
+/** "1 hour", "1.5 hours", "45 minutes" — for screen readers. */
+export function spokenDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} minutes`;
+  const hours = minutes / 60;
+  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+}
+
+/** The MRP strikes through only when it exists and differs from the price. */
+export function showsMrp(duration: Pick<CarouselDuration, 'pricePaise' | 'mrpPaise'>): boolean {
+  return duration.mrpPaise !== null && duration.mrpPaise !== duration.pricePaise;
+}
 
 /** `1555:10725` default tile and `1555:10508` focused tile. */
 const TILE = { width: 100, height: 130 };
@@ -29,20 +100,20 @@ const STEP = TILE.width + GAP;
 /** Skeleton count while pricing loads, per the carousel's dev note. */
 const SKELETONS = 6;
 
-export interface DurationCarouselProps {
-  readonly durations: readonly DurationOption[];
+export interface DurationCarouselProps<T extends CarouselDuration = CarouselDuration> {
+  readonly durations: readonly T[];
   readonly focusedId: string;
   /** The booking choice. It is drawn (lime + check) only while that tile is also centred. */
   readonly selectedId: string | null;
   /** Whether each tile can be booked in the current mode. */
-  readonly isAvailable: (duration: DurationOption) => boolean;
+  readonly isAvailable: (duration: T) => boolean;
   readonly status: 'ready' | 'loading' | 'error';
   /** Snapping reports a new focus; it does not select. */
   readonly onFocus: (id: string) => void;
   /** A tap selects (and centres) the tile. */
   readonly onSelect: (id: string) => void;
   /** A tap on an unavailable tile (the screen shows a toast). */
-  readonly onPressUnavailable: (duration: DurationOption) => void;
+  readonly onPressUnavailable: (duration: T) => void;
   readonly onRetry: () => void;
 }
 
@@ -56,7 +127,7 @@ export interface DurationCarouselProps {
  * x −87, as drawn. Snapping only lands on bookable tiles. The size swap between Default and
  * Focused animates over ~150 ms, or swaps instantly with Reduce Motion on.
  */
-export function DurationCarousel({
+export function DurationCarousel<T extends CarouselDuration>({
   durations,
   focusedId,
   selectedId,
@@ -66,7 +137,7 @@ export function DurationCarousel({
   onSelect,
   onPressUnavailable,
   onRetry,
-}: DurationCarouselProps) {
+}: DurationCarouselProps<T>) {
   const { width: screen } = useWindowDimensions();
   const scroll = useRef<ScrollView>(null);
   const reduceMotion = useReduceMotion();
@@ -325,7 +396,7 @@ function Tile({
   hidden = false,
   onPress,
 }: {
-  option: DurationOption;
+  option: CarouselDuration;
   focused: boolean;
   selected: boolean;
   available: boolean;

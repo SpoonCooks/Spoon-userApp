@@ -56,7 +56,7 @@ describe('Schedule', () => {
   it('opens the times once a duration is chosen, on the first time of day with a start free', () => {
     renderSchedule();
 
-    fireEvent.press(radio(/^1 hr/));
+    fireEvent.press(radio(/^1 hour/));
 
     expect(tab('Morning').props.accessibilityState?.selected).toBe(true);
     expect(radio('9:00 AM')).toBeTruthy();
@@ -65,17 +65,20 @@ describe('Schedule', () => {
 
   it('marks only the chosen duration card with the tick', () => {
     renderSchedule();
-    expect(screen.queryAllByTestId(/-check$/)).toHaveLength(0);
+    const checked = () =>
+      screen.queryAllByRole('radio').filter((r) => r.props.accessibilityState?.checked === true);
+    expect(checked()).toHaveLength(0);
 
-    fireEvent.press(radio(/^1 hr/));
+    fireEvent.press(radio(/^1 hour/));
 
-    expect(screen.getAllByTestId(/-check$/)).toHaveLength(1);
+    // The shared (Home) tile draws its lime liquid and tick from `checked`.
+    expect(checked()).toHaveLength(1);
   });
 
   it('saves the chosen visit once a start time is picked', () => {
     const { onSave } = renderSchedule();
 
-    fireEvent.press(radio(/^1 hr/));
+    fireEvent.press(radio(/^1 hour/));
     fireEvent.press(radio('9:00 AM'));
 
     expect(saveDisabled()).toBe(false);
@@ -90,20 +93,20 @@ describe('Schedule', () => {
   it('keeps the duration across a new time of the day, and clears the start time', () => {
     renderSchedule();
 
-    fireEvent.press(radio(/^1 hr/));
+    fireEvent.press(radio(/^1 hour/));
     fireEvent.press(radio('9:00 AM'));
     fireEvent.press(tab('Afternoon'));
 
     expect(saveDisabled()).toBe(true);
     expect(radio('12:00 PM').props.accessibilityState?.selected).toBe(false);
-    expect(radio(/^1 hr/).props.accessibilityState?.selected).toBe(true);
+    expect(radio(/^1 hour/).props.accessibilityState?.checked).toBe(true);
   });
 
   it('keeps the start time when a longer duration still fits', () => {
     renderSchedule({ initial: { durationId: 'd60', timeOfDay: 'morning', startMinutes: 9 * 60 } });
 
     expect(saveDisabled()).toBe(false);
-    fireEvent.press(radio(/^1.5 hrs/));
+    fireEvent.press(radio(/^1.5 hours/));
 
     expect(saveDisabled()).toBe(false);
   });
@@ -153,7 +156,7 @@ describe('Schedule', () => {
 
     it('greys what the first visit takes: 9 AM for an hour leaves no 9:00 or 8:30 start', () => {
       renderSchedule(adding);
-      fireEvent.press(radio(/^1 hr/));
+      fireEvent.press(radio(/^1 hour/));
       fireEvent.press(tab('Morning'));
 
       expect(disabled('8:30 AM')).toBe(true);

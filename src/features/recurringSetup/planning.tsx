@@ -53,6 +53,8 @@ export function durationOptionsFrom(
     label: durationLabelForMinutes(duration.durationMinutes),
     minutes: duration.durationMinutes,
     price: formatPaise(duration.pricePaise),
+    pricePaise: duration.pricePaise,
+    mrpPaise: duration.basePricePaise > duration.pricePaise ? duration.basePricePaise : null,
     ...(duration.basePricePaise > duration.pricePaise
       ? { strikePrice: formatPaise(duration.basePricePaise) }
       : {}),
