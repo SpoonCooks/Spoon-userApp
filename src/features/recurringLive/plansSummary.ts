@@ -1,7 +1,7 @@
 import { DURATION_PHOTOS, START_TIME_PHOTOS, TIME_OF_DAY_PHOTOS } from '@features/recurringSetup';
 import type { RecurringBookingDto, VisitSummaryDto } from '@features/recurringSetup';
 
-import { clockText, liveCalendarFrom } from './adapters';
+import { autopayNotApproved, clockText, liveCalendarFrom } from './adapters';
 import type {
   PlansSummaryModel,
   SummaryCalendar,
@@ -56,7 +56,11 @@ function calendarOf(booking: RecurringBookingDto, plan: Plan, todayId: string): 
   };
 }
 
-function historyRowOf(visit: VisitSummaryDto, todayId: string): SummaryHistoryRow | null {
+function historyRowOf(
+  visit: VisitSummaryDto,
+  todayId: string,
+  autopayExpired: boolean,
+): SummaryHistoryRow | null {
   if (visit.status !== 'completed' && visit.status !== 'cancelled') return null;
   const day =
     visit.date === todayId ? `Today, ${dayLabel(visit.date).split(', ')[1]}` : dayLabel(visit.date);
@@ -74,15 +78,22 @@ function historyRowOf(visit: VisitSummaryDto, todayId: string): SummaryHistoryRo
       ? 'Cancelled by you'
       : visit.cancelledBy === 'payment_failed'
         ? 'Cancelled · payment didn’t go through'
-        : 'Cancelled by Spoon';
+        : autopayExpired
+          ? 'Cancelled · Autopay not approved'
+          : 'Cancelled by Spoon';
   return { id: visit.visitId, status: 'cancelled', title, meta: by };
 }
 
-function visitOf(plan: Plan, visit: PlanVisit, todayId: string): SummaryVisit {
+function visitOf(
+  plan: Plan,
+  visit: PlanVisit,
+  todayId: string,
+  autopayExpired: boolean,
+): SummaryVisit {
   const history = plan.history
     .filter((past) => past.visitNumber === visit.visitNumber)
     .sort((a, b) => b.start.localeCompare(a.start))
-    .map((past) => historyRowOf(past, todayId))
+    .map((past) => historyRowOf(past, todayId, autopayExpired))
     .filter((row): row is SummaryHistoryRow => row !== null);
   const duration = DURATION_PHOTOS[visit.durationMinutes];
   return {
@@ -111,6 +122,7 @@ function visitOf(plan: Plan, visit: PlanVisit, todayId: string): SummaryVisit {
 }
 
 export function plansSummaryFrom(booking: RecurringBookingDto, todayId: string): PlansSummaryModel {
+  const autopayExpired = autopayNotApproved(booking);
   const plans = [...booking.plans]
     .sort((a, b) => a.planNumber - b.planNumber)
     .map((plan) => ({
@@ -119,7 +131,7 @@ export function plansSummaryFrom(booking: RecurringBookingDto, todayId: string):
       calendar: calendarOf(booking, plan, todayId),
       visits: [...plan.visits]
         .sort((a, b) => a.visitNumber - b.visitNumber)
-        .map((visit) => visitOf(plan, visit, todayId)),
+        .map((visit) => visitOf(plan, visit, todayId, autopayExpired)),
     }));
   return { plans, activePlanId: plans[0]?.id ?? '' };
 }

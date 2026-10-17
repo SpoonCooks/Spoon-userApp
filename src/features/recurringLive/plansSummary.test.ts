@@ -140,3 +140,32 @@ describe('plansSummaryFrom', () => {
     expect(second!.history[0]).toMatchObject({ status: 'cancelled', meta: 'Cancelled by you' });
   });
 });
+
+describe('a booking whose Autopay was never approved', () => {
+  const spoonCancelled = past({
+    date: '2026-10-02',
+    status: 'cancelled',
+    displayState: 'cancelled',
+    cancelledBy: 'spoon',
+    cook: null,
+  });
+  const withHistory = (booking: Partial<RecurringBookingDto>) =>
+    ({
+      ...BOOKING,
+      ...booking,
+      plans: [{ ...BOOKING.plans[0]!, history: [spoonCancelled] }],
+    }) as RecurringBookingDto;
+  const metaOf = (booking: RecurringBookingDto) =>
+    plansSummaryFrom(booking, TODAY).plans[0]?.visits.find((v) => v.id === 'visit-1')?.history[0]
+      ?.meta;
+
+  it('reads "Autopay not approved", not "Cancelled by Spoon"', () => {
+    expect(metaOf(withHistory({ status: 'cancelled', cancelledBy: 'system' }))).toBe(
+      'Cancelled · Autopay not approved',
+    );
+  });
+
+  it('still reads "Cancelled by Spoon" when Spoon cancelled it', () => {
+    expect(metaOf(withHistory({ status: 'active', cancelledBy: null }))).toBe('Cancelled by Spoon');
+  });
+});

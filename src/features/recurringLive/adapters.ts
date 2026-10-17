@@ -61,9 +61,18 @@ export function liveCalendarFrom(booking: RecurringBookingDto, todayId: string):
     visitsByDay: Object.fromEntries(
       booking.days
         .filter((day) => day.visits.length > 0)
-        .map((day) => [day.date, dayVisitsOf(day.visits)]),
+        .map((day) => [day.date, dayVisitsOf(day.visits, autopayNotApproved(booking))]),
     ),
   };
+}
+
+/**
+ * Whether the booking ended because Autopay was never approved: V0 cancels a recurring booking as
+ * `system` only when its approval window runs out (`expireUnapprovedBookings`). Its visits then
+ * read "Autopay not approved" rather than "Cancelled by Spoon", which sounds like Spoon's doing.
+ */
+export function autopayNotApproved(booking: RecurringBookingDto): boolean {
+  return booking.status === 'cancelled' && booking.cancelledBy === 'system';
 }
 
 /** Asia/Kolkata's calendar date now — a fixed UTC+5:30, no daylight saving. */
@@ -200,7 +209,7 @@ function cookName(visit: VisitSummaryDto): string | null {
   return visit.cook?.displayName ?? null;
 }
 
-function dayVisitOf(visit: VisitSummaryDto): DayVisit {
+function dayVisitOf(visit: VisitSummaryDto, autopayExpired: boolean): DayVisit {
   const title = `${ordinal(visit.visitNumber)} Visit · ${clockText(visit.startTime)} · ${durationText(visit.durationMinutes)}`;
   const cook = cookName(visit);
 
@@ -222,7 +231,9 @@ function dayVisitOf(visit: VisitSummaryDto): DayVisit {
           ? 'Cancelled by you'
           : visit.cancelledBy === 'payment_failed'
             ? 'Cancelled · payment failed'
-            : 'Cancelled by Spoon',
+            : autopayExpired
+              ? 'Cancelled · Autopay not approved'
+              : 'Cancelled by Spoon',
     };
   }
   if (cook !== null) {
@@ -248,13 +259,13 @@ function dayVisitOf(visit: VisitSummaryDto): DayVisit {
   };
 }
 
-function dayVisitsOf(visits: readonly VisitSummaryDto[]): DayVisits {
+function dayVisitsOf(visits: readonly VisitSummaryDto[], autopayExpired: boolean): DayVisits {
   const ordered = [...visits].sort((a, b) => a.start.localeCompare(b.start));
   const plans = [...new Set(ordered.map((visit) => visit.planNumber))].sort((a, b) => a - b);
   const count = `${ordered.length} ${ordered.length === 1 ? 'visit' : 'visits'}`;
   const planLabel =
     plans.length === 1 ? `Plan ${plans[0]} · ${count}` : `Plans ${plans.join(' & ')} · ${count}`;
-  return { planLabel, visits: ordered.map(dayVisitOf) };
+  return { planLabel, visits: ordered.map((visit) => dayVisitOf(visit, autopayExpired)) };
 }
 
 function upNextOf(visit: VisitSummaryDto, todayId: string): UpNextFixture {
