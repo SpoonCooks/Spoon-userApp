@@ -81,8 +81,12 @@ function booking(overrides: Partial<RecurringBookingDto> = {}): RecurringBooking
 }
 
 describe('liveCalendarFrom', () => {
-  it('lays out whole months in Mon → Sun rows, never mixing two months in a row', () => {
+  it('lays out Mon → Sun rows from the first visit’s week to the last’s, never mixing months', () => {
     const { weeks } = liveCalendarFrom(booking(), TODAY);
+
+    // Visits on 28 Sept, today (8 Oct) and 14 Oct: Sept's last week, then Oct to 14's week.
+    expect(weeks[0]?.monthLabel).toBe('Sept');
+    expect(weeks).toHaveLength(4);
 
     // 28 Sept 2026 is a Monday: Sept's last row is 28, 29, 30 then blanks; Oct opens on a Thursday.
     const sept = weeks.filter((week) => week.monthLabel === 'Sept');
@@ -97,7 +101,7 @@ describe('liveCalendarFrom', () => {
     ]);
     const oct = weeks.filter((week) => week.monthLabel === 'Oct');
     expect(oct[0]?.days.map((day) => day?.day ?? null)).toEqual([null, null, null, 1, 2, 3, 4]);
-    expect(oct).toHaveLength(5);
+    expect(oct.at(-1)?.days.map((day) => day?.day ?? null)).toEqual([12, 13, 14, 15, 16, 17, 18]);
     expect(weeks.every((week) => week.days.length === 7)).toBe(true);
   });
 

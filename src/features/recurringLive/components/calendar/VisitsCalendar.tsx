@@ -84,7 +84,8 @@ const LEGEND: readonly {
 export function VisitsCalendarHeader({ testID = 'visits-calendar-header' }: { testID?: string }) {
   return (
     <View style={styles.header} testID={testID}>
-      <Text variant="spoonButton" color="textPrimary">
+      {/* Never shrunk: squeezed by the spaced-out legend, Android wrapped it to "Your" (S21). */}
+      <Text variant="spoonButton" color="textPrimary" numberOfLines={1} style={styles.title}>
         Your visits
       </Text>
       {LEGEND.map(({ key, label, dot }) => (
@@ -220,6 +221,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  title: { flexShrink: 0 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.xs },
   legendDot: { width: 10, height: 10 },
 

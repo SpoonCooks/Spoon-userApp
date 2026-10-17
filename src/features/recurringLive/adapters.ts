@@ -31,7 +31,17 @@ export function liveCalendarFrom(booking: RecurringBookingDto, todayId: string):
   const groupByDate = new Map(booking.days.map((day) => [day.date, day.group]));
   const visitsByDate = new Map(booking.days.map((day) => [day.date, day.visits]));
 
-  const dates = [booking.window.startDate, booking.window.endDate, ...groupByDate.keys()].sort();
+  /*
+   * From the week of the first visit to the week of the last (`1746:3304` starts on the week of
+   * 28 Sept), not whole months: from the 1st, a plan starting on the 20th drew three greyed weeks
+   * before its first visit (owner, 2026-10-17). The booking's window is the fallback.
+   */
+  const visitDates = booking.days
+    .filter((day) => day.visits.length > 0)
+    .map((day) => day.date)
+    .sort();
+  const dates =
+    visitDates.length > 0 ? visitDates : [booking.window.startDate, booking.window.endDate].sort();
   const first = dates[0] ?? todayId;
   const last = dates[dates.length - 1] ?? todayId;
 
@@ -97,8 +107,8 @@ function daysInMonth(year: number, month: number): number {
 }
 
 /**
- * Whole months from `first`'s to `last`'s, one row per Mon → Sun week, a month's rows never
- * holding another month's dates (blank cells instead), as `1286:6575` draws Sept → Oct.
+ * The weeks from `first`'s to `last`'s, one row per Mon → Sun week, a month's rows never holding
+ * another month's dates (blank cells instead), as `1286:6575` draws Sept → Oct.
  */
 function weeksBetween(
   first: string,
@@ -138,7 +148,20 @@ function weeksBetween(
       year += 1;
     }
   }
-  return weeks;
+  // Only the weeks from `first`'s to `last`'s: a row is kept when it holds a date in that range.
+  return weeks.filter((week) => {
+    const ids = week.days.filter((cell) => cell !== null).map((cell) => cell.id);
+    const start = ids[0];
+    const end = ids[ids.length - 1];
+    return start !== undefined && end !== undefined && end >= weekStart(first) && start <= last;
+  });
+}
+
+/** The Monday of `id`'s week, so a row is kept whole even when `first` falls mid-week. */
+function weekStart(id: string): string {
+  const { year, month, day } = parts(id);
+  const date = new Date(Date.UTC(year, month - 1, day - weekdayIndex(year, month, day)));
+  return date.toISOString().slice(0, 10);
 }
 
 function ordinal(value: number): string {

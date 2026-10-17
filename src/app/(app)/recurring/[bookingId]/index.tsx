@@ -210,9 +210,6 @@ export default function RecurringBookingRoute() {
               onTabChange={setTab}
               notice={notice}
               onOpenVisit={guard(onOpenVisit)}
-              onOpenUpNext={guard(() => {
-                if (data?.upNext) openVisit(data.upNext, true);
-              })}
             />
             {autopaySheet}
           </>
