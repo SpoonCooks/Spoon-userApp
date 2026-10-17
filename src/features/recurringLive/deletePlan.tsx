@@ -27,10 +27,13 @@ import type { PlanCancellationDto, PlanCancellationQuoteDto } from '@features/re
 export function useDeletePlan({
   bookingId,
   planNumber,
+  lastPlan,
   onDeleted,
 }: {
   readonly bookingId: string | null;
   readonly planNumber: number | null;
+  /** No other Plan has a visit left: deleting this one closes the booking and stops Autopay. */
+  readonly lastPlan: boolean;
   readonly onDeleted: (result: PlanCancellationDto) => void;
 }): { readonly askToDelete: () => void; readonly sheet: ReactNode } {
   const quote = useRecurringPlanCancellationQuote(bookingId, planNumber);
@@ -41,15 +44,27 @@ export function useDeletePlan({
   const [error, setError] = useState<string | null>(null);
 
   const cancellation = useMemo(() => {
-    if (reasons.state.status !== 'ready') return null;
-    // Nothing deleted here was charged, so there is no fee or refund to show.
+    if (reasons.state.status !== 'ready' || planNumber === null) return null;
+    // Nothing deleted here was charged: the last step says what goes and that nothing is owed,
+    // in place of the one-time booking's refund breakdown (owner's device test, 2026-10-17).
+    const going = quoteData?.cancelDates.length ?? 0;
+    const kept = quoteData?.keptDates.length ?? 0;
     return {
       ...reasons.state.data,
-      refundRows: [],
+      title: `Delete Plan ${String(planNumber)}`,
+      refundTitle: 'What happens',
+      refundRows: [
+        { label: 'Days cancelled', value: String(going) },
+        ...(kept === 0 ? [] : [{ label: 'Days kept (already paid or done)', value: String(kept) }]),
+        { label: 'Charged for the cancelled days', value: '₹0', emphasis: 'total' as const },
+      ],
+      refundMethodTitle: 'Nothing to refund',
+      refundMethodBody: 'Autopay is never taken for these days.',
+      cancelCtaLabel: 'Delete plan',
       refundPending: false,
       rescheduleAllowed: false,
     };
-  }, [reasons.state]);
+  }, [reasons.state, planNumber, quoteData]);
 
   const askToDelete = () => {
     if (planNumber === null) return;
@@ -64,7 +79,7 @@ export function useDeletePlan({
       );
       return;
     }
-    Alert.alert(`Delete Plan ${planNumber}?`, deleteMessage(quoteData), [
+    Alert.alert(`Delete Plan ${planNumber}?`, deleteMessage(quoteData, lastPlan), [
       { text: 'Keep plan', style: 'cancel' },
       { text: 'Delete plan', style: 'destructive', onPress: () => setStep('reason') },
     ]);
@@ -118,10 +133,17 @@ export function useDeletePlan({
 
 const days = (n: number) => (n === 1 ? '1 day' : `${n} days`);
 
-/** What the confirm says: the days that go, free, and the paid days that stay. */
-export function deleteMessage(quote: PlanCancellationQuoteDto): string {
+/**
+ * What the confirm says: the days that go, free, and the paid days that stay. When nothing else is
+ * left in the booking, it says up front that the booking closes and Autopay stops.
+ */
+export function deleteMessage(quote: PlanCancellationQuoteDto, lastPlan = false): string {
   const going = `${days(quote.cancelDates.length)} still to come will be cancelled. Nothing is charged for them.`;
-  if (quote.keptDates.length === 0) return going;
+  if (quote.keptDates.length === 0) {
+    return lastPlan
+      ? `${going} This is your last plan, so your Recurring booking will close and Autopay will stop.`
+      : going;
+  }
   const kept = quote.keptDates.length;
   return `${going} ${days(kept)} already paid for or done ${kept === 1 ? 'stays' : 'stay'} as booked.`;
 }

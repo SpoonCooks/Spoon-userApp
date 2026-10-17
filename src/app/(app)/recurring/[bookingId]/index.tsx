@@ -12,6 +12,8 @@ import {
   useDeletePlan,
   RecurringPlansScreen,
   liveCalendarFrom,
+  planHasLiveVisit,
+  planNumberOf,
   plansSummaryFrom,
   todayInKolkata,
 } from '@features/recurringLive';
@@ -180,12 +182,22 @@ export default function RecurringBookingRoute() {
     );
 
   // ─── Deleting a Plan (Manage plans' trash) ─────────────────────────────────────────────────
-  const [planOnScreen, setPlanOnScreen] = useState(1);
+  const [planChosen, setPlanChosen] = useState<number | null>(null);
+  // The Plan on screen: the one chosen, while it is still shown; otherwise the first shown, as
+  // the screen opens on it (a deleted Plan drops out of Manage plans).
+  const shownPlans = plans?.plans.map((plan) => planNumberOf(plan.id)) ?? [];
+  const planOnScreen =
+    planChosen !== null && shownPlans.includes(planChosen) ? planChosen : (shownPlans[0] ?? 1);
   const { askToDelete, sheet: deletePlanSheet } = useDeletePlan({
     bookingId: bookingId ?? null,
     planNumber: tab === 'plans' ? planOnScreen : null,
+    lastPlan:
+      data !== null &&
+      !data.plans.some(
+        (plan) => plan.planNumber !== planOnScreen && planHasLiveVisit(data, plan.planNumber),
+      ),
     onDeleted: () => {
-      setPlanOnScreen(1);
+      setPlanChosen(null);
       booking.refetch();
     },
   });
@@ -206,7 +218,7 @@ export default function RecurringBookingRoute() {
                   ? askToDelete
                   : undefined
               }
-              onPlanChange={setPlanOnScreen}
+              onPlanChange={setPlanChosen}
               // The pencil changes one day's visit duration, until its Autopay notice (DEC-093).
               onEditDuration={
                 data?.status === 'active' || data?.status === 'pending_mandate'

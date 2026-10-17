@@ -110,6 +110,8 @@ export function RecurringEditDurationScreen({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        // Its own height only: in the screen's column a ScrollView otherwise takes what is left.
+        style={styles.dateStrip}
         contentContainerStyle={styles.dates}
         testID={`${testID}-dates`}
       >
@@ -125,7 +127,7 @@ export function RecurringEditDurationScreen({
               style={[styles.date, active ? styles.dateActive : null]}
               testID={`${testID}-date-${entry.date}`}
             >
-              <Text variant="bodyStrong" color="textPrimary">
+              <Text variant="bodyStrong" color="textPrimary" numberOfLines={1}>
                 {editDateLabel(entry.date)}
               </Text>
             </Pressable>
@@ -189,7 +191,9 @@ export function editDurationDatesFrom(
 }
 
 const styles = StyleSheet.create({
+  dateStrip: { flexGrow: 0 },
   dates: {
+    alignItems: 'flex-start',
     paddingHorizontal: lightTheme.space.lg,
     paddingTop: lightTheme.space.lg,
     gap: lightTheme.space.sm,

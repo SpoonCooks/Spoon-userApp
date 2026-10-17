@@ -1,6 +1,6 @@
 import type { RecurringBookingDto, VisitSummaryDto } from '@features/recurringSetup';
 
-import { plansSummaryFrom } from './plansSummary';
+import { planHasLiveVisit, plansSummaryFrom } from './plansSummary';
 
 /** Today is Thu 8 Oct 2026; the booking runs 28 Sept → 18 Oct with two plans. */
 const TODAY = '2026-10-08';
@@ -182,5 +182,69 @@ describe('a booking whose Autopay was never approved', () => {
 
   it('still reads "Cancelled by Spoon" when Spoon cancelled it', () => {
     expect(metaOf(withHistory({ status: 'active', cancelledBy: null }))).toBe('Cancelled by Spoon');
+  });
+});
+
+describe('after a Plan is deleted or one day’s duration changed', () => {
+  const upcoming = (date: string, overrides: Partial<VisitSummaryDto> = {}) =>
+    past({
+      date,
+      status: 'scheduled',
+      displayState: 'cook_pending',
+      cook: null,
+      bookingId: null,
+      ...overrides,
+    });
+  const withPlan1 = (visits: readonly VisitSummaryDto[]) =>
+    ({
+      ...BOOKING,
+      plans: BOOKING.plans.map((plan) =>
+        plan.planNumber === 1
+          ? {
+              ...plan,
+              visits: [{ ...BOOKING.plans[0]!.visits[1]!, visitNumber: 1 }],
+            }
+          : plan,
+      ),
+      days: visits.map((visit) => ({ date: visit.date, group: 'upcoming', visits: [visit] })),
+    }) as unknown as RecurringBookingDto;
+  const cancelled = {
+    status: 'cancelled',
+    displayState: 'cancelled',
+    cancelledBy: 'customer',
+  } as const;
+
+  it('leaves out a live booking’s Plan whose every visit is cancelled', () => {
+    const booking = withPlan1([
+      upcoming('2026-10-20', { planNumber: 1, ...cancelled }),
+      upcoming('2026-10-21', { planNumber: 1, ...cancelled }),
+    ]);
+    expect(planHasLiveVisit(booking, 1)).toBe(false);
+    expect(planHasLiveVisit(booking, 2)).toBe(true);
+    const model = plansSummaryFrom(booking, TODAY);
+    expect(model.plans.map((plan) => plan.label)).toEqual(['Plan 2']);
+    expect(model.activePlanId).toBe('plan-2');
+  });
+
+  it('keeps every Plan on a closed booking, as its record', () => {
+    const booking = {
+      ...withPlan1([upcoming('2026-10-20', { planNumber: 1, ...cancelled })]),
+      status: 'cancelled',
+    } as RecurringBookingDto;
+    expect(plansSummaryFrom(booking, TODAY).plans.map((plan) => plan.label)).toEqual([
+      'Plan 1',
+      'Plan 2',
+    ]);
+  });
+
+  it('names the range of lengths once one day runs longer', () => {
+    const booking = withPlan1([
+      upcoming('2026-10-20', { planNumber: 1 }),
+      upcoming('2026-10-21', { planNumber: 1, durationMinutes: 90 }),
+    ]);
+    const plan1 = plansSummaryFrom(booking, TODAY).plans.find((plan) => plan.id === 'plan-1')!;
+    expect(plan1.visits[0]!.details.find((tile) => tile.key === 'duration')!.caption).toBe(
+      '60–90 mins',
+    );
   });
 });

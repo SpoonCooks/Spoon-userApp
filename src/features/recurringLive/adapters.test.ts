@@ -214,3 +214,27 @@ describe('labels', () => {
     expect(todayInKolkata(new Date('2026-10-07T20:00:00.000Z'))).toBe('2026-10-08');
   });
 });
+
+describe('a day still to come with every visit cancelled', () => {
+  it('is drawn as a plain date, not an Upcoming ring, and opens nothing', () => {
+    const cancelled = visit({
+      date: '2026-10-14',
+      status: 'cancelled',
+      displayState: 'cancelled',
+      cancelledBy: 'customer',
+    });
+    const model = liveCalendarFrom(
+      booking({
+        days: [
+          { date: TODAY, group: 'today', visits: [visit({ date: TODAY, status: 'charged' })] },
+          { date: '2026-10-14', group: 'upcoming', visits: [cancelled] },
+        ],
+      }),
+      TODAY,
+    );
+    const day14 = model.weeks.flatMap((week) => week.days).find((day) => day?.id === '2026-10-14');
+    // Its week drops out with it: the calendar ends at the last date still marked.
+    expect(day14 === undefined || day14?.kind === 'none').toBe(true);
+    expect(model.visitsByDay['2026-10-14']).toBeUndefined();
+  });
+});

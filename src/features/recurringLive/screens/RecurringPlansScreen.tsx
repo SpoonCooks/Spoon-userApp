@@ -106,7 +106,8 @@ export function RecurringPlansScreen({
           />
           <PlanVisitBar
             plans={model.plans}
-            activePlanId={planId}
+            // The Plan drawn: the chosen one, or the first once it drops out (deleted).
+            activePlanId={plan?.id ?? planId}
             visits={visits}
             activeVisitId={visitId}
             onPlanChange={(id) => {

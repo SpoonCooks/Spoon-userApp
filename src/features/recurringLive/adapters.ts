@@ -28,8 +28,7 @@ import type {
  * `todayId` is the Asia/Kolkata date (`todayInKolkata`), only for the Up-next "TODAY" wording.
  */
 export function liveCalendarFrom(booking: RecurringBookingDto, todayId: string): LiveCalendarModel {
-  const groupByDate = new Map(booking.days.map((day) => [day.date, day.group]));
-  const visitsByDate = new Map(booking.days.map((day) => [day.date, day.visits]));
+  const daysByDate = new Map(booking.days.map((day) => [day.date, day]));
 
   /*
    * From the week of the first visit to the week of the last (`1746:3304` starts on the week of
@@ -37,7 +36,7 @@ export function liveCalendarFrom(booking: RecurringBookingDto, todayId: string):
    * before its first visit (owner, 2026-10-17). The booking's window is the fallback.
    */
   const visitDates = booking.days
-    .filter((day) => day.visits.length > 0)
+    .filter((day) => kindOf(day) !== 'none')
     .map((day) => day.date)
     .sort();
   const dates =
@@ -54,16 +53,30 @@ export function liveCalendarFrom(booking: RecurringBookingDto, todayId: string):
     progressFraction: total === 0 ? 0 : done / total,
     weekdays: WEEKDAYS,
     weeks: weeksBetween(first, last, (id) => {
-      const group = groupByDate.get(id);
-      return group === undefined || (visitsByDate.get(id)?.length ?? 0) === 0 ? 'none' : group;
+      const day = daysByDate.get(id);
+      return day === undefined ? 'none' : kindOf(day);
     }),
     hint: 'Tap a date to check its details',
     visitsByDay: Object.fromEntries(
       booking.days
-        .filter((day) => day.visits.length > 0)
+        .filter((day) => kindOf(day) !== 'none')
         .map((day) => [day.date, dayVisitsOf(day.visits, autopayNotApproved(booking))]),
     ),
   };
+}
+
+/**
+ * How a date is drawn: by the server's group, except a day still to come whose every visit is
+ * cancelled (one cancelled, or its Plan deleted, DEC-092), which has nothing left to come and is
+ * drawn as a plain date, not an Upcoming ring (owner's device test, 2026-10-17). A past or today's
+ * cancelled visit keeps its mark, so its record can still be opened.
+ */
+function kindOf(day: RecurringBookingDto['days'][number]): CalendarDayKind {
+  if (day.visits.length === 0) return 'none';
+  if (day.group === 'upcoming' && day.visits.every((visit) => visit.status === 'cancelled')) {
+    return 'none';
+  }
+  return day.group;
 }
 
 /**

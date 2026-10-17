@@ -21,12 +21,12 @@ export { AutopayNotice } from './components/calendar/AutopayNotice';
 export type { AutopayNoticeKind } from './components/calendar/AutopayNotice';
 export type { RecurringLiveScreenProps, VisitRef } from './screens/RecurringLiveScreen';
 export { CALENDAR_DEMO_DATES, CALENDAR_DEMO_MODEL } from './data/calendar';
-export { plansSummaryFrom } from './plansSummary';
+export { planHasLiveVisit, plansSummaryFrom } from './plansSummary';
 export type { PlansSummaryModel } from './data/summary';
 export type { LiveCalendarModel } from './data/calendar';
 export { liveCalendarFrom, todayInKolkata } from './adapters';
 
-export { RecurringPlansScreen } from './screens/RecurringPlansScreen';
+export { RecurringPlansScreen, planNumberOf } from './screens/RecurringPlansScreen';
 export type { RecurringPlansScreenProps } from './screens/RecurringPlansScreen';
 
 export { VisitDetailsScreen } from './screens/VisitDetailsScreen';
