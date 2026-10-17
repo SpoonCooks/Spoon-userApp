@@ -1,5 +1,5 @@
 import type { ApiClient } from '@core/api';
-import { idempotencyHeader } from '@core/api';
+import { idempotencyHeader, paymentsModeHeader } from '@core/api';
 
 import { paymentOrderSchema } from './schemas';
 import type { PaymentOrderDto, RazorpayCheckoutResult } from './schemas';
@@ -42,7 +42,7 @@ export function createPaymentApi(api: ApiClient) {
     async createOrder(bookingId: string, scope: string): Promise<PaymentOrderDto> {
       return api.request(PAYMENT_PATHS.order(bookingId), {
         method: 'POST',
-        headers: idempotencyHeader(scope),
+        headers: { ...idempotencyHeader(scope), ...paymentsModeHeader() },
         body: {},
         parse: (data) => paymentOrderSchema.parse(data),
       });

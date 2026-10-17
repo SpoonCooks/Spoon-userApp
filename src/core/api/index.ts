@@ -11,6 +11,7 @@ export {
   idempotencyHeader,
 } from './idempotency';
 export type { IdempotencyScope } from './idempotency';
+export { PAYMENTS_MODE_HEADER, paymentsModeHeader } from './paymentsMode';
 export { expectNoContent, passthrough } from './types';
 export type {
   ApiClient,
