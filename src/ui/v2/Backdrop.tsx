@@ -1,6 +1,6 @@
-import { createContext, useContext, useRef } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { AppState, Platform, StyleSheet, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { BlurTargetView, BlurView } from 'expo-blur';
 
@@ -45,9 +45,23 @@ export function BlurredScrim({
   readonly style?: StyleProp<ViewStyle>;
 }) {
   const target = useContext(BackdropTarget);
+  /*
+   * Android's blur draws a copy of the screen behind it. After the app has been in the background
+   * (the Play Store, a UPI app) that copy came back empty: a flat grey sheet over nothing (owner,
+   * 2026-10-17). Remounting the blur on the way back to the foreground draws it afresh.
+   */
+  const [generation, setGeneration] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return undefined;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setGeneration((value) => value + 1);
+    });
+    return () => subscription.remove();
+  }, []);
   return (
     <View style={[StyleSheet.absoluteFill, style]} pointerEvents="none">
       <BlurView
+        key={generation}
         intensity={BLUR_INTENSITY}
         tint="default"
         style={StyleSheet.absoluteFill}
