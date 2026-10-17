@@ -7,6 +7,8 @@ import { getUserMessage, isAppError } from '@core/errors';
 import { CancelBookingSheet, useCancellationData } from '@features/cancellation';
 import type { CancellationStep } from '@features/cancellation';
 import {
+  CALENDAR_REMOVE_ICON,
+  RecurringDialog,
   useCancelRecurringPlan,
   useRecurringPlanCancellationQuote,
 } from '@features/recurringSetup';
@@ -41,6 +43,7 @@ export function useDeletePlan({
   const reasons = useCancellationData(null);
   const cancelPlan = useCancelRecurringPlan();
   const [step, setStep] = useState<CancellationStep | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const cancellation = useMemo(() => {
@@ -79,10 +82,7 @@ export function useDeletePlan({
       );
       return;
     }
-    Alert.alert(`Delete Plan ${planNumber}?`, deleteMessage(quoteData, lastPlan), [
-      { text: 'Keep plan', style: 'cancel' },
-      { text: 'Delete plan', style: 'destructive', onPress: () => setStep('reason') },
-    ]);
+    setConfirming(true);
   };
 
   const confirmDelete = (reasonCode: string, reasonDetail: string) => {
@@ -112,7 +112,29 @@ export function useDeletePlan({
     );
   };
 
-  const sheet =
+  // The recurring flow's own confirm (`542:1669`), as setup's Summary deletes a Plan.
+  const confirm =
+    !confirming || quoteData === null || planNumber === null ? null : (
+      <RecurringDialog
+        visible
+        icon={CALENDAR_REMOVE_ICON}
+        title={`Delete Plan ${String(planNumber)}?`}
+        body={deleteMessage(quoteData)}
+        note={lastPlan && quoteData.keptDates.length === 0 ? LAST_PLAN_NOTE : undefined}
+        keepLabel="Keep plan"
+        confirmLabel="Delete plan"
+        onKeep={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          setStep('reason');
+        }}
+        // The count in the message is enough: a 14-day Plan's dates would fill the card (owner,
+        // 2026-10-17).
+        testID="delete-plan-dialog"
+      />
+    );
+
+  const reasonSheet =
     cancellation === null ? null : (
       <CancelBookingSheet
         visible={step !== null}
@@ -128,22 +150,26 @@ export function useDeletePlan({
       />
     );
 
+  const sheet = (
+    <>
+      {confirm}
+      {reasonSheet}
+    </>
+  );
+
   return { askToDelete, sheet };
 }
 
 const days = (n: number) => (n === 1 ? '1 day' : `${n} days`);
 
-/**
- * What the confirm says: the days that go, free, and the paid days that stay. When nothing else is
- * left in the booking, it says up front that the booking closes and Autopay stops.
- */
-export function deleteMessage(quote: PlanCancellationQuoteDto, lastPlan = false): string {
+/** The confirm's red line when nothing else is left in the booking: it closes, Autopay stops. */
+export const LAST_PLAN_NOTE =
+  'This is your last plan, so your Recurring booking will close and Autopay will stop.';
+
+/** What the confirm says: the days that go, free, and the paid days that stay. */
+export function deleteMessage(quote: PlanCancellationQuoteDto): string {
   const going = `${days(quote.cancelDates.length)} still to come will be cancelled. Nothing is charged for them.`;
-  if (quote.keptDates.length === 0) {
-    return lastPlan
-      ? `${going} This is your last plan, so your Recurring booking will close and Autopay will stop.`
-      : going;
-  }
+  if (quote.keptDates.length === 0) return going;
   const kept = quote.keptDates.length;
   return `${going} ${days(kept)} already paid for or done ${kept === 1 ? 'stays' : 'stay'} as booked.`;
 }

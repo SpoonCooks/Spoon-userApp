@@ -1,4 +1,4 @@
-import { deleteMessage } from './deletePlan';
+import { LAST_PLAN_NOTE, deleteMessage } from './deletePlan';
 
 /** Deleting a Plan (DEC-092): the confirm says what goes, what stays, and when the booking ends. */
 const quote = (cancelDates: readonly string[], keptDates: readonly string[] = []) => ({
@@ -17,14 +17,16 @@ describe('deleteMessage', () => {
     );
   });
 
-  it('warns that deleting the last plan closes the booking and stops Autopay', () => {
-    expect(deleteMessage(quote(['2026-10-20']), true)).toBe(
-      '1 day still to come will be cancelled. Nothing is charged for them. This is your last plan, so your Recurring booking will close and Autopay will stop.',
+  it('says a paid day of the plan stays as booked', () => {
+    expect(deleteMessage(quote(['2026-10-21'], ['2026-10-20']))).toBe(
+      '1 day still to come will be cancelled. Nothing is charged for them. 1 day already paid for or done stays as booked.',
     );
   });
 
-  it('does not warn when a paid day of the plan stays', () => {
-    expect(deleteMessage(quote(['2026-10-21'], ['2026-10-20']), true)).toContain('stays as booked');
-    expect(deleteMessage(quote(['2026-10-21'], ['2026-10-20']), true)).not.toContain('last plan');
+  it('warns in its own line that the last plan closes the booking and stops Autopay', () => {
+    expect(LAST_PLAN_NOTE).toBe(
+      'This is your last plan, so your Recurring booking will close and Autopay will stop.',
+    );
+    expect(LAST_PLAN_NOTE).not.toContain('—');
   });
 });

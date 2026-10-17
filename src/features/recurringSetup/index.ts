@@ -49,6 +49,8 @@ export type {
   RecurringWindowRow,
 } from './types';
 export { HelpFab, RecurringInfoProvider } from './components/HelpFab';
+export { RecurringDialog } from './components/RecurringDialog';
+export { CALENDAR_REMOVE_ICON } from './art';
 export type { HelpFabProps } from './components/HelpFab';
 export {
   LOCAL_PLANNING,

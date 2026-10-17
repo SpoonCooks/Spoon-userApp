@@ -182,18 +182,20 @@ describe('Recurring Manage plans route', () => {
     const alert = jest.spyOn(Alert, 'alert');
     await openPlans();
 
+    // The app's own confirm (`542:1669`), not a system alert: what goes, what stays, which days.
     await waitFor(() => {
       fireEvent.press(screen.getByTestId('recurring-plans-screen-header-delete'));
-      expect(alert).toHaveBeenCalledWith(
-        'Delete Plan 1?',
-        '2 days still to come will be cancelled. Nothing is charged for them. 1 day already paid for or done stays as booked.',
-        expect.any(Array),
-      );
+      expect(screen.getByTestId('delete-plan-dialog')).toBeTruthy();
     });
-    const call = alert.mock.calls.find((entry) => entry[0] === 'Delete Plan 1?');
-    const deleteButton = call?.[2]?.find((button) => button.text === 'Delete plan');
+    expect(screen.getByText('Delete Plan 1?')).toBeTruthy();
+    expect(
+      screen.getByText(
+        '2 days still to come will be cancelled. Nothing is charged for them. 1 day already paid for or done stays as booked.',
+      ),
+    ).toBeTruthy();
+    expect(alert).not.toHaveBeenCalledWith('Delete Plan 1?', expect.anything(), expect.anything());
     alert.mockImplementation(() => undefined);
-    deleteButton?.onPress?.();
+    fireEvent.press(screen.getByTestId('delete-plan-dialog-confirm'));
 
     fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
     fireEvent.press(screen.getByTestId('cancel-continue-reason'));
