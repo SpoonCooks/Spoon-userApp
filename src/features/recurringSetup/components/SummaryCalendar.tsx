@@ -86,7 +86,8 @@ export function SummaryCalendar({
   const startId = picked[0];
   const endId = picked.at(-1);
   const jiggle = useJiggle(editing);
-  const rows = Math.max(range.rows.length, GRID_ROWS);
+  // Exactly the plan's rows: five fixed rows left empty space under a short plan (2026-10-17).
+  const rows = range.rows.length;
 
   return (
     <View style={styles.section} testID={testID}>
@@ -297,8 +298,6 @@ function useJiggle(active: boolean): Jiggle {
 
 const COLUMNS = 7;
 const GAP = 5;
-/** `1079:3220` — the grid always holds five rows, so nothing under the calendar moves. */
-const GRID_ROWS = 5;
 /** `I1079:3220;1047:6012` — a date row is 39 tall (the text sits 10 down), 5 apart. */
 const ROW_HEIGHT = 39;
 /** `I1079:3220;1047:6064` — the weekday row: 20 of text with py 10 around it. */

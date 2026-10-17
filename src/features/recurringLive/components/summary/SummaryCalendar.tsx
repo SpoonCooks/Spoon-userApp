@@ -53,14 +53,9 @@ export function SummaryCalendar({
         </Pressable>
       )}
 
-      {/* 255pt as drawn, taller when the plan runs past five weeks: a fixed box let the extra
-          rows spill over the photo tiles below (S21, 2026-10-17). */}
-      <View
-        style={[
-          styles.calendar,
-          { height: Math.max(CALENDAR_HEIGHT, CELL_HEIGHT + calendar.rows.length * ROW_PITCH) },
-        ]}
-      >
+      {/* Exactly as tall as its rows: a fixed 255pt box let a sixth row spill over the photo
+          tiles and left empty space under a short plan (owner, 2026-10-17). */}
+      <View style={[styles.calendar, { height: CELL_HEIGHT + calendar.rows.length * ROW_PITCH }]}>
         <View style={styles.grid}>
           <View style={styles.row}>
             {calendar.weekdays.map((weekday) => (
@@ -117,8 +112,6 @@ const CELL_HEIGHT = 40;
 /** `1047:6011` / `1047:6054` — date rows and month rows both repeat every 44pt. */
 const ROW_GAP = 4;
 const ROW_PITCH = CELL_HEIGHT + ROW_GAP;
-/** `1067:2179` — the drawn height: the weekday row and five date rows. */
-const CALENDAR_HEIGHT = 255;
 
 const styles = StyleSheet.create({
   section: { gap: lightTheme.space.sm, backgroundColor: lightTheme.colors.surface },
