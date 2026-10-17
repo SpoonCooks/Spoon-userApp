@@ -67,12 +67,17 @@ export function liveCalendarFrom(booking: RecurringBookingDto, todayId: string):
 }
 
 /**
- * Whether the booking ended because Autopay was never approved: V0 cancels a recurring booking as
- * `system` only when its approval window runs out (`expireUnapprovedBookings`). Its visits then
- * read "Autopay not approved" rather than "Cancelled by Spoon", which sounds like Spoon's doing.
+ * Whether the booking ended because Autopay was never approved (`expireUnapprovedBookings`): closed
+ * by `system` with no bank-confirmed mandate. Its visits then read "Autopay not approved" rather
+ * than "Cancelled by Spoon", which sounds like Spoon's doing. A booking that closed because its
+ * last visit or Plan was cancelled is `system` too, but its mandate was confirmed (a masked handle).
  */
 export function autopayNotApproved(booking: RecurringBookingDto): boolean {
-  return booking.status === 'cancelled' && booking.cancelledBy === 'system';
+  return (
+    booking.status === 'cancelled' &&
+    booking.cancelledBy === 'system' &&
+    (booking.mandate === null || booking.mandate.handleMasked === null)
+  );
 }
 
 /** Asia/Kolkata's calendar date now — a fixed UTC+5:30, no daylight saving. */

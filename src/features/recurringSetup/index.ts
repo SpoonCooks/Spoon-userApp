@@ -12,6 +12,17 @@ export { RecurringVisitDaysScreen } from './screens/RecurringVisitDaysScreen';
 export type { RecurringVisitDaysScreenProps } from './screens/RecurringVisitDaysScreen';
 export { RecurringEditDateScreen } from './screens/RecurringEditDateScreen';
 export type { RecurringEditDateScreenProps } from './screens/RecurringEditDateScreen';
+export {
+  EDIT_WINDOW_CLOSED_NOTE,
+  EDIT_WINDOW_NOTE,
+  RecurringEditDurationScreen,
+  durationChangeMessage,
+  editDurationDatesFrom,
+} from './screens/RecurringEditDurationScreen';
+export type {
+  EditDurationDate,
+  RecurringEditDurationScreenProps,
+} from './screens/RecurringEditDurationScreen';
 export { RecurringPlanFlow } from './screens/RecurringPlanFlow';
 export { RecurringAutopayScreen } from './screens/RecurringAutopayScreen';
 export type { RecurringAutopayScreenProps } from './screens/RecurringAutopayScreen';

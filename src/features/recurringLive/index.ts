@@ -56,6 +56,7 @@ export type {
 export type { VisitRatingValue } from './data/rating';
 
 export { useCancelWholeBooking } from './cancelWholeBooking';
+export { useDeletePlan } from './deletePlan';
 
 // Shared with the one-time visit details (`@features/serviceVisit`).
 export { ActionDock } from './components/visit/ActionDock';

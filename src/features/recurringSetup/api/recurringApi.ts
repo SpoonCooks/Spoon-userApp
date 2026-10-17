@@ -4,6 +4,9 @@ import { idempotencyHeader } from '@core/api';
 import {
   bookingCancellationQuoteSchema,
   bookingCancellationSchema,
+  planCancellationQuoteSchema,
+  visitDurationOptionsSchema,
+  planCancellationSchema,
   bookingPrepSchema,
   mandateCheckoutSchema,
   mandateStatusViewSchema,
@@ -32,6 +35,9 @@ import type {
   TimeOfDayDto,
   VisitCancellationQuoteDto,
   VisitDetailDto,
+  PlanCancellationDto,
+  PlanCancellationQuoteDto,
+  VisitDurationOptionsDto,
 } from './schemas';
 
 /**
@@ -60,6 +66,14 @@ export const RECURRING_PATHS = {
     `/v1/me/recurring-bookings/${id}/visits/${visitId}/cancel`,
   cancellationQuote: (id: string) => `/v1/me/recurring-bookings/${id}/cancellation-quote`,
   cancel: (id: string) => `/v1/me/recurring-bookings/${id}/cancel`,
+  planCancellationQuote: (id: string, planNumber: number) =>
+    `/v1/me/recurring-bookings/${id}/plans/${String(planNumber)}/cancellation-quote`,
+  cancelPlan: (id: string, planNumber: number) =>
+    `/v1/me/recurring-bookings/${id}/plans/${String(planNumber)}/cancel`,
+  visitDurationOptions: (id: string, visitId: string) =>
+    `/v1/me/recurring-bookings/${id}/visits/${visitId}/duration-options`,
+  changeVisitDuration: (id: string, visitId: string) =>
+    `/v1/me/recurring-bookings/${id}/visits/${visitId}/duration`,
   mandate: (id: string) => `/v1/me/recurring-bookings/${id}/mandate`,
   mandateVerify: (id: string) => `/v1/me/recurring-bookings/${id}/mandate/verify`,
   prep: (bookingId: string) => `/v1/bookings/${bookingId}/prep`,
@@ -287,6 +301,60 @@ export function createRecurringApi(api: ApiClient) {
         headers: idempotencyHeader(scope),
         body: reasonBody(reason),
         parse: (data) => bookingCancellationSchema.parse(data),
+      });
+    },
+
+    /** What deleting a Plan would do now (DEC-092). */
+    async planCancellationQuote(
+      id: string,
+      planNumber: number,
+      signal?: AbortSignal,
+    ): Promise<PlanCancellationQuoteDto> {
+      return api.request(RECURRING_PATHS.planCancellationQuote(id, planNumber), {
+        parse: (data) => planCancellationQuoteSchema.parse(data),
+        ...withSignal(signal),
+      });
+    },
+
+    /** Deletes a Plan: its days not charged yet are cancelled free; the rest stay (DEC-092). */
+    async cancelPlan(
+      id: string,
+      planNumber: number,
+      reason: CancelReasonInput,
+      scope: string,
+    ): Promise<PlanCancellationDto> {
+      return api.request(RECURRING_PATHS.cancelPlan(id, planNumber), {
+        method: 'POST',
+        headers: idempotencyHeader(scope),
+        body: reasonBody(reason),
+        parse: (data) => planCancellationSchema.parse(data),
+      });
+    },
+
+    /** Whether a visit's duration can still change, and the prices (DEC-093). */
+    async visitDurationOptions(
+      id: string,
+      visitId: string,
+      signal?: AbortSignal,
+    ): Promise<VisitDurationOptionsDto> {
+      return api.request(RECURRING_PATHS.visitDurationOptions(id, visitId), {
+        parse: (data) => visitDurationOptionsSchema.parse(data),
+        ...withSignal(signal),
+      });
+    },
+
+    /** Changes one visit's duration, until its day's notice at T−27h (DEC-093). */
+    async changeVisitDuration(
+      id: string,
+      visitId: string,
+      durationMinutes: number,
+      scope: string,
+    ): Promise<VisitDetailDto> {
+      return api.request(RECURRING_PATHS.changeVisitDuration(id, visitId), {
+        method: 'POST',
+        headers: idempotencyHeader(scope),
+        body: { durationMinutes },
+        parse: (data) => visitDetailSchema.parse(data),
       });
     },
 

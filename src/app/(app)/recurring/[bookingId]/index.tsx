@@ -9,7 +9,7 @@ import { useNavigationGuard, useSafeBack } from '@core/navigation';
 import {
   AutopayNotice,
   RecurringLiveScreen,
-  useCancelWholeBooking,
+  useDeletePlan,
   RecurringPlansScreen,
   liveCalendarFrom,
   plansSummaryFrom,
@@ -45,8 +45,10 @@ import { QueryBoundary } from '@ui';
  *
  * "Manage plans" (`1017:433`) shows the same booking's plans, read-only: each plan's dates and its
  * visits' time, length and past visits (`plansSummaryFrom`). A past visit opens its details. The
- * trash cancels the whole booking — every visit still to come — after the server's quote and the
- * app's cancellation reason sheet. The backend cannot edit a plan yet, so no edit control is drawn.
+ * trash deletes the Plan on screen (DEC-092): its days not charged yet are cancelled free, after the
+ * server's quote and the app's cancellation reason sheet; the other Plans carry on. Cancelling the
+ * whole booking is Payment details → Manage. The pencil opens Edit duration for the visit on screen
+ * (DEC-093): one day's duration changes, until that day's Autopay notice 27 hours before.
  *
  * A booking whose visits can't be charged — saved but never approved (`pending_mandate`), or its
  * mandate paused / revoked / expired (`banner`) — carries the Autopay notice on the Live tab, which
@@ -177,13 +179,13 @@ export default function RecurringBookingRoute() {
       />
     );
 
-  // ─── Cancelling the whole booking ──────────────────────────────────────────────────────────
-  const { askToCancel, sheet: cancelSheet } = useCancelWholeBooking({
+  // ─── Deleting a Plan (Manage plans' trash) ─────────────────────────────────────────────────
+  const [planOnScreen, setPlanOnScreen] = useState(1);
+  const { askToDelete, sheet: deletePlanSheet } = useDeletePlan({
     bookingId: bookingId ?? null,
-    enabled: tab === 'plans',
-    onViewRefunds: guard(() => router.push('/refunds')),
-    onCancelled: () => {
-      setTab('live');
+    planNumber: tab === 'plans' ? planOnScreen : null,
+    onDeleted: () => {
+      setPlanOnScreen(1);
       booking.refetch();
     },
   });
@@ -197,16 +199,32 @@ export default function RecurringBookingRoute() {
               model={plans}
               onBack={guard(goBack)}
               onTabChange={setTab}
-              // Figma draws the bin on every live plan: a booking still waiting for Autopay can be
-              // cancelled too (the server's quote marks `pending_mandate` cancellable).
+              // Figma draws the bin on every live plan; a booking still waiting for Autopay can have
+              // a Plan deleted too (the server's quote marks `pending_mandate` cancellable).
               onDelete={
                 data?.status === 'active' || data?.status === 'pending_mandate'
-                  ? askToCancel
+                  ? askToDelete
+                  : undefined
+              }
+              onPlanChange={setPlanOnScreen}
+              // The pencil changes one day's visit duration, until its Autopay notice (DEC-093).
+              onEditDuration={
+                data?.status === 'active' || data?.status === 'pending_mandate'
+                  ? guard((planNumber: number, visitNumber: number) =>
+                      router.push({
+                        pathname: '/recurring/[bookingId]/duration',
+                        params: {
+                          bookingId: bookingId ?? '',
+                          planNumber: String(planNumber),
+                          visitNumber: String(visitNumber),
+                        },
+                      }),
+                    )
                   : undefined
               }
               onHistoryPress={guard((_visitKey: string, visitId: string) => openDetails(visitId))}
             />
-            {cancelSheet}
+            {deletePlanSheet}
           </>
         ) : (
           <>

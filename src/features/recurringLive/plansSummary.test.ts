@@ -165,6 +165,21 @@ describe('a booking whose Autopay was never approved', () => {
     );
   });
 
+  it('reads "Cancelled by Spoon" when an approved booking closed itself', () => {
+    const approved = withHistory({
+      status: 'cancelled',
+      cancelledBy: 'system',
+      mandate: {
+        mandateId: 'm-1',
+        method: 'upi',
+        status: 'revoked',
+        handleMasked: 'ra••••@okhdfc',
+        maxAmountPaise: 100000,
+      },
+    } as Partial<RecurringBookingDto>);
+    expect(metaOf(approved)).toBe('Cancelled by Spoon');
+  });
+
   it('still reads "Cancelled by Spoon" when Spoon cancelled it', () => {
     expect(metaOf(withHistory({ status: 'active', cancelledBy: null }))).toBe('Cancelled by Spoon');
   });
