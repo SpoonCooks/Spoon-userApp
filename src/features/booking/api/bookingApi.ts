@@ -1,5 +1,5 @@
 import type { ApiClient, JsonValue } from '@core/api';
-import { idempotencyHeader } from '@core/api';
+import { idempotencyHeader, paymentsModeHeader } from '@core/api';
 
 import {
   bookingCreateResponseSchema,
@@ -334,7 +334,7 @@ export function createServiceApi(api: ApiClient) {
     async createExtension(bookingId: string, minutes: number, scope: string) {
       return api.request(BOOKING_PATHS.extensions(bookingId), {
         method: 'POST',
-        headers: idempotencyHeader(scope),
+        headers: { ...idempotencyHeader(scope), ...paymentsModeHeader() },
         body: { minutes },
         parse: (data) => extensionQuoteSchema.parse(data),
       });
@@ -414,7 +414,7 @@ export function createServiceApi(api: ApiClient) {
     async tip(bookingId: string, amountPaise: number, scope: string) {
       return api.request(BOOKING_PATHS.tips(bookingId), {
         method: 'POST',
-        headers: idempotencyHeader(scope),
+        headers: { ...idempotencyHeader(scope), ...paymentsModeHeader() },
         body: { amountPaise },
         parse: (data) => tipOrderSchema.parse(data),
       });
