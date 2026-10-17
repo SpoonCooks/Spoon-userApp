@@ -33,13 +33,13 @@ import { useNavigationGuard, useSafeBack } from '@core/navigation';
  * and start times per visit by time of day (`useRecurringPlanningSource`). Each falls back to the
  * local rules until it has answered.
  *
- * "Book Now" opens UPI Autopay. Two ways, chosen by the server (`useAutopayIntentEnabled`, V0
- * `RECURRING_UPI_INTENT_ENABLED`):
- *   - UPI Intent: the Figma sheet over the Summary (`2316:3558` … `2317:4009`, note 2317:13580:
- *     "Back closes the sheet and returns to Summary"). "Back to home" while the bank confirms goes
- *     Home; "View my plan" opens the live booking.
- *   - Checkout (the fallback, and the default until Razorpay S2S is confirmed): the Autopay step
- *     and its confirmation, as before; back (and "Change times") returns to the Summary.
+ * "Book Now" opens UPI Autopay: the Figma sheet over the Summary (`2316:3558` … `2317:4009`,
+ * note 2317:13580: "Back closes the sheet and returns to Summary") on any build that can list UPI
+ * apps (`useAutopayIntentEnabled`). "Back to home" while the bank confirms goes Home; "View my
+ * plan" opens the live booking. The app picked approves by UPI Intent when the server has it on
+ * (V0 `RECURRING_UPI_INTENT_ENABLED`), otherwise through Razorpay's Checkout from the sheet.
+ *   - A build that cannot list apps keeps the plain Checkout step and its confirmation; back (and
+ *     "Change times") returns to the Summary.
  *
  * The "?" on every screen opens the Recurring landing page (`/recurring`, `1302:2617`).
  *

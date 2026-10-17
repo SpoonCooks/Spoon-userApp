@@ -19,6 +19,7 @@ import { INITIAL_AUTOPAY_STATE, autopayReducer, isPolling } from './machine';
 import type { AutopayState } from './machine';
 import { listInstalledUpiApps, openUpiApp, sortUpiApps } from './upiApps';
 import type { UpiApp } from './upiApps';
+import { useServerUpiIntent } from './useAutopayIntentEnabled';
 
 /**
  * Runs the UPI Autopay sheet (Figma 2316:3558 … 2317:4009): finds the UPI apps, saves the booking,
@@ -107,6 +108,8 @@ export function useAutopayFlow({
   const create = useCreateRecurringBooking();
   const startMandate = useStartRecurringMandate();
   const checkout = useApproveRecurringMandate(launcher);
+  /** Off: a picked app goes straight to Checkout, not to an Intent request the server refuses. */
+  const serverIntent = useServerUpiIntent();
   const bookingId = booking?.recurringBookingId ?? null;
   const status = useRecurringMandateStatus(isPolling(state) ? bookingId : null, {
     poll: isPolling(state),
@@ -182,6 +185,10 @@ export function useAutopayFlow({
           });
           return;
         }
+        if (!serverIntent) {
+          await viaCheckout(target);
+          return;
+        }
         try {
           const attempt = await startMandate.mutateAsync({
             id: target.recurringBookingId,
@@ -217,7 +224,7 @@ export function useAutopayFlow({
         }
       })();
     },
-    [ensureBooking, startMandate, viaCheckout, queryClient],
+    [ensureBooking, startMandate, viaCheckout, queryClient, serverIntent],
   );
 
   // The server's word, as it arrives.
