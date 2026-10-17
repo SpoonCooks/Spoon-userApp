@@ -134,12 +134,16 @@ export function RecurringPlansScreen({
       {visit === undefined ? null : (
         <>
           <BookingDetails tiles={visit.details} testID={`${testID}-details`} />
-          <VisitHistory
-            countLabel={visit.historyCount}
-            rows={visit.history}
-            onRowPress={(rowId) => onHistoryPress?.(visit.id, rowId)}
-            testID={`${testID}-history`}
-          />
+          {/* Only once there is a past visit: Figma draws the section with rows only, and on its
+              own the heading sat over empty space (owner, 2026-10-17). */}
+          {visit.history.length === 0 ? null : (
+            <VisitHistory
+              countLabel={visit.historyCount}
+              rows={visit.history}
+              onRowPress={(rowId) => onHistoryPress?.(visit.id, rowId)}
+              testID={`${testID}-history`}
+            />
+          )}
         </>
       )}
     </Screen>

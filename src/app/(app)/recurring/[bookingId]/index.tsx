@@ -197,7 +197,13 @@ export default function RecurringBookingRoute() {
               model={plans}
               onBack={guard(goBack)}
               onTabChange={setTab}
-              onDelete={data?.status === 'active' ? askToCancel : undefined}
+              // Figma draws the bin on every live plan: a booking still waiting for Autopay can be
+              // cancelled too (the server's quote marks `pending_mandate` cancellable).
+              onDelete={
+                data?.status === 'active' || data?.status === 'pending_mandate'
+                  ? askToCancel
+                  : undefined
+              }
               onHistoryPress={guard((_visitKey: string, visitId: string) => openDetails(visitId))}
             />
             {cancelSheet}
