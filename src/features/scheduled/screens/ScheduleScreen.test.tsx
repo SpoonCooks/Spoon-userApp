@@ -424,3 +424,39 @@ describe('Book Now is disabled until every required selection is made', () => {
     expect(disabled()).toBe(true);
   });
 });
+
+describe('Schedule — the start-time grid never shows an answer for another selection', () => {
+  /**
+   * The screen keeps its selection locally and reports it to the host after rendering, so a tap
+   * first renders beside the PREVIOUS answer. Drawing it there is what made the grid flash the
+   * old start times, vanish while the new read loaded, and come back on every Duration tap.
+   */
+  const answeredFor = (durationMinutes: number) => ({
+    ...DEMO_SCHEDULE_BOOK,
+    slotsFor: { date: 'day-1', durationMinutes },
+  });
+
+  it('withholds the grid until the answer is for the duration just chosen, then shows it', () => {
+    const view = render(
+      <ScheduleView
+        state={ready(answeredFor(60))}
+        initialSelection={COMPLETE_SELECTION}
+        {...actions}
+      />,
+    );
+    expect(screen.getByTestId('schedule-slots')).toBeTruthy();
+
+    // The host has not re-read yet: the state still answers 1 hr.
+    fireEvent.press(screen.getByTestId('schedule-duration-dur-30'));
+    expect(screen.queryByTestId('schedule-slots')).toBeNull();
+
+    view.rerender(
+      <ScheduleView
+        state={ready(answeredFor(30))}
+        initialSelection={COMPLETE_SELECTION}
+        {...actions}
+      />,
+    );
+    expect(screen.getByTestId('schedule-slots')).toBeTruthy();
+  });
+});
