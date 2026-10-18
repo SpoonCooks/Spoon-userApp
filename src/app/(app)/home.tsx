@@ -69,7 +69,7 @@ function SignedInHomeRoute() {
   const [durationId, setDurationId] = useState<string | null>(null);
   // The chosen duration is what availability and the quote are ABOUT, so it is an input to the
   // read, not something applied to its result.
-  const instant = useInstantData({ durationId });
+  const instant = useInstantData({ durationId, probeDurations: instantOpen });
   const submission = useBookingSubmission({ slotType: 'instant', durationId });
   const addressGate = useAddressGate();
 
@@ -114,7 +114,21 @@ function SignedInHomeRoute() {
   return (
     <>
       <HomeScreen
-        onPressInstant={() => setInstantOpen(true)}
+        /**
+         * Every opening starts with NO duration chosen. The choice is an input to the availability
+         * read, so a duration the server refused (say 2.5 hr with no cook free that long) kept the
+         * sheet blocked after it closed: reopening re-asked about the same duration and drew the
+         * same "not available" veil, over tiles it had disabled. Instant could not be booked
+         * again until the app restarted. With nothing chosen the read does not run at all, so the
+         * sheet opens as Home's own probe says it is.
+         *
+         * TEMPORARY main-only hotfix (18 Oct 2026). `dev` replaced this sheet in the Home
+         * redesign; this goes away when `dev` is released to `main`.
+         */
+        onPressInstant={() => {
+          setDurationId(null);
+          setInstantOpen(true);
+        }}
         onPressSchedule={() => router.push('/scheduled')}
         onPressAddress={() => router.push('/address?from=home')}
         onPressProfile={() => router.push('/profile')}

@@ -573,6 +573,55 @@ describe('`1:728` Page 4a Instant — the arrow returns to Home (task §13)', ()
     expect(mockRouter.replace).not.toHaveBeenCalled();
     expect(mockRouter.back).not.toHaveBeenCalled();
   });
+
+  const REFUSED = {
+    available: false,
+    reason: 'NO_PRESENT_COOK',
+    arrivalTargetMinutes: 30,
+    validUntil: '2026-08-18T09:00:30.000Z',
+  };
+  const isDisabled = (testID: string) =>
+    (screen.getByTestId(testID).props as { accessibilityState?: { disabled?: boolean } })
+      .accessibilityState?.disabled === true;
+
+  it('greys out a duration the server refuses, before it is tapped, and leaves the rest bookable', async () => {
+    renderWithRuntime(<HomeRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          'GET /v1/me/bookings/active': () => [],
+          // Only the 1 hr booking is refused; Home's own probe (30 min) stays available.
+          'GET /v1/availability/instant?addressId=addr-1&durationMinutes=60': () => REFUSED,
+        }),
+      }),
+    });
+
+    fireEvent.press(await screen.findByTestId('home-tile-instant'));
+
+    await waitFor(() => expect(isDisabled('instant-sheet-duration-dur-60')).toBe(true));
+    expect(isDisabled('instant-sheet-duration-dur-30')).toBe(false);
+    expect(screen.queryByTestId('instant-sheet-unavailable')).toBeNull();
+
+    // A tap on the grey tile chooses nothing, so the sheet never blocks.
+    fireEvent.press(screen.getByTestId('instant-sheet-duration-dur-60'));
+    expect(screen.queryByTestId('instant-sheet-unavailable')).toBeNull();
+  });
+
+  it('blocks the sheet only when every duration is refused', async () => {
+    renderWithRuntime(<HomeRoute />, {
+      runtime: createTestRuntime({
+        api: createStubApi({
+          ...DEFAULT_API_STUBS,
+          'GET /v1/me/bookings/active': () => [],
+          'GET /v1/availability/instant': () => REFUSED,
+        }),
+      }),
+    });
+
+    fireEvent.press(await screen.findByTestId('home-tile-instant'));
+
+    expect(await screen.findByTestId('instant-sheet-unavailable')).toBeTruthy();
+  });
 });
 
 /* ------------------------------------------------------------------- carousel */

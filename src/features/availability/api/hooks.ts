@@ -1,4 +1,4 @@
-import { useApiQuery } from '@core/data';
+import { useApiQueries, useApiQuery } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 import { useRuntime } from '@core/runtimeContext';
 
@@ -44,6 +44,35 @@ export function useInstantAvailability(input: {
     enabled: addressId !== null && durationMinutes !== null,
     staleTime: 15_000,
   });
+}
+
+/**
+ * Instant availability for EVERY duration at once, so the sheet can grey out the ones the server
+ * would refuse before the customer taps them.
+ *
+ * Same keys as `useInstantAvailability`, so the chosen duration's read is shared, not repeated.
+ * `enabled` is the sheet being open: Home does not pay for six reads it never shows.
+ *
+ * TEMPORARY main-only hotfix (18 Oct 2026); `dev` replaced the Instant sheet in the Home redesign.
+ */
+export function useInstantAvailabilities(input: {
+  addressId: string | null;
+  durationsMinutes: readonly number[];
+  enabled: boolean;
+}): readonly ScreenQuery<InstantAvailabilityDto>[] {
+  const { api } = useRuntime();
+  const availability = createAvailabilityApi(api);
+  const { addressId, durationsMinutes, enabled } = input;
+
+  return useApiQueries<InstantAvailabilityDto>(
+    durationsMinutes.map((durationMinutes) => ({
+      queryKey: availabilityKeys.instant({ addressId: addressId ?? 'none', durationMinutes }),
+      queryFn: ({ signal }) =>
+        availability.instant({ addressId: addressId ?? '', durationMinutes }, signal),
+      enabled: enabled && addressId !== null,
+      staleTime: 15_000,
+    })),
+  );
 }
 
 export function useScheduledAvailability(input: {
