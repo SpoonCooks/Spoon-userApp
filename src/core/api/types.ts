@@ -39,7 +39,11 @@ export interface ApiClient {
  */
 export interface AuthTokenProvider {
   getAccessToken(): Promise<string | null>;
-  /** Single-flight refresh. Resolves with a new access token, or null when refresh failed. */
+  /**
+   * Single-flight refresh. Resolves with a new access token, or null when the server rejected the
+   * refresh (the session is gone). REJECTS when the refresh got no answer — a timeout, the
+   * network, a 5xx — and the session is kept.
+   */
   refreshAccessToken(): Promise<string | null>;
   /** Called when the session is unrecoverable — clears session state app-wide. */
   onSessionExpired(): void;
