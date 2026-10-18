@@ -7,6 +7,7 @@
  *
  * bootstrapping -> unauthenticated | authenticated
  * authenticated -> refreshing -> authenticated | expired
+ * refreshing -> authenticated (REFRESH_INTERRUPTED: no answer, so the stored session is kept)
  * expired -> unauthenticated (after teardown)
  * expired -> authenticated (the customer signed in again without restarting the app)
  *
@@ -31,6 +32,11 @@ export type SessionEvent =
   | { type: 'REFRESH_STARTED' }
   | { type: 'REFRESH_SUCCEEDED' }
   | { type: 'REFRESH_FAILED' }
+  /**
+   * The refresh got no answer — a timeout, the network, a 5xx. Nothing says the session is bad,
+   * so it stays: the next request refreshes again.
+   */
+  | { type: 'REFRESH_INTERRUPTED' }
   | { type: 'SESSION_EXPIRED' }
   | { type: 'SIGNED_OUT' };
 
@@ -85,6 +91,7 @@ export function sessionReducer(status: SessionStatus, event: SessionEvent): Sess
     case 'refreshing':
       switch (event.type) {
         case 'REFRESH_SUCCEEDED':
+        case 'REFRESH_INTERRUPTED':
           return 'authenticated';
         case 'REFRESH_FAILED':
         case 'SESSION_EXPIRED':

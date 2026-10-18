@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 
 import { ready } from '@core/data';
-import { getLogger } from '@core/logging';
 import type { ScreenQuery } from '@core/data';
 
 import { EMPTY_ADDRESS_DRAFT, useAddressDraftStore } from '@core/store/addressDraftStore';
@@ -32,7 +31,9 @@ import type {
  *
  * `DEMO_ADDRESS_LIST` supplies the screen's STATIC COPY only: the title, the add-CTA label, the
  * section heading and the empty-state text. The rows themselves are the customer's real saved
- * addresses, and the "selected" row is the server's `isDefault` — the client picks no default.
+ * addresses, and the "selected" row is the address bookings are made against — the server's
+ * `isDefault`, or the oldest row when there is none (`currentAddressOf`). Nothing is written back:
+ * the highlight shows what is in use, it does not store a default.
  *
  * The designed empty state is reached naturally: a real account with no addresses returns `[]`,
  * which renders `emptyTitle` / `emptyDescription` exactly as drawn.
@@ -457,8 +458,6 @@ export function isAddressUsable(address: AddressDto): boolean {
 export type AddressGate = 'resolving' | 'required' | 'satisfied';
 
 export function useAddressGate(options: { enabled?: boolean } = {}): AddressGate {
-  // TEMP PROBE — remove before commit
-  getLogger('probe').warn('gate:enter', { enabled: options.enabled ?? true });
   /**
    * `enabled` exists for the BOOT gate, which asks this question at `/` before the session has
    * been proved. A `GET /v1/me/addresses` fired while signed out 401s and burns a refresh, so the
