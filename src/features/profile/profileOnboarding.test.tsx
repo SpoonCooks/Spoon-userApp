@@ -1,5 +1,6 @@
 import { BackHandler } from 'react-native';
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import * as SecureStore from 'expo-secure-store';
 
 import {
   DEFAULT_API_STUBS,
@@ -13,15 +14,14 @@ import ProfileDetailsRoute from '@/app/(app)/profile/details';
 import { sessionStore } from '@core/store';
 
 /**
- * V8 profile onboarding — `338:4508` "Page 17- profile" and the flow around it.
+ * The taste-profile wizard (Figma page `1405:448`) and the flow around it.
  *
- * The founder's first-run sequence is Login -> OTP -> **Profile details** -> Address -> Home, and
- * the page is NON-SKIPPABLE. Both halves of that are load-bearing and neither is visible from a
- * screenshot, so they are asserted here: the order the boot gate produces, and the fact that
- * nothing on the screen or on the device lets a first-run customer past it without saving.
+ * The first-run sequence is Login -> OTP -> **taste profile** -> Address -> Home, and the wizard is
+ * NON-SKIPPABLE. Both halves are asserted here: the order the boot gate produces, and that nothing
+ * on screen or on the device lets a first-run customer past it without saving.
  *
  * The router is mocked for the same reason `navigation.test.tsx` mocks it — a real navigator needs
- * the whole app mounted, and what matters is which router METHOD each path reaches and with what.
+ * the whole app mounted, and what matters is which router METHOD each path reaches.
  */
 
 let mockRouter: {
@@ -63,10 +63,19 @@ const ME_INCOMPLETE = {
   grownUpEating: null,
   regionPreference: null,
   genderPreference: null,
+  householdAdults: null,
+  householdKids: null,
+  householdElders: null,
+  nonVegPreferences: null,
+  oilLevel: null,
+  gheeOnly: null,
+  mealHassles: null,
   profileComplete: false,
 };
 
 const ME_COMPLETE = { ...ME_INCOMPLETE, name: 'Aarav Mehta', profileComplete: true };
+
+const DRAFT_KEY = 'spoon.profile.draft.user-1';
 
 beforeEach(() => {
   mockRouter = {
@@ -80,67 +89,65 @@ beforeEach(() => {
   mockSearchParams = {};
   mockRedirected = [];
   jest.clearAllMocks();
+  (SecureStore as unknown as { __reset: () => void }).__reset();
 });
 
 function runtimeWith(handlers: Record<string, (body: unknown) => unknown>) {
   return createTestRuntime({ api: createStubApi({ ...DEFAULT_API_STUBS, ...handlers }) });
 }
 
-/** Fills the three starred fields, which is the whole of what the CTA gate asks for. */
-/**
- * What `PUT /v1/me/profile` answers with: the committed projection, not an echo of the request.
- *
- * Every stub goes through this rather than returning `{ name }`, because the response schema is
- * the same `ProfileData` `GET /v1/me` embeds — a partial reply would fail to parse, which is
- * exactly the regression this helper keeps a test honest about.
- */
+/** What `PUT /v1/me/profile` answers with: the committed projection, not an echo. */
 function savedProfile(overrides: Record<string, unknown> = {}) {
+  const { id: _id, role: _role, status: _status, phone: _phone, ...profile } = ME_COMPLETE;
   return {
-    name: 'Aarav Mehta',
-    householdStructure: null,
-    mealStructure: 'daily-cook-1x',
-    pressingIssue: null,
+    ...profile,
+    mealStructure: 'regular-cook',
     dietaryPreference: 'vegetarian',
-    grownUpEating: [],
-    regionPreference: null,
-    genderPreference: null,
-    profileComplete: true,
     ...overrides,
   };
 }
 
 /**
- * The body `completeMandatoryFields` produces.
- *
- * All eight keys, every time. The five untouched optionals travel as the `null` / `''` / `[]`
- * the prefill put in them, which is what makes "submitting everything" safe: an answer nobody
- * edited round-trips its own value instead of being omitted and hoped for.
+ * The body a customer who answers only what is required produces. Every question travels: the
+ * defaults (one adult, Light oil, ghee off) and the empty lists are answers the screens showed.
  */
-const MANDATORY_ONLY_PAYLOAD = {
+const REQUIRED_ONLY_PAYLOAD = {
   name: 'Aarav Mehta',
-  householdStructure: null,
-  mealStructure: 'daily-cook-1x',
-  pressingIssue: null,
+  householdAdults: 1,
+  householdKids: 0,
+  householdElders: 0,
   dietaryPreference: 'vegetarian',
+  nonVegPreferences: null,
   grownUpEating: [],
-  regionPreference: null,
+  oilLevel: 'light',
+  gheeOnly: false,
   genderPreference: null,
+  regionPreference: null,
+  mealStructure: 'regular-cook',
+  mealHassles: [],
+  pressingIssue: null,
 };
 
-async function completeMandatoryFields() {
-  fireEvent.changeText(screen.getByTestId('profile-name'), 'Aarav Mehta');
-  fireEvent.press(screen.getByTestId('profile-meal-structure-daily-cook-1x'));
-  fireEvent.press(screen.getByTestId('profile-dietary-vegetarian'));
+const cta = () => screen.getByTestId('taste-profile-continue');
+const isDisabled = (testID: string) =>
+  screen.getByTestId(testID).props.accessibilityState?.disabled === true;
+const isChecked = (testID: string) =>
+  screen.getByTestId(testID).props.accessibilityState?.checked === true;
+
+/** Walks all four steps answering only what is required. */
+async function answerRequiredSteps(name = 'Aarav Mehta') {
+  fireEvent.changeText(await screen.findByTestId('taste-profile-name'), name);
+  fireEvent.press(cta());
+  fireEvent.press(await screen.findByTestId('taste-profile-diet-vegetarian'));
+  fireEvent.press(cta());
+  await screen.findByTestId('taste-profile-oil');
+  fireEvent.press(cta());
+  fireEvent.press(await screen.findByTestId('taste-profile-meal-regular-cook'));
 }
 
-/* ------------------------------------------------------------------ 1, 15: the boot order */
+/* ------------------------------------------------------------------------- the boot order */
 
-describe('the boot gate (task §14)', () => {
-  /**
-   * The session machine starts at `bootstrapping`, where the gate correctly HOLDS on the splash
-   * rather than guessing. These tests are about what it does once the session has SETTLED, so it
-   * is settled here — the same setup `navigation.test.tsx` uses.
-   */
+describe('the boot gate', () => {
   beforeEach(() => {
     sessionStore.reset();
     sessionStore.dispatch({ type: 'BOOTSTRAP_FOUND_SESSION' });
@@ -150,8 +157,7 @@ describe('the boot gate (task §14)', () => {
     sessionStore.reset();
   });
 
-  /** Test 1 — a new authenticated customer reaches Profile details BEFORE the address flow. */
-  it('sends an authenticated customer with an incomplete profile to Profile details, not Address', async () => {
+  it('sends an authenticated customer with an incomplete profile to the wizard, not Address', async () => {
     renderWithRuntime(<BootGate />, {
       runtime: runtimeWith({
         'GET /v1/me': () => ME_INCOMPLETE,
@@ -160,13 +166,10 @@ describe('the boot gate (task §14)', () => {
     });
 
     await waitFor(() => expect(mockRedirected.length).toBeGreaterThan(0));
-
     expect(mockRedirected[mockRedirected.length - 1]).toBe('/profile/details?context=onboarding');
-    // The address step is NOT reached first, even though this account has no address either.
     expect(mockRedirected).not.toContain('/address/location?onboarding=1');
   });
 
-  /** The next step in the sequence, once the profile is answered. */
   it('sends a complete profile with no address to the address flow', async () => {
     renderWithRuntime(<BootGate />, {
       runtime: runtimeWith({
@@ -179,7 +182,6 @@ describe('the boot gate (task §14)', () => {
     expect(mockRedirected).not.toContain('/profile/details?context=onboarding');
   });
 
-  /** And the settled case. */
   it('sends a complete profile with a saved address to Home', async () => {
     renderWithRuntime(<BootGate />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_COMPLETE }),
@@ -188,13 +190,6 @@ describe('the boot gate (task §14)', () => {
     await waitFor(() => expect(mockRedirected).toContain('/home'));
   });
 
-  /**
-   * NO FLICKER (task §14).
-   *
-   * While either gate is resolving the boot screen holds the splash and redirects NOWHERE. That is
-   * the whole anti-flicker mechanism: if it redirected to Home first and corrected itself later,
-   * the customer would see Home's carousel for the length of a round trip before it was replaced.
-   */
   it('redirects nowhere at all while the gates are still resolving', () => {
     renderWithRuntime(<BootGate />, {
       runtime: runtimeWith({
@@ -208,47 +203,35 @@ describe('the boot gate (task §14)', () => {
   });
 });
 
-/* ---------------------------------------------------- 2, 3, 4, 5, 6, 16: the page itself */
+/* ------------------------------------------------------------------------ the wizard */
 
-describe('the profile-details page (338:4508)', () => {
-  /** Test 2 + 16 — non-skippable: no drawn escape, and no hardware one either. */
-  it('draws no back control in the first-run context', async () => {
+describe('the taste-profile wizard', () => {
+  it('draws no back control on step 1 of the first run', async () => {
     mockSearchParams = { context: 'onboarding' };
-
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
     });
 
-    await screen.findByTestId('profile-details-header');
-    expect(screen.queryByTestId('profile-details-header-back')).toBeNull();
+    await screen.findByTestId('taste-profile-header');
+    expect(screen.queryByTestId('taste-profile-header-back')).toBeNull();
   });
 
-  it('draws a back control in the edit context', async () => {
-    mockSearchParams = {};
-
+  it('draws a back control on step 1 of an edit', async () => {
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_COMPLETE }),
     });
 
-    expect(await screen.findByTestId('profile-details-header-back')).toBeTruthy();
+    expect(await screen.findByTestId('taste-profile-header-back')).toBeTruthy();
   });
 
-  /**
-   * Test 16 — Android's hardware back cannot bypass first-run onboarding.
-   *
-   * The handler returning `true` means "handled": the navigator never sees the press, so the stack
-   * is not popped and the OS does not finish the activity. In the EDIT context it returns `false`
-   * and back behaves exactly as it does everywhere else.
-   */
-  it('swallows Android back during onboarding and lets it through when editing', async () => {
+  it('swallows Android back on step 1 of the first run and lets it through when editing', async () => {
     const spy = jest.spyOn(BackHandler, 'addEventListener');
 
     mockSearchParams = { context: 'onboarding' };
     const onboarding = renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
     });
-    await screen.findByTestId('profile-details-header');
-
+    await screen.findByTestId('taste-profile-header');
     const onboardingHandler = spy.mock.calls.at(-1)?.[1] as () => boolean;
     expect(onboardingHandler()).toBe(true);
 
@@ -259,149 +242,164 @@ describe('the profile-details page (338:4508)', () => {
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_COMPLETE }),
     });
-    await screen.findByTestId('profile-details-header');
-
+    await screen.findByTestId('taste-profile-header');
     const editHandler = spy.mock.calls.at(-1)?.[1] as () => boolean;
     expect(editHandler()).toBe(false);
-
-    spy.mockRestore();
   });
 
-  /** Test 3 — a missing REQUIRED field holds Confirm, visually and functionally. */
-  it('keeps Confirm disabled until every starred field is answered', async () => {
+  it('gates each step on its required answer only', async () => {
     mockSearchParams = { context: 'onboarding' };
-    const put = jest.fn(() => savedProfile());
-
-    renderWithRuntime(<ProfileDetailsRoute />, {
-      runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE, 'PUT /v1/me/profile': put }),
-    });
-
-    const cta = await screen.findByTestId('profile-details-submit');
-    expect(cta.props.accessibilityState.disabled).toBe(true);
-
-    // A press on the disabled bar must reach NOTHING — no write, no navigation.
-    fireEvent.press(cta);
-    expect(put).not.toHaveBeenCalled();
-    expect(mockRouter.replace).not.toHaveBeenCalled();
-
-    // Two of three is still not three.
-    fireEvent.changeText(screen.getByTestId('profile-name'), 'Aarav Mehta');
-    fireEvent.press(screen.getByTestId('profile-meal-structure-daily-cook-1x'));
-    expect(screen.getByTestId('profile-details-submit').props.accessibilityState.disabled).toBe(
-      true,
-    );
-
-    fireEvent.press(screen.getByTestId('profile-dietary-vegetarian'));
-    expect(screen.getByTestId('profile-details-submit').props.accessibilityState.disabled).toBe(
-      false,
-    );
-  });
-
-  /** Whitespace is not an answer — `'   '` can neither clear the gate nor be saved. */
-  it('does not accept a whitespace-only name', async () => {
-    mockSearchParams = { context: 'onboarding' };
-
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
     });
 
-    await screen.findByTestId('profile-name');
-    fireEvent.changeText(screen.getByTestId('profile-name'), '   ');
-    fireEvent.press(screen.getByTestId('profile-meal-structure-daily-cook-1x'));
-    fireEvent.press(screen.getByTestId('profile-dietary-vegetarian'));
+    // Family: the name (one adult is already counted).
+    await screen.findByTestId('taste-profile-name');
+    expect(isDisabled('taste-profile-continue')).toBe(true);
+    fireEvent.changeText(screen.getByTestId('taste-profile-name'), '   ');
+    expect(isDisabled('taste-profile-continue')).toBe(true);
+    fireEvent.changeText(screen.getByTestId('taste-profile-name'), 'Aarav');
+    expect(isDisabled('taste-profile-continue')).toBe(false);
+    fireEvent.press(cta());
 
-    expect(screen.getByTestId('profile-details-submit').props.accessibilityState.disabled).toBe(
-      true,
-    );
+    // Diet: a tile, no default.
+    await screen.findByTestId('taste-profile-diet-vegetarian');
+    expect(isDisabled('taste-profile-continue')).toBe(true);
+    fireEvent.press(screen.getByTestId('taste-profile-diet-jain'));
+    expect(isDisabled('taste-profile-continue')).toBe(false);
+    fireEvent.press(cta());
+
+    // Taste: everything optional.
+    await screen.findByTestId('taste-profile-oil');
+    expect(isDisabled('taste-profile-continue')).toBe(false);
+    fireEvent.press(cta());
+
+    // Cook: the meal setup.
+    await screen.findByTestId('taste-profile-meals');
+    expect(isDisabled('taste-profile-continue')).toBe(true);
+    fireEvent.press(screen.getByTestId('taste-profile-meal-tiffin'));
+    expect(isDisabled('taste-profile-continue')).toBe(false);
   });
 
-  /** Test 4 — the five UNSTARRED fields never block progression. */
-  it('enables Confirm with every optional field left empty', async () => {
+  it('keeps Adults at one or more and the others at zero or more', async () => {
     mockSearchParams = { context: 'onboarding' };
-
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
     });
 
-    await screen.findByTestId('profile-name');
-    await completeMandatoryFields();
-
-    expect(screen.getByTestId('profile-details-submit').props.accessibilityState.disabled).toBe(
-      false,
-    );
-    // Nothing optional was touched.
-    expect(screen.queryByTestId('profile-grown-up-chips')).toBeNull();
+    await screen.findByTestId('taste-profile-householdAdults-minus');
+    expect(isDisabled('taste-profile-householdAdults-minus')).toBe(true);
+    expect(isDisabled('taste-profile-householdKids-minus')).toBe(true);
+    fireEvent.press(screen.getByTestId('taste-profile-householdKids-plus'));
+    expect(isDisabled('taste-profile-householdKids-minus')).toBe(false);
+    expect(screen.getByLabelText('1 kids')).toBeTruthy();
   });
 
-  /** Test 5 — `341:4655` is genuinely multi-select. */
-  it('holds several grown-up-eating values at once', async () => {
+  it('goes back a step, keeping what was answered', async () => {
     mockSearchParams = { context: 'onboarding' };
-
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
     });
 
-    const entry = await screen.findByTestId('profile-grown-up-entry');
-    for (const cuisine of ['Rajasthani food', 'Bihari food', 'Odiya food']) {
-      fireEvent.changeText(entry, cuisine);
-      fireEvent(entry, 'submitEditing');
+    fireEvent.changeText(await screen.findByTestId('taste-profile-name'), 'Aarav');
+    fireEvent.press(cta());
+    fireEvent.press(await screen.findByTestId('taste-profile-header-back'));
+
+    expect((await screen.findByTestId('taste-profile-name')).props.value).toBe('Aarav');
+    expect(screen.queryByTestId('taste-profile-header-back')).toBeNull();
+  });
+
+  it('asks the meat question only for Non-veg and Mixed home, and clears it otherwise', async () => {
+    mockSearchParams = { context: 'onboarding' };
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
+    });
+
+    fireEvent.changeText(await screen.findByTestId('taste-profile-name'), 'Aarav');
+    fireEvent.press(cta());
+    fireEvent.press(await screen.findByTestId('taste-profile-diet-vegetarian'));
+    expect(screen.queryByTestId('taste-profile-meats')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('taste-profile-diet-non-vegetarian'));
+    fireEvent.press(screen.getByTestId('taste-profile-meat-chicken'));
+    expect(isChecked('taste-profile-meat-chicken')).toBe(true);
+
+    fireEvent.press(screen.getByTestId('taste-profile-diet-eggetarian'));
+    expect(screen.queryByTestId('taste-profile-meats')).toBeNull();
+    fireEvent.press(screen.getByTestId('taste-profile-diet-mixed'));
+    expect(isChecked('taste-profile-meat-chicken')).toBe(false);
+  });
+
+  it('does not deselect the chosen diet when it is tapped again', async () => {
+    mockSearchParams = { context: 'onboarding' };
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
+    });
+
+    fireEvent.changeText(await screen.findByTestId('taste-profile-name'), 'Aarav');
+    fireEvent.press(cta());
+    fireEvent.press(await screen.findByTestId('taste-profile-diet-vegan'));
+    fireEvent.press(screen.getByTestId('taste-profile-diet-vegan'));
+    expect(isChecked('taste-profile-diet-vegan')).toBe(true);
+  });
+
+  it('adds a cuisine only from the list, at most five', async () => {
+    mockSearchParams = { context: 'onboarding' };
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
+    });
+
+    fireEvent.changeText(await screen.findByTestId('taste-profile-name'), 'Aarav');
+    fireEvent.press(cta());
+    fireEvent.press(await screen.findByTestId('taste-profile-diet-vegan'));
+    fireEvent.press(cta());
+
+    // Typing filters the FULL list, including the search-only cuisines.
+    fireEvent.changeText(await screen.findByTestId('taste-profile-cuisine-search'), 'pars');
+    fireEvent.press(screen.getByTestId('taste-profile-cuisine-result-Parsi'));
+    expect(isChecked('taste-profile-cuisine-Parsi')).toBe(true);
+
+    fireEvent.changeText(screen.getByTestId('taste-profile-cuisine-search'), 'Grandma');
+    expect(screen.getByTestId('taste-profile-cuisine-none')).toBeTruthy();
+
+    for (const label of ['Punjabi', 'Gujarati', 'Bengali', 'Tamil']) {
+      fireEvent.press(screen.getByTestId(`taste-profile-cuisine-${label}`));
     }
-
-    expect(screen.getByTestId('profile-grown-up-Rajasthani food')).toBeTruthy();
-    expect(screen.getByTestId('profile-grown-up-Bihari food')).toBeTruthy();
-    expect(screen.getByTestId('profile-grown-up-Odiya food')).toBeTruthy();
+    expect(isDisabled('taste-profile-cuisine-Kerala')).toBe(true);
   });
 
-  /** Test 6 — removing one chip leaves the others alone. */
-  it('removes one grown-up-eating value without clearing the rest', async () => {
+  it('shows the hassle list for the chosen meal setup and swaps it on a change', async () => {
     mockSearchParams = { context: 'onboarding' };
-
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
     });
 
-    const entry = await screen.findByTestId('profile-grown-up-entry');
-    for (const cuisine of ['Rajasthani food', 'Bihari food', 'Odiya food']) {
-      fireEvent.changeText(entry, cuisine);
-      fireEvent(entry, 'submitEditing');
-    }
+    await answerRequiredSteps();
+    expect(screen.getByText('What’s hardest with your regular cook?')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('taste-profile-hassle-cook-skips-or-late'));
+    expect(isChecked('taste-profile-hassle-cook-skips-or-late')).toBe(true);
 
-    fireEvent.press(screen.getByTestId('profile-grown-up-Bihari food'));
-
-    expect(screen.queryByTestId('profile-grown-up-Bihari food')).toBeNull();
-    expect(screen.getByTestId('profile-grown-up-Rajasthani food')).toBeTruthy();
-    expect(screen.getByTestId('profile-grown-up-Odiya food')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('taste-profile-meal-order-in'));
+    expect(screen.queryByTestId('taste-profile-hassle-cook-skips-or-late')).toBeNull();
+    expect(isChecked('taste-profile-hassle-order-costs')).toBe(false);
   });
 
-  /** A single-select group takes ONE answer, and swapping does not accumulate. */
-  it('keeps the single-select groups single', async () => {
+  it('counts the hassle note and stops it at 150', async () => {
     mockSearchParams = { context: 'onboarding' };
-
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
     });
 
-    await screen.findByTestId('profile-dietary-vegan');
-    fireEvent.press(screen.getByTestId('profile-dietary-vegan'));
-    expect(screen.getByTestId('profile-dietary-vegan').props.accessibilityState.selected).toBe(
-      true,
-    );
-
-    fireEvent.press(screen.getByTestId('profile-dietary-vegetarian'));
-    expect(screen.getByTestId('profile-dietary-vegan').props.accessibilityState.selected).toBe(
-      false,
-    );
-    expect(screen.getByTestId('profile-dietary-vegetarian').props.accessibilityState.selected).toBe(
-      true,
-    );
+    await answerRequiredSteps();
+    fireEvent.changeText(screen.getByTestId('taste-profile-hassle-note'), 'x'.repeat(170));
+    expect(screen.getByTestId('taste-profile-hassle-note-count').props.children).toBe('150/150');
   });
 });
 
-/* --------------------------------------------------- 7, 8, 11, 12, 13, 14, 15: save + flow */
+/* ------------------------------------------------------------------------------ saving */
 
-describe('saving (task §7, §10, §12)', () => {
-  /** Test 7 — first-run Confirm saves, THEN opens `53:31` in the first-run flow context. */
-  it('saves and then opens Address 18a on a first run', async () => {
+describe('saving', () => {
+  it('saves every answer once, then opens the address step on a first run', async () => {
     mockSearchParams = { context: 'onboarding' };
     const put = jest.fn(() => savedProfile());
 
@@ -413,26 +411,69 @@ describe('saving (task §7, §10, §12)', () => {
       }),
     });
 
-    await screen.findByTestId('profile-name');
-    await completeMandatoryFields();
-    fireEvent.press(screen.getByTestId('profile-details-submit'));
+    await answerRequiredSteps();
+    // Nothing is saved while moving between steps.
+    expect(put).not.toHaveBeenCalled();
+    fireEvent.press(cta());
 
     await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
-    expect(put).toHaveBeenCalledWith(MANDATORY_ONLY_PAYLOAD);
-    // `onboarding=1` is what makes `53:31` draw no back control and end at Home.
+    expect(put).toHaveBeenCalledWith(REQUIRED_ONLY_PAYLOAD);
     await waitFor(() =>
       expect(mockRouter.replace).toHaveBeenCalledWith('/address/location?onboarding=1'),
     );
+    // The draft is gone once the save lands.
+    await waitFor(async () => expect(await SecureStore.getItemAsync(DRAFT_KEY)).toBeNull());
   });
 
-  /**
-   * The case that would otherwise be a trap.
-   *
-   * A customer can owe the profile page while ALREADY having an address — which is every existing
-   * account the day the server's completeness rule widens to V8's three starred fields. Sending
-   * them to `53:31` would put them on a first-run map with no back control, asking for an address
-   * they already have. Onboarding finishes at Home instead.
-   */
+  it('sends the optional answers it collected, trimmed', async () => {
+    mockSearchParams = { context: 'onboarding' };
+    const put = jest.fn(() => savedProfile());
+
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({
+        'GET /v1/me': () => ME_INCOMPLETE,
+        'GET /v1/me/addresses': () => [],
+        'PUT /v1/me/profile': put,
+      }),
+    });
+
+    fireEvent.changeText(await screen.findByTestId('taste-profile-name'), '  Aarav Mehta ');
+    fireEvent.press(screen.getByTestId('taste-profile-householdKids-plus'));
+    fireEvent.press(cta());
+    fireEvent.press(await screen.findByTestId('taste-profile-diet-mixed'));
+    fireEvent.press(screen.getByTestId('taste-profile-meat-prawns'));
+    fireEvent.press(cta());
+    fireEvent.press(await screen.findByTestId('taste-profile-cuisine-Bengali'));
+    fireEvent.press(screen.getByTestId('taste-profile-oil-moderate'));
+    fireEvent.press(screen.getByTestId('taste-profile-ghee'));
+    fireEvent.press(cta());
+    fireEvent.press(await screen.findByTestId('taste-profile-gender-either'));
+    fireEvent.press(screen.getByTestId('taste-profile-region-south-indian'));
+    fireEvent.press(screen.getByTestId('taste-profile-meal-office-meals'));
+    fireEvent.press(screen.getByTestId('taste-profile-hassle-office-weekends'));
+    fireEvent.changeText(screen.getByTestId('taste-profile-hassle-note'), '  Too salty  ');
+    fireEvent.press(cta());
+
+    await waitFor(() =>
+      expect(put).toHaveBeenCalledWith({
+        name: 'Aarav Mehta',
+        householdAdults: 1,
+        householdKids: 1,
+        householdElders: 0,
+        dietaryPreference: 'mixed',
+        nonVegPreferences: ['prawns'],
+        grownUpEating: ['Bengali'],
+        oilLevel: 'moderate',
+        gheeOnly: true,
+        genderPreference: 'either',
+        regionPreference: 'south-indian',
+        mealStructure: 'office-meals',
+        mealHassles: ['office-weekends'],
+        pressingIssue: 'Too salty',
+      }),
+    );
+  });
+
   it('finishes at Home when the first-run customer already has an address', async () => {
     mockSearchParams = { context: 'onboarding' };
     const put = jest.fn(() => savedProfile());
@@ -442,21 +483,14 @@ describe('saving (task §7, §10, §12)', () => {
       runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE, 'PUT /v1/me/profile': put }),
     });
 
-    await screen.findByTestId('profile-name');
-    await completeMandatoryFields();
-    fireEvent.press(screen.getByTestId('profile-details-submit'));
+    await answerRequiredSteps();
+    fireEvent.press(cta());
 
     await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/home'));
     expect(mockRouter.replace).not.toHaveBeenCalledWith('/address/location?onboarding=1');
   });
 
-  /**
-   * Test 8 — a REJECTED save keeps the customer here, with everything they typed.
-   *
-   * This is the case §7 is written against: advancing on a failed write would put a first-run
-   * customer past a page they can never reach again, with no profile saved.
-   */
-  it('stays on the page when the save is rejected, and keeps the answers', async () => {
+  it('stays on the last step when the save is rejected, keeping every answer', async () => {
     mockSearchParams = { context: 'onboarding' };
 
     renderWithRuntime(<ProfileDetailsRoute />, {
@@ -468,179 +502,164 @@ describe('saving (task §7, §10, §12)', () => {
       }),
     });
 
-    await screen.findByTestId('profile-name');
-    await completeMandatoryFields();
-    fireEvent.press(screen.getByTestId('profile-details-submit'));
+    await answerRequiredSteps();
+    fireEvent.press(cta());
 
-    await waitFor(() => expect(screen.getByTestId('profile-details-error')).toBeTruthy());
-
+    await waitFor(() => expect(screen.getByTestId('taste-profile-continue-error')).toBeTruthy());
     expect(mockRouter.replace).not.toHaveBeenCalled();
-    expect(screen.getByTestId('profile-name').props.value).toBe('Aarav Mehta');
-    expect(screen.getByTestId('profile-dietary-vegetarian').props.accessibilityState.selected).toBe(
-      true,
-    );
+    expect(isChecked('taste-profile-meal-regular-cook')).toBe(true);
+
+    fireEvent.press(screen.getByTestId('taste-profile-header-back'));
+    fireEvent.press(screen.getByTestId('taste-profile-header-back'));
+    expect(isChecked('taste-profile-diet-vegetarian')).toBe(true);
   });
 
-  /**
-   * Test 11 + 14 — the saved name is prefilled, on an edit and after a restart alike.
-   *
-   * A cold start IS this test: the route mounts, reads `GET /v1/me`, and fills the form from the
-   * response. There is no client-side cache in play, so "restart" and "first mount" are the same
-   * code path.
-   *
-   * BACKEND GAP, asserted honestly rather than hidden: the other seven answers come back BLANK,
-   * because `user_profiles` has no columns for them and `GET /v1/me` cannot return what was never
-   * stored. This assertion documents the current contract; it flips to a real prefill the day the
-   * columns exist. See `docs/FRONTEND_BACKEND_PENDING.md`.
-   */
-  it('prefills every saved answer on an edit', async () => {
-    mockSearchParams = {};
+  it('keeps a first-run draft on the device and resumes from it', async () => {
+    mockSearchParams = { context: 'onboarding' };
+    await SecureStore.setItemAsync(
+      DRAFT_KEY,
+      JSON.stringify({
+        version: 1,
+        step: 'taste',
+        values: { name: 'Aarav', dietaryPreference: 'vegan', householdKids: 2 },
+      }),
+    );
 
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
+    });
+
+    expect(await screen.findByTestId('taste-profile-oil')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('taste-profile-header-back'));
+    expect(isChecked('taste-profile-diet-vegan')).toBe(true);
+
+    fireEvent.press(screen.getByTestId('taste-profile-diet-jain'));
+    await waitFor(async () => {
+      const stored = await SecureStore.getItemAsync(DRAFT_KEY);
+      expect(JSON.parse(stored ?? '{}').values.dietaryPreference).toBe('jain');
+    });
+  });
+
+  it('never resumes a draft past a step whose required answer is missing', async () => {
+    mockSearchParams = { context: 'onboarding' };
+    await SecureStore.setItemAsync(
+      DRAFT_KEY,
+      JSON.stringify({ version: 1, step: 'cook', values: { name: 'Aarav' } }),
+    );
+
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({ 'GET /v1/me': () => ME_INCOMPLETE }),
+    });
+
+    expect(await screen.findByTestId('taste-profile-diet-vegetarian')).toBeTruthy();
+  });
+
+  it('prefills every saved answer on an edit', async () => {
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({
         'GET /v1/me': () => ({
           ...ME_COMPLETE,
-          householdStructure: 'bachelors',
-          mealStructure: 'daily-cook-1x',
-          pressingIssue: 'My cook never varies the menu.',
-          dietaryPreference: 'vegetarian',
-          grownUpEating: ['Rajasthani food', 'Bihari food'],
-          regionPreference: 'my-state',
-          genderPreference: 'male',
+          householdAdults: 2,
+          householdElders: 1,
+          dietaryPreference: 'non-vegetarian',
+          nonVegPreferences: ['mutton'],
+          grownUpEating: ['Rajasthani food', 'Odiya food'],
+          oilLevel: 'none',
+          gheeOnly: true,
+          genderPreference: 'female',
+          regionPreference: 'north-indian',
+          mealStructure: 'tiffin',
+          mealHassles: ['tiffin-timings'],
+          pressingIssue: 'Late lunch',
         }),
       }),
     });
 
-    await waitFor(() => expect(screen.getByTestId('profile-name').props.value).toBe('Aarav Mehta'));
-    expect(screen.getByTestId('profile-pressing-issue').props.value).toBe(
-      'My cook never varies the menu.',
-    );
-
-    for (const optionId of [
-      'profile-household-bachelors',
-      'profile-meal-structure-daily-cook-1x',
-      'profile-dietary-vegetarian',
-      'profile-region-my-state',
-      'profile-gender-male',
-    ]) {
-      expect(screen.getByTestId(optionId).props.accessibilityState.selected).toBe(true);
-    }
-
-    // The MULTI-select restores every chip the customer added, in the stored order.
-    expect(screen.getByTestId('profile-grown-up-chips')).toBeTruthy();
-    expect(screen.getByTestId('profile-grown-up-Rajasthani food')).toBeTruthy();
-    expect(screen.getByTestId('profile-grown-up-Bihari food')).toBeTruthy();
-  });
-
-  /**
-   * `null` and `[]` are different facts on the wire; neither is a chip on the screen.
-   *
-   * The display collapse is asserted here so it cannot quietly become a two-way one — sending
-   * `null` for an emptied chip row would tell the server the customer never answered.
-   */
-  it('opens an unanswered questionnaire blank without inventing selections', async () => {
-    mockSearchParams = {};
-
-    renderWithRuntime(<ProfileDetailsRoute />, {
-      runtime: runtimeWith({ 'GET /v1/me': () => ME_COMPLETE }),
-    });
-
-    await waitFor(() => expect(screen.getByTestId('profile-name').props.value).toBe('Aarav Mehta'));
-
-    for (const optionId of [
-      'profile-household-bachelors',
-      'profile-meal-structure-daily-cook-1x',
-      'profile-dietary-vegetarian',
-      'profile-region-my-state',
-      'profile-gender-male',
-    ]) {
-      expect(screen.getByTestId(optionId).props.accessibilityState.selected).toBe(false);
-    }
-    expect(screen.queryByTestId('profile-grown-up-chips')).toBeNull();
-  });
-
-  /**
-   * Test 12 + 15 — an EDIT returns to Page 16 and never enters the address flow.
-   *
-   * A POP, not a replace: this context is only ever reached by a push from Profile, so
-   * `useSafeBack` pops rather than falling back — and gets the platform's reverse-of-push
-   * closing animation, where `dismissAll` + `replace` played none.
-   */
-  it('returns to Profile after an edit, and never diverts to Address', async () => {
-    mockSearchParams = {};
-    const put = jest.fn(() => savedProfile({ name: 'Rekha S' }));
-
-    renderWithRuntime(<ProfileDetailsRoute />, {
-      runtime: runtimeWith({ 'GET /v1/me': () => ME_COMPLETE, 'PUT /v1/me/profile': put }),
-    });
-
-    await screen.findByTestId('profile-name');
-    fireEvent.changeText(screen.getByTestId('profile-name'), 'Rekha S');
-    fireEvent.press(screen.getByTestId('profile-meal-structure-daily-cook-1x'));
-    fireEvent.press(screen.getByTestId('profile-dietary-vegetarian'));
-    fireEvent.press(screen.getByTestId('profile-details-submit'));
-
     await waitFor(() =>
-      expect(put).toHaveBeenCalledWith({ ...MANDATORY_ONLY_PAYLOAD, name: 'Rekha S' }),
+      expect(screen.getByTestId('taste-profile-name').props.value).toBe('Aarav Mehta'),
     );
-    await waitFor(() => expect(mockRouter.back).toHaveBeenCalledTimes(1));
-
-    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('2 adults')).toBeTruthy();
+    expect(screen.getByLabelText('1 elders')).toBeTruthy();
+    fireEvent.press(cta());
+    expect(isChecked('taste-profile-diet-non-vegetarian')).toBe(true);
+    expect(isChecked('taste-profile-meat-mutton')).toBe(true);
+    fireEvent.press(cta());
+    // V8's " food" labels read back as today's chips.
+    expect(isChecked('taste-profile-cuisine-Rajasthani')).toBe(true);
+    expect(isChecked('taste-profile-cuisine-Odia')).toBe(true);
+    expect(screen.getByTestId('taste-profile-ghee').props.accessibilityState.checked).toBe(true);
+    fireEvent.press(cta());
+    expect(isChecked('taste-profile-gender-female')).toBe(true);
+    expect(isChecked('taste-profile-region-north-indian')).toBe(true);
+    expect(isChecked('taste-profile-meal-tiffin')).toBe(true);
+    expect(isChecked('taste-profile-hassle-tiffin-timings')).toBe(true);
+    expect(screen.getByTestId('taste-profile-hassle-note').props.value).toBe('Late lunch');
   });
 
-  /**
-   * The no-history half of the same rule: a deep link straight into the edit context still has
-   * to land somewhere real.
-   */
-  it('falls back to Profile after an edit with no history to pop', async () => {
-    mockSearchParams = {};
-    mockRouter.canGoBack = jest.fn(() => false);
-    mockRouter.canDismiss = jest.fn(() => false);
-    const put = jest.fn(() => savedProfile({ name: 'Rekha S' }));
-
-    renderWithRuntime(<ProfileDetailsRoute />, {
-      runtime: runtimeWith({ 'GET /v1/me': () => ME_COMPLETE, 'PUT /v1/me/profile': put }),
-    });
-
-    await screen.findByTestId('profile-name');
-    fireEvent.changeText(screen.getByTestId('profile-name'), 'Rekha S');
-    fireEvent.press(screen.getByTestId('profile-meal-structure-daily-cook-1x'));
-    fireEvent.press(screen.getByTestId('profile-dietary-vegetarian'));
-    fireEvent.press(screen.getByTestId('profile-details-submit'));
-
-    await waitFor(() =>
-      expect(put).toHaveBeenCalledWith({ ...MANDATORY_ONLY_PAYLOAD, name: 'Rekha S' }),
-    );
-    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/profile'));
-
-    expect(mockRouter.back).not.toHaveBeenCalled();
-  });
-
-  /**
-   * Test 13 — "sync with page 16".
-   *
-   * The mechanism is the mutation's invalidation of `auth.me`: Page 16 reads that key, so a
-   * successful save makes it re-read rather than render a cached verdict. Asserted at the
-   * transport, which is where the refetch is observable — a second `GET /v1/me` after the `PUT`.
-   */
-  it('re-reads the identity after a save so Page 16 cannot show a stale verdict', async () => {
-    mockSearchParams = {};
-    const get = jest.fn(() => ME_COMPLETE);
-
+  it('asks again for a meal setup saved under the V8 wording', async () => {
     renderWithRuntime(<ProfileDetailsRoute />, {
       runtime: runtimeWith({
-        'GET /v1/me': get,
-        'PUT /v1/me/profile': () => savedProfile({ name: 'Rekha S' }),
+        'GET /v1/me': () => ({
+          ...ME_COMPLETE,
+          dietaryPreference: 'vegetarian',
+          mealStructure: 'daily-cook-2x',
+        }),
       }),
     });
 
-    await screen.findByTestId('profile-name');
-    await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
+    await screen.findByTestId('taste-profile-name');
+    fireEvent.press(cta());
+    fireEvent.press(cta());
+    fireEvent.press(cta());
+    await screen.findByTestId('taste-profile-meals');
+    expect(isDisabled('taste-profile-continue')).toBe(true);
+  });
 
-    fireEvent.changeText(screen.getByTestId('profile-name'), 'Rekha S');
-    fireEvent.press(screen.getByTestId('profile-meal-structure-daily-cook-1x'));
-    fireEvent.press(screen.getByTestId('profile-dietary-vegetarian'));
-    fireEvent.press(screen.getByTestId('profile-details-submit'));
+  it('returns to the Account hub after an edit, and never diverts to Address', async () => {
+    const put = jest.fn(() => savedProfile({ name: 'Rekha S' }));
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({ 'GET /v1/me': () => ME_COMPLETE, 'PUT /v1/me/profile': put }),
+    });
+
+    await answerRequiredSteps('Rekha S');
+    fireEvent.press(cta());
+
+    await waitFor(() =>
+      expect(put).toHaveBeenCalledWith({ ...REQUIRED_ONLY_PAYLOAD, name: 'Rekha S' }),
+    );
+    await waitFor(() => expect(mockRouter.back).toHaveBeenCalledTimes(1));
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    // An edit keeps no draft.
+    expect(await SecureStore.getItemAsync(DRAFT_KEY)).toBeNull();
+  });
+
+  it('falls back to the Account hub after an edit with no history to pop', async () => {
+    mockRouter.canGoBack = jest.fn(() => false);
+    mockRouter.canDismiss = jest.fn(() => false);
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({
+        'GET /v1/me': () => ME_COMPLETE,
+        'PUT /v1/me/profile': () => savedProfile(),
+      }),
+    });
+
+    await answerRequiredSteps();
+    fireEvent.press(cta());
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/profile'));
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the identity after a save so the hub cannot show a stale verdict', async () => {
+    const get = jest.fn(() => ME_COMPLETE);
+    renderWithRuntime(<ProfileDetailsRoute />, {
+      runtime: runtimeWith({ 'GET /v1/me': get, 'PUT /v1/me/profile': () => savedProfile() }),
+    });
+
+    await screen.findByTestId('taste-profile-name');
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
+    await answerRequiredSteps();
+    fireEvent.press(cta());
 
     await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(1));
   });
