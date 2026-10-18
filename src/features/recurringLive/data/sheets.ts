@@ -91,5 +91,5 @@ export const PAYMENT_DETAILS_SHEET: PaymentDetailsSheetData = {
   methodDetail: '••••@okhdfcbank · Mandate active',
   manageLabel: 'Manage',
   reminder:
-    'Mandate is shared 27 hrs before & payment is auto-debited 3 hrs before the service time.',
+    'Mandate is shared 27 hrs before & payment is auto-debited 3 hrs before your first visit of the day.',
 };

@@ -33,7 +33,7 @@ export interface CookPoolSummary {
 
 /**
  * One line of a cook's profile header (`1380:3196`): "West Bengal", "Speaks Hindi, Bengali",
- * "Visits with you: 45", "Rating: 4.5 ★". Drawn as `label: value`, or the value alone when the
+ * "Visits with you: 45", "Your rating: 4.5 ★". Drawn as `label: value`, or the value alone when the
  * line carries no label.
  */
 export interface CookProfileLine {

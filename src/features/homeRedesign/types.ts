@@ -71,6 +71,34 @@ export interface Waitlist {
   readonly joined: boolean;
 }
 
+/**
+ * `2240:5822` Home banner — one card per active booking. Only these three states reach Home:
+ * cancelled bookings never do.
+ */
+export type ActiveBookingState = 'upcoming' | 'in_progress' | 'completed';
+
+/** The card's backdrop, by the visit's start time: before 12:00, 12:00–17:00, after 17:00. */
+export type ActiveBookingTimeOfDay = 'morning' | 'afternoon' | 'evening';
+
+export interface ActiveBookingCard {
+  /** Stable across refreshes, so a state change updates the card in place. */
+  readonly key: string;
+  /** The booking the card opens. */
+  readonly bookingId: string;
+  readonly type: 'recurring' | 'one_time';
+  readonly state: ActiveBookingState;
+  readonly timeOfDay: ActiveBookingTimeOfDay;
+  /** "Today · 9:00 AM", "Tomorrow · 1:00 PM", "Wed, 14 Oct · 7:00 PM". */
+  readonly whenLabel: string;
+  /** "2" over "HRS", "45" over "MINS" — the booked time, extensions included. */
+  readonly duration: { readonly value: string; readonly unit: string };
+  /**
+   * In progress only: the service window the bottom-edge bar fills across (epoch ms, server
+   * instants). `null` while the booking's detail has not landed — the bar is then not drawn.
+   */
+  readonly service: { readonly startMs: number; readonly endMs: number } | null;
+}
+
 export interface HomeModel {
   readonly serviceability: Serviceability;
   /** `1625:11065` — "Label ⌄" over "Building_name · Flat/House #" (`null`: no such parts). */
@@ -96,6 +124,11 @@ export interface HomeModel {
    * that read lands; the chip then falls back to counting `cookPool`.
    */
   readonly recurringChip?: 'locked' | 'book' | 'live';
+  /**
+   * `2243:1120` Active bookings, in carousel order (in progress, upcoming by start, completed).
+   * Absent or empty: the section is hidden.
+   */
+  readonly activeBookings?: readonly ActiveBookingCard[];
   /** Not-live only. */
   readonly liveHubs: readonly LiveHub[];
   readonly waitlist: Waitlist | null;

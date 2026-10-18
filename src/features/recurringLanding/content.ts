@@ -42,7 +42,7 @@ export interface FeatureCopy {
   readonly iconTop: number;
 }
 
-/** `983:6050`, `983:6056`, `983:6057`, `983:6063`. */
+/** `983:6050`, `983:6056`, `983:6057`, `983:6063` (copy as in `970:5435` / `970:5441`). */
 export const FEATURES: readonly FeatureCopy[] = [
   {
     title: 'Schedule',
@@ -54,7 +54,7 @@ export const FEATURES: readonly FeatureCopy[] = [
   },
   {
     title: 'Pay as you go',
-    body: 'No upfront payment. UPI Autopay charges as you avail the service',
+    body: 'No upfront payment. Charged 3 hours before your first visit of the day through UPI AutoPay',
     icon: PAY_ICON,
     iconSize: 24,
     iconLeft: 8,
@@ -62,7 +62,7 @@ export const FEATURES: readonly FeatureCopy[] = [
   },
   {
     title: 'On the go flexibility',
-    body: 'Change timings, reschedule to a different day, or cancel even when the plan is live',
+    body: 'Change of plans while Recurring is live? Cancel and book a ‘one-time’ service anytime',
     icon: EDIT_ICON,
     iconSize: 24,
     iconLeft: 8,

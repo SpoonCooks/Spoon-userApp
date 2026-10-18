@@ -21,7 +21,14 @@ import type {
   RecurringTab,
   VisitRef,
 } from '@features/recurringLive';
-import { useApproveRecurringMandate, useRecurringBooking } from '@features/recurringSetup';
+import { useMe } from '@features/auth';
+import {
+  AutopayFlowSheet,
+  summaryFromBooking,
+  useApproveRecurringMandate,
+  useAutopayIntentEnabled,
+  useRecurringBooking,
+} from '@features/recurringSetup';
 import type { VisitSummaryDto } from '@features/recurringSetup';
 import { QueryBoundary } from '@ui';
 
@@ -43,7 +50,8 @@ import { QueryBoundary } from '@ui';
  *
  * A booking whose visits can't be charged — saved but never approved (`pending_mandate`), or its
  * mandate paused / revoked / expired (`banner`) — carries the Autopay notice on the Live tab, which
- * reopens Razorpay's Autopay checkout for this same booking.
+ * approves Autopay again for this same booking: the UPI Autopay sheet (Figma 2316:3558) when the
+ * server has UPI Intent on (`useAutopayIntentEnabled`), otherwise Razorpay's Autopay checkout.
  */
 export default function RecurringBookingRoute() {
   const router = useRouter();
@@ -96,6 +104,10 @@ export default function RecurringBookingRoute() {
 
   // ─── Autopay ───────────────────────────────────────────────────────────────────────────────
   const autopay = useApproveRecurringMandate();
+  const intent = useAutopayIntentEnabled();
+  const me = useMe();
+  /** The UPI Autopay sheet, fresh per tap. */
+  const [sheet, setSheet] = useState<{ readonly open: boolean; readonly key: number } | null>(null);
   const noticeKind: AutopayNoticeKind | null =
     data === null
       ? null
@@ -106,6 +118,10 @@ export default function RecurringBookingRoute() {
           : null;
   const approveAutopay = () => {
     if (data === null) return;
+    if (intent) {
+      setSheet((previous) => ({ open: true, key: (previous?.key ?? 0) + 1 }));
+      return;
+    }
     autopay.approve(data).then(
       (outcome) => {
         booking.refetch();
@@ -143,6 +159,23 @@ export default function RecurringBookingRoute() {
     noticeKind === null ? null : (
       <AutopayNotice kind={noticeKind} busy={autopay.pending} onApprove={approveAutopay} />
     );
+  const closeSheet = () => {
+    setSheet((previous) => (previous === null ? null : { ...previous, open: false }));
+    booking.refetch();
+  };
+  const autopaySheet =
+    sheet === null || data === null ? null : (
+      <AutopayFlowSheet
+        key={sheet.key}
+        visible={sheet.open}
+        source={{ kind: 'booking', booking: data }}
+        summary={summaryFromBooking(data)}
+        userId={me.state.status === 'ready' ? me.state.data.id : null}
+        onClose={closeSheet}
+        onBackToHome={guard(() => router.dismissTo('/home'))}
+        onViewPlan={closeSheet}
+      />
+    );
 
   // ─── Cancelling the whole booking ──────────────────────────────────────────────────────────
   const { askToCancel, sheet: cancelSheet } = useCancelWholeBooking({
@@ -170,16 +203,19 @@ export default function RecurringBookingRoute() {
             {cancelSheet}
           </>
         ) : (
-          <RecurringLiveScreen
-            model={model}
-            onBack={guard(goBack)}
-            onTabChange={setTab}
-            notice={notice}
-            onOpenVisit={guard(onOpenVisit)}
-            onOpenUpNext={guard(() => {
-              if (data?.upNext) openVisit(data.upNext, true);
-            })}
-          />
+          <>
+            <RecurringLiveScreen
+              model={model}
+              onBack={guard(goBack)}
+              onTabChange={setTab}
+              notice={notice}
+              onOpenVisit={guard(onOpenVisit)}
+              onOpenUpNext={guard(() => {
+                if (data?.upNext) openVisit(data.upNext, true);
+              })}
+            />
+            {autopaySheet}
+          </>
         )
       }
     </QueryBoundary>

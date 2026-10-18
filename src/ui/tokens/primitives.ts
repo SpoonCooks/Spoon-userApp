@@ -235,6 +235,8 @@ export const palette = {
   amber700: '#BB4D00',
   /** `3:1151` — "Cancel Booking & Refund"; also the destructive ink across the file. */
   rose600: '#EC003F',
+  /** Spoon — User `color/status/negative-subtle`: the Autopay "Didn't go through" well. */
+  coral50: '#FFE8E3',
   /** The delete-account confirmation prompt's rose block — `rose600` at 30%, Figma inspector. */
   rose600Surface: 'rgba(236,0,63,0.3)',
   /** `6:22` — the "Free" fee value on the cancellation policy, NEW in the current Figma file. */
@@ -316,8 +318,6 @@ export const palette = {
   // ---------------------------------------------------------------------------
   /** `848:7809` — a dish card's name. */
   grey333: '#333333',
-  /** `755:2362` — a menu section's title on the deck card. */
-  navy142: '#142C44',
   /** `848:7809` — a dish card's idle heart. */
   grey217: '#D9D9D9',
   /** `848:6318` — black at 6 %: the skip tab and a card dragged toward it. */
@@ -379,6 +379,10 @@ export const space = {
   s22: 22,
   /** Duration-matrix inter-column gap (`135:95`). */
   s40: 40,
+  /** The Autopay "Last used" tag's vertical padding (`2316:3597`). */
+  s3: 3,
+  /** The Autopay app rows' leading inset and the info card's padding (`2316:3593`, `2316:3630`). */
+  s14: 14,
 } as const;
 
 /**
@@ -575,7 +579,7 @@ export const elevations = {
   subtle: elevation(0, 1, 1, 0.15, 2),
   /** `1:821` the primary CTA bar — a 3pt blur, tighter than the 4pt used by surfaces. */
   cta: elevation(0, 0, 3, 0.15, 3),
-  /** `983:6074` — Spoon — User `Elevation/2`: the Recurring landing's "Schedule Now" tag. */
+  /** `983:6074` — Spoon — User `Elevation/2`: the Recurring landing's "Book Recurring" tag. */
   tag: elevation(0, 0, 12, 0.1, 4),
 } as const;
 

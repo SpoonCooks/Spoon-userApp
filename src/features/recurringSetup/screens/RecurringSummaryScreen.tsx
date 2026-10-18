@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router';
 
 import { useAndroidBackHandler } from '@core/navigation';
 import { Screen, ScreenHeader, Text, useBottomGutter } from '@ui';
@@ -132,6 +133,9 @@ export function RecurringSummaryScreen({
   const [managing, setManaging] = useState<'sheet' | 'visit' | 'plan' | 'startOver' | null>(
     initialManaging ?? null,
   );
+  // The sheet and its dialogs are modals: close them when the Summary loses focus, or they stay
+  // drawn over whatever screen the app moved to (a deep link, a push tap).
+  useFocusEffect(useCallback(() => () => setManaging(null), []));
   const { windowStartId } = useRecurringPlanning();
   const todayKey = today?.getTime();
   /** One window for every plan (`1079:3220`), so the calendar does not move between tabs. */

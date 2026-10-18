@@ -14,6 +14,7 @@ import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
 import { innerShadows } from '@ui/tokens/primitives';
 
+import { DURATION_SELECTED_CHECK } from '../art';
 import type { RecurringDurationOption } from '../types';
 
 /**
@@ -26,6 +27,9 @@ import type { RecurringDurationOption } from '../types';
  * duration, the higher the level (`1219:4396`: 22 / 33 / 53 / 65 / 87 / 108 of 130 for 30 / 45 /
  * 60 / 90 / 120 / 150 minutes — `minutes / 180` of the card's height). Dots under the strip count
  * the options and mark the one in the centre.
+ *
+ * The CHOSEN card (`340:7539`) turns its liquid lime and wears a 20pt lime tick 5pt in from its
+ * top-right corner; a card the strip merely rests on (nothing chosen yet, `340:7110`) stays yellow.
  *
  * CONTROLLED: `selectedId` is the choice and the strip follows it. `onSelect` reports a new choice
  * when the strip comes to rest on a card, or a card is tapped (a tap on a neighbour also glides it
@@ -298,6 +302,7 @@ function DurationCard({
             surfaceScale={surfaceScale}
             idleOpacity={idleOpacity}
             focus={focus}
+            selected={selected}
           />
           <View style={focused ? styles.contentFocused : styles.contentIdle}>
             <Text variant={focused ? 'displayMid' : 'titleNav'} color="textPrimary" align="center">
@@ -316,6 +321,13 @@ function DurationCard({
           </View>
         </View>
         <Animated.View pointerEvents="none" style={[styles.edge, { opacity: focus }]} />
+        {selected ? (
+          <Animated.Image
+            source={DURATION_SELECTED_CHECK}
+            style={[styles.check, { opacity: focus }]}
+            testID={`${testID}-check`}
+          />
+        ) : null}
       </Animated.View>
     </Pressable>
   );
@@ -331,14 +343,20 @@ function Level({
   surfaceScale,
   idleOpacity,
   focus,
+  selected,
 }: {
   readonly height: Animated.AnimatedMultiplication<number>;
   readonly surfaceScale: Animated.AnimatedDivision<number>;
   readonly idleOpacity: Animated.AnimatedInterpolation<number>;
   readonly focus: Animated.AnimatedInterpolation<number>;
+  readonly selected: boolean;
 }) {
   const idle = lightTheme.gradients.durationLevel;
-  const focused = lightTheme.gradients.durationLevelFocused;
+  const focused = selected
+    ? lightTheme.gradients.durationLevelSelected
+    : lightTheme.gradients.durationLevelFocused;
+  // The surface takes the body's top stop when chosen (`#CFFF04`), its middle one otherwise.
+  const focusedSurface = selected ? focused.colors[0] : focused.colors[1];
   return (
     <View style={styles.level} pointerEvents="none">
       <Animated.View style={{ height }}>
@@ -363,7 +381,7 @@ function Level({
             <Animated.View
               style={[
                 styles.surface,
-                { backgroundColor: focused.colors[1], transform: [{ scaleX: surfaceScale }] },
+                { backgroundColor: focusedSurface, transform: [{ scaleX: surfaceScale }] },
               ]}
             />
           </View>
@@ -418,6 +436,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: lightTheme.colors.borderDurationFocus,
   },
+  /** `340:7539` "Selected check" — 20pt, 5 in from the card's top-right corner. */
+  check: { position: 'absolute', top: 5, right: 5, width: 20, height: 20 },
   level: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end' },
   surfaceRow: {
     position: 'absolute',

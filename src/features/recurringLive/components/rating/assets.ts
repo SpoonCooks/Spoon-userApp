@@ -11,8 +11,8 @@ import type { ImageSourcePropType } from 'react-native';
 
 const art = {
   // --- Card chrome ----------------------------------------------------------------------------
-  /** `1501:6632` — the 44pt cook photo: white disc, portrait, 2pt `#FFD600` ring. */
-  cookPhoto: require('../../../../../assets/figma/recurring/rating/cook-photo.webp'),
+  /** `1501:6632` — the cook's cut-out portrait, drawn in the card's 44pt `#FFF7CC` circle. */
+  cookPhoto: require('../../../../../assets/figma/recurring/visit/cook-photo.webp'),
 
   // --- 1 · Idle sticker (`1501:6638`) ---------------------------------------------------------
   /** `1501:6642` — 104pt `#FFF7CC` disc with the 2pt dashed 18 % rim. */

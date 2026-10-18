@@ -23,8 +23,8 @@ import {
 } from '../stickyFooter';
 
 /**
- * The sticky "Schedule Recurring" footer — `970:5470`, with the show/hide behaviour of the page's
- * design notes (`983:6006` …): parked below the screen while the "Schedule Now" tag is on it, and
+ * The sticky "Book Recurring" footer — `970:5470`, with the show/hide behaviour of the page's
+ * design notes (`983:6006` …): parked below the screen while the "Book Recurring" tag is on it, and
  * slid in once the tag has scrolled away (`stickyFooter.ts` holds the rule).
  *
  * `useStickyFooter` gives the page the scroll handler to attach to its `Animated.ScrollView` and

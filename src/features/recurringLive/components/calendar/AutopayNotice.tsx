@@ -16,7 +16,7 @@ export type AutopayNoticeKind =
 const COPY: Record<AutopayNoticeKind, { title: string; body: string; action: string }> = {
   pending: {
     title: 'Approve UPI Autopay',
-    body: 'Your visits are saved. Approve Autopay so each visit can be charged 3 hours before it starts and your cook confirmed.',
+    body: 'Your visits are saved. Approve Autopay so you’re charged 3 hours before your first visit of the day and your cook is confirmed.',
     action: 'Approve UPI Autopay',
   },
   MANDATE_PAUSED: {

@@ -219,6 +219,15 @@ export const lightColors = {
   borderPlanTile: palette.yellow200,
   /** `1219:4271` — the focused duration card's 1pt edge: the file's `--disabled`, black at 25 %. */
   borderDurationFocus: palette.black25,
+  /** `340:7539` — a start time: white, a 1.5pt `#FFEF99` edge. */
+  borderStartTime: palette.yellow300,
+  /** `340:7539` — a start time no pool Cook can take: black at 3 %, no edge. */
+  surfaceStartTimeUnavailable: palette.black3,
+  /** `340:7539` — the picked start time: `#E2FF68` with a 1.5pt black-25 % edge. */
+  surfaceStartTimeSelected: palette.canary,
+  /** `340:7539` — the time-of-day tabs' rule (1pt, black 25 %) and the chosen tab's 2pt underline. */
+  borderTimeTabs: palette.black25,
+  borderTimeTabSelected: palette.yellow500,
   /** Spoon — User `color/border/strong` — the outlined "Delete date" button (`586:4386`). */
   borderInk: palette.black,
   /** Spoon — User `--disabled` (`#00000040`) as a fill: the undo banner's tick badge (`567:1031`). */
@@ -335,7 +344,6 @@ export const lightColors = {
 
   // Cook Pool (`755:2333` … `848:7809`).
   textDish: palette.grey333,
-  textMenuSection: palette.navy142,
   iconIdle: palette.grey217,
   surfaceSkipTab: palette.black06,
   surfaceSkipTabActive: palette.black14,
@@ -352,6 +360,10 @@ export const lightColors = {
   surfaceVideoScene: palette.yellow100,
   /** `970:5600` — the wash over the landing while the video plays. */
   scrimPlayer: palette.scrimPlayer,
+
+  // Recurring UPI Autopay sheets (`2316:3558` … `2317:4009`).
+  /** `2317:3826` — `color/status/negative-subtle`, the "Didn't go through" status well. */
+  surfaceNegativeSubtle: palette.coral50,
 } as const;
 
 /** TODO(designer): no dark theme exists in Figma. Mirrors light until one does. */
@@ -469,6 +481,12 @@ export const gradients = {
   /** `1219:4274` — the liquid in the focused duration card: `#FFD600` → `#FFDE33` (60 %) → `#FFE666`. */
   durationLevelFocused: {
     colors: [palette.yellow500, palette.yellow33, palette.yellow400],
+    locations: [0, 0.6, 1],
+    angleDeg: 180,
+  },
+  /** `340:7539` — the CHOSEN duration card's liquid: `#CFFF04` → `#E2FF68` (60 %) → `#ECFF9B`. */
+  durationLevelSelected: {
+    colors: [palette.lime500, palette.canary, palette.lime300],
     locations: [0, 0.6, 1],
     angleDeg: 180,
   },
@@ -1644,8 +1662,10 @@ export const elevation = {
   glow: elevations.glow,
   sheet: elevations.raised,
   cta: elevations.cta,
-  /** `983:6074` — the Recurring landing's "Schedule Now" tag. */
+  /** `983:6074` — the Recurring landing's "Book Recurring" tag. */
   tag: elevations.tag,
+  /** `2316:3575` — Spoon — User `Elevation/2` (`0 0 12 #0000001A`) on the Autopay sheets. */
+  sheetSoft: elevations.tag,
 } as const satisfies Record<string, Elevation>;
 
 export type ElevationRole = keyof typeof elevation;

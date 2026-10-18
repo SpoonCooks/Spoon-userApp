@@ -49,6 +49,28 @@ const REFUND_EVENT_TYPES: ReadonlySet<string> = new Set([
   'recurring.visit.refund_credited',
 ]);
 
+/**
+ * Recurring Autopay pushes (DEC-086): they carry `recurringBookingId`, not `bookingId`, and open
+ * the Recurring booking — confirmed or failed after the customer left the approval sheet (Figma
+ * note 2317:13605), or a live mandate paused, revoked or expired (its re-approve banner).
+ */
+const RECURRING_MANDATE_EVENT_TYPES: ReadonlySet<string> = new Set([
+  'recurring.mandate.confirmed',
+  'recurring.mandate.failed',
+  'recurring.mandate.paused',
+  'recurring.mandate.revoked',
+  'recurring.mandate.expired',
+]);
+
+/** Whether a push is about a Recurring booking's Autopay, whose reads it should refresh. */
+export function isRecurringMandateEvent(data: unknown): boolean {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    RECURRING_MANDATE_EVENT_TYPES.has(String((data as Record<string, unknown>)['eventType']))
+  );
+}
+
 const BOOKING_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A uuid — the shape of every booking and refund id Spoon issues. */
@@ -78,6 +100,14 @@ export function routeForNotification(data: unknown): string {
   const refundId = record['refundId'];
   if (REFUND_EVENT_TYPES.has(String(record['eventType'])) && isBookingId(refundId)) {
     return `/refund/${refundId}`;
+  }
+
+  const recurringBookingId = record['recurringBookingId'];
+  if (
+    RECURRING_MANDATE_EVENT_TYPES.has(String(record['eventType'])) &&
+    isBookingId(recurringBookingId)
+  ) {
+    return `/recurring/${recurringBookingId}`;
   }
 
   // A booking id is the only thing that can target a screen. Anything else — a malformed

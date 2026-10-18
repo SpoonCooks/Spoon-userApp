@@ -44,7 +44,12 @@ const ELIGIBILITY: RecurringEligibilityDto = {
       pricingVersion: 'p',
     },
   ],
-  charging: { notifyLeadHours: 27, debitLeadHours: 3, mandateMaxChargePaise: 100000 },
+  charging: {
+    notifyLeadHours: 27,
+    debitLeadHours: 3,
+    mandateMaxChargePaise: 100000,
+    mandateFlow: 'checkout',
+  },
 };
 
 describe('planningFrom', () => {
@@ -143,7 +148,7 @@ describe('VisitChoices start times', () => {
     });
     renderWithRuntime(
       <RecurringPlanningProvider value={{ ...LOCAL_PLANNING, addressId: 'addr-1' }}>
-        <VisitChoices busy={busy} dayIds={DAYS} timeLabel="Time of the day" onChange={jest.fn()} />
+        <VisitChoices busy={busy} dayIds={DAYS} onChange={jest.fn()} />
       </RecurringPlanningProvider>,
       { runtime },
     );
@@ -152,14 +157,16 @@ describe('VisitChoices start times', () => {
 
   const disabled = (label: string) =>
     screen.getByRole('radio', { name: label }).props.accessibilityState?.disabled === true;
+  const tabDisabled = (label: string) =>
+    screen.getByRole('tab', { name: label }).props.accessibilityState?.disabled === true;
 
   it('asks for this visit’s days, the picked duration and the Plan’s other visits', async () => {
     const { startTimesBodies } = renderChoices([
       { fromMinutes: 9 * 60, toMinutes: 10 * 60, dayIds: ['2026-10-06'] },
     ]);
 
-    fireEvent.press(screen.getByRole('radio', { name: 'Morning' }));
     fireEvent.press(screen.getByRole('radio', { name: /^1 hr/ }));
+    fireEvent.press(screen.getByRole('tab', { name: 'Morning' }));
 
     await waitFor(() =>
       expect(startTimesBodies).toEqual([
@@ -176,12 +183,12 @@ describe('VisitChoices start times', () => {
   it('offers only starts the backend offers, and closes a time of day with none left', async () => {
     renderChoices();
 
-    fireEvent.press(screen.getByRole('radio', { name: 'Morning' }));
     fireEvent.press(screen.getByRole('radio', { name: /^1 hr/ }));
+    fireEvent.press(screen.getByRole('tab', { name: 'Morning' }));
 
     await waitFor(() => expect(disabled('8:30 AM')).toBe(true));
     expect(disabled('8:00 AM')).toBe(false);
-    expect(disabled('Afternoon')).toBe(true);
-    expect(disabled('Evening')).toBe(false);
+    expect(tabDisabled('Afternoon')).toBe(true);
+    expect(tabDisabled('Evening')).toBe(false);
   });
 });

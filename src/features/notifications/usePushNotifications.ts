@@ -7,10 +7,12 @@ import { useRouter } from 'expo-router';
 import { useSessionStore } from '@core/store';
 import { useRuntime } from '@core/runtimeContext';
 import { bookingKeys } from '@features/booking';
+import { recurringKeys } from '@features/recurringSetup';
 
 import { createExpoPushTokenProvider } from './api/expoPushProvider';
-import { useRegisterPushToken } from './api';
-import { routeForNotification } from './deepLink';
+import { readNotificationsEnabled, useRegisterPushToken } from './api';
+import type { PushRegistration, PushRegistrationOutcome } from './api';
+import { isRecurringMandateEvent, routeForNotification } from './deepLink';
 
 /**
  * Push, end to end on the client: register, receive, tap, route.
@@ -35,6 +37,13 @@ import { routeForNotification } from './deepLink';
  * A denied prompt, a build with no Firebase config and a device that cannot produce a token all
  * return null: registration is skipped, no token is fabricated and no error is shown. The REASON
  * is logged, because those three are identical to the customer and completely different to fix.
+ *
+ * ## Telling the server whether notifications are on
+ *
+ * Every registration carries `notificationsEnabled`, read (never requested) from the OS. A
+ * customer who switches notifications off in Settings is still re-registered — with the token
+ * this install last registered and `false` — because the backend otherwise keeps a token marked
+ * enabled and sends a push nobody sees where it would have sent an SMS.
  */
 
 /**
@@ -75,32 +84,55 @@ export function usePushNotifications(): void {
   const register = useRegisterPushToken(provider);
 
   /**
-   * Whether a token has actually been REGISTERED — not whether one was attempted.
+   * What the backend was last told in this app session — token and flag — or null when nothing
+   * has reached it yet (fresh launch, or a new sign-in).
    *
-   * This guard used to close after the first attempt, which quietly made the failure permanent.
-   * A customer who had not granted the OS permission at that moment produced no token, the
-   * attempt was recorded as done, and the app never asked again for the life of the install: the
-   * one path back was a sign-out and sign-in. Turning notifications on in system Settings
-   * afterwards — the obvious thing to do, and the thing support would tell them to do — changed
-   * nothing at all, silently.
+   * Only a registration that REACHED the backend sets it. This used to be a "done" flag that closed
+   * after the first attempt, which quietly made a failure permanent: a customer who had not
+   * granted the OS permission at sign-in produced no token, the attempt was recorded as done, and
+   * turning notifications on in Settings afterwards changed nothing for the life of the install.
    *
-   * So the door only closes on a token that reached the backend.
+   * It is also what keeps foregrounding quiet: a foreground re-sends only when the permission has
+   * changed since the last successful send. A rotated token is caught by the listener below.
    */
-  const registeredRef = useRef(false);
+  const lastSentRef = useRef<PushRegistration | null>(null);
   /** One attempt at a time. Foregrounding twice in a second must not send two registrations. */
   const inFlightRef = useRef(false);
 
+  /** Records what reached the backend. `no-token` / `unsupported` leave the door open. */
+  const remember = useCallback((outcome: PushRegistrationOutcome) => {
+    if (outcome.kind === 'sent' || outcome.kind === 'unchanged') {
+      lastSentRef.current = outcome.registration;
+    }
+  }, []);
+
   const attemptRegistration = useCallback(() => {
-    if (status !== 'authenticated' || registeredRef.current || inFlightRef.current) return;
+    if (status !== 'authenticated' || inFlightRef.current) return;
     inFlightRef.current = true;
 
-    register
-      .mutateAsync(undefined)
-      .then((registered) => {
-        // `false` means no token was available — permission, config or platform. Stays open.
-        registeredRef.current = registered;
-        logger.info('notifications.register', { feature: 'notifications', registered });
-      })
+    void (async () => {
+      const previous = lastSentRef.current;
+      // Already told the backend this session, and the permission has not moved: nothing to say.
+      if (
+        previous !== null &&
+        (await readNotificationsEnabled()) === previous.notificationsEnabled
+      ) {
+        return;
+      }
+
+      const outcome = await register.mutateAsync({ previous });
+      remember(outcome);
+      if (outcome.kind !== 'unchanged') {
+        // `registered: false` means no token was available — permission, config or platform.
+        logger.info('notifications.register', {
+          feature: 'notifications',
+          registered: outcome.kind === 'sent',
+          ...(outcome.kind === 'sent'
+            ? { notificationsEnabled: outcome.registration.notificationsEnabled }
+            : {}),
+        });
+      }
+    })()
       .catch((error: unknown) => {
         // Push is an enhancement. A failed registration is logged and dropped, never surfaced.
         logger.warn('notifications.register.failed', {
@@ -114,15 +146,15 @@ export function usePushNotifications(): void {
       });
     // `register` is a new mutation object each render; depending on it would re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, logger]);
+  }, [status, logger, remember]);
 
   /**
-   * Registration runs on sign-in, and again whenever the app comes back to the foreground while
-   * it still has no token.
+   * Registration runs on sign-in, and again whenever the app comes back to the foreground — which
+   * sends only if there is still no token on the backend, or the permission has changed since.
    *
-   * Foreground is the moment that matters: granting the permission means LEAVING the app for
-   * Settings and coming back, so it is exactly when a previously impossible registration becomes
-   * possible. It does not re-prompt anybody — `getToken` asks the OS first and only raises a
+   * Foreground is the moment that matters: granting OR revoking the permission means LEAVING the
+   * app for Settings and coming back, so it is exactly when a previously impossible registration
+   * becomes possible, or a registered token stops being shown. It does not re-prompt anybody — `getToken` asks the OS first and only raises a
    * dialog where `canAskAgain` is true, so a customer who declined is asked once, not on every
    * switch back.
    */
@@ -130,7 +162,7 @@ export function usePushNotifications(): void {
     if (status !== 'authenticated') {
       // A sign-out invalidates the association; the next sign-in registers again, which is what
       // moves the token to the new account on a shared handset.
-      registeredRef.current = false;
+      lastSentRef.current = null;
       return undefined;
     }
 
@@ -148,8 +180,8 @@ export function usePushNotifications(): void {
    * schedule. A rotation is not an error and produces no failure anywhere in the app; it simply
    * means the value the backend holds stops delivering, silently, forever.
    *
-   * So the rotation is registered as it happens. `registeredRef` is deliberately not consulted:
-   * this is a NEW token, not a repeat of the one already sent, and the OS is telling us rather
+   * So the rotation is registered as it happens, with the current permission flag. It is skipped
+   * only if the backend already holds exactly this token and flag; the OS is telling us rather
    * than us asking it — there is no permission prompt to re-raise.
    *
    * Gated on an authenticated session for the same reason the first registration is: a token has
@@ -160,27 +192,35 @@ export function usePushNotifications(): void {
 
     const rotated = Notifications.addPushTokenListener((token) => {
       if (typeof token.data !== 'string' || token.data.length === 0) return;
-      register.mutateAsync({ token: token.data }).catch((error: unknown) => {
-        logger.warn('notifications.register.rotated.failed', {
-          feature: 'notifications',
-          operation: 'registerToken',
-          error: error instanceof Error ? error.name : 'unknown',
+      register
+        .mutateAsync({ token: token.data, previous: lastSentRef.current })
+        .then(remember)
+        .catch((error: unknown) => {
+          logger.warn('notifications.register.rotated.failed', {
+            feature: 'notifications',
+            operation: 'registerToken',
+            error: error instanceof Error ? error.name : 'unknown',
+          });
         });
-      });
     });
 
     return () => rotated.remove();
     // `register` is a new mutation object each render; depending on it would re-subscribe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, logger]);
+  }, [status, logger, remember]);
 
   // A notification that ARRIVES refreshes the booking reads rather than applying its contents.
   useEffect(() => {
-    const received = Notifications.addNotificationReceivedListener(() => {
+    const received = Notifications.addNotificationReceivedListener((notification) => {
       // The feature's own key factory, not an inline array (§6): the blast radius of a push has
       // to be the same thing every booking mutation invalidates, or a notification refreshes a
       // cache entry the rest of the app has already moved on from.
       void queryClient.invalidateQueries({ queryKey: bookingKeys.all() });
+      // An Autopay outcome: the approval sheet, Home's "Confirming Autopay" banner and the
+      // booking re-read at once rather than at their next poll.
+      if (isRecurringMandateEvent(notification.request.content.data)) {
+        void queryClient.invalidateQueries({ queryKey: recurringKeys.all() });
+      }
     });
 
     const tapped = Notifications.addNotificationResponseReceivedListener((response) => {

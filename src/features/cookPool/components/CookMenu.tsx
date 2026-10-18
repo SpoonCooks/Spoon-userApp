@@ -10,19 +10,18 @@ import type { CookMenuSection } from '../types';
 import { DishCard } from './DishCard';
 
 /**
- * `Carousel list` — Figma `755:2359` (the deck card) and `719:1582` (the profile).
+ * `Carousel list` — Figma `I1384:2942;1380:3076` (the deck card, `755:2333`) and `719:1582` (the
+ * profile): the same list in both.
  *
  * py 16, 24 between sections, each a title and a row of dish cards that scrolls sideways: px 16,
- * 10 between cards, running past the right edge. Sections and dishes are drawn in the order the
- * backend sends them; a section with no dishes is left out.
+ * 10 between cards, running past the right edge; 12 between the title and the row. Sections and
+ * dishes are drawn in the order the backend sends them; a section with no dishes is left out.
  *
- * The deck titles its sections SemiBold 18/26 `#142C44` (`755:2362`); the profile, SemiBold
- * 14/20 black (`719:1585`).
+ * A section's title is SemiBold 14/20 black (`I1384:2942;1380:3079`, `719:1585`).
  */
 export interface CookMenuProps {
   readonly sections: readonly CookMenuSection[];
-  readonly tone: 'card' | 'page';
-  /** Hearts on, with these dishes filled. Omit for no hearts (`755:2364`). */
+  /** Hearts on, with these dishes filled. Omit for no hearts. */
   readonly favourites?: ReadonlySet<string> | undefined;
   readonly onToggleFavourite?: ((dishId: string) => void) | undefined;
   /**
@@ -35,7 +34,6 @@ export interface CookMenuProps {
 
 export function CookMenu({
   sections,
-  tone,
   favourites,
   onToggleFavourite,
   rowGestures,
@@ -57,7 +55,6 @@ export function CookMenu({
                 key={dish.id}
                 dish={dish}
                 favourite={favourites?.has(dish.id) ?? false}
-                tone={tone}
                 onToggleFavourite={
                   onToggleFavourite === undefined ? undefined : () => onToggleFavourite(dish.id)
                 }
@@ -69,8 +66,8 @@ export function CookMenu({
         return (
           <View key={section.id} style={styles.section}>
             <Text
-              variant={tone === 'card' ? 'headingSection' : 'bodyLargeStrong'}
-              color={tone === 'card' ? 'textMenuSection' : 'textPrimary'}
+              variant="bodyLargeStrong"
+              color="textPrimary"
               style={styles.title}
               accessibilityRole="header"
             >

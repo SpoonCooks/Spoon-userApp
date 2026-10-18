@@ -27,6 +27,17 @@ export const C = {
 
 export const F = fontFamily;
 
+/**
+ * `2240:5822` Home banner — the card's fill per time of day, as Figma states it: Morning and Late
+ * evening run top to bottom, Afternoon at 163.3° (`gradientAxis` maps that onto the card). Late
+ * evening is the dark card: white text and a brand-yellow progress fill instead of black.
+ */
+export const BANNER_FILL = {
+  morning: { colors: ['#FFF9DB', '#FFD9A8'], angleDeg: 180, dark: false },
+  afternoon: { colors: ['#FFF3A6', '#FFD600'], angleDeg: 163.3, dark: false },
+  evening: { colors: ['#2E2766', '#0D0A22'], angleDeg: 180, dark: true },
+} as const;
+
 /*
  * Shadows as Figma states them, through `boxShadow` (CSS semantics on both platforms under the New
  * Architecture this app runs). Figma's effect "radius" is a CSS blur; iOS's `shadowRadius` is not —

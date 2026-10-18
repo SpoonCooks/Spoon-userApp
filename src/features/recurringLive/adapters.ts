@@ -216,7 +216,8 @@ function dayVisitOf(visit: VisitSummaryDto): DayVisit {
     id: visit.visitId,
     status: 'unassigned',
     title,
-    meta: 'Cook pending',
+    // "Upcoming · …" like an assigned visit (`1006:527`); no cook to name yet.
+    meta: 'Upcoming · Cook pending',
     pool: {
       title: `Cook confirmed by ${kolkataClock(visit.cookConfirmBy)}`,
       subtitle: 'Familiar cooks from your Pool',

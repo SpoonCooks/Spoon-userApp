@@ -12,6 +12,9 @@ import { RouteScaffold } from '@ui';
  *   player   the player up over the page, at 1:52 (`970:5546`)
  *   watched  scrolled to the end with the video already watched (`970:5472`)
  *
+ * `?pool=1` draws the Cook Pool button as for a household with a pool ("Check your Cook Pool");
+ * without it the button reads "Make your Cook Pool".
+ *
  * `?video=<url>` plays that video in the player, in place of the configured one (`video.ts`) —
  * for trying a link without editing code. Needs a build that has `expo-video`; an older one plays
  * the placeholder. Percent-encode the URL (`?video=https%3A%2F%2F…`).
@@ -19,13 +22,17 @@ import { RouteScaffold } from '@ui';
  * The real route (`(app)/recurring`) sits behind the session guard, which a build with no live
  * backend cannot pass — the same reason `recurring-setup.tsx` and `cook-pool-preview.tsx` sit
  * outside `(app)`. Here "schedule" opens the dev preview of the plan flow, and "Make your Cook
- * Pool" the Cook Pool's.
+ * Pool" / "Check your Cook Pool" the Cook Pool's.
  */
 const PLAYER_AT_SECONDS = 112;
 
 export default function RecurringLandingPreviewRoute() {
   const router = useRouter();
-  const { state, video } = useLocalSearchParams<{ state?: string; video?: string }>();
+  const { state, video, pool } = useLocalSearchParams<{
+    state?: string;
+    video?: string;
+    pool?: string;
+  }>();
   const configured = useExplainerVideoSource();
   const videoSource = video === undefined || video === '' ? configured : { uri: video };
 
@@ -46,6 +53,7 @@ export default function RecurringLandingPreviewRoute() {
       onBack={() => router.back()}
       onSchedule={() => router.push('/recurring-setup')}
       onMakeCookPool={() => router.push('/cook-pool-preview')}
+      hasCookPool={pool === '1'}
       initialScroll={state === 'bottom' || state === 'watched' ? 'end' : 'top'}
       initialWatched={state === 'watched'}
       {...(videoSource === undefined ? {} : { videoSource })}

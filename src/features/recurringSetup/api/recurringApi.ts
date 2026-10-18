@@ -6,6 +6,7 @@ import {
   bookingCancellationSchema,
   bookingPrepSchema,
   mandateCheckoutSchema,
+  mandateStatusViewSchema,
   mandateVerifySchema,
   recurringBookingListSchema,
   recurringBookingSchema,
@@ -21,6 +22,7 @@ import type {
   BookingCancellationQuoteDto,
   BookingPrepDto,
   MandateCheckoutDto,
+  MandateStatusViewDto,
   MandateVerifyDto,
   RecurringBookingDto,
   RecurringCalendarDto,
@@ -288,12 +290,28 @@ export function createRecurringApi(api: ApiClient) {
       });
     },
 
-    /** Approve Autopay for a saved booking, or re-approve it for a live one whose mandate lapsed. */
-    async startMandate(id: string, scope: string): Promise<MandateCheckoutDto> {
+    /**
+     * Approve Autopay for a saved booking, or re-approve it for a live one whose mandate lapsed.
+     * `intent` also returns the UPI Intent attempt's link; Checkout sends no body, as before.
+     */
+    async startMandate(
+      id: string,
+      scope: string,
+      flow: 'checkout' | 'intent' = 'checkout',
+    ): Promise<MandateCheckoutDto> {
       return api.request(RECURRING_PATHS.mandate(id), {
         method: 'POST',
         headers: idempotencyHeader(scope),
+        ...(flow === 'intent' ? { body: { flow } } : {}),
         parse: (data) => mandateCheckoutSchema.parse(data),
+      });
+    },
+
+    /** The latest mandate and its UPI Intent attempt (polled while approval is open). */
+    async mandateStatus(id: string, signal?: AbortSignal): Promise<MandateStatusViewDto> {
+      return api.request(RECURRING_PATHS.mandate(id), {
+        parse: (data) => mandateStatusViewSchema.parse(data),
+        ...withSignal(signal),
       });
     },
 

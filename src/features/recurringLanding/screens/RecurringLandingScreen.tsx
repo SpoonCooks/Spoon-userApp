@@ -30,13 +30,16 @@ import {
  * and `970:5472` (the end again, once the video has been watched).
  *
  * One page that scrolls: a hero with a yellow thread running down it, the headline and, hanging
- * off the thread's knot, the lime "Schedule Now" tag; then, along the thread's rail, "Unlock by
- * creating your Cook Pool" (with three sample bookings and "Make your Cook Pool"), "One time
+ * off the thread's knot, the lime "Book Recurring" tag; then, along the thread's rail, "Unlock by
+ * creating your Cook Pool" (with three sample bookings and the Cook Pool button: "Check your Cook
+ * Pool" (`983:6046`) once the household has a cook in its pool, "Make your Cook Pool" while it
+ * is empty or not yet known), "One time
  * planning, familiar cooks", and the explainer video's card. The thread's tail ends the page.
  *
  * ## One schedule button at a time
  *
- * Both "Schedule Now" and the sticky footer's "Schedule Recurring" are `onSchedule`. The tag is
+ * Both the "Book Recurring" tag (`983:6077`) and the sticky footer's "Book Recurring"
+ * (`970:5471`) are `onSchedule`. The tag is
  * the button while it is on screen; once it has scrolled off the top the footer slides in, and
  * out again when the tag returns (`stickyFooter.ts`).
  *
@@ -53,10 +56,15 @@ import {
  */
 export interface RecurringLandingScreenProps {
   readonly onBack: () => void;
-  /** "Schedule Now" and "Schedule Recurring": both open the plan flow. */
+  /** The "Book Recurring" tag and footer: both open the plan flow. */
   readonly onSchedule: () => void;
-  /** "Make your Cook Pool". */
+  /** The Cook Pool button ("Make your Cook Pool" / "Check your Cook Pool"). */
   readonly onMakeCookPool: () => void;
+  /**
+   * Whether the household's Cook Pool has at least one cook: the button then reads "Check your
+   * Cook Pool" (`983:6046`). False or absent (empty, or not known yet) reads "Make your Cook Pool".
+   */
+  readonly hasCookPool?: boolean;
   /** The explainer video. Absent until there is one. */
   readonly videoSource?: ExplainerVideoSource;
   /** Where the page opens: scrolled to the top (the default) or to the end. For previews. */
@@ -72,6 +80,7 @@ export function RecurringLandingScreen({
   onBack,
   onSchedule,
   onMakeCookPool,
+  hasCookPool = false,
   videoSource,
   initialScroll = 'top',
   initialWatched = false,
@@ -80,7 +89,10 @@ export function RecurringLandingScreen({
 }: RecurringLandingScreenProps) {
   const footer = useStickyFooter();
   const scrollRef = useRef<Animated.ScrollView>(null);
-  const scrolledToEnd = useRef(false);
+  // A page that opens at its end keeps following the end until the customer drags it: the
+  // footer's measured height grows the content after the first scroll, and the thread's tail must
+  // still end on the footer (`970:5397`).
+  const followEnd = useRef(initialScroll === 'end');
   const [watched, setWatched] = useState(initialWatched);
   const [playerAt, setPlayerAt] = useState<number | null>(initialPlayerAt ?? null);
   const [footerHeight, setFooterHeight] = useState(FOOTER_HEIGHT);
@@ -95,11 +107,13 @@ export function RecurringLandingScreen({
 
   // A page that opens at its end has the footer in already, without sliding.
   const onContentSizeChange = useCallback(() => {
-    if (initialScroll !== 'end' || scrolledToEnd.current) return;
-    scrolledToEnd.current = true;
+    if (!followEnd.current) return;
     scrollRef.current?.scrollToEnd({ animated: false });
     jumpTo(true);
-  }, [initialScroll, jumpTo]);
+  }, [jumpTo]);
+  const onScrollBeginDrag = useCallback(() => {
+    followEnd.current = false;
+  }, []);
 
   return (
     <View style={styles.screen} testID={testID}>
@@ -109,6 +123,7 @@ export function RecurringLandingScreen({
           onScroll={footer.onScroll}
           scrollEventThrottle={16}
           onContentSizeChange={onContentSizeChange}
+          onScrollBeginDrag={onScrollBeginDrag}
           showsVerticalScrollIndicator={false}
           alwaysBounceVertical={false}
           contentContainerStyle={{ paddingBottom: footerHeight }}
@@ -166,7 +181,7 @@ export function RecurringLandingScreen({
                   </Text>
                   <TicketRow tickets={SAMPLE_TICKETS} testID={`${testID}-tickets`} />
                   <Button
-                    label="Make your Cook Pool"
+                    label={hasCookPool ? 'Check your Cook Pool' : 'Make your Cook Pool'}
                     onPress={onMakeCookPool}
                     size="pillLg"
                     flat
@@ -224,7 +239,7 @@ export function RecurringLandingScreen({
 
       <StickyFooter
         state={footer}
-        label="Schedule Recurring"
+        label="Book Recurring"
         onPress={onSchedule}
         onHeight={setFooterHeight}
         testID={`${testID}-footer`}
@@ -249,8 +264,11 @@ const FOOTER_HEIGHT = 72;
 const HEADING_HEIGHT = 26;
 /** `983:6073` — the tail's frame: 159 tall (its stroke overhangs by 4), the rail ending where it begins. */
 const TAIL_HEIGHT = 159;
-/** The rail runs this far past the last of the content before the tail takes over (`970:5408`). */
-const RAIL_PAST_CONTENT = 80;
+/**
+ * The rail runs this far past the last of the content before the tail takes over: `970:5408` is
+ * 848 tall under 16 + 790 of content (`970:5409`), so 42.
+ */
+const RAIL_PAST_CONTENT = 42;
 /** `983:6074` — the tag's top in the frame, 250, less the status bar's 54. */
 const TAG_TOP = 196;
 

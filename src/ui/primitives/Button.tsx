@@ -17,6 +17,7 @@ import type { ColorToken, TypographyToken } from '@ui/tokens/semantic';
  *  - `accent`    — lime CTA: "Start Service", "Book NOW", "Call Cook", "Reschedule for free".
  *  - `inverse`   — the dark inset pill sitting inside the primary bar ("Pay →").
  *  - `secondary` — white/outlined ("No" on the cancellation confirmation).
+ *  - `tint`      — `90:180` Style=Secondary: a flat `#FFF7CC` pill (the Autopay sheets).
  *  - `link`      — text-only row action ("Reschedule Booking", "Share your requests →").
  *  - `danger`    — the red-on-pink destructive treatment proved by Profile's Log Out.
  *  - `dangerSolid` — a SOLID `#FF0404` fill with a white label. The delete-account confirmation
@@ -34,6 +35,7 @@ export type ButtonVariant =
   | 'bright'
   | 'inverse'
   | 'secondary'
+  | 'tint'
   | 'outlineSoft'
   | 'subtle'
   | 'link'
@@ -117,6 +119,12 @@ const SURFACE: Record<ButtonVariant, ViewStyle> = {
     borderColor: lightTheme.colors.border,
   },
   /**
+   * `90:180` Style=Secondary (Spoon — User) — the redesigned file's secondary Button: a flat
+   * `color/surface/subtle` (`#FFF7CC`) fill, no edge. The Autopay sheets' "Cancel", "Choose
+   * another app" and "Back to home" (`2317:3577` …).
+   */
+  tint: { backgroundColor: lightTheme.colors.surfaceAccent },
+  /**
    * `250:2979` Confirmation "Cancel" and `201:93` the auto-cancel "No" — white behind a 1pt
    * `#FFDE33` edge. Distinct from `secondary`, whose edge is the `#CAD5E2` slate hairline.
    */
@@ -138,6 +146,7 @@ const LABEL_COLOR: Record<ButtonVariant, ColorToken> = {
   bright: 'textOnAccent',
   inverse: 'textInverse',
   secondary: 'textPrimary',
+  tint: 'textPrimary',
   outlineSoft: 'textPrimary',
   subtle: 'textSecondaryStrong',
   link: 'danger',

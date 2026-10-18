@@ -201,6 +201,13 @@ jest.mock('@react-native-firebase/remote-config', () => ({
 
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { DEFAULT: 3 },
+  IosAuthorizationStatus: {
+    NOT_DETERMINED: 0,
+    DENIED: 1,
+    AUTHORIZED: 2,
+    PROVISIONAL: 3,
+    EPHEMERAL: 4,
+  },
   setNotificationHandler: jest.fn(),
   setNotificationChannelAsync: jest.fn(async () => undefined),
   getPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: false })),

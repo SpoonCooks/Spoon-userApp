@@ -21,6 +21,32 @@ jest.mock('react-native-worklets', () =>
 );
 jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));
 
+/**
+ * No navigator is mounted: focus is the screen's mount, and `mockBlur()` plays the screen losing
+ * focus (a push or a deep link over it) by running each focus effect's cleanup.
+ */
+const mockBlurs = new Set<() => void>();
+function mockBlur() {
+  act(() => {
+    mockBlurs.forEach((cleanup) => cleanup());
+  });
+}
+jest.mock('expo-router', () => ({
+  __esModule: true,
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('react').useEffect(() => {
+      const cleanup = effect();
+      if (cleanup === undefined) return undefined;
+      mockBlurs.add(cleanup);
+      return () => {
+        mockBlurs.delete(cleanup);
+        cleanup();
+      };
+    }, [effect]);
+  },
+}));
+
 const SANCHITA = 'demo-pool-sanchita';
 
 /** The dev preview's way in: the local store, seeded with these cooks already in the pool. */
@@ -80,6 +106,17 @@ describe('Cook profile (demo source)', () => {
     expect(screen.queryByTestId('cook-profile-screen-remove')).toBeNull();
   });
 
+  it('closes the remove dialog when the profile loses focus', () => {
+    renderDemo(<CookProfileScreen cookId={SANCHITA} onBack={jest.fn()} onRemoved={jest.fn()} />, [
+      SANCHITA,
+    ]);
+    fireEvent.press(screen.getByTestId('cook-profile-screen-remove'));
+    expect(screen.getByTestId('cook-profile-screen-dialog')).toBeTruthy();
+
+    mockBlur();
+    expect(screen.queryByTestId('cook-profile-screen-dialog')).toBeNull();
+  });
+
   it('hearts a dish, on the device only', () => {
     renderDemo(<CookProfileScreen cookId={SANCHITA} onBack={jest.fn()} onRemoved={jest.fn()} />);
     const heart = screen.getByTestId('dish-card-sanchita-dahi-bhindi-favourite');
@@ -115,7 +152,8 @@ const CARD = {
     { dishKey: 'palak-paneer', label: 'Palak paneer', dietCategory: 'veg', displayOrder: 1 },
   ],
   profileVariant: 'mixed',
-  rating: { average: 4.5, count: 12 },
+  rating: { average: 4.2, count: 12 },
+  yourRating: { average: 4.5, count: 3 },
   visitsWithYou: 3,
 };
 
@@ -167,7 +205,7 @@ describe('Cook Pool on the API (default source)', () => {
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
     await waitFor(() => expect(screen.getByText('Visits with you: 3')).toBeTruthy());
-    expect(screen.getByText('Rating: 4.5')).toBeTruthy();
+    expect(screen.getByText('Your rating: 4.5')).toBeTruthy();
     fireEvent.press(screen.getByTestId('cook-profile-screen-remove'));
     fireEvent.press(screen.getByTestId('cook-profile-screen-dialog-remove'));
 
@@ -208,6 +246,18 @@ describe('Cook Pool on the API (default source)', () => {
       nativeEvent: { layout: { x: 0, y: 0, width: 402, height: 600 } },
     });
     expect(screen.getAllByText('Cook Sanchita').length).toBeGreaterThan(0);
+
+    // `755:2333` — each dish on the card carries its heart, the profile's favourites: one cook
+    // dealt is drawn on top and again behind it, and both hearts follow the one store.
+    const selected = () =>
+      screen
+        .getAllByLabelText('Favourite Palak paneer')
+        .map((heart) => (heart.props.accessibilityState as { selected?: boolean }).selected);
+    expect(selected()).toEqual([false, false]);
+    fireEvent.press(screen.getAllByLabelText('Favourite Palak paneer')[1]!);
+    expect(selected()).toEqual([true, true]);
+    fireEvent.press(screen.getAllByLabelText('Favourite Palak paneer')[1]!);
+    expect(selected()).toEqual([false, false]);
   });
 
   it('adds the top cook with POST /v1/me/cooks, and skipping stores nothing', async () => {
