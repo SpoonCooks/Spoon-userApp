@@ -57,6 +57,9 @@ export interface HomeTopBannerProps {
 const NO_ADDRESS_LABEL = 'Add address';
 const NO_ADDRESS_LINE = 'Set your delivery location';
 
+/** Clear space between the status bar's icons and the headline. */
+const STATUS_BAR_GAP = lightTheme.space.md;
+
 export function HomeTopBanner({
   header,
   onPressAddress,
@@ -67,13 +70,11 @@ export function HomeTopBanner({
   const addressLabel = header.addressLabel ?? NO_ADDRESS_LABEL;
   const addressLine = header.addressLine ?? NO_ADDRESS_LINE;
   /**
-   * `DESIGN.paddingTop` (22) is a FLOOR, not an addend — the same shape `useBottomGutter` uses
-   * for the bottom safe area (`src/ui/primitives/Screen.tsx`). The inset already clears the
-   * status bar on notch/island devices, so summing the design gap on top of it would double up
-   * the clearance the design never asked for; on a device with a smaller inset, the design gap
-   * still wins.
+   * `DESIGN.paddingTop` (22) is a FLOOR. Under a status bar, the headline also keeps a 12pt gap
+   * below it: the inset alone ended exactly at the bar's bottom edge, so "Spoon in 15 mins" sat
+   * flush against the clock and battery icons.
    */
-  const paddingTop = Math.max(DESIGN.paddingTop, topInset);
+  const paddingTop = Math.max(DESIGN.paddingTop, topInset > 0 ? topInset + STATUS_BAR_GAP : 0);
 
   return (
     <View style={[styles.container, { paddingTop }]} testID="home-header">
