@@ -345,3 +345,27 @@ describe('waitlistFrom (GET /v1/me/waitlist, 1302:3539)', () => {
     ).toBe(true);
   });
 });
+
+describe('Later tiles (DEC-094)', () => {
+  it('greys a Later tile with nothing free in the next three days, and leaves the unknown bookable', () => {
+    const model = homeModelFrom(
+      sources({
+        later: new Map([
+          [30, true],
+          [60, false],
+        ]),
+      }),
+    );
+    const later = (minutes: number) =>
+      model.durations.find((d) => d.minutes === minutes)?.available;
+    expect(later(30)).toEqual({ now: true, later: true });
+    expect(later(60)).toEqual({ now: true, later: false });
+    // No answer for 90 minutes: bookable for Later, as before the overview existed.
+    expect(later(90)?.later).toBe(true);
+  });
+
+  it('keeps every Later tile bookable while the overview has not answered', () => {
+    const model = homeModelFrom(sources());
+    expect(model.durations.every((d) => d.available.later)).toBe(true);
+  });
+});

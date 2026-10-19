@@ -87,6 +87,12 @@ export interface HomeRedesignActions {
   readonly onRefreshAvailability?: () => void;
   /** Defaults to `shareSpoon`: WhatsApp first, the system share sheet otherwise. */
   readonly onShare?: () => void;
+  /**
+   * Whether the tiles are showing Later availability: the Later tab, or Now while Instant is
+   * unavailable ("Book for later"). The route re-reads the three-day overview every 30 seconds
+   * only while this holds (DEC-094).
+   */
+  readonly onLaterTilesChange?: (showing: boolean) => void;
 }
 
 export interface HomeRedesignViewProps extends HomeRedesignActions {
@@ -162,6 +168,11 @@ export function HomeRedesignView({
   // what each can do — Now without instant simply leaves the CTA off.
   const mode = draft.mode;
   const cta = ctaKind(mode, model.instant.available);
+  const { onLaterTilesChange } = actions;
+  const laterTiles = cta === 'schedule';
+  useEffect(() => {
+    onLaterTilesChange?.(laterTiles);
+  }, [laterTiles, onLaterTilesChange]);
   // Tiles priced for the current CTA: Instant's for "Book Now", Scheduled's otherwise.
   const durations = useMemo(
     () => model.durations.map((d) => forCta(d, cta)),

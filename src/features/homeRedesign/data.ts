@@ -4,7 +4,11 @@ import { LOADING, failed, ready, useApiQueries } from '@core/data';
 import type { DataState, ScreenQuery } from '@core/data';
 import { useRuntime } from '@core/runtimeContext';
 import { currentAddressOf, useAddresses } from '@features/address';
-import { availabilityKeys, createAvailabilityApi } from '@features/availability';
+import {
+  availabilityKeys,
+  createAvailabilityApi,
+  useScheduledOverview,
+} from '@features/availability';
 import type { InstantAvailabilityDto } from '@features/availability';
 import { useActiveBookings, useBookingDetails, useBookingHistory } from '@features/booking';
 import type { BookingDetailDto } from '@features/booking';
@@ -48,6 +52,11 @@ export function useHomeRedesignData(options: {
    * `undefined` while it is still being read from the device.
    */
   triedPlace?: { title: string; line: string; locality: string | null } | null | undefined;
+  /**
+   * Home is on screen with its Later tab showing: the three-day overview is re-read every 30
+   * seconds while this holds (DEC-094), and not at all on Now or Recurring, or off screen.
+   */
+  pollLater?: boolean;
 }): HomeRedesignData {
   const { api } = useRuntime();
   const addresses = useAddresses();
@@ -77,6 +86,18 @@ export function useHomeRedesignData(options: {
         ? catalogue.state.data.durations.map((d) => d.durationMinutes)
         : [],
     [catalogue.state],
+  );
+
+  // Every duration over the next three days, for the Later tiles (DEC-094).
+  const overview = useScheduledOverview({ addressId, poll: options.pollLater === true });
+  const later = useMemo(
+    () =>
+      overview.state.status === 'ready'
+        ? new Map(
+            overview.state.data.durations.map((d) => [d.durationMinutes, d.available] as const),
+          )
+        : undefined,
+    [overview.state],
   );
 
   const availability = createAvailabilityApi(api);
@@ -146,6 +167,7 @@ export function useHomeRedesignData(options: {
         pool: pool.state.status === 'ready' ? pool.state.data : undefined,
         recurring: recurring.state.status === 'ready' ? recurring.state.data : undefined,
         activeBookings,
+        later,
       }),
     );
   }, [
@@ -164,6 +186,7 @@ export function useHomeRedesignData(options: {
     detailIds,
     detailReads,
     recurringBookings.state,
+    later,
   ]);
 
   // ONE identity for the life of Home. The route calls this from `useFocusEffect`, which re-runs
@@ -180,6 +203,7 @@ export function useHomeRedesignData(options: {
     active,
     detailReads,
     recurringBookings,
+    overview,
   });
   useEffect(() => {
     reads.current = {
@@ -192,6 +216,7 @@ export function useHomeRedesignData(options: {
       active,
       detailReads,
       recurringBookings,
+      overview,
     };
   });
   const refetch = useCallback(() => {
@@ -203,6 +228,7 @@ export function useHomeRedesignData(options: {
     latest.recurring.refetch();
     latest.active.refetch();
     latest.recurringBookings.refetch();
+    latest.overview.refetch();
     for (const read of latest.instantReads) read.refetch();
     for (const read of latest.detailReads) read.refetch();
   }, []);

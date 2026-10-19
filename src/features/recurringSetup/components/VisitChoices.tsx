@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@ui';
 import { lightTheme } from '@ui/theme/ThemeProvider';
+import { SlotChip, TimeGrid, TimeOfDayTabs, TimeTab } from '@ui/v2/TimePicker';
 
-import { TIME_OF_DAY_TAB_ICONS } from '../art';
 import { useRecurringStartTimes } from '../api';
 import { useRecurringPlanning } from '../planning';
 import {
@@ -158,7 +158,7 @@ export function VisitChoices({
       {timeOfDay === null || durationId === null ? null : (
         <View style={styles.times}>
           {/* `340:7539` "Time of day" — three tabs over a 1pt rule. */}
-          <View style={styles.tabs} accessibilityRole="tablist">
+          <TimeOfDayTabs>
             {TIME_OF_DAY_BANDS.map((band) => (
               <TimeTab
                 key={band.id}
@@ -169,10 +169,11 @@ export function VisitChoices({
                   !bandFits(band.id, durationMinutes(durationId)) || closedBands.has(band.id)
                 }
                 onPress={() => pickTimeOfDay(band.id)}
+                testID={`recurring-time-${band.id}`}
               />
             ))}
-          </View>
-          <Grid columns={3} gap={SLOT_GAP}>
+          </TimeOfDayTabs>
+          <TimeGrid columns={3}>
             {startTimesFor(timeOfDay).map((minutes) => (
               <SlotChip
                 key={minutes}
@@ -185,7 +186,7 @@ export function VisitChoices({
                 onPress={() => commit(timeOfDay, durationId, minutes)}
               />
             ))}
-          </Grid>
+          </TimeGrid>
         </View>
       )}
     </View>
@@ -198,157 +199,9 @@ function minutesOf(time: string): number {
   return hours * 60 + minutes;
 }
 
-/** Rows of `columns` equal cells, `gap` apart both ways; a short last row keeps cell widths. */
-function Grid({
-  columns,
-  gap,
-  children,
-}: {
-  readonly columns: number;
-  readonly gap: number;
-  readonly children: React.ReactNode[];
-}) {
-  const rows: React.ReactNode[][] = [];
-  children.forEach((child, index) => {
-    const row = Math.floor(index / columns);
-    (rows[row] ??= []).push(child);
-  });
-  return (
-    <View style={{ gap }}>
-      {rows.map((row, rowIndex) => (
-        <View key={`row-${rowIndex}`} style={[styles.row, { gap }]}>
-          {Array.from({ length: columns }, (_, column) => (
-            <View key={`cell-${column}`} style={styles.cell}>
-              {row[column] ?? null}
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-interface ChoiceProps {
-  readonly selected: boolean;
-  /** `332:5780` / `332:5810` — taken by another visit: `color/surface/disabled`, not pressable. */
-  readonly disabled?: boolean;
-  readonly onPress: () => void;
-}
-
-/**
- * `340:7539` "Period" — a third of the row: the 18pt yellow pictogram 6 from a 14/20 label,
- * 4 below. The tab in use is SemiBold black over a 2pt `#FFD600` underline; the rest Regular at
- * 60 %. A time of day with nothing left is greyed to 25 % and does not respond.
- */
-function TimeTab({
-  id,
-  label,
-  selected,
-  disabled = false,
-  onPress,
-}: ChoiceProps & { readonly id: RecurringTimeOfDay; readonly label: string }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="tab"
-      disabled={disabled}
-      accessibilityState={{ selected, disabled }}
-      accessibilityLabel={label}
-      style={[styles.tab, selected ? styles.tabSelected : null, disabled ? styles.dim : null]}
-      testID={`recurring-time-${id}`}
-    >
-      <Image source={TIME_OF_DAY_TAB_ICONS[id]} style={styles.tabIcon} />
-      <Text
-        variant={selected ? 'bodyLargeStrong' : 'bodyLarge'}
-        color={selected ? 'textPrimary' : 'textSubdued'}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-/**
- * `340:7539` "Slot" — 44 tall at a 16pt radius, a 14/20 time. Open: white with a 1.5pt `#FFEF99`
- * edge. Picked: `#E2FF68`, a 1.5pt black-25 % edge and a soft lift, the time SemiBold. Taken: black
- * at 3 %, the time at 25 %.
- */
-function SlotChip({
-  label,
-  selected,
-  disabled = false,
-  onPress,
-}: ChoiceProps & { readonly label: string }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      disabled={disabled}
-      accessibilityState={{ selected, disabled }}
-      accessibilityLabel={label}
-      style={[
-        styles.slot,
-        disabled ? styles.slotTaken : selected ? styles.slotPicked : styles.slotOpen,
-      ]}
-    >
-      <Text
-        variant={selected && !disabled ? 'bodyLargeStrong' : 'bodyLarge'}
-        color={disabled ? 'textDisabledSoft' : 'textPrimary'}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-/** `340:7539` — three 118pt slots across 370: 8 apart, both ways. */
-const SLOT_GAP = 8;
-
 const styles = StyleSheet.create({
   /** The title sits right on the carousel, whose cards carry their own 8pt top margin. */
   section: { gap: 0 },
   /** The carousel's dots, 16, the tabs, 12, the start times. */
   times: { gap: lightTheme.space.md, marginTop: lightTheme.space.lg },
-  row: { flexDirection: 'row' },
-  cell: { flex: 1 },
-  tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: lightTheme.colors.borderTimeTabs,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingTop: lightTheme.space.xs,
-    paddingBottom: lightTheme.space.s10,
-  },
-  /** The 2pt underline sits on the 1pt rule: pulled down by 1 so the two overlap. */
-  tabSelected: {
-    borderBottomWidth: 2,
-    borderBottomColor: lightTheme.colors.borderTimeTabSelected,
-    marginBottom: -1,
-  },
-  tabIcon: { width: 18, height: 18 },
-  dim: { opacity: 0.4 },
-  slot: {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: lightTheme.radius.md,
-  },
-  slotOpen: {
-    borderWidth: 1.5,
-    borderColor: lightTheme.colors.borderStartTime,
-    backgroundColor: lightTheme.colors.surface,
-  },
-  slotPicked: {
-    borderWidth: 1.5,
-    borderColor: lightTheme.colors.borderDurationFocus,
-    backgroundColor: lightTheme.colors.surfaceStartTimeSelected,
-    boxShadow: '0 0 12px rgba(0,0,0,0.1)',
-  },
-  slotTaken: { backgroundColor: lightTheme.colors.surfaceStartTimeUnavailable },
 });

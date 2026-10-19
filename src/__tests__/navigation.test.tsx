@@ -196,7 +196,7 @@ const POPPING_BACK_ROUTES = [
   // `215:1472` is PUSHED over a live `53:31`, and popping is what returns the customer to the pin
   // they placed rather than to a map that re-acquires the device fix (task §5).
   ['address/out-of-service', AddressOutOfServiceRoute, 'not-serviceable-back', '/address/location'],
-  ['scheduled', ScheduledRoute, 'schedule-header-back', '/home'],
+  ['scheduled', ScheduledRoute, 'schedule-later-header-back', '/home'],
   // `275:4321`'s "edit number" IS the back control on OTP — the frame draws no chevron.
   ['otp', OtpRoute, 'login-otp-screen-edit', '/login'],
   // `68:214` is always pushed directly on top of whichever entry sent it (Home or Profile — see

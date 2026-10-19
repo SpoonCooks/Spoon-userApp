@@ -92,10 +92,20 @@ export interface HomeSources {
   readonly recurring?: RecurringEligibilityDto | undefined;
   /** The Active bookings carousel, already built (`activeBookingCardsFrom`). */
   readonly activeBookings?: readonly ActiveBookingCard[];
+  /**
+   * Per duration in minutes, whether ANY start time is free on any of the next three days
+   * (`GET /v1/availability/scheduled/overview`, DEC-094). Absent while it loads, if it failed, or
+   * on a server without it: every Later tile then stays bookable, as before.
+   */
+  readonly later?: ReadonlyMap<number, boolean> | undefined;
 }
 
-/** The carousel's tiles, from the catalogue and whatever instant reads have landed. */
-function durationsFrom(catalogue: Catalogue | undefined, instant: InstantReads): DurationOption[] {
+/** The carousel's tiles, from the catalogue and whatever instant and Later reads have landed. */
+function durationsFrom(
+  catalogue: Catalogue | undefined,
+  instant: InstantReads,
+  later?: ReadonlyMap<number, boolean>,
+): DurationOption[] {
   return (catalogue?.durations ?? [])
     .slice()
     .sort((a, b) => a.durationMinutes - b.durationMinutes)
@@ -124,8 +134,8 @@ function durationsFrom(catalogue: Catalogue | undefined, instant: InstantReads):
           // Unknown (still loading, or the read failed) is treated as bookable: the booking
           // itself is the authoritative refusal, and greying every tile on a slow read is worse.
           now: instant.get(d.durationMinutes)?.available ?? true,
-          // Slot capacity is per date; the slot picker answers it. No per-duration roll-up exists.
-          later: true,
+          // Free on any of the next three days (DEC-094). Unknown is bookable, as for Now.
+          later: later?.get(d.durationMinutes) ?? true,
         },
       };
     });
@@ -140,7 +150,7 @@ function focusIdOf(durations: readonly DurationOption[]): string {
 
 export function homeModelFrom(sources: HomeSources): HomeModel {
   const { address, catalogue } = sources;
-  const durations = durationsFrom(catalogue, sources.instant);
+  const durations = durationsFrom(catalogue, sources.instant, sources.later);
 
   // Instant is "available" when any duration can go now; the ETA is the shortest such one's.
   const instantNow = durations

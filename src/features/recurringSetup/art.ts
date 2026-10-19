@@ -29,12 +29,8 @@ export const TIME_OF_DAY_ICONS: Readonly<Record<RecurringTimeOfDay, ImageSourceP
   evening: require('../../../assets/figma/recurring/evening.png') as ImageSourcePropType,
 };
 
-/** `340:7539` — the 18pt yellow sunrise / noon / sunset on the time-of-day tabs. */
-export const TIME_OF_DAY_TAB_ICONS: Readonly<Record<RecurringTimeOfDay, ImageSourcePropType>> = {
-  morning: require('../../../assets/figma/recurring/tab-morning.png') as ImageSourcePropType,
-  afternoon: require('../../../assets/figma/recurring/tab-afternoon.png') as ImageSourcePropType,
-  evening: require('../../../assets/figma/recurring/tab-evening.png') as ImageSourcePropType,
-};
+/** `340:7539` — the 18pt tab pictograms, shared with Schedule for Later (`@ui/v2/TimePicker`). */
+export { TIME_OF_DAY_TAB_ICONS } from '@ui/v2/TimePicker';
 
 /** `340:7539` "Selected check" — the chosen duration card's 20pt lime disc and tick. */
 export const DURATION_SELECTED_CHECK =
