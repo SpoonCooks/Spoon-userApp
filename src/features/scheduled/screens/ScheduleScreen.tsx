@@ -140,6 +140,23 @@ function isBlocked(
   return period.noSlots === true && period.id !== chosenId;
 }
 
+/**
+ * Whether the grid's answer is for the day and duration now chosen. A screen with no duration
+ * section (reschedule) is matched on the day alone; one without `slotsFor` (fixtures, previews)
+ * is trusted as before.
+ */
+function answersSelection(
+  schedule: ScheduleViewModel,
+  dayId: string | null,
+  durationId: string | null,
+): boolean {
+  const answered = schedule.slotsFor;
+  if (answered === undefined) return true;
+  if (answered === null || dayId === null || answered.date !== dayId) return false;
+  const hasDurations = schedule.durations !== undefined && schedule.durations.length > 0;
+  return !hasDurations || durationId === `dur-${answered.durationMinutes}`;
+}
+
 export function ScheduleView({ state, onRetry, initialSelection, ...actions }: ScheduleViewProps) {
   /**
    * `333:3643` — "Help me pick". PURELY LOCAL: it opens a sheet over content the screen already
@@ -179,7 +196,16 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
    * The start times currently on offer, read off `state` here rather than inside the boundary's
    * render prop, so the staleness rule below can be an ordinary derivation.
    */
-  const slotsPending = state.status !== 'ready' || state.data.slotsPending;
+  /**
+   * Pending also covers an answer for a DIFFERENT day or duration than the one now chosen. A tap
+   * updates this screen first and reaches the host's read a render later, so without this the
+   * previous answer was drawn for a frame, the grid then vanished while the new read loaded, and
+   * came back: the blink on every Day, Time and Duration tap. TEMPORARY main-only hotfix.
+   */
+  const slotsPending =
+    state.status !== 'ready' ||
+    state.data.slotsPending ||
+    !answersSelection(state.data, selection.dayId, selection.durationId);
   const offered = useMemo(
     () =>
       state.status === 'ready' && periodId !== null
@@ -267,7 +293,7 @@ export function ScheduleView({ state, onRetry, initialSelection, ...actions }: S
           showTime &&
           periodId !== null &&
           (!hasDurations || selection.durationId !== null) &&
-          !schedule.slotsPending;
+          !slotsPending;
 
         const slots = periodId === null ? [] : (schedule.slotsByPeriod[periodId] ?? []);
 

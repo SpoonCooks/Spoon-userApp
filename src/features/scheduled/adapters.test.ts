@@ -222,4 +222,36 @@ describe('time chips with nothing to book', () => {
     const s = schedule([slot('2026-08-25T14:00:00.000Z', true)], true);
     expect(noSlots(s)).toEqual([]);
   });
+
+  it('keeps the last answer for the same day while a new duration is read, so chips do not blink', () => {
+    const previous = {
+      date: '2026-08-25',
+      durationMinutes: 30,
+      slots: [
+        slot('2026-08-25T06:15:00.000Z', false),
+        slot('2026-08-25T08:00:00.000Z', false),
+        slot('2026-08-25T14:00:00.000Z', true),
+      ],
+      validUntil: '2026-08-25T10:00:30.000Z',
+    } as never;
+    const s = scheduleFrom({
+      base: BASE,
+      catalogue: CATALOGUE,
+      availability: null,
+      serviceDate: '2026-08-25',
+      slotsPending: true,
+      previousAvailability: previous,
+      now: NOW,
+    });
+
+    expect(noSlots(s)).toEqual(['MORNING', 'NOON']);
+    // The grid itself still waits for the new answer.
+    expect(s.slotsPending).toBe(true);
+    expect(s.slotsFor).toBeNull();
+  });
+
+  it('names the day and duration its grid answers', () => {
+    const s = schedule([slot('2026-08-25T14:00:00.000Z', true)]);
+    expect(s.slotsFor).toEqual({ date: '2026-08-25', durationMinutes: 30 });
+  });
 });

@@ -230,7 +230,18 @@ export function InstantSheet({
         ? {}
         : {
             overlay: (
-              <View style={styles.blockedLayer} testID={`${testID}-unavailable`} accessible>
+              /*
+                Touches pass THROUGH the veil. It covers the header too, so it used to swallow the
+                Back arrow: on iPhone, with no system back, a blocked sheet could only be left by
+                the backdrop or "Schedule NOW". Nothing on the veil is tappable and the tiles
+                under it are already disabled. TEMPORARY main-only hotfix (18 Oct 2026).
+              */
+              <View
+                style={styles.blockedLayer}
+                pointerEvents="none"
+                testID={`${testID}-unavailable`}
+                accessible
+              >
                 <View style={styles.blockedScrim} />
                 <View style={styles.blockedMessage}>
                   {art === undefined ? null : (

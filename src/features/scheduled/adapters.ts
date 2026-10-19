@@ -263,6 +263,11 @@ export function scheduleFrom(input: {
    * for nothing; the availability read already took the same date as its argument.
    */
   readonly serviceDate?: string | null;
+  /**
+   * The last answer for this SAME day, used only while a new read is in flight, so the Time chips
+   * keep the state they had instead of dropping every "no slots" flag for the length of a request.
+   */
+  readonly previousAvailability?: ScheduledAvailabilityDto | null;
   readonly now?: Date;
 }): ScheduleViewModel {
   const { base, catalogue } = input;
@@ -292,12 +297,15 @@ export function scheduleFrom(input: {
    * day with nothing bookable anywhere keeps its chips, and the grid of grey cards is what says
    * the day is full — every chip greyed would say nothing at all.
    */
+  const chipSource = pending ? (input.previousAvailability ?? null) : input.availability;
+  const chipSlots = pending
+    ? slotsByPeriodFrom({ catalogue, availability: chipSource })
+    : slotsByPeriod;
   const bookable = (periodId: string) =>
-    (slotsByPeriod[periodId] ?? []).some((slot) => slot.disabled !== true);
+    (chipSlots[periodId] ?? []).some((slot) => slot.disabled !== true);
   const answered =
-    !pending &&
-    input.availability != null &&
-    rejection == null &&
+    chipSource != null &&
+    chipSource.rejection == null &&
     clockPeriods.some((period) => period.disabled !== true && bookable(period.id));
   const periods = clockPeriods.map((period) =>
     answered && period.disabled !== true && !bookable(period.id)
@@ -313,6 +321,13 @@ export function scheduleFrom(input: {
     ...(base.mode === 'reschedule' ? {} : { durations: durationsFrom(catalogue) }),
     slotsByPeriod,
     slotsPending: pending,
+    slotsFor:
+      pending || input.availability == null
+        ? null
+        : {
+            date: input.availability.date,
+            durationMinutes: input.availability.durationMinutes,
+          },
     ...(rejection === null || rejection === undefined
       ? {}
       : { slotsRejection: rejection, slotsMessage: rejectionMessageFor(rejection) }),

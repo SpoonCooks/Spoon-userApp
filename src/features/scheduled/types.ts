@@ -88,6 +88,14 @@ export interface ScheduleViewModel {
    */
   readonly slotsPending: boolean;
   /**
+   * The day and duration `slotsByPeriod` ANSWERS, read off the server's own reply; `null` while
+   * nothing has been answered. The screen keeps its selection locally and reports it to the host
+   * after it renders, so for one render a fresh tap sits beside the PREVIOUS answer. Comparing the
+   * two is what keeps that answer off screen, instead of the grid flashing the old start times,
+   * vanishing while the new read loads, and coming back. TEMPORARY main-only hotfix (18 Oct 2026).
+   */
+  readonly slotsFor?: { readonly date: string; readonly durationMinutes: number } | null;
+  /**
    * The server refused the whole day rather than judging individual times. Distinct from an empty
    * grid; carried so the two states can be told apart in code and in tests.
    */

@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useScheduledAvailability } from '@features/availability';
+import type { ScheduledAvailabilityDto } from '@features/availability';
 import { currentAddressOf, useAddresses } from '@features/address';
 import { useCatalogue } from '@features/catalogue';
 import { ready } from '@core/data';
@@ -69,6 +70,15 @@ export function useScheduleData(
 
   const availability = useScheduledAvailability({ addressId, date, durationMinutes });
 
+  // The last answer the server gave, so the Time chips can keep their state for the same day
+  // while a new duration is read (see `previousAvailability`).
+  // Kept in state and updated during render (React's "storing information from previous renders"
+  // pattern), so it is already current in the render that needs it.
+  const [lastAnswer, setLastAnswer] = useState<ScheduledAvailabilityDto | null>(null);
+  const answer = availability.state.status === 'ready' ? availability.state.data : null;
+  if (answer !== null && answer !== lastAnswer) setLastAnswer(answer);
+  const previousAvailability = lastAnswer !== null && lastAnswer.date === date ? lastAnswer : null;
+
   const state = useMemo(() => {
     if (catalogue.state.status !== 'ready') return catalogue.state;
 
@@ -94,6 +104,7 @@ export function useScheduleData(
       // Loading is its own state. The chips stay exactly where they are — a read must never blank
       // a screen full of local choices — but the grid is withheld rather than drawn empty.
       slotsPending: availability.state.status !== 'ready',
+      previousAvailability,
     });
 
     /**
@@ -116,7 +127,7 @@ export function useScheduleData(
         rows: DEMO_DURATION_GUIDE,
       },
     });
-  }, [catalogue.state, availability.state, date, mode]);
+  }, [catalogue.state, availability.state, date, mode, previousAvailability]);
 
   return {
     state,

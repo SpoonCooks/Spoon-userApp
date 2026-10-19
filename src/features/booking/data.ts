@@ -11,7 +11,11 @@ import { getLogger } from '@core/logging';
 import { assertNever } from '@core/render';
 import { useRuntime } from '@core/runtimeContext';
 import { currentAddressOf, useAddresses } from '@features/address';
-import { availabilityKeys, useInstantAvailability } from '@features/availability';
+import {
+  availabilityKeys,
+  useInstantAvailabilities,
+  useInstantAvailability,
+} from '@features/availability';
 import type { InstantAvailabilityDto } from '@features/availability';
 import { useCatalogue } from '@features/catalogue';
 import {
@@ -341,7 +345,14 @@ function etaMinutesFor(live: InstantAvailabilityDto | null): string {
 }
 
 export function useInstantData(
-  selection: { durationId?: string | null } = {},
+  selection: {
+    durationId?: string | null;
+    /**
+     * Ask about EVERY duration, so a refused one is greyed out before it can be tapped. The
+     * host passes "the sheet is open". TEMPORARY main-only hotfix (18 Oct 2026).
+     */
+    probeDurations?: boolean;
+  } = {},
 ): ScreenQuery<InstantViewModel> {
   const catalogue = useCatalogue();
   const addressId = useDefaultAddressId();
@@ -349,6 +360,19 @@ export function useInstantData(
 
   const availability = useInstantAvailability({ addressId, durationMinutes });
   const quote = useQuote({ addressId, slotType: 'instant', durationMinutes });
+
+  const catalogueMinutes = useMemo(
+    () =>
+      catalogue.state.status === 'ready'
+        ? catalogue.state.data.durations.map((duration) => duration.durationMinutes)
+        : [],
+    [catalogue.state],
+  );
+  const perDuration = useInstantAvailabilities({
+    addressId,
+    durationsMinutes: catalogueMinutes,
+    enabled: selection.probeDurations === true,
+  });
 
   const state = useMemo(() => {
     /**
@@ -373,6 +397,12 @@ export function useInstantData(
     const data = catalogue.state.data;
     const live = availability.state.status === 'ready' ? availability.state.data : null;
     const priced = quote.state.status === 'ready' ? quote.state.data : null;
+    /** Per catalogue duration: the server's refusal, or `undefined` if available or unanswered. */
+    const refusals = data.durations.map((_, index) => {
+      const read = perDuration[index]?.state;
+      return read?.status === 'ready' && !read.data.available ? read.data : undefined;
+    });
+    const allRefused = refusals.length > 0 && refusals.every((refusal) => refusal !== undefined);
 
     const base: InstantViewModel = {
       ...DEMO_INSTANT_AVAILABLE,
@@ -401,11 +431,13 @@ export function useInstantData(
        * later, is a flicker and a claim with nothing behind it.
        */
       etaLabel: etaMinutesFor(live),
-      durations: data.durations.map((duration) => ({
+      durations: data.durations.map((duration, index) => ({
         id: durationIdFor(duration.durationMinutes),
         label: durationLabelFor(duration.durationMinutes),
         price: formatPaise(duration.serviceAmountPaise),
         ...durationMerchandisingFor(duration),
+        // Greyed out only on the SERVER's refusal; an unanswered read leaves the tile tappable.
+        ...(refusals[index] === undefined ? {} : { disabled: true }),
       })),
       // `Book NOW • ₹198` — the amount is the quote's total, tax included, never assembled here.
       ...(priced === null
@@ -413,16 +445,18 @@ export function useInstantData(
         : { ctaLabel: `Book NOW • ${formatPaise(priced.quote.totalAmountPaise)}` }),
     };
 
-    // `available: false` is the SERVER refusing, and it is the only thing that blocks the sheet.
-    if (live === null || live.available) return ready(base);
+    // `available: false` is the SERVER refusing, and it is the only thing that blocks the sheet:
+    // the chosen duration refused (a race the greyed tiles leave open), or every duration refused.
+    const refusal = live !== null && !live.available ? live : allRefused ? refusals[0] : undefined;
+    if (refusal === undefined) return ready(base);
 
-    const icon = blockedIconFor(live.reason);
+    const icon = blockedIconFor(refusal.reason);
     const blocked =
       icon === 'moon' ? DEMO_INSTANT_OUT_OF_SHIFT.unavailable : DEMO_INSTANT_NO_SLOTS.unavailable;
     if (blocked === undefined) return ready(base);
 
     return ready<InstantViewModel>({ ...base, unavailable: { ...blocked, icon } });
-  }, [catalogue.state, availability.state, quote.state]);
+  }, [catalogue.state, availability.state, quote.state, perDuration]);
 
   return {
     state,

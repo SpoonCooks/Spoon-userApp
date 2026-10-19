@@ -141,6 +141,21 @@ describe('Instant sheet — blocked states (25:1327 / 44:5378)', () => {
     expect(actions.onSchedule).toHaveBeenCalledTimes(1);
   });
 
+  it('lets touches through the veil, so the Back arrow it covers still closes the sheet', () => {
+    render(
+      <InstantSheet
+        visible
+        instant={DEMO_INSTANT_OUT_OF_SHIFT}
+        selectedDurationId={null}
+        {...actions}
+      />,
+    );
+
+    expect(screen.getByTestId('instant-sheet-unavailable').props.pointerEvents).toBe('none');
+    fireEvent.press(screen.getByTestId('instant-sheet-back'));
+    expect(actions.onClose).toHaveBeenCalled();
+  });
+
   it('shows the sold-out message', () => {
     render(
       <InstantSheet
