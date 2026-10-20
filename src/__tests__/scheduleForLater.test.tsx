@@ -132,13 +132,12 @@ describe('Schedule for Later', () => {
     );
   });
 
-  it('picks a free start time, greys a taken one, and states the pick in the footer', async () => {
+  it('shows only the free start times, and states the pick in the footer', async () => {
     render();
     await waitFor(() => expect(day(DATES[2]!).props.accessibilityState?.disabled).toBe(false));
     fireEvent.press(day(DATES[2]!));
-    const taken = await screen.findByLabelText('1:30 PM');
-    expect(taken.props.accessibilityState?.disabled).toBe(true);
-    fireEvent.press(screen.getByLabelText('1:00 PM'));
+    fireEvent.press(await screen.findByLabelText('1:00 PM'));
+    expect(screen.queryByLabelText('1:30 PM')).toBeNull();
 
     expect(await screen.findByTestId('schedule-later-summary')).toBeTruthy();
     expect(screen.getByText('Thu, 3 Jan · 1:00 PM')).toBeTruthy();

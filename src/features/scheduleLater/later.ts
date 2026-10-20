@@ -78,6 +78,21 @@ export interface LaterModel {
 
 const TIMES_OF_DAY: readonly TimeOfDayId[] = ['morning', 'afternoon', 'evening'];
 
+/**
+ * `2466:19043` — the tabs' names. By position, not the catalogue's id: the server calls the middle
+ * period `NOON`, the frame "Afternoon".
+ */
+const TIME_OF_DAY_LABELS: Readonly<Record<TimeOfDayId, string>> = {
+  morning: 'Morning',
+  afternoon: 'Afternoon',
+  evening: 'Evening',
+};
+
+/** `2466:19058` — "1:30 PM": the meridiem in capitals, whatever the device writes. */
+function slotLabel(label: string): string {
+  return label.replace(/\b(am|pm)\b/iu, (meridiem) => meridiem.toUpperCase());
+}
+
 /** "45 mins", "1 hr", "1.5 hrs" — the carousel's wording (Home and `2466:19028`). */
 export function laterDurationLabel(minutes: number): string {
   if (minutes < 60) return `${minutes} mins`;
@@ -173,20 +188,28 @@ export function laterModelFrom(input: {
   const buckets = slotsByPeriodFrom({ catalogue, availability: answer });
   const clock = periodsFrom(catalogue, { serviceDate: input.dayId, now });
 
-  const periods = clock.map((period, index): LaterPeriod => {
-    const slots = (buckets[period.id] ?? []).map((slot) => ({
-      id: slot.id,
-      label: slot.label,
-      available: slot.disabled !== true,
-    }));
-    return {
-      id: period.id,
-      timeOfDay: TIMES_OF_DAY[index] ?? 'afternoon',
-      label: period.label,
-      // Unknown (still loading) stays open; an answered window with nothing free is greyed.
-      available: period.disabled !== true && (slotsPending || slots.some((slot) => slot.available)),
-      slots,
-    };
+  /*
+   * The owner's rule (2026-10-19), after Figma's "Time @noon" / "Time @eve" frames: a time of day
+   * that has already passed today is not shown at all, and a start time that cannot be booked
+   * (taken, not served, past) is not shown either. A time of day still ahead with nothing free stays
+   * on the row, greyed (`2466:19110`).
+   */
+  const periods = clock.flatMap((period, index): LaterPeriod[] => {
+    if (period.disabled === true) return [];
+    const slots = (buckets[period.id] ?? [])
+      .filter((slot) => slot.disabled !== true)
+      .map((slot) => ({ id: slot.id, label: slotLabel(slot.label), available: true }));
+    const timeOfDay = TIMES_OF_DAY[index] ?? 'afternoon';
+    return [
+      {
+        id: period.id,
+        timeOfDay,
+        label: TIME_OF_DAY_LABELS[timeOfDay],
+        // Unknown (still loading) stays open; an answered window with nothing free is greyed.
+        available: slotsPending || slots.length > 0,
+        slots,
+      },
+    ];
   });
 
   return {

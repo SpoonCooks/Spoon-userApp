@@ -120,14 +120,11 @@ describe('Schedule for Later model', () => {
       ['EVENING', 'evening', false],
     ]);
     expect(firstOpenPeriodId(model.periods)).toBe('NOON');
-    // Every candidate stays, the taken ones greyed: a full slot is not a missing one.
-    expect(model.periods[1]?.slots.map((s) => [s.label, s.available])).toEqual([
-      ['1:00 PM', true],
-      ['1:30 PM', false],
-    ]);
+    // Only the start times that can be booked are shown.
+    expect(model.periods[1]?.slots.map((s) => s.label)).toEqual(['1:00 PM']);
   });
 
-  it('greys a time of day that has already passed today', () => {
+  it('hides a time of day that has already passed today', () => {
     const late = new Date('2026-10-13T08:30:00.000Z'); // 14:00 IST
     const model = laterModelFrom({
       catalogue: CATALOGUE,
@@ -136,7 +133,7 @@ describe('Schedule for Later model', () => {
       dayId: DATES[0]!,
       now: late,
     });
-    expect(model.periods[0]?.available).toBe(false);
+    expect(model.periods.map((p) => p.timeOfDay)).toEqual(['afternoon', 'evening']);
   });
 
   it('greys nothing before the overview answers, and waits for the chosen day', () => {
@@ -170,7 +167,11 @@ describe('Schedule for Later model', () => {
       now: NOW,
     });
     expect(model.slotsPending).toBe(false);
-    expect(model.periods.map((p) => p.available)).toEqual([false, false, true]);
+    expect(model.periods.map((p) => [p.timeOfDay, p.available])).toEqual([
+      ['morning', false],
+      ['afternoon', false],
+      ['evening', true],
+    ]);
   });
 
   it('carries a refusal of the whole address', () => {
