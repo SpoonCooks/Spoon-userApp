@@ -186,7 +186,8 @@ describe('VisitChoices start times', () => {
     fireEvent.press(screen.getByRole('radio', { name: /^1 hr/ }));
     fireEvent.press(screen.getByRole('tab', { name: 'Morning' }));
 
-    await waitFor(() => expect(disabled('8:30 AM')).toBe(true));
+    // A start the backend does not offer is not shown at all.
+    await waitFor(() => expect(screen.queryByRole('radio', { name: '8:30 AM' })).toBeNull());
     expect(disabled('8:00 AM')).toBe(false);
     expect(tabDisabled('Afternoon')).toBe(true);
     expect(tabDisabled('Evening')).toBe(false);

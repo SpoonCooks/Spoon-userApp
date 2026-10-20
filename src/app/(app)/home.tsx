@@ -103,10 +103,17 @@ function SignedInHomeRoute() {
   // The server's waitlist state: joined (so "You're on the list" survives a relaunch) and how many
   // others are waiting in this pincode, for the meter.
   const waitlistState = useWaitlistState();
+  /**
+   * Home is on screen and its tiles show Later availability: the three-day overview is re-read
+   * every 30 seconds only then (DEC-094).
+   */
+  const [focused, setFocused] = useState(false);
+  const [laterTiles, setLaterTiles] = useState(false);
   const home = useHomeRedesignData({
     waitlistJoined,
     waitlistState: waitlistState.state.status === 'ready' ? waitlistState.state.data : undefined,
     triedPlace,
+    pollLater: focused && laterTiles,
   });
   /** No saved address: the header's address opens the map to add one, not the empty list. */
   const hasAddress = home.addressId !== null;
@@ -144,6 +151,8 @@ function SignedInHomeRoute() {
   useFocusEffect(
     useCallback(() => {
       refetch();
+      setFocused(true);
+      return () => setFocused(false);
     }, [refetch]),
   );
 
@@ -232,6 +241,7 @@ function SignedInHomeRoute() {
             router.push({ pathname: '/cook-pool/[cookId]', params: { cookId: cook.id } }),
           )}
           onRefreshAvailability={home.refetch}
+          onLaterTilesChange={setLaterTiles}
           onJoinWaitlist={async () => {
             const meData = me.state.status === 'ready' ? me.state.data : null;
             const name = meData?.name?.trim() || meData?.phone || 'Spoon customer';

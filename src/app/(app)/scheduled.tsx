@@ -1,62 +1,54 @@
-import { useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { destinationForPayment, useBookingSubmission } from '@features/booking';
+import { isAppError } from '@core/errors';
 import { formatPaise } from '@core/format';
 import { useNavigationGuard, useSafeBack } from '@core/navigation';
-import { ScheduleView, devScheduleSelection, useScheduleData } from '@features/scheduled';
-import type { ScheduleSelection } from '@features/scheduled';
+import { ScheduleForLaterView, useScheduleForLater } from '@features/scheduleLater';
 
 /**
- * Scheduled booking — Figma `sbIXeBfaMzUFUz2NYJIJTm`, finalized "Scheduled flow" `267:3521`.
+ * Schedule for Later — Figma `cCQlzTeiObQkpVBzwI8mZi` `2466:18844` / `2466:18864` / `2466:19025`.
  *
- * One screen, four progressively-disclosed states:
- *   `275:4488` Day → `275:4713` + Time → `275:4938` + Duration → `34:3035` + Start time.
- *
- * No booking horizon is encoded (blocker B-8): the day row renders whatever the payload provides.
- *
- * The selection lives here as well as in the screen, because the DAY and the DURATION are the
- * arguments to `GET /v1/availability/scheduled` — picking a different day has to re-ask the
- * server which slots exist, not re-filter a grid the client already holds. The slot id IS the
- * server's ISO start, so submitting sends back exactly the instant that was offered.
- *
- * DEV reachability (task §16): `?step=1..4` seeds the selection so each finalized state opens
- * directly instead of requiring three taps. `__DEV__`-only; a release build always starts empty.
+ * Reached from Home's "Book for later" with the chosen duration. The duration carousel, the three
+ * days, the time-of-day tabs and the start times all read the three-day overview (DEC-094), so a
+ * duration, day, time of day or start time with nothing free is greyed before it is tapped. The
+ * slot id is the server's ISO start, so booking sends back exactly the instant that was offered.
+ * Rescheduling keeps its own screen (`reschedule/[id].tsx`).
  */
 export default function ScheduledRoute() {
   const router = useRouter();
-  const {
-    step,
-    durationId: presetDuration,
-    date: presetDate,
-  } = useLocalSearchParams<{
-    step?: string;
+  const { durationId: presetDuration, date: presetDate } = useLocalSearchParams<{
     durationId?: string;
     date?: string;
   }>();
   /**
-   * Home's Schedule CTA passes the duration the customer already chose (`?durationId=dur-90`),
-   * so it stays pre-selected here and only a slot and payment remain.
+   * Home's "Book for later" passes the duration the customer already chose (`?durationId=dur-90`),
+   * so it stays selected on the carousel and only a day and a start time remain.
    */
   const preset = presetDuration?.startsWith('dur-') === true ? presetDuration : null;
   /**
    * A Recurring visit whose Autopay debit failed books "a one-time visit for the same slot"
-   * (`?date=2026-10-14&durationId=dur-60`): its day is chosen too. A date outside the strip is
-   * the server's to refuse, which the grid already draws as its own message.
+   * (`?date=2026-10-14&durationId=dur-60`): its day is chosen too, when it is free.
    */
   const presetDay =
     typeof presetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(presetDate) ? presetDate : null;
-  const [selection, setSelection] = useState<ScheduleSelection>({
-    dayId: presetDay,
-    periodId: null,
-    durationId: preset,
-    slotId: null,
-  });
 
-  const { state, refetch } = useScheduleData('book', {
-    date: selection.dayId,
-    durationMinutes: durationMinutesFrom(selection.durationId),
+  // Re-read every 30 seconds only while this screen is showing (DEC-094).
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
+  );
+
+  const later = useScheduleForLater({
+    presetDurationId: preset,
+    presetDayId: presetDay,
+    focused,
   });
+  const { selection, refreshFresh } = later;
 
   const submission = useBookingSubmission({
     slotType: 'scheduled',
@@ -64,99 +56,58 @@ export default function ScheduledRoute() {
     scheduledStart: selection.slotId,
   });
 
-  const devSeed = __DEV__ ? devScheduleSelection(state, step) : undefined;
-  const seed =
-    devSeed ??
-    (preset === null && presetDay === null
-      ? undefined
-      : {
-          ...(preset === null ? {} : { durationId: preset }),
-          ...(presetDay === null ? {} : { dayId: presetDay }),
-        });
-
-  /**
-   * Home. Reached from the Home tile and from the Instant sheet's "Schedule instead", both of
-   * which sit on Home; a `spoon://scheduled` deep link has nothing behind it and lands there too.
-   */
   // One screen per tap: a quick double tap must not open (or pop) a screen twice.
   const guard = useNavigationGuard();
   const goBack = useSafeBack('/home');
 
   return (
-    <ScheduleView
-      state={state}
-      onRetry={refetch}
+    <ScheduleForLaterView
+      state={later.state}
+      selection={selection}
+      lostPick={later.lostPick}
       onBack={guard(goBack)}
-      {...(seed === undefined ? {} : { initialSelection: seed })}
-      {...(submission.quote.state.status === 'ready'
-        ? {
-            primaryCtaAmountLabel: formatPaise(submission.quote.state.data.quote.totalAmountPaise),
-          }
-        : {})}
+      onRetry={later.refetch}
+      onSelectDuration={later.selectDuration}
+      onSelectDay={later.selectDay}
+      onSelectPeriod={later.selectPeriod}
+      onSelectSlot={later.selectSlot}
       /**
-       * The SERVER's half of the CTA gate (task §A4/§A5).
-       *
-       * A complete grid selection is not a bookable booking. `canSubmit` is the account's default
-       * address plus a duration plus a start the server itself offered; the ready QUOTE is the
-       * server having priced that exact combination. Until both hold, "Book Now" stays grey —
-       * which is also what stops the bar from ever being live while it carries no amount, since
-       * the amount comes from the same quote.
-       *
-       * A quote that fails or is still in flight therefore leaves the CTA disabled rather than
-       * letting a booking be created at a price nobody stated.
+       * The SERVER's half of the CTA gate: the account's default address, a duration and a start
+       * the server offered, priced by a ready quote. Until both hold, Confirm Booking stays grey,
+       * so it is never live without the amount the footer states.
        */
       canSubmit={submission.canSubmit && submission.quote.state.status === 'ready'}
-      onSelectionChange={setSelection}
       submitting={submission.submitting}
       submitError={submission.submitError}
+      {...(submission.quote.state.status === 'ready'
+        ? { amountLabel: formatPaise(submission.quote.state.data.quote.totalAmountPaise) }
+        : {})}
       onSubmit={() => {
         if (!submission.canSubmit || submission.submitting) return;
         void submission
           .submit()
           .then((created) => {
+            // This customer's own booking changed what is free: Home reads it afresh, not from
+            // the 30-second cache that still offers the time just taken.
+            void refreshFresh().catch(() => undefined);
             const bookingId = created.booking.booking.id;
-
             /**
-             * REPLACE, not push (task §3). The slot has been taken, so returning to a grid that
-             * still offers it — with a filled-in selection and a live "Book Now" — invites a
-             * second booking of a time the customer already has.
-             *
-             * A VERIFIED payment goes to `433:2290`, Page 21, which waits on the SERVER and then
-             * moves to Home (V7 founder comment, task §9/§10). Anything unpaid goes to Payment
-             * Failed — never to the booking screen, which heads an unpaid `created` hold
-             * "Booking confirmed!". `destinationForPayment` is shared with `app/(app)/home.tsx`
-             * so this mapping is decided in exactly one place.
-             *
-             * A null destination is a DISMISSED checkout, and it STAYS — the paragraph above is
-             * about a time the customer now HAS, which is exactly what someone who backed out of
-             * paying does not. Sending them on anyway made the grid flash past on the way to
-             * Home; leaving them on it, selection intact, is both what they asked for by
-             * dismissing and what lets them simply press the CTA again.
+             * REPLACE, not push: returning to a grid that still offers the time just booked
+             * invites a second booking of it. A VERIFIED payment goes to the confirmation, an
+             * unpaid one to Payment Failed (`destinationForPayment`, shared with Home); a dismissed
+             * checkout (null) stays here with the selection intact so the CTA can be pressed again.
              */
             const destination = destinationForPayment(created.payment, bookingId);
             if (destination !== null) router.replace(destination);
           })
-          .catch(() => {
-            // Swallowed HERE because the screen renders it through `submitError` — the comment
-            // this replaces claimed the mutation surfaced it, which was true of nothing: there
-            // was no error surface on this screen at all, so a refused booking left a live CTA
-            // that did nothing. The selection is left intact so a retry replays the same
-            // idempotency scope rather than creating a second booking.
+          .catch((failure: unknown) => {
+            // Rendered through `submitError`. A start time taken since the grid was drawn: read
+            // the three days again past the cache, so the grid greys it and the pick is dropped.
+            if (isAppError(failure) && failure.code === 'SLOT_UNAVAILABLE') {
+              void refreshFresh().catch(() => undefined);
+            }
           });
       }}
-      /*
-       * `onOpenPaymentDetails` is deliberately NOT passed. FIGMA_PENDING: the breakdown sheet is
-       * drawn for the Instant sheet (`25:1585`) and for the extension (`275:4189`) but NOT for
-       * Scheduled — the numbers exist on the quote and there is no frame to render them in. The
-       * screen therefore draws no link at all, rather than one that opens nothing.
-       */
     />
   );
-}
-
-/** `dur-90` -> 90. Mirrors the booking feature's own handle for a server duration. */
-function durationMinutesFrom(durationId: string | null): number | null {
-  if (durationId === null || !durationId.startsWith('dur-')) return null;
-  const minutes = Number.parseInt(durationId.slice('dur-'.length), 10);
-  return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
 }

@@ -1,7 +1,15 @@
 import type { ApiClient } from '@core/api';
 
-import { instantAvailabilitySchema, scheduledAvailabilitySchema } from './schemas';
-import type { InstantAvailabilityDto, ScheduledAvailabilityDto } from './schemas';
+import {
+  instantAvailabilitySchema,
+  scheduledAvailabilitySchema,
+  scheduledOverviewSchema,
+} from './schemas';
+import type {
+  InstantAvailabilityDto,
+  ScheduledAvailabilityDto,
+  ScheduledOverviewDto,
+} from './schemas';
 
 /**
  * Availability endpoints.
@@ -14,6 +22,8 @@ import type { InstantAvailabilityDto, ScheduledAvailabilityDto } from './schemas
 export const AVAILABILITY_PATHS = {
   instant: '/v1/availability/instant',
   scheduled: '/v1/availability/scheduled',
+  scheduledOverview: '/v1/availability/scheduled/overview',
+  scheduledSearches: '/v1/availability/scheduled/searches',
 } as const;
 
 function query(params: Readonly<Record<string, string>>): string {
@@ -55,6 +65,40 @@ export function createAvailabilityApi(api: ApiClient) {
       return api.request(`${AVAILABILITY_PATHS.scheduled}?${search}`, {
         parse: (data) => scheduledAvailabilitySchema.parse(data),
         ...(signal === undefined ? {} : { signal }),
+      });
+    },
+
+    /**
+     * `GET /v1/availability/scheduled/overview?addressId[&fresh=true]` (DEC-094). `fresh` skips the
+     * server's 30-second cache, for the read after the customer's own booking changed.
+     */
+    async scheduledOverview(
+      input: { addressId: string; fresh?: boolean },
+      signal?: AbortSignal,
+    ): Promise<ScheduledOverviewDto> {
+      const search = query({
+        addressId: input.addressId,
+        ...(input.fresh === true ? { fresh: 'true' } : {}),
+      });
+      return api.request(`${AVAILABILITY_PATHS.scheduledOverview}?${search}`, {
+        parse: (data) => scheduledOverviewSchema.parse(data),
+        ...(signal === undefined ? {} : { signal }),
+      });
+    },
+
+    /**
+     * `POST /v1/availability/scheduled/searches` — the day and length the customer looked at, for
+     * the demand telemetry (DEC-094). The overview itself is not counted as a search.
+     */
+    async recordScheduledSearch(input: {
+      addressId: string;
+      date: string;
+      durationMinutes: number;
+    }): Promise<void> {
+      await api.request(AVAILABILITY_PATHS.scheduledSearches, {
+        method: 'POST',
+        body: input,
+        parse: () => undefined,
       });
     },
   };

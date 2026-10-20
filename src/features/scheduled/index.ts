@@ -35,5 +35,7 @@ export {
 } from './serviceTime';
 export { devScheduleSelection } from './devSteps';
 export { ScheduleView } from './screens/ScheduleScreen';
+/** The period and slot readers, shared with Schedule for Later (`@features/scheduleLater`). */
+export { periodsFrom, rejectionMessageFor, slotsByPeriodFrom } from './adapters';
 export type { ScheduleActions, ScheduleViewProps } from './screens/ScheduleScreen';
 export type * from './types';

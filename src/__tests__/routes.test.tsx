@@ -107,7 +107,7 @@ describe('routes render', () => {
 
   it.each([
     ['home', HomeRoute, 'home-redesign-screen'],
-    ['scheduled', ScheduledRoute, 'schedule-screen'],
+    ['scheduled', ScheduledRoute, 'schedule-later'],
     ['reschedule/[id]', RescheduleRoute, 'schedule-screen'],
     ['meal-brief', MealBriefRoute, 'meal-brief-screen'],
     ['booking/[id]', BookingRoute, 'booking-detail-screen'],

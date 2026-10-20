@@ -151,16 +151,24 @@ describe('Schedule', () => {
       expect(screen.getByText('Add this visit')).toBeTruthy();
     });
 
-    it('greys what the first visit takes: 9 AM for an hour leaves no 9:00 or 8:30 start', () => {
+    it('hides what the first visit takes: 9 AM for an hour leaves no start from 8:15 to 9:45', () => {
       renderSchedule(adding);
       fireEvent.press(radio(/^1 hr/));
       fireEvent.press(tab('Morning'));
 
-      expect(disabled('8:30 AM')).toBe(true);
-      expect(disabled('9:00 AM')).toBe(true);
-      expect(disabled('9:30 AM')).toBe(true);
-      expect(disabled('10:00 AM')).toBe(false);
+      for (const taken of [
+        '8:15 AM',
+        '8:30 AM',
+        '8:45 AM',
+        '9:00 AM',
+        '9:15 AM',
+        '9:30 AM',
+        '9:45 AM',
+      ]) {
+        expect(screen.queryByRole('radio', { name: taken })).toBeNull();
+      }
       expect(disabled('8:00 AM')).toBe(false);
+      expect(disabled('10:00 AM')).toBe(false);
     });
   });
 });
