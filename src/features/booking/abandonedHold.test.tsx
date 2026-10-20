@@ -175,16 +175,14 @@ const BASE: StubHandlers = {
 };
 
 /**
- * A dismissed checkout keeps its hold for the RETRY, and gives it back on the way out.
+ * A closed checkout gives the cook back AT ONCE (owner, 2026-10-20, DEC-095).
  *
- * The server creates the booking before Razorpay opens and counts it as live, so a customer who
- * backs out and presses again is refused for overlapping themselves. Reusing the hold is what
- * makes the second press work. Releasing it on dismissal would defeat that — there would be
- * nothing left to reuse — so the release waits until the screen is left, when nothing is going
- * to reuse it and leaving it would block the customer's own slot.
+ * The server creates the booking before Razorpay opens. A customer who closes checkout without
+ * paying has its hold released straight away, before the press resolves, so the slot is free
+ * again the moment they are back on the screen. Pressing again books afresh.
  */
-describe('a dismissed checkout keeps its hold for the retry', () => {
-  it('does NOT release while the customer is still on the screen', async () => {
+describe('a closed checkout releases its hold at once', () => {
+  it('releases while the customer is still on the screen, before the press resolves', async () => {
     const { calls, outcomes, getByTestId } = renderSubmission({
       ...BASE,
       'GET /v1/bookings/bkg-held/cancellation-preview': preview(),
@@ -195,18 +193,13 @@ describe('a dismissed checkout keeps its hold for the retry', () => {
     fireEvent.press(getByTestId('submit'));
 
     await waitFor(() => expect(outcomes).toEqual(['cancelled']));
-
-    // Still mounted, so the hold is still theirs to retry against. Releasing here would cancel
-    // the very booking the next press needs.
-    expect(calls).not.toContain('POST /v1/bookings/bkg-held/cancel');
-    expect(calls).not.toContain('GET /v1/bookings/bkg-held/cancellation-preview');
+    // Awaited inside the press: by the time it resolves the hold is already given back.
+    expect(calls).toContain('GET /v1/bookings/bkg-held/cancellation-preview');
+    expect(calls).toContain('POST /v1/bookings/bkg-held/cancel');
   });
 
-  /**
-   * The whole point: a second press pays for the booking already held, rather than asking the
-   * server for another one it will refuse as an overlap.
-   */
-  it('reuses the held booking on a retry instead of creating a second one', async () => {
+  /** The released booking is not reused: a second press is a new booking, paid for anew. */
+  it('books afresh on a retry instead of paying for the released booking', async () => {
     const { calls, outcomes, getByTestId } = renderSubmission({
       ...BASE,
       'GET /v1/bookings/bkg-held/cancellation-preview': preview(),
@@ -220,14 +213,12 @@ describe('a dismissed checkout keeps its hold for the retry', () => {
     fireEvent.press(getByTestId('submit'));
     await waitFor(() => expect(outcomes).toEqual(['cancelled', 'cancelled']));
 
-    // One booking for two attempts, and checkout opened against it both times.
-    expect(calls.filter((call) => call === 'POST /v1/bookings')).toHaveLength(1);
-    expect(
-      calls.filter((call) => call === 'POST /v1/bookings/bkg-held/payments/order'),
-    ).toHaveLength(2);
+    // Two bookings for two attempts, each released when its checkout was closed.
+    expect(calls.filter((call) => call === 'POST /v1/bookings')).toHaveLength(2);
+    expect(calls.filter((call) => call === 'POST /v1/bookings/bkg-held/cancel')).toHaveLength(2);
   });
 
-  it('releases the hold once the screen is left', async () => {
+  it('has given the hold back by the time the screen is left', async () => {
     const { calls, outcomes, getByTestId, unmount } = renderSubmission({
       ...BASE,
       'GET /v1/bookings/bkg-held/cancellation-preview': preview(),
@@ -487,8 +478,8 @@ describe('changing the selection releases the hold it no longer matches', () => 
     expect(calls).toContain('POST /v1/bookings/bkg-second/payments/order');
   });
 
-  /** The same selection is untouched: that hold is the one the retry pays for. */
-  it('leaves the hold alone when the selection has not changed', async () => {
+  /** The same selection pressed again books afresh: its earlier hold went when checkout closed. */
+  it('books afresh when the same selection is pressed again', async () => {
     const { calls, outcomes, getByTestId } = renderSelection();
 
     await waitFor(() => expect(getByTestId('can-submit')).toHaveTextContent('true'));
@@ -498,7 +489,7 @@ describe('changing the selection releases the hold it no longer matches', () => 
     fireEvent.press(getByTestId('submit'));
     await waitFor(() => expect(outcomes).toEqual(['cancelled', 'cancelled']));
 
-    expect(calls).not.toContain('POST /v1/bookings/bkg-held/cancel');
-    expect(calls.filter((call) => call === 'POST /v1/bookings')).toHaveLength(1);
+    expect(calls).toContain('POST /v1/bookings/bkg-held/cancel');
+    expect(calls.filter((call) => call === 'POST /v1/bookings')).toHaveLength(2);
   });
 });

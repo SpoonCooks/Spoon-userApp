@@ -655,8 +655,9 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
   const [couldNotStart, setCouldNotStart] = useState<string | null>(null);
 
   /**
-   * The booking a dismissed checkout left behind, kept so the NEXT press can pay for it instead
-   * of creating a second one.
+   * The booking an attempt whose payment may still go through (`processing`, `unavailable`) left
+   * behind, kept so the NEXT press can pay for it instead of creating a second one. A CLOSED
+   * checkout keeps nothing: its hold is released at once (DEC-095).
    *
    * `POST /v1/bookings` puts a row in `created` and takes the capacity, and the server's
    * `bookings_customer_active_no_overlap` constraint counts that as live — so a customer who
@@ -684,10 +685,10 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
   /**
    * Leaving the screen gives the slot back.
    *
-   * Deliberately not on the dismissal itself: the hold is what the retry above reuses, so
-   * releasing it the moment checkout closes would cancel the very booking the next press needs.
-   * Once the customer has navigated away there is nothing left to reuse it for, and leaving it
-   * would block the slot — their own — until the server's sweep expires it.
+   * A CLOSED checkout is released at once inside `submit` (DEC-095). What reaches this cleanup is
+   * a hold kept for a payment that may still go through (`processing`, `unavailable`): once the
+   * customer has navigated away nothing will pay for it, and leaving it would block the slot —
+   * their own — until the server's sweep expires it.
    *
    * ## Why focus and not unmount
    *
@@ -791,14 +792,31 @@ export function useBookingSubmission(selection: BookingSelection): BookingSubmis
     const payment = await payAndClassify(pay.mutateAsync, booking.booking.id);
 
     /**
-     * What survives this attempt.
+     * What survives this attempt (owner, 2026-10-20, DEC-095).
      *
-     * A dismissal keeps the booking so the next press pays for THIS one instead of being refused
-     * for overlapping it. Anything else lets it go: `verified` has moved on, and `failed` hands
-     * the customer to a screen that owns the booking and offers its own retry. The hold itself
-     * is released when the screen is left — see the effect above.
+     * A closed checkout gives the cook back AT ONCE: the hold is released before this returns, so
+     * the slot is free for anyone, this customer included, the moment they are back on the screen.
+     * Pressing again books afresh — the create's idempotency scope was released on success, so it
+     * is a new booking, not a replay of the one just cancelled — and if the time went in the few
+     * seconds between, the server says so like any taken slot. AWAITED for the same reason as the
+     * supersede release above: a retry racing a cancel still in flight would be refused for
+     * overlapping it.
+     *
+     * Nothing else is released here: `verified` has moved on, `failed` hands the customer to a
+     * screen that owns the booking and its retry, and `processing` / `unavailable` may still be
+     * paid. Those keep the hold for the press below, and leaving the screen releases it.
      */
-    setHeldBooking(payment === 'cancelled' ? { key: selectionKey, response: booking } : null);
+    if (payment === 'cancelled') {
+      heldRef.current = null;
+      setHeldBooking(null);
+      await releaseAbandonedHold(createBookingApi(api), queryClient, booking.booking.id);
+    } else {
+      setHeldBooking(
+        payment === 'processing' || payment === 'unavailable'
+          ? { key: selectionKey, response: booking }
+          : null,
+      );
+    }
 
     /**
      * Checkout never opened, and neither outcome navigates anywhere — so unless the screen says
