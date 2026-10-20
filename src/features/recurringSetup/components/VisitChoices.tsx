@@ -30,8 +30,8 @@ import { DurationCarousel } from './DurationCarousel';
  * free; a changed duration keeps the tab, a changed tab clears the start, and either clears a
  * start that no longer fits.
  *
- * Anything that would overlap `busy` is greyed out, a duration with no free start left in the
- * band greys too, and so does a time of day with none left for the chosen duration. Rendered as
+ * A start that would overlap `busy`, or that the backend does not offer, is not shown; a duration
+ * with no free start left in the band greys, and so does a time of day with none left for it. Rendered as
  * siblings so they take the screen's own spacing.
  *
  * Durations and prices come from Recurring eligibility, and once a duration is picked the start
@@ -173,19 +173,23 @@ export function VisitChoices({
               />
             ))}
           </TimeOfDayTabs>
+          {/* Only the starts that can be taken: one that would overlap another visit, or that no
+              pool Cook can take, is not shown (owner, 2026-10-20, as on Schedule for Later). */}
           <TimeGrid columns={3}>
-            {startTimesFor(timeOfDay).map((minutes) => (
-              <SlotChip
-                key={minutes}
-                label={formatStartTime(minutes)}
-                selected={minutes === startMinutes}
-                disabled={
-                  clashes(minutes, durationMinutes(durationId), busy) ||
-                  (offered !== null && !offered.has(minutes))
-                }
-                onPress={() => commit(timeOfDay, durationId, minutes)}
-              />
-            ))}
+            {startTimesFor(timeOfDay)
+              .filter(
+                (minutes) =>
+                  !clashes(minutes, durationMinutes(durationId), busy) &&
+                  (offered === null || offered.has(minutes)),
+              )
+              .map((minutes) => (
+                <SlotChip
+                  key={minutes}
+                  label={formatStartTime(minutes)}
+                  selected={minutes === startMinutes}
+                  onPress={() => commit(timeOfDay, durationId, minutes)}
+                />
+              ))}
           </TimeGrid>
         </View>
       )}
