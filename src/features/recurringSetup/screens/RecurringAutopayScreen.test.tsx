@@ -112,8 +112,12 @@ function setup(
     launcher?: CheckoutLauncher;
     create?: () => unknown;
     quote?: unknown;
+    /** What a quote reads once the booking is saved: its own reservations claim those times. */
+    quoteAfterSave?: unknown;
+    mandate?: () => unknown;
   } = {},
 ) {
+  let savedOnce = false;
   const calls: string[] = [];
   const opened: Parameters<CheckoutLauncher['open']>[0][] = [];
   const launcher: CheckoutLauncher = options.launcher ?? {
@@ -124,15 +128,20 @@ function setup(
   };
   const runtime = createTestRuntime({
     api: createStubApi({
-      'POST /v1/recurring/bookings/quote': () => options.quote ?? QUOTE,
+      'POST /v1/recurring/bookings/quote': () =>
+        savedOnce && options.quoteAfterSave !== undefined
+          ? options.quoteAfterSave
+          : (options.quote ?? QUOTE),
       'GET /v1/recurring/eligibility': () => ELIGIBILITY,
       'POST /v1/recurring/bookings': () => {
         calls.push('create');
-        return (options.create ?? (() => BOOKING))();
+        const created = (options.create ?? (() => BOOKING))();
+        savedOnce = true;
+        return created;
       },
       'POST /v1/me/recurring-bookings/rb-1/mandate': () => {
         calls.push('mandate');
-        return CHECKOUT;
+        return (options.mandate ?? (() => CHECKOUT))();
       },
       'POST /v1/me/recurring-bookings/rb-1/mandate/verify': () => {
         calls.push('verify');
@@ -142,7 +151,7 @@ function setup(
   });
   const onBooked = jest.fn();
   const onChangeTimes = jest.fn();
-  renderWithRuntime(
+  const { queryClient } = renderWithRuntime(
     <RecurringAutopayScreen
       addressId={ADDRESS}
       plans={PLANS}
@@ -153,7 +162,7 @@ function setup(
     />,
     { runtime },
   );
-  return { calls, opened, onBooked, onChangeTimes };
+  return { calls, opened, onBooked, onChangeTimes, queryClient };
 }
 
 const approve = () => fireEvent.press(screen.getByTestId('recurring-autopay-screen-approve'));
@@ -207,6 +216,79 @@ describe('RecurringAutopayScreen', () => {
     approve();
     await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1));
     expect(calls.filter((call) => call === 'create')).toHaveLength(1);
+  });
+
+  /*
+   * Saving reserves a pool Cook for every visit and claims the dates, so a quote refetched when the
+   * app comes back from checkout reads `bookable: false`. That is the customer's own booking, not
+   * a time someone took: the screen must keep "Approve" and reopen the same booking.
+   */
+  it("keeps Approve after checkout is closed, though the refetched quote counts the customer's own hold", async () => {
+    let attempt = 0;
+    const { calls, onBooked, queryClient } = setup({
+      quoteAfterSave: {
+        ...QUOTE,
+        bookable: false,
+        visits: [{ ...QUOTE.visits[0], available: false, reason: 'DATE_IN_LIVE_RECURRING' }],
+      },
+      launcher: {
+        open: async () => {
+          attempt += 1;
+          if (attempt === 1) throw new CheckoutCancelledError();
+          return { providerPaymentId: 'pay_1', signature: 'sig' };
+        },
+      },
+    });
+    await screen.findByText('₹135.45');
+
+    approve();
+    expect(await screen.findByText("Autopay isn't approved yet")).toBeTruthy();
+
+    // What returning to the app does: every active query refetches, the quote included.
+    await queryClient.invalidateQueries();
+    await waitFor(() => expect(calls.filter((call) => call === 'create')).toHaveLength(1));
+    expect(screen.queryByText('Some times were just taken')).toBeNull();
+    expect(screen.queryByTestId('recurring-autopay-screen-change-times')).toBeNull();
+    expect(screen.getByText("Autopay isn't approved yet")).toBeTruthy();
+
+    approve();
+    await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1));
+    expect(calls.filter((call) => call === 'create')).toHaveLength(1);
+  });
+
+  it('saves again when the saved booking lapsed before it was approved', async () => {
+    let mandates = 0;
+    let opens = 0;
+    const { calls, onBooked } = setup({
+      mandate: () => {
+        mandates += 1;
+        if (mandates === 2) {
+          throw {
+            kind: 'server',
+            status: 409,
+            message: 'window closed',
+            code: 'INVALID_BOOKING_STATE',
+            details: { reason: 'MANDATE_WINDOW_CLOSED' },
+          };
+        }
+        return CHECKOUT;
+      },
+      launcher: {
+        open: async () => {
+          opens += 1;
+          if (opens === 1) throw new CheckoutCancelledError();
+          return { providerPaymentId: 'pay_1', signature: 'sig' };
+        },
+      },
+    });
+    await screen.findByText('₹135.45');
+
+    approve();
+    expect(await screen.findByText("Autopay isn't approved yet")).toBeTruthy();
+
+    approve();
+    await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1));
+    expect(calls).toEqual(['create', 'mandate', 'mandate', 'create', 'mandate', 'verify']);
   });
 
   it('sends the customer back to change times when a slot was taken since the Summary', async () => {
