@@ -321,8 +321,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      * `blockedPermissions` makes prebuild emit `tools:node="remove"` for it, so the merge drops it
      * from every variant this config produces rather than us editing a generated file that the
      * next prebuild overwrites.
+     *
+     * The three advertising-ID permissions arrive with `@react-native-firebase/remote-config`
+     * (the update popup): `firebase-config` pulls in Google's measurement SDK, whose manifest
+     * declares them. Nothing in this app reads the advertising ID: Remote Config identifies an
+     * install by its Firebase Installation ID, and there are no ads or Google Analytics. With
+     * them declared, Play requires an "uses advertising ID" declaration before any rollout
+     * (first seen on AAB 20); removed, the honest answer is "No".
      */
-    blockedPermissions: ['android.permission.SYSTEM_ALERT_WINDOW'],
+    blockedPermissions: [
+      'android.permission.SYSTEM_ALERT_WINDOW',
+      'com.google.android.gms.permission.AD_ID',
+      'android.permission.ACCESS_ADSERVICES_AD_ID',
+      'android.permission.ACCESS_ADSERVICES_ATTRIBUTION',
+    ],
 
     ...(GOOGLE_SERVICES_JSON === '' ? {} : { googleServicesFile: GOOGLE_SERVICES_JSON }),
 
