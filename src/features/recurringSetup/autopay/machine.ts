@@ -134,7 +134,11 @@ export function autopayReducer(state: AutopayState, event: AutopayEvent): Autopa
 function applyStatus(state: AutopayState, status: MandateStatusViewDto, now: number): AutopayState {
   if (state.kind !== 'waiting' && state.kind !== 'confirming') return state;
   const app = appOf(state);
-  if (status.status === 'confirmed' || status.bookingStatus === 'active') {
+  // Only the bank's confirmation of THIS mandate is approval. `bookingStatus` cannot stand in for
+  // it: on a re-approval (paused, revoked or expired mandate) the booking is already `active`
+  // while the new mandate is still pending, so it read as approved on the first poll. V0 sets
+  // the booking `active` only in the same step that confirms its mandate (`mandate-service.ts`).
+  if (status.status === 'confirmed') {
     return { kind: 'active', app, handleMasked: status.handleMasked };
   }
   const attempt = status.attempt;

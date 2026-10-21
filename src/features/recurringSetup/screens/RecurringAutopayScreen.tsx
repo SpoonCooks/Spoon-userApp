@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { getUserMessage, isAppError } from '@core/errors';
+import { CheckoutNoPaymentMethodsError, NO_UPI_APP_MESSAGE } from '@features/payment';
 import type { CheckoutLauncher } from '@features/payment';
 import { formatPaise, formatPaiseGrouped } from '@core/format';
 import { Button, LoadingState, NoteCard, Screen, ScreenHeader, Text } from '@ui';
@@ -120,9 +121,12 @@ export function RecurringAutopayScreen({
       }
       setNotice({
         kind: 'error',
-        message: isAppError(error)
-          ? getUserMessage(error)
-          : 'Autopay could not be set up. Please try again.',
+        message:
+          error instanceof CheckoutNoPaymentMethodsError
+            ? NO_UPI_APP_MESSAGE
+            : isAppError(error)
+              ? getUserMessage(error)
+              : 'Autopay could not be set up. Please try again.',
       });
     }
   };

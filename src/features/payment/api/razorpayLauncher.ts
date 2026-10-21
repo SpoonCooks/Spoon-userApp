@@ -69,6 +69,25 @@ export class CheckoutFailedError extends Error {
   }
 }
 
+/**
+ * Checkout had nothing to offer (`no_payment_methods` at `checkout_load`). For UPI Autopay, which
+ * offers only the phone's UPI apps, that means no UPI app is installed: a cause the customer can
+ * fix, so it is told apart from a failed payment.
+ */
+export class CheckoutNoPaymentMethodsError extends CheckoutFailedError {
+  constructor(providerCode: number | null, providerDescription: string | null) {
+    super(providerCode, providerDescription);
+    this.name = 'CheckoutNoPaymentMethodsError';
+  }
+}
+
+/** Razorpay's reason for an empty checkout, wherever the rejection carries it. */
+const NO_PAYMENT_METHODS = 'no_payment_methods';
+
+/** Customer copy for {@link CheckoutNoPaymentMethodsError} on UPI Autopay. */
+export const NO_UPI_APP_MESSAGE =
+  'Install a UPI app such as Google Pay or PhonePe to set up Autopay, then try again.';
+
 /** Narrows the SDK's rejection, which is a plain object rather than an `Error`. */
 function readRejection(error: unknown): {
   code: number | null;
@@ -205,6 +224,32 @@ export const AUTOPAY_CHECKOUT_CONFIG = {
   },
 } as const;
 
+/**
+ * The same block with a typed UPI ID added, for TEST keys only. Razorpay's test mode approves or
+ * declines a mandate typed as `success@razorpay` / `failure@razorpay`; with intent alone, a test
+ * phone without a real UPI app gets `no_payment_methods` and Autopay cannot be tested at all.
+ * Live keys keep {@link AUTOPAY_CHECKOUT_CONFIG}: real customers still approve in a UPI app.
+ */
+export const AUTOPAY_TEST_CHECKOUT_CONFIG = {
+  display: {
+    blocks: {
+      upi_apps: {
+        name: 'Approve with UPI',
+        instruments: [{ method: 'upi', flows: ['intent', 'collect'] }],
+      },
+    },
+    sequence: ['block.upi_apps'],
+    preferences: { show_default_blocks: false },
+  },
+} as const;
+
+/** The Autopay checkout block for this key: a typed UPI ID only in Razorpay test mode. */
+export function autopayCheckoutConfig(
+  keyId: string,
+): typeof AUTOPAY_CHECKOUT_CONFIG | typeof AUTOPAY_TEST_CHECKOUT_CONFIG {
+  return keyId.startsWith('rzp_test_') ? AUTOPAY_TEST_CHECKOUT_CONFIG : AUTOPAY_CHECKOUT_CONFIG;
+}
+
 export const razorpayCheckoutLauncher: CheckoutLauncher = {
   async open(input): Promise<RazorpayCheckoutResult> {
     const checkout = loadCheckout();
@@ -228,7 +273,7 @@ export const razorpayCheckoutLauncher: CheckoutLauncher = {
           : {
               customer_id: input.recurring.providerCustomerId,
               recurring: '1',
-              config: AUTOPAY_CHECKOUT_CONFIG,
+              config: autopayCheckoutConfig(input.keyId),
             }),
       });
     } catch (error) {
@@ -245,6 +290,10 @@ export const razorpayCheckoutLauncher: CheckoutLauncher = {
         reason,
         raw: error,
       });
+      // Seen on a Galaxy S21 with no UPI app: the reason sat inside `description` as a JSON string.
+      if ([description, reason].some((value) => value?.includes(NO_PAYMENT_METHODS) === true)) {
+        throw new CheckoutNoPaymentMethodsError(code, description);
+      }
       throw new CheckoutFailedError(code, description);
     }
 

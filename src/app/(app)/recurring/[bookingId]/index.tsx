@@ -22,6 +22,7 @@ import type {
   VisitRef,
 } from '@features/recurringLive';
 import { useMe } from '@features/auth';
+import { CheckoutNoPaymentMethodsError, NO_UPI_APP_MESSAGE } from '@features/payment';
 import {
   AutopayFlowSheet,
   summaryFromBooking,
@@ -129,7 +130,9 @@ export default function RecurringBookingRoute() {
         // Only the bank's confirmation is "approved". Checkout succeeding means the request
         // reached the bank; it can still be pending there, or refused (handoff V2).
         const { mandate } = outcome;
-        if (mandate.status === 'confirmed' || mandate.bookingStatus === 'active') {
+        // Not `bookingStatus === 'active'`: re-approving a paused, revoked or expired mandate
+        // happens on a booking that is already active, whatever the new mandate's state.
+        if (mandate.status === 'confirmed') {
           Alert.alert(
             'Autopay approved',
             'Your visits are set. We’ll confirm each cook 3 hours before.',
@@ -150,7 +153,11 @@ export default function RecurringBookingRoute() {
         booking.refetch();
         Alert.alert(
           'Couldn’t approve Autopay',
-          isAppError(error) ? getUserMessage(error) : 'Please try again in a moment.',
+          error instanceof CheckoutNoPaymentMethodsError
+            ? NO_UPI_APP_MESSAGE
+            : isAppError(error)
+              ? getUserMessage(error)
+              : 'Please try again in a moment.',
         );
       },
     );

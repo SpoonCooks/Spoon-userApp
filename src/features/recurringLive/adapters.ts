@@ -97,25 +97,30 @@ function daysInMonth(year: number, month: number): number {
 }
 
 /**
- * Whole months from `first`'s to `last`'s, one row per Mon → Sun week, a month's rows never
- * holding another month's dates (blank cells instead), as `1286:6575` draws Sept → Oct.
+ * The dates from `first` to `last`, one row per Mon → Sun week, a month's rows never holding another
+ * month's dates (blank cells instead), as `1286:6575` draws a 28 Sept → 18 Oct window: 28–30 Sept
+ * on one row, then 1–18 Oct. Only the window's dates are drawn, not the whole months around it:
+ * whole months doubled the calendar to ten rows of mostly blank dates.
  */
 function weeksBetween(
   first: string,
   last: string,
   kindOf: (id: string) => CalendarDayKind,
 ): CalendarWeek[] {
+  const start = parts(first);
   const end = parts(last);
-  let { year, month } = parts(first);
+  let { year, month } = start;
   const weeks: CalendarWeek[] = [];
 
   while (year < end.year || (year === end.year && month <= end.month)) {
     const label = MONTHS[month - 1] ?? '';
+    const fromDay = year === start.year && month === start.month ? start.day : 1;
+    const toDay = year === end.year && month === end.month ? end.day : daysInMonth(year, month);
     let row: (CalendarDay | null)[] = Array.from(
-      { length: weekdayIndex(year, month, 1) },
+      { length: weekdayIndex(year, month, fromDay) },
       () => null,
     );
-    for (let day = 1; day <= daysInMonth(year, month); day += 1) {
+    for (let day = fromDay; day <= toDay; day += 1) {
       const index = weekdayIndex(year, month, day);
       const id = idOf(year, month, day);
       row.push({ id, day, month: label, weekday: WEEKDAYS[index] ?? '', kind: kindOf(id) });
@@ -125,7 +130,7 @@ function weeksBetween(
       }
     }
     if (row.length > 0) {
-      const id = row.find((cell) => cell !== null)?.id ?? idOf(year, month, 1);
+      const id = row.find((cell) => cell !== null)?.id ?? idOf(year, month, fromDay);
       weeks.push({
         id: `w-${id}`,
         monthLabel: label,
