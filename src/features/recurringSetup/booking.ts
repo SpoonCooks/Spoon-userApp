@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
+import { isAppError } from '@core/errors';
 import { razorpayCheckoutLauncher } from '@features/payment';
 import type { CheckoutLauncher } from '@features/payment';
 
@@ -140,29 +141,62 @@ export function useApproveRecurringMandate(launcher: CheckoutLauncher = razorpay
 }
 
 /**
+ * The saved booking can no longer be approved: its Autopay window closed (`MANDATE_WINDOW_CLOSED`)
+ * or the sweep already cancelled it (`BOOKING_CANCELLED`). Its Cooks are released, so the draft has
+ * to be saved again rather than reopening checkout for a booking that will not take it.
+ */
+function isLapsedBooking(error: unknown): boolean {
+  if (!isAppError(error) || error.code !== 'INVALID_BOOKING_STATE') return false;
+  const reason = error.details?.['reason'];
+  return reason === 'MANDATE_WINDOW_CLOSED' || reason === 'BOOKING_CANCELLED';
+}
+
+/**
  * Save, then approve UPI Autopay. A retry after a failure re-uses the same save (its scope names
  * the draft), so it can never hold Cooks twice; checkout can be reopened for the saved booking.
+ *
+ * `isSaved(draft)` says this draft already has a saved booking waiting for approval. The screen
+ * needs it because a fresh quote then reads `bookable: false`: the booking's own reservations
+ * claim those dates and Cooks, so "not bookable" no longer means someone else took a time.
+ *
+ * A saved booking that lapsed (not approved within the window) is dropped and the draft saved
+ * again under a new idempotency scope; the same scope would replay the cancelled booking.
  */
 export function useBookRecurring(launcher: CheckoutLauncher = razorpayCheckoutLauncher) {
   const create = useCreateRecurringBooking();
   const mandate = useApproveRecurringMandate(launcher);
   const [saving, setSaving] = useState(false);
   const saved = useRef<{ key: string; booking: RecurringBookingDto } | null>(null);
+  const [savedKey, setSavedKey] = useState<string | null>(null);
+  const saves = useRef(0);
 
   const book = useCallback(
     async (draft: RecurringDraftInput): Promise<BookRecurringOutcome> => {
       setSaving(true);
+      const key = JSON.stringify(draft);
+      const save = async (): Promise<RecurringBookingDto> => {
+        // The first save keeps the original scope, so a retry of a failed request still replays.
+        const attempt = saves.current === 0 ? '' : `#${String(saves.current)}`;
+        const booking = await create.mutateAsync({
+          input: draft,
+          scope: `recurring.booking.create:${key}${attempt}`,
+        });
+        saved.current = { key, booking };
+        setSavedKey(key);
+        return booking;
+      };
       try {
-        const key = JSON.stringify(draft);
-        let booking = saved.current?.key === key ? saved.current.booking : null;
-        if (booking === null) {
-          booking = await create.mutateAsync({
-            input: draft,
-            scope: `recurring.booking.create:${key}`,
-          });
-          saved.current = { key, booking };
+        const reused = saved.current?.key === key ? saved.current.booking : null;
+        if (reused === null) return await mandate.approve(await save());
+        try {
+          return await mandate.approve(reused);
+        } catch (error) {
+          if (!isLapsedBooking(error)) throw error;
+          saved.current = null;
+          setSavedKey(null);
+          saves.current += 1;
+          return await mandate.approve(await save());
         }
-        return await mandate.approve(booking);
       } finally {
         setSaving(false);
       }
@@ -170,5 +204,10 @@ export function useBookRecurring(launcher: CheckoutLauncher = razorpayCheckoutLa
     [create, mandate],
   );
 
-  return { book, pending: saving || mandate.pending };
+  const isSaved = useCallback(
+    (draft: RecurringDraftInput) => savedKey !== null && savedKey === JSON.stringify(draft),
+    [savedKey],
+  );
+
+  return { book, isSaved, pending: saving || mandate.pending };
 }
