@@ -402,12 +402,31 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
      * tree, and this setting is the usual cause of a first iOS build failing after Firebase is
      * added. Recorded here so the next person reading a linker error knows where it came from.
      *
-     * Android is deliberately left alone.
+     * Android: R8 is on for release builds (Play flagged "DEX code optimisation: Low" and 1%
+     * obfuscation on AAB 17). It removes unused code and renames the rest, so a library that
+     * looks code up by name can fail in a RELEASE build only. React Native, Expo, Firebase and
+     * Google Maps ship their own keep rules inside their AARs; Razorpay Checkout asks apps to add
+     * its rules (its JavaScript bridge and the onPayment* callbacks), which is what
+     * `extraProguardRules` carries. Debug builds are unaffected.
      */
     [
       'expo-build-properties',
       {
         ios: { useFrameworks: 'static' },
+        android: {
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          extraProguardRules: [
+            '# Razorpay Checkout (https://razorpay.com/docs/payments/payment-gateway/android-integration/standard/)',
+            '-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }',
+            '-keepattributes JavascriptInterface',
+            '-keepattributes *Annotation*',
+            '-dontwarn com.razorpay.**',
+            '-keep class com.razorpay.** { *; }',
+            '-optimizations !method/inlining/',
+            '-keepclasseswithmembers class * { public void onPayment*(...); }',
+          ].join('\n'),
+        },
       },
     ],
 
