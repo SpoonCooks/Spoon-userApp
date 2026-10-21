@@ -156,8 +156,8 @@ export function useAutopayFlow({
         }
         dispatch({
           type: 'CHECKOUT_DONE',
-          confirmed:
-            outcome.mandate.status === 'confirmed' || outcome.mandate.bookingStatus === 'active',
+          // The mandate's own status, never `bookingStatus`: see `applyStatus` in `machine.ts`.
+          confirmed: outcome.mandate.status === 'confirmed',
           handleMasked: outcome.mandate.handleMasked,
         });
       } catch {

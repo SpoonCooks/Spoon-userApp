@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import type { CheckoutLauncher } from '@features/payment';
-import { CheckoutCancelledError } from '@features/payment';
+import { CheckoutCancelledError, CheckoutNoPaymentMethodsError } from '@features/payment';
 import { createStubApi, createTestRuntime, renderWithRuntime } from '@/test/renderWithRuntime';
 
 import type { RecurringPlanDraft } from '../types';
@@ -289,6 +289,26 @@ describe('RecurringAutopayScreen', () => {
     approve();
     await waitFor(() => expect(onBooked).toHaveBeenCalledTimes(1));
     expect(calls).toEqual(['create', 'mandate', 'mandate', 'create', 'mandate', 'verify']);
+  });
+
+  it('asks for a UPI app when checkout has no way to approve Autopay, and keeps Approve', async () => {
+    setup({
+      launcher: {
+        open: async () => {
+          throw new CheckoutNoPaymentMethodsError(2, 'no_payment_methods');
+        },
+      },
+    });
+    await screen.findByText('₹135.45');
+
+    approve();
+
+    expect(
+      await screen.findByText(
+        'Install a UPI app such as Google Pay or PhonePe to set up Autopay, then try again.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByTestId('recurring-autopay-screen-approve')).toBeTruthy();
   });
 
   it('sends the customer back to change times when a slot was taken since the Summary', async () => {

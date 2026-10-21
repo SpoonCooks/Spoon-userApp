@@ -44,7 +44,8 @@ export function RecurringBookedScreen({
   onViewPlan,
   testID = 'recurring-booked-screen',
 }: RecurringBookedScreenProps) {
-  const confirmed = mandate.status === 'confirmed' || mandate.bookingStatus === 'active';
+  // The mandate's own status: see `applyStatus` in `autopay/machine.ts`.
+  const confirmed = mandate.status === 'confirmed';
   const days = booking.plans.reduce((sum, plan) => sum + plan.days.length, 0);
   const visits = booking.counts.toGo;
   const first = booking.upNext;

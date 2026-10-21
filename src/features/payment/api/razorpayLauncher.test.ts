@@ -1,6 +1,7 @@
 import {
   CheckoutCancelledError,
   CheckoutFailedError,
+  CheckoutNoPaymentMethodsError,
   CheckoutSdkMissingError,
   razorpayCheckoutLauncher,
 } from './razorpayLauncher';
@@ -79,10 +80,14 @@ describe('razorpayCheckoutLauncher', () => {
     expect(options['recurring']).toBeUndefined();
   });
 
-  it('offers Autopay only through UPI apps, never a typed UPI ID', async () => {
+  it('offers Autopay only through UPI apps, never a typed UPI ID, on a live key', async () => {
     mockOpen.mockResolvedValue({ razorpay_payment_id: 'pay_1', razorpay_signature: 'sig' });
 
-    await razorpayCheckoutLauncher.open({ ...ORDER, recurring: { providerCustomerId: 'cust_1' } });
+    await razorpayCheckoutLauncher.open({
+      ...ORDER,
+      keyId: 'rzp_live_publishable',
+      recurring: { providerCustomerId: 'cust_1' },
+    });
 
     expect(mockOpen).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -102,6 +107,42 @@ describe('razorpayCheckoutLauncher', () => {
         },
       }),
     );
+  });
+
+  /*
+   * Razorpay's test mode approves a mandate typed as `success@razorpay`. Offering intent alone left
+   * a test phone with no real UPI app at `no_payment_methods`, so Autopay could not be tested.
+   */
+  it('adds a typed UPI ID to Autopay on a test key, so test mode can approve it', async () => {
+    mockOpen.mockResolvedValue({ razorpay_payment_id: 'pay_1', razorpay_signature: 'sig' });
+
+    await razorpayCheckoutLauncher.open({ ...ORDER, recurring: { providerCustomerId: 'cust_1' } });
+
+    const options = mockOpen.mock.calls[0]?.[0] as {
+      config: { display: { blocks: { upi_apps: { instruments: unknown } } } };
+    };
+    expect(options.config.display.blocks.upi_apps.instruments).toEqual([
+      { method: 'upi', flows: ['intent', 'collect'] },
+    ]);
+  });
+
+  /*
+   * Captured from a Galaxy S21 with no UPI app: the reason is inside `description`, as a JSON
+   * string, not in any field `readRejection` reads.
+   */
+  it('tells an empty checkout apart from a failed payment', async () => {
+    mockOpen.mockRejectedValue({
+      code: 2,
+      description:
+        '{"error":{"code":"BAD_REQUEST_ERROR","description":"no_payment_methods","source":"razorpay","step":"checkout_load","reason":"no_payment_methods"}}',
+    });
+
+    const rejection = razorpayCheckoutLauncher.open({
+      ...ORDER,
+      recurring: { providerCustomerId: 'cust_1' },
+    });
+    await expect(rejection).rejects.toBeInstanceOf(CheckoutNoPaymentMethodsError);
+    await expect(rejection).rejects.toBeInstanceOf(CheckoutFailedError);
   });
 
   it('reports a dismissed sheet as a cancellation, not as a failure', async () => {
