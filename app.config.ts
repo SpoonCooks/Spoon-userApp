@@ -213,7 +213,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   name: `Spoon${ENV_SUFFIX[APP_ENV]}`,
   slug: 'spoon-user-app',
-  version: '1.0.1',
+  version: '1.0.2',
 
   orientation: 'portrait',
 
