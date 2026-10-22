@@ -239,6 +239,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
        * fourteen iOS builds is fourteen interruptions for one unchanging answer.
        */
       ITSAppUsesNonExemptEncryption: false,
+
+      /**
+       * The UPI apps Razorpay Checkout may offer. iOS answers `canOpenURL` only for schemes listed
+       * here, so without this list Checkout cannot see GPay, PhonePe or Paytm on the device and
+       * silently leaves them out of the UPI section (docs/IOS_QA_CHECKLIST.md). Android needs no
+       * equivalent: its `<queries>` already cover `upi://`.
+       *
+       * The same list `dev` declares for UPI Autopay, kept identical so the two do not conflict
+       * when `dev` reaches `main`.
+       */
+      LSApplicationQueriesSchemes: ['phonepe', 'tez', 'paytmmp', 'credpay', 'bhim'],
     },
 
     /**
