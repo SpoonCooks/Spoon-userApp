@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { getUserMessage, isAppError } from '@core/errors';
+import { CheckoutNoPaymentMethodsError, NO_UPI_APP_MESSAGE } from '@features/payment';
 import type { CheckoutLauncher } from '@features/payment';
 import { formatPaise, formatPaiseGrouped } from '@core/format';
 import { Button, LoadingState, NoteCard, Screen, ScreenHeader, Text } from '@ui';
@@ -79,7 +80,7 @@ export function RecurringAutopayScreen({
   const draft = useMemo(() => draftFromPlans(addressId, plans), [addressId, plans]);
   const quote = useRecurringQuote(draft);
   const eligibility = useRecurringEligibility();
-  const { book, pending } = useBookRecurring(launcher);
+  const { book, isSaved, pending } = useBookRecurring(launcher);
   const [notice, setNotice] = useState<Notice>({ kind: 'none' });
 
   const quoted = quote.state.status === 'ready' ? quote.state.data : null;
@@ -87,9 +88,11 @@ export function RecurringAutopayScreen({
   // Days whose visits add up past the per-debit cap (one debit pays a whole day, DEC-091): the
   // Summary has to change, but no time was taken, so it is said apart from `slotTaken`.
   const overLimitDays = quoted?.dayTotals?.filter((day) => day.overLimit) ?? [];
-  const slotTaken =
-    overLimitDays.length === 0 &&
-    (notice.kind === 'slotTaken' || (quoted !== null && !quoted.bookable));
+  // Once this draft is saved, its own reservations claim those dates and Cooks, so a quote
+  // refetched on return from checkout reads `bookable: false` with nothing taken by anyone else.
+  // Only the save's own refusal (`notice.kind === 'slotTaken'`) can mean a time was taken then.
+  const quoteTaken = quoted !== null && !quoted.bookable && !isSaved(draft);
+  const slotTaken = overLimitDays.length === 0 && (notice.kind === 'slotTaken' || quoteTaken);
   const mustChange = slotTaken || overLimitDays.length > 0;
 
   const approve = async () => {
@@ -118,9 +121,12 @@ export function RecurringAutopayScreen({
       }
       setNotice({
         kind: 'error',
-        message: isAppError(error)
-          ? getUserMessage(error)
-          : 'Autopay could not be set up. Please try again.',
+        message:
+          error instanceof CheckoutNoPaymentMethodsError
+            ? NO_UPI_APP_MESSAGE
+            : isAppError(error)
+              ? getUserMessage(error)
+              : 'Autopay could not be set up. Please try again.',
       });
     }
   };

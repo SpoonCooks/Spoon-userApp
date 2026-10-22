@@ -105,6 +105,19 @@ describe('liveCalendarFrom', () => {
     expect(weeks.every((week) => week.days.length === 7)).toBe(true);
   });
 
+  it('keeps a mid-week window\'s first and last rows whole, and draws no months beyond it', () => {
+    const { weeks } = liveCalendarFrom(
+      booking({ window: { startDate: '2026-10-24', endDate: '2026-11-13' }, days: [] }),
+      '2026-10-21',
+    );
+    const numbers = (week: (typeof weeks)[number] | undefined) =>
+      week?.days.map((day) => day?.day ?? null);
+    // 24 Oct 2026 is a Saturday and 13 Nov a Friday: their weeks are drawn whole, nothing more.
+    expect(weeks.map((week) => week.monthLabel)).toEqual(['Oct', 'Oct', 'Nov', 'Nov', 'Nov']);
+    expect(numbers(weeks[0])).toEqual([19, 20, 21, 22, 23, 24, 25]);
+    expect(numbers(weeks.at(-1))).toEqual([9, 10, 11, 12, 13, 14, 15]);
+  });
+
   it("marks dates by the backend's own grouping, and leaves dates without visits unmarked", () => {
     const days = liveCalendarFrom(booking(), TODAY).weeks.flatMap((week) => week.days);
     const kindOf = (id: string) => days.find((day) => day?.id === id)?.kind;

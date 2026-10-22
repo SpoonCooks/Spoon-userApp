@@ -160,8 +160,12 @@ export const TIME_OF_DAY_BANDS: readonly {
   { id: 'evening', label: 'Evening', fromMinutes: 17 * 60, toMinutes: 21 * 60 + 45 },
 ];
 
-/** Start times are offered every 30 minutes until availability is read from the backend. */
-const START_STEP_MINUTES = 30;
+/**
+ * Start times every 15 minutes, as one-time Schedule offers them (the backend's
+ * `BOOKING_SLOT_INTERVAL_MINUTES`, which the Recurring start-times read checks against). Was 30,
+ * from the recurring frames; the owner asked for both flows to match (2026-10-19).
+ */
+const START_STEP_MINUTES = 15;
 
 /** The start times a band offers, earliest first. */
 export function startTimesFor(timeOfDay: RecurringTimeOfDay): readonly number[] {

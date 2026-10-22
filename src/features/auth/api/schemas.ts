@@ -107,6 +107,17 @@ export const profileDataSchema = z.object({
   regionPreference: z.string().nullable(),
   genderPreference: z.string().nullable(),
   /**
+   * The taste-profile wizard's answers (Figma page `1405:448`). Optional on the way IN so a V0
+   * that has not shipped them yet still parses: an absent key reads as `null`, "not answered".
+   */
+  householdAdults: z.number().int().nullable().default(null),
+  householdKids: z.number().int().nullable().default(null),
+  householdElders: z.number().int().nullable().default(null),
+  nonVegPreferences: z.array(z.string()).nullable().default(null),
+  oilLevel: z.string().nullable().default(null),
+  gheeOnly: z.boolean().nullable().default(null),
+  mealHassles: z.array(z.string()).nullable().default(null),
+  /**
    * Server-owned, read verbatim, never recomputed here (task §9).
    *
    * The rule is `name` AND `mealStructure` AND `dietaryPreference`, each present and non-blank —
@@ -126,8 +137,9 @@ export type ProfileData = z.infer<typeof profileDataSchema>;
  * it, and a value replaces it. Everything but `name` is therefore optional at the type level,
  * which is what lets a caller send `{ name }` alone without erasing seven answers.
  *
- * The profile screen does not use that latitude — it prefills all eight and submits all eight,
- * so an untouched field round-trips its own value rather than relying on omission. See
+ * The taste-profile wizard does not use that latitude — it prefills every answer and submits
+ * every answer, so an untouched field round-trips its own value rather than relying on omission.
+ * The one exception is `householdStructure`, which the wizard no longer asks and so omits. See
  * `profileUpdateFrom`.
  */
 export interface ProfileUpdateRequest {
@@ -139,6 +151,13 @@ export interface ProfileUpdateRequest {
   readonly grownUpEating?: readonly string[] | null;
   readonly regionPreference?: string | null;
   readonly genderPreference?: string | null;
+  readonly householdAdults?: number | null;
+  readonly householdKids?: number | null;
+  readonly householdElders?: number | null;
+  readonly nonVegPreferences?: readonly string[] | null;
+  readonly oilLevel?: string | null;
+  readonly gheeOnly?: boolean | null;
+  readonly mealHassles?: readonly string[] | null;
 }
 
 /**

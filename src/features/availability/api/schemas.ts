@@ -79,3 +79,34 @@ export const scheduledAvailabilitySchema = z.object({
 });
 
 export type ScheduledAvailabilityDto = z.infer<typeof scheduledAvailabilitySchema>;
+
+/**
+ * `GET /v1/availability/scheduled/overview` (DEC-094): every duration over the booking horizon in
+ * one read. Each day carries the same candidate list `GET /v1/availability/scheduled` returns for
+ * it, with `available` rolled up per day and per duration. Home's Later tab and the Schedule for
+ * Later screen both read it, so neither asks day by day.
+ */
+export const scheduledOverviewDaySchema = z.object({
+  date: z.string(),
+  available: z.boolean(),
+  slots: z.array(scheduledSlotSchema),
+  rejection: z.string().nullish(),
+});
+
+export const scheduledOverviewSchema = z.object({
+  addressId: z.string(),
+  dates: z.array(z.string()),
+  durations: z.array(
+    z.object({
+      durationMinutes: z.number().int().positive(),
+      available: z.boolean(),
+      days: z.array(scheduledOverviewDaySchema),
+    }),
+  ),
+  /** The address is not served: nothing on any day of any length. */
+  rejection: z.string().nullish(),
+  validUntil: z.string().datetime(),
+});
+
+export type ScheduledOverviewDto = z.infer<typeof scheduledOverviewSchema>;
+export type ScheduledOverviewDayDto = z.infer<typeof scheduledOverviewDaySchema>;

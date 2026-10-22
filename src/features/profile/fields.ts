@@ -1,319 +1,357 @@
+import type { FoodProfileArtKey } from './art';
+
 /**
- * `338:4508` "Page 17- profile" — the V8 profile-details field catalogue.
+ * The taste-profile wizard's question catalogue — Figma `cCQlzTeiObQkpVBzwI8mZi` page `1405:448`
+ * ("Food Profile"): Family `1548:3676`, Diet `1548:3786`, Taste `1548:3922`, Cook `1548:4061` /
+ * `2522:1049`, and the four "Dev notes" frames beside them (`2505:4910` … `2505:4931`).
  *
  * ## Why this is data and not JSX
  *
- * The screen asks eight questions, and three separate things need to agree about them: what is
- * drawn, what gates Confirm, and what is submitted. Spelling the questions out in the screen and
- * re-deriving the required set in a validator is how those three drift — the defect the address
- * form already solved by putting its rule in `features/address/validation.ts` rather than on the
- * button. This module is the single description; `validation.ts` reads it, the screen renders it,
- * and the adapter submits it.
+ * What each step draws, what gates its Continue, and what is submitted have to agree. The screen
+ * renders this module, `validation.ts` gates from it and `detailsData.ts` submits from it, so the
+ * three cannot drift (the same reason the address form's rule lives in its own `validation.ts`).
  *
- * ## Required vs optional — read off the STAR, not guessed
+ * ## Ids are the backend's, verbatim
  *
- * The founder's rule is "sections marked * are mandatory". Three labels in `338:4511` carry one
- * and five do not:
- *
- *   REQUIRED  `456:3392`  Name*
- *             `456:3418`  Daily meal structure*
- *             `338:4534`  Dietary preference*
- *   OPTIONAL  `456:3404`  Household structure
- *             `456:3432`  What is the most pressing issue with your meals today?
- *             `341:4658`  What food have you grown up eating?
- *             `341:4646`  Region preference
- *             `341:4642`  Gender preference
- *
- * The star is part of the DRAWN LABEL in Figma, so it is part of the label string here too —
- * `label` is what the frame prints, and `required` is what the gate reads. Neither is derived
- * from the other, so a label that loses its star in a future file cannot silently unlock the CTA,
- * and a requirement cannot silently appear without the mark that announces it.
- *
- * ## Selection mode
- *
- * `341:4655` is the one MULTI-select input (founder comment: "multi select"), and the frame proves
- * it: three chips — Rajasthani, Bihari, Odiya — are shown selected TOGETHER, each carrying its own
- * `408:1382` remove cross. Every other chip group draws exactly one selected chip and is
- * single-select. Nothing here is inferred from the control's shape; it is read off the frame.
- *
- * ## Chip families
- *
- * The frame draws chips in two distinct treatments, consistently per group rather than at random:
- * a LIME family (`#CFFF04` edge, `#ECFF9B` at 70 % when selected) and a GOLD family (`#FFD600`
- * edge, `#FFEF99` when selected). Household, Region and Gender are lime; Daily meal structure and
- * Dietary preference are gold. That is carried as `tone` so the screen never picks a colour.
+ * Every option id below is exactly what V0 stores (`src/identity/profile-details.ts`). Labels are
+ * never sent, so copy can be re-worded without touching anybody's saved answer. The one exception
+ * is the grown-up food list: V0 holds it as an open vocabulary and has always stored the LABEL,
+ * so that is what this sends too.
  */
 
-/** Every field the V8 page collects, in the order `338:4511` draws them. */
-export type ProfileFieldId =
-  | 'name'
-  | 'householdStructure'
-  | 'mealStructure'
-  | 'pressingIssue'
-  | 'dietaryPreference'
-  | 'grownUpEating'
-  | 'regionPreference'
-  | 'genderPreference';
+export type WizardStepId = 'family' | 'diet' | 'taste' | 'cook';
 
-/** The two chip treatments `338:4511` draws. Never chosen by the screen. */
-export type ProfileChipTone = 'lime' | 'gold';
-
-export interface ProfileOption {
-  readonly id: string;
-  /** The chip's drawn word, verbatim from the frame. */
+export interface WizardStep {
+  readonly id: WizardStepId;
+  /** The bowl's caption in the progress thali (`1548:3685`). */
   readonly label: string;
+  /** The header title. */
+  readonly title: string;
 }
 
-interface ProfileFieldBase {
-  readonly id: ProfileFieldId;
-  /** The label exactly as drawn, INCLUDING the `*` where the frame carries one. */
-  readonly label: string;
-  /** True only where the drawn label carries a `*`. */
-  readonly required: boolean;
-}
-
-export interface ProfileTextField extends ProfileFieldBase {
-  readonly kind: 'text';
-  readonly placeholder: string;
-}
-
-export interface ProfileChoiceField extends ProfileFieldBase {
-  readonly kind: 'single' | 'multi';
-  readonly tone: ProfileChipTone;
-  /** Fixed options. Absent on `grownUpEating`, whose values are open — see `ProfileEntryField`. */
-  readonly options: readonly ProfileOption[];
-  /** Grid track count: `456:3405` is 2 columns, `341:4647` is 3. */
-  readonly columns: number;
-}
-
-/**
- * `341:4655` — a search field that FILTERS a published vocabulary and adds the match.
- *
- * ## It used to accept anything, and that was the defect
- *
- * The control was free text: whatever the customer typed became a chip. So "It's okay", a
- * half-typed "Rajasth", a typo and "Rajasthani food" were four different stored answers for at
- * most one real preference, and the column filled with values nothing downstream could group,
- * count or match a cook against. The founder's rule is explicit — this field takes a cuisine, not
- * a sentence.
- *
- * It is now a picker: typing narrows `options` and only a value FROM that list can be added. The
- * closed set is the whole point, so `validation.ts` enforces it rather than the screen.
- *
- * ## Where the vocabulary comes from, and where it should come from
- *
- * BACKEND_GAP_GROWN_UP_FOOD_CATALOGUE is still open: no endpoint publishes a cuisine list.
- * `GET /v1/catalogue` carries pricing, the operating window, cancellation bands, extension options
- * and the meal-brief diet axis, and nothing resembling a regional-cuisine vocabulary — so the list
- * below is bundled with the client, which means re-wording or extending it costs a release.
- *
- * That is a known interim position, taken because the alternative in production is worse: a free
- * field writing ungroupable strings into durable customer data. `cook_profiles.cuisines` already
- * exists on the backend as the same kind of value, which is where the shared vocabulary belongs —
- * see `docs/FRONTEND_BACKEND_PENDING.md`.
- *
- * The three names on the frame (`341:4652`) — Rajasthani, Bihari, Odiya — are members of this list
- * rather than its whole extent, and the " food" suffix is the frame's own wording.
- */
-export interface ProfileEntryField extends ProfileFieldBase {
-  readonly kind: 'entry';
-  readonly placeholder: string;
-  /**
-   * The values that may be added. Multi-select: presence in the answer IS the selection, so there
-   * is no `columns` — the chosen ones are drawn as `341:4652` removable chips, not as a grid.
-   */
-  readonly options: readonly ProfileOption[];
-}
-
-/**
- * The cuisine vocabulary offered by `341:4655`.
- *
- * Ordered roughly by how commonly each is claimed as a household's own cooking, not
- * alphabetically: the list is read top-down under a search box, and the first screenful should be
- * the likely answers. Search reorders it anyway the moment anything is typed.
- *
- * `id` is kebab-case for consistency with every other option in this file, but note that what is
- * SUBMITTED for this field is the LABEL, not the id — see `validation.ts`. The backend stores
- * these as free strings (`MAX_GROWN_UP_EATING_LENGTH`), and a saved answer from before this list
- * existed still round-trips and can still be removed.
- */
-export const PROFILE_GROWN_UP_FOOD_OPTIONS: readonly ProfileOption[] = [
-  { id: 'north-indian', label: 'North Indian food' },
-  { id: 'south-indian', label: 'South Indian food' },
-  { id: 'punjabi', label: 'Punjabi food' },
-  { id: 'rajasthani', label: 'Rajasthani food' },
-  { id: 'gujarati', label: 'Gujarati food' },
-  { id: 'maharashtrian', label: 'Maharashtrian food' },
-  { id: 'bengali', label: 'Bengali food' },
-  { id: 'bihari', label: 'Bihari food' },
-  { id: 'odiya', label: 'Odiya food' },
-  { id: 'assamese', label: 'Assamese food' },
-  { id: 'tamil', label: 'Tamil food' },
-  { id: 'kerala', label: 'Kerala food' },
-  { id: 'andhra', label: 'Andhra food' },
-  { id: 'telangana', label: 'Telangana food' },
-  { id: 'karnataka', label: 'Karnataka food' },
-  { id: 'chettinad', label: 'Chettinad food' },
-  { id: 'hyderabadi', label: 'Hyderabadi food' },
-  { id: 'awadhi', label: 'Awadhi food' },
-  { id: 'mughlai', label: 'Mughlai food' },
-  { id: 'kashmiri', label: 'Kashmiri food' },
-  { id: 'goan', label: 'Goan food' },
-  { id: 'sindhi', label: 'Sindhi food' },
-  { id: 'marwari', label: 'Marwari food' },
-  { id: 'konkani', label: 'Konkani food' },
-  { id: 'jain', label: 'Jain food' },
-  { id: 'indo-chinese', label: 'Indo-Chinese food' },
-  { id: 'continental', label: 'Continental food' },
+export const WIZARD_STEPS: readonly WizardStep[] = [
+  { id: 'family', label: 'Family', title: 'Who are we cooking for?' },
+  { id: 'diet', label: 'Diet', title: 'What’s on the plate?' },
+  { id: 'taste', label: 'Taste', title: 'Make it taste like home' },
+  { id: 'cook', label: 'Cook', title: 'Cooks you’re comfortable with' },
 ];
 
-export type ProfileField = ProfileTextField | ProfileChoiceField | ProfileEntryField;
+/** `1548:3784` on steps 1–3, `1548:4174` on the last. */
+export const WIZARD_CONTINUE = 'Continue';
+export const WIZARD_SAVE = 'Save & Continue';
 
-/** `456:3389` — the intro line, Livvic Bold 14/20. */
-export const PROFILE_DETAILS_INTRO =
-  'Please tell us about your meal structure, so that we can serve you better!';
+/* ------------------------------------------------------------------------------------ family */
 
-/** `I338:4510;53:126` — the header title. */
-export const PROFILE_DETAILS_TITLE = 'Profile';
+/** Dev note `2505:4913`: free text, trimmed, max 40, mandatory. */
+export const NAME_MAX_LENGTH = 40;
+export const NAME_PLACEHOLDER = 'What should we call you?';
 
-/** `338:4559` — the CTA label. */
-export const PROFILE_DETAILS_CTA = 'Confirm';
+export const PEOPLE_QUESTION = 'How many people usually eat with you?';
+export const PEOPLE_TIP = 'We’ll suggest duration & brief the cook accordingly';
 
-/** `341:4629` — the group heading above Region and Gender. It collects no value of its own. */
-export const PROFILE_COOK_PREFERENCE_LABEL = 'Cook preference';
+export type HouseholdCountId = 'householdAdults' | 'householdKids' | 'householdElders';
 
-export const PROFILE_FIELDS: readonly ProfileField[] = [
-  /** `456:3390` — the only field the backend can currently store. */
-  { id: 'name', kind: 'text', label: 'Name*', required: true, placeholder: 'Name*' },
-
-  {
-    id: 'householdStructure',
-    kind: 'single',
-    label: 'Household structure',
-    required: false,
-    tone: 'lime',
-    columns: 2,
-    options: [
-      { id: 'family-with-kids', label: 'Family with kids' },
-      { id: 'family-with-no-kids', label: 'Family with no kids' },
-      { id: 'family-with-elderly', label: 'Family with elderly' },
-      { id: 'bachelors', label: 'Bachelors' },
-    ],
-  },
-
-  {
-    id: 'mealStructure',
-    kind: 'single',
-    label: 'Daily meal structure*',
-    required: true,
-    tone: 'gold',
-    columns: 2,
-    options: [
-      { id: 'daily-cook-2x', label: 'Daily cook with 2x visits' },
-      { id: 'daily-cook-1x', label: 'Daily cook with 1x visit' },
-      { id: 'self-or-family', label: 'Cook by myself/ family' },
-      // `456:3427` carries a trailing space in the frame; the drawn word is trimmed here.
-      { id: 'office-and-delivery', label: 'Office meals + food delivery' },
-    ],
-  },
-
-  {
-    id: 'pressingIssue',
-    kind: 'text',
-    label: 'What is the most pressing issue with your meals today?',
-    required: false,
-    placeholder: 'I don’t like my cook because ...',
-  },
-
-  {
-    id: 'dietaryPreference',
-    kind: 'single',
-    label: 'Dietary preference*',
-    required: true,
-    tone: 'gold',
-    columns: 2,
-    options: [
-      { id: 'vegan', label: 'Vegan' },
-      { id: 'vegetarian', label: 'Vegetarian' },
-      { id: 'eggetarian', label: 'Eggetarian' },
-      { id: 'non-vegetarian', label: 'Non-vegetarian' },
-    ],
-  },
-
-  {
-    id: 'grownUpEating',
-    kind: 'entry',
-    label: 'What food have you grown up eating?',
-    required: false,
-    // `341:4678` — the frame's own placeholder, and now also the first thing the open list offers.
-    placeholder: 'Rajasthani food',
-    options: PROFILE_GROWN_UP_FOOD_OPTIONS,
-  },
-
-  {
-    id: 'regionPreference',
-    kind: 'single',
-    label: 'Region preference',
-    required: false,
-    tone: 'lime',
-    columns: 3,
-    options: [
-      { id: 'north-indian', label: 'North Indian' },
-      { id: 'south-indian', label: 'South Indian' },
-      { id: 'my-state', label: 'My state' },
-    ],
-  },
-
-  {
-    id: 'genderPreference',
-    kind: 'single',
-    label: 'Gender preference',
-    required: false,
-    tone: 'lime',
-    columns: 3,
-    options: [
-      { id: 'female', label: 'Female' },
-      { id: 'male', label: 'Male' },
-      { id: 'either', label: 'Either' },
-    ],
-  },
-] as const;
-
-/** The three starred fields, derived from the catalogue so the two can never disagree. */
-export const PROFILE_REQUIRED_FIELDS: readonly ProfileFieldId[] = PROFILE_FIELDS.filter(
-  (field) => field.required,
-).map((field) => field.id);
-
-export function profileField(id: ProfileFieldId): ProfileField {
-  const found = PROFILE_FIELDS.find((field) => field.id === id);
-  // Unreachable: `ProfileFieldId` is derived from the catalogue itself.
-  if (found === undefined) throw new Error(`Unknown profile field: ${id}`);
-  return found;
+export interface HouseholdRow {
+  readonly id: HouseholdCountId;
+  readonly label: string;
+  readonly hint: string;
+  /**
+   * Dev note `2505:4914`: the customer counts as an adult, so Adults starts at 1 and its − stops
+   * there; Kids and Elders start and stop at 0. No maximum is drawn; V0 bounds each at 50.
+   */
+  readonly min: number;
+  /** The icon well's fill: `#FFF7CC`, `#ECFF9B` and `#FFE666` down the card. */
+  readonly well: 'subtle' | 'positive' | 'tint';
+  /** `1548:3733` draws the Kids glyph at 19.2 rather than 24. */
+  readonly iconSize: number;
 }
 
-/** The five chip groups. Narrowed here so the screen never casts. */
-export type ProfileChoiceFieldId =
-  | 'householdStructure'
-  | 'mealStructure'
-  | 'dietaryPreference'
-  | 'regionPreference'
-  | 'genderPreference';
+export const HOUSEHOLD_ROWS: readonly HouseholdRow[] = [
+  {
+    id: 'householdAdults',
+    label: 'Adults',
+    hint: '13–60 yrs',
+    min: 1,
+    well: 'subtle',
+    iconSize: 24,
+  },
+  {
+    id: 'householdKids',
+    label: 'Kids',
+    hint: 'Under 12',
+    min: 0,
+    well: 'positive',
+    iconSize: 19.2,
+  },
+  { id: 'householdElders', label: 'Elders', hint: '60+ yrs', min: 0, well: 'tint', iconSize: 24 },
+];
 
-export function profileChoiceField(id: ProfileChoiceFieldId): ProfileChoiceField {
-  const field = profileField(id);
-  if (field.kind !== 'single' && field.kind !== 'multi') {
-    throw new Error(`Profile field is not a choice: ${id}`);
-  }
-  return field;
+export const HOUSEHOLD_MAX = 50;
+
+/* -------------------------------------------------------------------------------------- diet */
+
+export interface TileOption {
+  readonly id: string;
+  readonly label: string;
+  /** The tile's second line, where one is drawn. */
+  readonly hint?: string;
+  /** `mixed` is the one tile whose glyph is two marks overlapped (`1548:3857`). */
+  readonly icon: FoodProfileArtKey | 'mixed';
 }
 
-/** The two free-text fields and the one open-entry field, narrowed for their placeholders. */
-export function profilePromptField(
-  id: 'name' | 'pressingIssue' | 'grownUpEating',
-): ProfileTextField | ProfileEntryField {
-  const field = profileField(id);
-  if (field.kind !== 'text' && field.kind !== 'entry') {
-    throw new Error(`Profile field has no placeholder: ${id}`);
-  }
-  return field;
+/** `1548:3825` — 3 × 2 tiles, single-select, mandatory, no default (dev note `2505:4919`). */
+export const DIET_OPTIONS: readonly TileOption[] = [
+  { id: 'vegetarian', label: 'Vegetarian', hint: 'No meat, no egg', icon: 'markVeg' },
+  { id: 'eggetarian', label: 'Eggetarian', hint: 'Veg + eggs', icon: 'markEgg' },
+  { id: 'non-vegetarian', label: 'Non-veg', hint: 'Meat, fish & eggs', icon: 'markNonVeg' },
+  { id: 'jain', label: 'Jain/ Sattvic', hint: 'No onion, garlic', icon: 'dietJain' },
+  { id: 'vegan', label: 'Vegan', hint: 'No dairy either', icon: 'dietVegan' },
+  { id: 'mixed', label: 'Mixed home', hint: 'Varies by person', icon: 'mixed' },
+];
+
+export const NON_VEG_QUESTION = 'What are your non-veg preferences?';
+
+/** Dev note `2505:4921`: the meat chips show only for these two diets. */
+export const MEAT_EATING_DIETS: ReadonlySet<string> = new Set(['non-vegetarian', 'mixed']);
+
+export interface ChipOption {
+  readonly id: string;
+  readonly label: string;
+}
+
+/** `2475:19480` — a horizontal scroll, multi-select, optional. */
+export const NON_VEG_OPTIONS: readonly ChipOption[] = [
+  { id: 'chicken', label: 'Chicken' },
+  { id: 'mutton', label: 'Mutton' },
+  { id: 'freshwater-fish', label: 'Freshwater fish' },
+  { id: 'seawater-fish', label: 'Seawater fish' },
+  { id: 'prawns', label: 'Prawns' },
+  { id: 'crabs', label: 'Crabs' },
+  { id: 'pork', label: 'Pork' },
+];
+
+/* ------------------------------------------------------------------------------------- taste */
+
+export const CUISINE_QUESTION = 'What food did you grow up eating?';
+export const CUISINE_SEARCH_PLACEHOLDER = 'Search';
+/** Dev note `2505:4926`: optional, max 5. */
+export const CUISINE_MAX = 5;
+
+/**
+ * Dev note `2505:4926`: ten chips are shown without searching, in this order; everything after
+ * them is reachable only through search. The note's search-only list ends in "e.g.", so the
+ * regional names the V8 list already offered stay searchable too.
+ */
+export const FEATURED_CUISINES: readonly string[] = [
+  'Punjabi',
+  'Gujarati',
+  'Maharashtrian',
+  'Bengali',
+  'Tamil',
+  'Kerala',
+  'Andhra / Telangana',
+  'UP / Awadhi',
+  'Rajasthani',
+  'Sindhi',
+];
+
+export const SEARCH_ONLY_CUISINES: readonly string[] = [
+  'Kashmiri',
+  'Parsi',
+  'Goan',
+  'Odia',
+  'Assamese',
+  'Bohri / Memon',
+  'Christian community',
+  'Northeast',
+  'Bihari',
+  'Karnataka',
+  'Chettinad',
+  'Hyderabadi',
+  'Mughlai',
+  'Marwari',
+  'Konkani',
+  'North Indian',
+  'South Indian',
+  'No fixed region',
+];
+
+export const ALL_CUISINES: readonly string[] = [...FEATURED_CUISINES, ...SEARCH_ONLY_CUISINES];
+
+/**
+ * The V8 page stored labels with a " food" suffix ("Rajasthani food"), and three of its regions are
+ * spelled or grouped differently now. A saved answer is read back to today's chip so it shows as
+ * selected rather than as an unknown value; anything else is kept exactly as stored.
+ */
+const LEGACY_CUISINE_LABELS: Readonly<Record<string, string>> = {
+  'odiya food': 'Odia',
+  'andhra food': 'Andhra / Telangana',
+  'telangana food': 'Andhra / Telangana',
+  'awadhi food': 'UP / Awadhi',
+};
+
+export function canonicalCuisine(stored: string): string {
+  const key = stored.trim().toLowerCase();
+  const mapped = LEGACY_CUISINE_LABELS[key];
+  if (mapped !== undefined) return mapped;
+  const bare = key.replace(/ food$/, '');
+  return ALL_CUISINES.find((label) => label.toLowerCase() === bare) ?? stored.trim();
+}
+
+export const OIL_QUESTION = 'Oil & ghee';
+
+export interface OilStop {
+  readonly id: 'none' | 'light' | 'moderate';
+  readonly label: string;
+  readonly drop: FoodProfileArtKey;
+}
+
+/** `2486:896` — a 3-stop slider, default Light (dev note `2505:4927`). */
+export const OIL_STOPS: readonly OilStop[] = [
+  { id: 'none', label: 'No oil', drop: 'dropNone' },
+  { id: 'light', label: 'Light', drop: 'dropLight' },
+  { id: 'moderate', label: 'Moderate', drop: 'dropModerate' },
+];
+export const DEFAULT_OIL_LEVEL = 'light';
+
+export const GHEE_LABEL = 'Cook only in ghee';
+export const GHEE_HINT = 'Ghee replaces oil in every dish';
+
+/* -------------------------------------------------------------------------------------- cook */
+
+export const GENDER_QUESTION = 'Cook’s gender preferences?';
+
+/** `2527:925` — single-select, optional. "No preference" is V0's `either`. */
+export const GENDER_OPTIONS: readonly TileOption[] = [
+  { id: 'either', label: 'No preference', hint: 'Any trusted cook', icon: 'friends' },
+  { id: 'female', label: 'Female', hint: 'Women cooks only', icon: 'genderFemale' },
+  { id: 'male', label: 'Male', hint: 'Men cooks only', icon: 'genderMale' },
+];
+
+export const REGION_QUESTION = 'Cook’s regionality preferences?';
+
+/** `2527:14278` — single-select, optional. V8's `my-state` is no longer offered. */
+export const REGION_OPTIONS: readonly TileOption[] = [
+  { id: 'north-indian', label: 'North Indian', icon: 'regionNorth' },
+  { id: 'south-indian', label: 'South Indian', icon: 'regionSouth' },
+];
+
+export const MEAL_QUESTION = 'How do you get your daily meals sorted?';
+
+export type MealSetupId = 'self-cooking' | 'regular-cook' | 'order-in' | 'tiffin' | 'office-meals';
+
+export interface ListOption {
+  readonly id: string;
+  readonly label: string;
+  readonly hint?: string;
+  readonly icon: FoodProfileArtKey;
+}
+
+/** `2522:960` — one grouped list, radio rows, single-select, mandatory, no default. */
+export const MEAL_OPTIONS: readonly (ListOption & { readonly id: MealSetupId })[] = [
+  { id: 'self-cooking', label: 'Self cooking', hint: 'We cook ourselves', icon: 'cookingPot' },
+  { id: 'regular-cook', label: 'Regular cook', hint: 'A cook comes home', icon: 'cookAssigned' },
+  { id: 'order-in', label: 'Order in', hint: 'Delivery apps, most days', icon: 'onTheWay' },
+  {
+    id: 'tiffin',
+    label: 'Tiffin service',
+    hint: 'Neighbourhood tiffin or meal subscription',
+    icon: 'dish',
+  },
+  {
+    id: 'office-meals',
+    label: 'Office meals',
+    hint: 'Cafeteria or canteen at work',
+    icon: 'apartment',
+  },
+];
+
+export interface HassleSet {
+  readonly question: string;
+  readonly options: readonly ListOption[];
+}
+
+/**
+ * Dev note `2505:4935`: the hassle question appears once a meal setup is picked, its title and its
+ * four checkbox rows depend on that setup, and it is optional.
+ *
+ * FIGMA_PENDING: only the Regular cook set is drawn (`2522:1173`), so its title and icons are the
+ * frame's. The other four titles follow the same "What's hardest…" pattern and reuse icons from
+ * the same set; the labels are the dev note's, verbatim.
+ */
+export const HASSLES_BY_MEAL: Readonly<Record<MealSetupId, HassleSet>> = {
+  'self-cooking': {
+    question: 'What’s hardest about cooking yourselves?',
+    options: [
+      { id: 'no-time-weekdays', label: 'No time on weekdays', icon: 'time' },
+      { id: 'too-tiring', label: 'Too tiring after work', icon: 'profile' },
+      { id: 'prep-and-cleaning', label: 'Prep & cleaning take long', icon: 'cookingPot' },
+      { id: 'groceries-and-planning', label: 'Groceries & planning', icon: 'vegetable' },
+    ],
+  },
+  'regular-cook': {
+    question: 'What’s hardest with your regular cook?',
+    options: [
+      { id: 'cook-skips-or-late', label: 'Skips days or comes late', icon: 'time' },
+      { id: 'cook-not-our-taste', label: 'Doesn’t cook to our taste', icon: 'taste' },
+      { id: 'cook-too-much-oil', label: 'Too much oil or masala', icon: 'cookingPot' },
+      { id: 'cook-needs-supervision', label: 'Needs constant supervision', icon: 'profile' },
+    ],
+  },
+  'order-in': {
+    question: 'What’s hardest about ordering in?',
+    options: [
+      { id: 'order-costs', label: 'Costs add up', icon: 'dish' },
+      { id: 'order-unhealthy', label: 'Too oily or unhealthy', icon: 'vegetable' },
+      { id: 'order-not-homely', label: 'Doesn’t taste like home', icon: 'taste' },
+      { id: 'order-late-delivery', label: 'Late or inconsistent delivery', icon: 'onTheWay' },
+    ],
+  },
+  tiffin: {
+    question: 'What’s hardest with your tiffin?',
+    options: [
+      { id: 'tiffin-repetitive', label: 'Bland or repetitive', icon: 'taste' },
+      { id: 'tiffin-too-little', label: 'Too little quantity or variety', icon: 'dish' },
+      { id: 'tiffin-hard-to-change', label: 'Hard to pause, skip or change', icon: 'profile' },
+      { id: 'tiffin-timings', label: 'Timings don’t suit me', icon: 'time' },
+    ],
+  },
+  'office-meals': {
+    question: 'What’s hardest about office meals?',
+    options: [
+      { id: 'office-same-options', label: 'Same few options every day', icon: 'dish' },
+      { id: 'office-too-heavy', label: 'Too heavy or oily', icon: 'cookingPot' },
+      { id: 'office-not-homely', label: 'Doesn’t feel like home food', icon: 'taste' },
+      { id: 'office-weekends', label: 'Nothing good on weekends', icon: 'apartment' },
+    ],
+  },
+};
+
+export function isMealSetup(id: string | null): id is MealSetupId {
+  return id !== null && id in HASSLES_BY_MEAL;
+}
+
+/** Dev note `2505:4936`: max 150, live counter, trimmed before saving. */
+export const HASSLE_NOTE_MAX_LENGTH = 150;
+export const HASSLE_NOTE_PLACEHOLDER = 'Something else? Tell us';
+
+/* ----------------------------------------------------------------------------------- summary */
+
+/**
+ * Display labels for the Account hub's food summary, including the V8 ids an older answer may
+ * still hold, so a saved profile never reads as blank there.
+ */
+const LEGACY_LABELS: Readonly<Record<string, string>> = {
+  'non-vegetarian': 'Non-veg',
+  'my-state': 'My state',
+};
+
+export function dietLabel(id: string | null): string | null {
+  if (id === null) return null;
+  return DIET_OPTIONS.find((option) => option.id === id)?.label ?? LEGACY_LABELS[id] ?? null;
+}
+
+export function regionLabel(id: string | null): string | null {
+  if (id === null) return null;
+  return REGION_OPTIONS.find((option) => option.id === id)?.label ?? LEGACY_LABELS[id] ?? null;
 }

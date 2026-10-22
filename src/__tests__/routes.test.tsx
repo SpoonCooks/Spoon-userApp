@@ -107,14 +107,14 @@ describe('routes render', () => {
 
   it.each([
     ['home', HomeRoute, 'home-redesign-screen'],
-    ['scheduled', ScheduledRoute, 'schedule-screen'],
+    ['scheduled', ScheduledRoute, 'schedule-later'],
     ['reschedule/[id]', RescheduleRoute, 'schedule-screen'],
     ['meal-brief', MealBriefRoute, 'meal-brief-screen'],
     ['booking/[id]', BookingRoute, 'booking-detail-screen'],
     ['profile', ProfileRoute, 'profile-screen'],
     // `338:4508`, V8. Mounted in the EDIT context; the first-run context is covered end to end in
     // `features/profile/profileOnboarding.test.tsx`.
-    ['profile/details', ProfileDetailsRoute, 'profile-details-screen'],
+    ['profile/details', ProfileDetailsRoute, 'taste-profile'],
     ['history', HistoryRoute, 'history-screen'],
     ['refunds', RefundsRoute, 'refunds-screen'],
     ['address', SavedAddressesRoute, 'saved-addresses'],

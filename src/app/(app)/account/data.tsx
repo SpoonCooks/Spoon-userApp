@@ -62,8 +62,13 @@ export default function AccountDataRoute() {
         identity.dietaryPreference,
         identity.regionPreference,
         identity.genderPreference,
+        identity.householdAdults,
+        identity.oilLevel,
+        identity.gheeOnly,
       ].some((answer) => answer !== null) ||
-      (identity.grownUpEating?.length ?? 0) > 0);
+      (identity.grownUpEating?.length ?? 0) > 0 ||
+      (identity.nonVegPreferences?.length ?? 0) > 0 ||
+      (identity.mealHassles?.length ?? 0) > 0);
 
   const signOutNow = () =>
     signOut.mutate(undefined, {

@@ -59,6 +59,28 @@ describe('autopayReducer (Figma 2316:3558 … 2317:4009)', () => {
     expect(state).toEqual({ kind: 'active', app: PHONEPE, handleMasked: 'ra••••@ybl' });
   });
 
+  /*
+   * Re-approving a paused, revoked or expired mandate happens on a booking that is already
+   * `active`. The new mandate's own status decides; the first poll must not read as approved.
+   */
+  it('stays waiting on a re-approval until the new mandate itself is confirmed', () => {
+    const state = autopayReducer(waiting(), {
+      type: 'STATUS',
+      status: status({ status: 'initiated', bookingStatus: 'active' }),
+      now: T0 + 3_000,
+    });
+    expect(state.kind).toBe('waiting');
+    expect(isPolling(state)).toBe(true);
+  });
+
+  it('does not call a checkout re-approval approved while the bank is still confirming', () => {
+    const state = run([
+      { type: 'PICK', app: PHONEPE },
+      { type: 'CHECKOUT_DONE', confirmed: false, handleMasked: null },
+    ]);
+    expect(state.kind).toBe('confirming');
+  });
+
   it('tells "left without approving" from "didn’t go through"', () => {
     const left = autopayReducer(waiting(), {
       type: 'STATUS',

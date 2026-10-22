@@ -1,10 +1,17 @@
+import { useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+
 import { useApiQuery } from '@core/data';
 import type { ScreenQuery } from '@core/data';
 import { useRuntime } from '@core/runtimeContext';
 
 import { createAvailabilityApi } from './availabilityApi';
 import { availabilityKeys } from './keys';
-import type { InstantAvailabilityDto, ScheduledAvailabilityDto } from './schemas';
+import type {
+  InstantAvailabilityDto,
+  ScheduledAvailabilityDto,
+  ScheduledOverviewDto,
+} from './schemas';
 
 /**
  * Availability reads.
@@ -69,4 +76,75 @@ export function useScheduledAvailability(input: {
     enabled: addressId !== null && date !== null,
     staleTime: 15_000,
   });
+}
+
+/**
+ * How long one overview stands: the server's `validUntil` window (`BOOKING_INSTANT_CACHE_TTL_SECONDS`,
+ * 30 seconds). Also the refresh interval while a screen that shows it is open.
+ */
+export const SCHEDULED_OVERVIEW_REFRESH_MS = 30_000;
+
+export interface ScheduledOverviewQuery extends ScreenQuery<ScheduledOverviewDto> {
+  /**
+   * Re-reads past the server's 30-second cache. For the moment the customer's OWN bookings changed
+   * (a booking made, refused or cancelled): a cached answer would still offer what they just took.
+   */
+  readonly refreshFresh: () => Promise<void>;
+}
+
+/**
+ * Every duration over the three-day horizon for the address (DEC-094): Home's Later tab and the
+ * Schedule for Later screen share this one read and its cache, so the picker opens on what Home
+ * already holds.
+ *
+ * `poll` re-reads every 30 seconds while it holds; the caller sets it only while the screen that
+ * shows it is focused (Home on its Later tab, the picker). TanStack pauses it in the background on
+ * its own (`useAppStateFocus`). A refresh keeps the previous answer on screen until the new one
+ * lands, so nothing flickers grey.
+ */
+export function useScheduledOverview(input: {
+  addressId: string | null;
+  poll?: boolean;
+}): ScheduledOverviewQuery {
+  const { api } = useRuntime();
+  const queryClient = useQueryClient();
+  const availability = createAvailabilityApi(api);
+  const { addressId } = input;
+  const key = availabilityKeys.scheduledOverview({ addressId: addressId ?? 'none' });
+
+  const query = useApiQuery<ScheduledOverviewDto>({
+    queryKey: key,
+    queryFn: ({ signal }) => availability.scheduledOverview({ addressId: addressId ?? '' }, signal),
+    enabled: addressId !== null,
+    staleTime: SCHEDULED_OVERVIEW_REFRESH_MS,
+    refetchInterval: input.poll === true ? SCHEDULED_OVERVIEW_REFRESH_MS : false,
+  });
+
+  const refreshFresh = useCallback(async () => {
+    if (addressId === null) return;
+    const fresh = await createAvailabilityApi(api).scheduledOverview({ addressId, fresh: true });
+    queryClient.setQueryData(availabilityKeys.scheduledOverview({ addressId }), fresh);
+  }, [api, addressId, queryClient]);
+
+  return useMemo(() => ({ ...query, refreshFresh }), [query, refreshFresh]);
+}
+
+/**
+ * Logs the day and length the customer looked at in the picker as one demand search (DEC-094).
+ * Fire and forget: a failed log never touches the screen.
+ */
+export function useRecordScheduledSearch(): (input: {
+  addressId: string;
+  date: string;
+  durationMinutes: number;
+}) => void {
+  const { api } = useRuntime();
+  return useCallback(
+    (input) => {
+      createAvailabilityApi(api)
+        .recordScheduledSearch(input)
+        .catch(() => undefined);
+    },
+    [api],
+  );
 }
