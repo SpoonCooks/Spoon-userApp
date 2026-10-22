@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ART } from '../assets';
 import { C, F } from '../theme';
@@ -9,6 +9,11 @@ export interface HomeHeaderProps {
   readonly addressDetail?: string | null;
   readonly onPressAddress?: () => void;
   readonly onPressProfile?: () => void;
+  /**
+   * 0 → 1 as the pinned header fills on scroll. The profile disc turns white with it: its own
+   * `#FFEF99` all but vanishes into the filled header's yellow (owner, 2026-10-14).
+   */
+  readonly filled?: Animated.AnimatedInterpolation<number>;
 }
 
 /**
@@ -22,6 +27,7 @@ export function HomeHeader({
   addressDetail = null,
   onPressAddress,
   onPressProfile,
+  filled,
 }: HomeHeaderProps) {
   return (
     <View style={styles.row}>
@@ -54,6 +60,9 @@ export function HomeHeader({
         onPress={onPressProfile}
         style={styles.profile}
       >
+        {filled === undefined ? null : (
+          <Animated.View style={[styles.profileWhite, { opacity: filled }]} pointerEvents="none" />
+        )}
         <Image source={ART.profile} style={styles.profileGlyph} />
       </Pressable>
     </View>
@@ -87,6 +96,15 @@ const styles = StyleSheet.create({
     backgroundColor: C.soft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  profileWhite: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 22,
+    backgroundColor: C.base,
   },
   profileGlyph: { width: 32, height: 32 },
 });

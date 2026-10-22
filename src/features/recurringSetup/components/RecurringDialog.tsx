@@ -7,6 +7,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 import { innerShadows } from '@ui/tokens/primitives';
 
 import { selectedDayLabel } from '../data';
+import { BlurredScrim } from '@ui/v2/Backdrop';
 
 /**
  * The recurring flow's confirm dialog — Figma `586:4373` (delete date), `542:1592` (delete visit),
@@ -50,6 +51,7 @@ export function RecurringDialog({ visible, ...card }: RecurringDialogProps) {
   return (
     <Modal transparent animationType="none" statusBarTranslucent onRequestClose={card.onKeep}>
       <View style={styles.scrim} accessibilityViewIsModal testID={`${card.testID}-modal`}>
+        <BlurredScrim dim={0.4} />
         <Pressable
           style={StyleSheet.absoluteFill}
           accessibilityRole="button"
@@ -241,7 +243,7 @@ const COLUMNS = 7;
 
 const styles = StyleSheet.create({
   /** `586:4372` / `542:1591` — the Scrim: black at 40 %. */
-  scrim: { flex: 1, backgroundColor: lightTheme.colors.surfaceScrim },
+  scrim: { flex: 1 },
   /** `586:4373` — the card sits 24 in from the screen's edges, centred. */
   center: { flex: 1, justifyContent: 'center', paddingHorizontal: lightTheme.space.xl },
   /** `586:4373` — p 24, 16 between rows, a 24pt radius, `Elevation/3`. */

@@ -13,7 +13,6 @@ import { FillImage } from '../components/FillImage';
 import { CALENDAR_THREAD, CALENDAR_TOUCH_GLYPH } from '../components/calendar/assets';
 import { DAY_POPUP_WIDTH, DayVisitsPopup } from '../components/calendar/DayVisitsPopup';
 import { ProgressThread } from '../components/calendar/ProgressThread';
-import { UpNextBanner } from '../components/calendar/UpNextBanner';
 import {
   VisitsCalendar,
   VisitsCalendarHeader,
@@ -58,9 +57,7 @@ export interface RecurringLiveScreenProps {
   readonly onTabChange?: ((tab: RecurringTab) => void) | undefined;
   /** A visit row in the pop-up — Visit details, or the live booking page for today's. */
   readonly onOpenVisit?: ((visit: VisitRef) => void) | undefined;
-  /** The Up-next banner — the existing live booking page. */
-  readonly onOpenUpNext?: (() => void) | undefined;
-  /** Above the Up-next banner: e.g. the Autopay notice while visits can't be charged. */
+  /** Above the progress line: e.g. the Autopay notice while visits can't be charged. */
   readonly notice?: ReactNode;
   /** Opens with this date's pop-up showing, e.g. `CALENDAR_DEMO_DATES.past`. */
   readonly initialSelectedDate?: string;
@@ -80,7 +77,6 @@ export function RecurringLiveScreen({
   onBack,
   onTabChange,
   onOpenVisit,
-  onOpenUpNext,
   notice,
   initialSelectedDate,
   testID = 'recurring-live-screen',
@@ -187,17 +183,8 @@ export function RecurringLiveScreen({
 
         {notice}
 
-        {fixture.upNext === null ? null : (
-          <UpNextBanner
-            label={fixture.upNext.label}
-            title={fixture.upNext.title}
-            meta={fixture.upNext.meta}
-            photo={fixture.upNext.photo}
-            onPress={onOpenUpNext}
-            testID={`${testID}-up-next`}
-          />
-        )}
-
+        {/* No Up-next card: `1746:3304` goes from the tabs straight to the progress line (owner,
+            2026-10-17). The Autopay notice above it stays. */}
         <ProgressThread
           label={fixture.progressLabel}
           fraction={fixture.progressFraction}

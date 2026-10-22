@@ -5,6 +5,7 @@ import { lightTheme } from '@ui/theme/ThemeProvider';
 import { innerShadows } from '@ui/tokens/primitives';
 
 import { COOK_ICON } from '../art';
+import { BlurredScrim } from '@ui/v2/Backdrop';
 
 /**
  * Remove a cook from the pool — Figma `848:7494`.
@@ -59,6 +60,7 @@ export function RemoveCookDialog({
       testID={`${testID}-modal`}
     >
       <View style={styles.scrim} accessibilityViewIsModal>
+        <BlurredScrim dim={0.4} />
         <Pressable
           style={StyleSheet.absoluteFill}
           accessibilityRole="button"
@@ -117,7 +119,7 @@ const CARD_TOP = 287;
 
 const styles = StyleSheet.create({
   /** `848:7551` — black at 40 % over the whole screen. */
-  scrim: { flex: 1, backgroundColor: lightTheme.colors.surfaceScrim },
+  scrim: { flex: 1 },
   /** 24 in from each side (354 of 402), the card's top at 287. */
   place: { flex: 1, paddingTop: CARD_TOP, paddingHorizontal: lightTheme.space.xl },
   card: {

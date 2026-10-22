@@ -153,6 +153,9 @@ export function useUpdateAddress() {
   });
 }
 
+/** Every switch shares this key, so a settling switch can tell whether a newer tap is still saving. */
+const SET_DEFAULT_KEY = [...addressKeys.all(), 'set-default'] as const;
+
 /**
  * Make one saved address the account default — the address every booking then uses.
  *
@@ -186,7 +189,34 @@ export function useSetDefaultAddress() {
   const queryClient = useQueryClient();
   const addresses = createAddressApi(api);
 
-  return useMutation<AddressWriteResponse, Error, string>({
+  return useMutation<
+    AddressWriteResponse,
+    Error,
+    string,
+    { readonly previous: readonly AddressDto[] | undefined }
+  >({
+    /*
+     * The tag moves on the tap, not after the save and the refetch behind it: on staging those two
+     * round trips took seconds (owner, 2026-10-14). The cached list is marked first and put back
+     * if the server refuses, so a refused switch still lands on the address that was in use.
+     *
+     * Quick taps between addresses each move the tag at once. Their saves queue in tap order (one
+     * `scope`), so the server keeps the LAST tap, and only the last switch to settle refetches or
+     * rolls back: an earlier one doing so would drag the tag back to an address already left.
+     */
+    mutationKey: SET_DEFAULT_KEY,
+    scope: { id: 'address-set-default' },
+    async onMutate(addressId) {
+      await queryClient.cancelQueries({ queryKey: addressKeys.list() });
+      const previous = queryClient.getQueryData<readonly AddressDto[]>(addressKeys.list());
+      if (previous !== undefined) {
+        queryClient.setQueryData<readonly AddressDto[]>(
+          addressKeys.list(),
+          previous.map((address) => ({ ...address, isDefault: address.id === addressId })),
+        );
+      }
+      return { previous };
+    },
     mutationFn: (addressId) => {
       const list = queryClient.getQueryData<readonly AddressDto[]>(addressKeys.list());
       const saved = list?.find((address) => address.id === addressId);
@@ -201,7 +231,15 @@ export function useSetDefaultAddress() {
       }
       return addresses.update(addressId, { ...addressWriteInputFrom(saved), isDefault: true });
     },
-    onSuccess() {
+    // A switch is still pending in its own callbacks, so 1 means no newer tap is waiting.
+    onError(_error, _addressId, context) {
+      if (queryClient.isMutating({ mutationKey: SET_DEFAULT_KEY }) > 1) return;
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(addressKeys.list(), context.previous);
+      }
+    },
+    onSettled() {
+      if (queryClient.isMutating({ mutationKey: SET_DEFAULT_KEY }) > 1) return;
       void queryClient.invalidateQueries({ queryKey: addressKeys.all() });
     },
   });

@@ -42,6 +42,10 @@ export interface RecurringDurationOption {
   readonly price: string;
   /** e.g. "₹450" — the struck original. Absent when the catalogue price is not discounted. */
   readonly strikePrice?: string | undefined;
+  /** The same price in paise, for the shared duration carousel (Home's). */
+  readonly pricePaise: number;
+  /** The struck original in paise, or null when the price is not discounted. */
+  readonly mrpPaise: number | null;
 }
 
 export type RecurringTimeOfDay = 'morning' | 'afternoon' | 'evening';

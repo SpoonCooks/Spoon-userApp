@@ -461,6 +461,30 @@ export const bookingCancellationSchema = z.object({
 });
 export type BookingCancellationDto = z.infer<typeof bookingCancellationSchema>;
 
+/**
+ * `GET …/plans/:planNumber/cancellation-quote` (DEC-092): what deleting a Plan would do. Only days
+ * not charged yet are cancelled; charged, started or done days stay.
+ */
+export const planCancellationQuoteSchema = z.object({
+  recurringBookingId: z.string(),
+  planNumber: z.number().int().positive(),
+  cancellable: z.boolean(),
+  cancelDates: z.array(localDate),
+  keptDates: z.array(localDate),
+  visitsCancelled: count,
+});
+export type PlanCancellationQuoteDto = z.infer<typeof planCancellationQuoteSchema>;
+
+/** `POST …/plans/:planNumber/cancel`. */
+export const planCancellationSchema = z.object({
+  booking: recurringBookingSchema,
+  planNumber: z.number().int().positive(),
+  visitsCancelled: count,
+  cancelDates: z.array(localDate),
+  keptDates: z.array(localDate),
+});
+export type PlanCancellationDto = z.infer<typeof planCancellationSchema>;
+
 /** `GET/PUT /v1/bookings/:bookingId/prep`. */
 export const bookingPrepSchema = z.object({
   bookingId: z.string(),
@@ -470,3 +494,25 @@ export const bookingPrepSchema = z.object({
   updatedAt: instant,
 });
 export type BookingPrepDto = z.infer<typeof bookingPrepSchema>;
+
+/** Whether one visit's duration can still change, and today's price for each (DEC-093). */
+export const visitDurationOptionsSchema = z.object({
+  recurringBookingId: z.string(),
+  visitId: z.string(),
+  serviceDate: localDate,
+  durationMinutes: z.number().int().positive(),
+  /** False from the day's pre-debit notice at T−27h, or once the day has a debit. */
+  editable: z.boolean(),
+  editableUntil: instant,
+  refusal: z.enum(['BOOKING_NOT_LIVE', 'EDIT_WINDOW_CLOSED']).nullable(),
+  options: z.array(
+    z.object({
+      durationMinutes: z.number().int().positive(),
+      basePricePaise: paise,
+      pricePaise: paise,
+      gstPaise: paise,
+      totalPaise: paise,
+    }),
+  ),
+});
+export type VisitDurationOptionsDto = z.infer<typeof visitDurationOptionsSchema>;

@@ -157,9 +157,13 @@ jest.mock('react-native-maps', () => {
    */
   const animateToRegion = jest.fn();
   const animateCamera = jest.fn();
+  /** A north-up camera, so the address map's compass stays hidden unless a test turns it. */
+  const getCamera = jest.fn(() =>
+    Promise.resolve({ center: { latitude: 0, longitude: 0 }, heading: 0, pitch: 0, zoom: 17 }),
+  );
 
   function MapViewMock(props: Record<string, unknown>, ref: ReactTypes.Ref<unknown>) {
-    React.useImperativeHandle(ref, () => ({ animateToRegion, animateCamera }), []);
+    React.useImperativeHandle(ref, () => ({ animateToRegion, animateCamera, getCamera }), []);
     return React.createElement(ReactNative.View, props, props['children'] as ReactTypes.ReactNode);
   }
   const MapView = React.forwardRef(MapViewMock);
@@ -171,6 +175,8 @@ jest.mock('react-native-maps', () => {
     PROVIDER_GOOGLE: 'google',
     /** Exposed for tests that need to prove the camera moved (or did not). */
     __animateToRegion: animateToRegion,
+    __animateCamera: animateCamera,
+    __getCamera: getCamera,
   };
 });
 

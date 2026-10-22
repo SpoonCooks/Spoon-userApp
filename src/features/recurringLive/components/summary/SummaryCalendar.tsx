@@ -53,7 +53,9 @@ export function SummaryCalendar({
         </Pressable>
       )}
 
-      <View style={styles.calendar}>
+      {/* Exactly as tall as its rows: a fixed 255pt box let a sixth row spill over the photo
+          tiles and left empty space under a short plan (owner, 2026-10-17). */}
+      <View style={[styles.calendar, { height: CELL_HEIGHT + calendar.rows.length * ROW_PITCH }]}>
         <View style={styles.grid}>
           <View style={styles.row}>
             {calendar.weekdays.map((weekday) => (
@@ -109,6 +111,7 @@ export function SummaryCalendar({
 const CELL_HEIGHT = 40;
 /** `1047:6011` / `1047:6054` — date rows and month rows both repeat every 44pt. */
 const ROW_GAP = 4;
+const ROW_PITCH = CELL_HEIGHT + ROW_GAP;
 
 const styles = StyleSheet.create({
   section: { gap: lightTheme.space.sm, backgroundColor: lightTheme.colors.surface },
@@ -126,7 +129,7 @@ const styles = StyleSheet.create({
   editClip: { width: 24, height: 24, overflow: 'hidden', borderRadius: lightTheme.radius.pill },
   editGlyph: { position: 'absolute', top: -1, left: 0, width: 24, height: 24 },
   /** `1067:2179` — 370 × 255 at the design width; it takes the column's width elsewhere. */
-  calendar: { width: '100%', height: 255 },
+  calendar: { width: '100%' },
   /** The 7-column grid stops 41.88pt short of the right edge (`1047:6011`). */
   grid: { position: 'absolute', top: 0, left: 0, right: 41.88 },
   dates: { gap: ROW_GAP },

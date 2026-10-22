@@ -90,7 +90,12 @@ export function TimeTab({
       style={[styles.tab, selected ? styles.tabSelected : null, disabled ? styles.dim : null]}
       testID={testID}
     >
-      <Image source={TIME_OF_DAY_TAB_ICONS[id]} style={styles.tabIcon} />
+      {/* Full colour on the tab in use, half on the others (`340:7539`). The Morning and Evening
+          exports had the half baked in, so they stayed faded when chosen (owner, 2026-10-16). */}
+      <Image
+        source={TIME_OF_DAY_TAB_ICONS[id]}
+        style={[styles.tabIcon, selected ? null : styles.tabIconIdle]}
+      />
       <Text
         variant={selected ? 'bodyLargeStrong' : 'bodyLarge'}
         color={selected ? 'textPrimary' : 'textSubdued'}
@@ -163,6 +168,7 @@ const styles = StyleSheet.create({
     marginBottom: -1,
   },
   tabIcon: { width: 18, height: 18 },
+  tabIconIdle: { opacity: 0.5 },
   dim: { opacity: 0.4 },
   slot: {
     height: 44,

@@ -6,7 +6,7 @@
  */
 export { HomeRedesignView } from './screens/HomeRedesignScreen';
 /** Home's duration carousel, shared with Schedule for Later (`2466:19028`). */
-export { DurationCarousel } from './components/DurationCarousel';
+export { DurationCarousel } from '@ui/v2/DurationCarousel';
 export type {
   BookingRequest,
   HomeRedesignActions,

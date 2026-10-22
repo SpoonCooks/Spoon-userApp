@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 import { resetConfigCache } from '@core/config';
 
-import { googleReverseGeocode, placeDetails, placesAutocomplete } from './googlePlaces';
+import { googleReverseGeocode, namesFirst, placeDetails, placesAutocomplete } from './googlePlaces';
 
 /**
  * Places (New) and Geocoding, at the boundary.
@@ -220,5 +220,28 @@ describe('googleReverseGeocode', () => {
       ok: false,
       reason: 'rejected',
     });
+  });
+});
+
+/** Google's answer for "Shubha" at the pin in HSR Layout, read on 2026-10-14. */
+describe('namesFirst', () => {
+  const s = (primary: string) => ({ primary });
+
+  it('puts the places named what was typed ahead of spell-corrected guesses', () => {
+    expect(
+      namesFirst(
+        [s('Subhash Nagar'), s('Shubha sagari'), s('Subhash Chowk'), s('Shubha labha Apartment')],
+        'Shubha',
+      ).map((x) => x.primary),
+    ).toEqual(['Shubha sagari', 'Shubha labha Apartment', 'Subhash Nagar', 'Subhash Chowk']);
+  });
+
+  it('matches a later word of the name, and keeps Google order otherwise', () => {
+    expect(
+      namesFirst([s('Indiranagar Club'), s('5th Block Koramangala')], 'koramangala').map(
+        (x) => x.primary,
+      ),
+    ).toEqual(['5th Block Koramangala', 'Indiranagar Club']);
+    expect(namesFirst([s('A'), s('B')], 'zz').map((x) => x.primary)).toEqual(['A', 'B']);
   });
 });

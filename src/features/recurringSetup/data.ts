@@ -128,16 +128,20 @@ export function durationLabel(durationId: string | null): string {
  * `GET /v1/catalogue` (see `planning.tsx`).
  */
 export const DURATION_OPTIONS: readonly RecurringDurationOption[] = [
-  { minutes: 30, price: '₹69', strikePrice: '₹150' },
-  { minutes: 45, price: '₹99', strikePrice: '₹225' },
-  { minutes: 60, price: '₹129', strikePrice: '₹300' },
-  { minutes: 90, price: '₹189', strikePrice: '₹450' },
-  { minutes: 120, price: '₹259', strikePrice: '₹600' },
-  { minutes: 150, price: '₹319', strikePrice: '₹750' },
-].map((option) => ({
-  ...option,
-  id: durationIdFor(option.minutes),
-  label: durationLabelForMinutes(option.minutes),
+  { minutes: 30, rupees: 69, mrp: 150 },
+  { minutes: 45, rupees: 99, mrp: 225 },
+  { minutes: 60, rupees: 129, mrp: 300 },
+  { minutes: 90, rupees: 189, mrp: 450 },
+  { minutes: 120, rupees: 259, mrp: 600 },
+  { minutes: 150, rupees: 319, mrp: 750 },
+].map(({ minutes, rupees, mrp }) => ({
+  minutes,
+  price: `₹${String(rupees)}`,
+  strikePrice: `₹${String(mrp)}`,
+  pricePaise: rupees * 100,
+  mrpPaise: mrp * 100,
+  id: durationIdFor(minutes),
+  label: durationLabelForMinutes(minutes),
 }));
 
 /**

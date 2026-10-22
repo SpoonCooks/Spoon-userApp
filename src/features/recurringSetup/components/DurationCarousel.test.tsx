@@ -1,17 +1,14 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { DURATION_OPTIONS } from '../data';
-import { DurationCarousel, durationCardLabel, durationLevelShare } from './DurationCarousel';
+import { DurationCarousel, durationCardLabel } from './DurationCarousel';
 import type { DurationCarouselOption } from './DurationCarousel';
 
 /**
- * The duration carousel (`1221:4505`): the card the strip rests on is the choice; a tap on a card
- * chooses it; the level rises with the duration; disabled cards cannot be chosen.
+ * Recurring's duration strip is Home's carousel (`@ui/v2/DurationCarousel`): a swipe only moves the
+ * focus, a TAP chooses, and a disabled duration cannot be chosen (owner, 2026-10-16).
  */
-
-/** One card to the next, between the idle ones (`1217:6619`: 100 wide + 12). */
-const PITCH = 112;
 
 function Harness({
   options = DURATION_OPTIONS,
@@ -35,15 +32,8 @@ function Harness({
   );
 }
 
-/** The dots are hidden from assistive tech, so they are looked up past that. */
-const HIDDEN = { includeHiddenElements: true };
-const dot = (index: number) =>
-  screen.getByTestId(`recurring-duration-carousel-dot-${index}`, HIDDEN);
-
-const settleAt = (index: number) =>
-  fireEvent(screen.getByTestId('recurring-duration-carousel-track'), 'momentumScrollEnd', {
-    nativeEvent: { contentOffset: { x: index * PITCH, y: 0 } },
-  });
+/** A duration's tile, the copy of the looping strip a screen reader hears. */
+const tile = (spoken: string) => screen.getByRole('radio', { name: new RegExp(`^${spoken}, ₹`) });
 
 describe('durationCardLabel', () => {
   it('writes the carousel wording: mins under an hour, hr for one, hrs above', () => {
@@ -51,138 +41,49 @@ describe('durationCardLabel', () => {
     expect(durationCardLabel(60)).toBe('1 hr');
     expect(durationCardLabel(90)).toBe('1.5 hrs');
     expect(durationCardLabel(120)).toBe('2 hrs');
-    expect(durationCardLabel(150)).toBe('2.5 hrs');
   });
 });
 
-describe('durationLevelShare', () => {
-  it('rises with the duration: minutes / 180 of the card', () => {
-    // `1219:4396` — 22, 33, 53, 65, 87 and 108 of a 130 card (the 1 hr one is 53 of 160).
-    expect(durationLevelShare(30) * 130).toBeCloseTo(21.7, 0);
-    expect(durationLevelShare(45) * 130).toBeCloseTo(32.5, 0);
-    expect(durationLevelShare(60) * 160).toBeCloseTo(53.3, 0);
-    expect(durationLevelShare(90) * 130).toBeCloseTo(65, 0);
-    expect(durationLevelShare(120) * 130).toBeCloseTo(86.7, 0);
-    expect(durationLevelShare(150) * 130).toBeCloseTo(108.3, 0);
-  });
-
-  it('never overflows the card', () => {
-    expect(durationLevelShare(600)).toBe(1);
-    expect(durationLevelShare(0)).toBe(0);
-  });
-});
-
-describe('DurationCarousel', () => {
-  it('draws a card per option with its price and the struck original', () => {
+describe('Recurring duration carousel', () => {
+  it('draws each duration with its price and the struck original, as on Home', () => {
     render(<Harness />);
-
-    for (const option of DURATION_OPTIONS) {
-      expect(screen.getByTestId(`recurring-duration-carousel-option-${option.id}`)).toBeTruthy();
-    }
-    expect(screen.getByText('1 hr')).toBeTruthy();
-    expect(screen.getByText('₹129')).toBeTruthy();
-    expect(screen.getByText('₹300')).toBeTruthy();
-    expect(screen.getByLabelText('1.5 hrs, ₹189, was ₹450')).toBeTruthy();
+    expect(screen.getAllByText('1.5 hrs').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('₹189').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('₹450').length).toBeGreaterThan(0);
   });
 
-  it('rests on the middle card while nothing is chosen, and has not chosen it', () => {
+  it('chooses nothing until a tile is tapped', () => {
     const onSelect = jest.fn();
     render(<Harness onSelect={onSelect} />);
-
-    // 6 options: the 3rd (1 hr) is the middle one, as the frames draw it.
-    expect(dot(2).props.style.width).toBe(12);
-    expect(dot(1).props.style.width).toBe(4);
     expect(onSelect).not.toHaveBeenCalled();
+    expect(tile('1 hour').props.accessibilityState?.checked).toBe(false);
   });
 
-  it('chooses the card it comes to rest on', () => {
+  it('chooses a tapped tile and marks it selected (the lime liquid and tick)', () => {
     const onSelect = jest.fn();
     render(<Harness onSelect={onSelect} />);
-
-    settleAt(3);
-
-    expect(onSelect).toHaveBeenCalledTimes(1);
+    fireEvent.press(tile('1.5 hours'));
     expect(onSelect).toHaveBeenCalledWith('d90');
+    expect(tile('1.5 hours').props.accessibilityState?.checked).toBe(true);
   });
 
-  it('chooses the middle card when a tap confirms it', () => {
+  it('does not choose on a swipe coming to rest', () => {
     const onSelect = jest.fn();
     render(<Harness onSelect={onSelect} />);
-
-    fireEvent.press(screen.getByTestId('recurring-duration-carousel-option-d60'));
-
-    expect(onSelect).toHaveBeenCalledWith('d60');
-  });
-
-  it('chooses a tapped neighbour', () => {
-    const onSelect = jest.fn();
-    render(<Harness onSelect={onSelect} />);
-
-    fireEvent.press(screen.getByTestId('recurring-duration-carousel-option-d45'));
-
-    expect(onSelect).toHaveBeenCalledWith('d45');
-  });
-
-  it('reports a card once: a tap and the rest that follows it are one choice', () => {
-    const onSelect = jest.fn();
-    render(<Harness onSelect={onSelect} />);
-
-    fireEvent.press(screen.getByTestId('recurring-duration-carousel-option-d90'));
-    settleAt(3);
-
-    expect(onSelect).toHaveBeenCalledTimes(1);
-  });
-
-  it('marks the chosen card selected for assistive tech', () => {
-    render(<Harness initial="d120" />);
-
-    expect(
-      screen.getByTestId('recurring-duration-carousel-option-d120').props.accessibilityState,
-    ).toMatchObject({ selected: true });
-    expect(
-      screen.getByTestId('recurring-duration-carousel-option-d60').props.accessibilityState,
-    ).toMatchObject({ selected: false });
-  });
-
-  it('follows a choice made from outside', () => {
-    const { rerender } = render(
-      <DurationCarousel options={DURATION_OPTIONS} selectedId="d30" onSelect={jest.fn()} />,
-    );
-
-    rerender(
-      <DurationCarousel options={DURATION_OPTIONS} selectedId="d150" onSelect={jest.fn()} />,
-    );
-
-    expect(
-      screen.getByTestId('recurring-duration-carousel-option-d150').props.accessibilityState,
-    ).toMatchObject({ selected: true });
-  });
-
-  it('cannot choose a disabled card, by tap or by rest', () => {
-    const onSelect = jest.fn();
-    const options = DURATION_OPTIONS.map((option) => ({
-      ...option,
-      disabled: option.id === 'd90',
-    }));
-    render(<Harness options={options} initial="d60" onSelect={onSelect} />);
-
-    fireEvent.press(screen.getByTestId('recurring-duration-carousel-option-d90'));
-    act(() => settleAt(3));
-
+    fireEvent(screen.getByLabelText('Duration'), 'momentumScrollEnd', {
+      nativeEvent: { contentOffset: { x: 112 * 8, y: 0 } },
+    });
     expect(onSelect).not.toHaveBeenCalled();
-    expect(
-      screen.getByTestId('recurring-duration-carousel-option-d90').props.accessibilityState,
-    ).toMatchObject({ disabled: true });
   });
 
-  it('counts the options in its dots', () => {
-    render(<Harness />);
-
-    for (let index = 0; index < DURATION_OPTIONS.length; index += 1) {
-      expect(dot(index)).toBeTruthy();
-    }
-    expect(
-      screen.queryByTestId(`recurring-duration-carousel-dot-${DURATION_OPTIONS.length}`, HIDDEN),
-    ).toBeNull();
+  it('cannot choose a disabled duration, which reads Unavailable', () => {
+    const onSelect = jest.fn();
+    const options = DURATION_OPTIONS.map((option) =>
+      option.minutes === 120 ? { ...option, disabled: true } : option,
+    );
+    render(<Harness options={options} onSelect={onSelect} />);
+    fireEvent.press(tile('2 hours'));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
   });
 });

@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 
-import { getCurrentCoordinates, reverseGeocode } from './deviceLocation';
+import { androidAddressTitle, getCurrentCoordinates, reverseGeocode } from './deviceLocation';
 
 /**
  * Device location.
@@ -173,5 +173,63 @@ describe('reverseGeocode', () => {
   it('returns null rather than throwing when the geocoder itself fails', async () => {
     mocked.reverseGeocodeAsync.mockRejectedValue(new Error('offline'));
     await expect(reverseGeocode(POINT)).resolves.toBeNull();
+  });
+});
+
+/** Real Android geocoder answers, read off a Galaxy S21 in HSR Layout on 2026-10-14. */
+describe('androidAddressTitle', () => {
+  const place = { city: 'Bengaluru', region: 'Karnataka', country: 'India', postalCode: '560102' };
+
+  it('names the place and its street, dropping the Plus Code', () => {
+    expect(
+      androidAddressTitle({
+        ...place,
+        formattedAddress:
+          'WM22+96W Sri Anthya Nilayam, 27th Main Rd, ITI Layout, 7th Sector, HSR Layout, Bengaluru, Karnataka 560102, India',
+      }),
+    ).toBe('Sri Anthya Nilayam, 27th Main Rd');
+  });
+
+  it('keeps a house number with its street, as iOS does', () => {
+    expect(
+      androidAddressTitle({
+        ...place,
+        formattedAddress:
+          '57, 27th Main Rd, ITI Layout, 7th Sector, HSR Layout, Bengaluru, Karnataka 560102, India',
+      }),
+    ).toBe('57, 27th Main Rd');
+    expect(
+      androidAddressTitle({
+        ...place,
+        formattedAddress:
+          'BLOCK-D, ARATT ROYAL MANOR, ITI Layout, Somasundarapalya, Bengaluru, Karnataka 560102, India',
+      }),
+    ).toBe('BLOCK-D, ARATT ROYAL MANOR');
+  });
+
+  it('says a building named twice only once', () => {
+    expect(
+      androidAddressTitle({
+        ...place,
+        formattedAddress:
+          'Aratt Royal Manor, ARATT ROYAL MANOR, apartments, Muneshwara Nagar, Bengaluru, Karnataka 560102, India',
+      }),
+    ).toBe('Aratt Royal Manor, apartments');
+  });
+
+  it('names the area when the point is only a Plus Code', () => {
+    expect(
+      androidAddressTitle({
+        ...place,
+        formattedAddress: 'WM22+C49, Somasundarapalya, Bengaluru, Karnataka 560102, India',
+      }),
+    ).toBe('Somasundarapalya');
+  });
+
+  it('gives nothing when the line names nothing before the city', () => {
+    expect(
+      androidAddressTitle({ ...place, formattedAddress: 'Bengaluru, Karnataka 560102, India' }),
+    ).toBe(null);
+    expect(androidAddressTitle({ ...place, formattedAddress: null })).toBe(null);
   });
 });

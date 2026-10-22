@@ -20,6 +20,7 @@ import { countdownLabel } from './machine';
 import type { AutopayState } from './machine';
 import { VISIBLE_UPI_APPS } from './upiApps';
 import type { UpiApp } from './upiApps';
+import { BlurredScrim } from '@ui/v2/Backdrop';
 
 /**
  * The UPI Autopay sheet over the Summary — Figma `cCQlzTeiObQkpVBzwI8mZi`, page "Recurring:
@@ -128,6 +129,7 @@ export function AutopaySheet(props: AutopaySheetProps) {
       testID={`${testID}-modal`}
     >
       <View style={styles.root} accessibilityViewIsModal>
+        <BlurredScrim dim={0.4} />
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={dismiss}
@@ -547,7 +549,7 @@ function DetailRow({ label, value }: { readonly label: string; readonly value: s
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: lightTheme.colors.scrimRecurringSheet },
+  root: { flex: 1 },
   /** `2316:3575` — r24 top corners, pt 8 / px 16, `Elevation/2`. */
   sheet: {
     marginTop: 'auto',

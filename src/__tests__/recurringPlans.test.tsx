@@ -112,13 +112,22 @@ function render(onCancel = jest.fn(), booking: Record<string, unknown> = BOOKING
           startedCount: 0,
           totals: { feePaise: 0, refundPaise: 0 },
         }),
-        'POST /v1/me/recurring-bookings/rb-1/cancel': (body) => {
+        'GET /v1/me/recurring-bookings/rb-1/plans/1/cancellation-quote': () => ({
+          recurringBookingId: 'rb-1',
+          planNumber: 1,
+          cancellable: true,
+          cancelDates: ['2026-10-14', '2026-10-21'],
+          keptDates: ['2026-10-02'],
+          visitsCancelled: 2,
+        }),
+        'POST /v1/me/recurring-bookings/rb-1/plans/1/cancel': (body) => {
           onCancel(body);
           return {
-            booking: { ...BOOKING, status: 'cancelled' },
+            booking: { ...BOOKING, status: 'completed' },
+            planNumber: 1,
             visitsCancelled: 2,
-            totals: { feePaise: 0, refundPaise: 0 },
-            whatsappUrl: null,
+            cancelDates: ['2026-10-14', '2026-10-21'],
+            keptDates: ['2026-10-02'],
           };
         },
       }),
@@ -135,7 +144,7 @@ async function openPlans() {
 describe('Recurring Manage plans route', () => {
   beforeEach(() => mockPush.mockClear());
 
-  it('shows the booking’s own plans, with no edits the backend can’t make', async () => {
+  it('shows the booking’s own plans, with only the duration pencil (DEC-093)', async () => {
     render();
     await openPlans();
 
@@ -143,9 +152,16 @@ describe('Recurring Manage plans route', () => {
     expect(screen.getByText('90 minutes')).toBeTruthy();
     expect(screen.getByText('1 past visit')).toBeTruthy();
     expect(screen.getByText('Completed · Cook Meera')).toBeTruthy();
-    // Nothing from the frames, and no pencil / add plan / add visit.
+    // Nothing from the frames, and no add plan / add visit. The pencil opens Edit duration for
+    // the visit on screen.
     expect(screen.queryByText(/Sanchita|Plan 2/)).toBeNull();
-    expect(screen.queryByTestId('recurring-plans-screen-calendar-edit')).toBeNull();
+    fireEvent.press(screen.getByTestId('recurring-plans-screen-calendar-edit'));
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/recurring/[bookingId]/duration',
+        params: expect.objectContaining({ planNumber: '1', visitNumber: '1' }),
+      }),
+    );
     expect(screen.queryByTestId('recurring-plans-screen-bar-add-plan')).toBeNull();
     expect(screen.queryByTestId('recurring-plans-screen-bar-add-visit')).toBeNull();
   });
@@ -160,22 +176,26 @@ describe('Recurring Manage plans route', () => {
     });
   });
 
-  it('cancels every visit still to come from the trash', async () => {
+  // DEC-092: the trash deletes the Plan on screen; its days not charged yet go, the paid one stays.
+  it('deletes the plan on screen from the trash, keeping the day already paid', async () => {
     const onCancel = render();
     const alert = jest.spyOn(Alert, 'alert');
     await openPlans();
 
+    // The app's own confirm (`542:1669`), not a system alert: what goes, what stays, which days.
     await waitFor(() => {
       fireEvent.press(screen.getByTestId('recurring-plans-screen-header-delete'));
-      expect(alert).toHaveBeenCalledWith(
-        'Cancel this booking?',
-        expect.stringContaining('no cancellation fee'),
-        expect.any(Array),
-      );
+      expect(screen.getByTestId('delete-plan-dialog')).toBeTruthy();
     });
-    const buttons = alert.mock.calls.find((call) => call[0] === 'Cancel this booking?')![2]!;
+    expect(screen.getByText('Delete Plan 1?')).toBeTruthy();
+    expect(
+      screen.getByText(
+        '2 days still to come will be cancelled. Nothing is charged for them. 1 day already paid for or done stays as booked.',
+      ),
+    ).toBeTruthy();
+    expect(alert).not.toHaveBeenCalledWith('Delete Plan 1?', expect.anything(), expect.anything());
     alert.mockImplementation(() => undefined);
-    buttons.find((button) => button.text === 'Cancel booking')!.onPress!();
+    fireEvent.press(screen.getByTestId('delete-plan-dialog-confirm'));
 
     fireEvent.press(await screen.findByTestId('cancel-reason-URGENT_CHANGE'));
     fireEvent.press(screen.getByTestId('cancel-continue-reason'));
@@ -183,7 +203,10 @@ describe('Recurring Manage plans route', () => {
 
     await waitFor(() => expect(onCancel).toHaveBeenCalledWith({ reasonCode: 'URGENT_CHANGE' }));
     await waitFor(() =>
-      expect(alert).toHaveBeenCalledWith('Booking cancelled', '2 visits cancelled.'),
+      expect(alert).toHaveBeenCalledWith(
+        'Plan 1 deleted',
+        '2 days cancelled, nothing charged. That was your last plan, so this Recurring booking is closed and Autopay is stopped.',
+      ),
     );
     alert.mockRestore();
   });

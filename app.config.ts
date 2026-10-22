@@ -460,6 +460,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     './plugins/withAndroidSingleFcmReceiver',
 
     /**
+     * Android only: react-native-compressor's TAndroidLame asks for allowBackup="true", which the
+     * manifest merger refuses against the app's "false". Keeps "false". See the plugin.
+     */
+    './plugins/withAndroidKeepNoBackup',
+
+    /**
      * Instant / Schedule / Recurring as OS-level shortcuts: Spotlight's buttons beside the app on
      * iOS, launcher search and the icon's long-press menu on Android. See the plugin.
      */

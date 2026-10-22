@@ -185,11 +185,8 @@ export function ServiceVisitHost({
     phase,
     reassigned,
     title:
-      link !== null
-        ? 'Recurring visit'
-        : booking.slotType === 'instant'
-          ? 'Instant visit'
-          : 'On-time visit',
+      // Figma names every one-time visit, Instant or scheduled, "On-time visit".
+      link !== null ? 'Recurring visit' : 'On-time visit',
     bannerTitle:
       start === null
         ? length

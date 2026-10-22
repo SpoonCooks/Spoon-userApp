@@ -46,13 +46,15 @@ export const LOCAL_PLANNING: RecurringPlanning = {
  * design shows it) and the struck-through base price, both from the backend's published policies.
  */
 export function durationOptionsFrom(
-  durations: readonly DurationPriceDto[],
+  durations: readonly Pick<DurationPriceDto, 'durationMinutes' | 'pricePaise' | 'basePricePaise'>[],
 ): readonly RecurringDurationOption[] {
   return durations.map((duration) => ({
     id: durationIdFor(duration.durationMinutes),
     label: durationLabelForMinutes(duration.durationMinutes),
     minutes: duration.durationMinutes,
     price: formatPaise(duration.pricePaise),
+    pricePaise: duration.pricePaise,
+    mrpPaise: duration.basePricePaise > duration.pricePaise ? duration.basePricePaise : null,
     ...(duration.basePricePaise > duration.pricePaise
       ? { strikePrice: formatPaise(duration.basePricePaise) }
       : {}),

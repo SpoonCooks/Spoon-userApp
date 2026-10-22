@@ -375,9 +375,9 @@ describe('routes render', () => {
     });
 
     expect(await screen.findByTestId('recurring-live-screen')).toBeTruthy();
-    expect(screen.getByText('1st Visit, 9:00 AM')).toBeTruthy();
-    expect(screen.getByText('1 hr • Cook Meera')).toBeTruthy();
     expect(screen.getByText('2 done · 0 cancelled · 3 to go')).toBeTruthy();
+    // No Up-next card (`1746:3304`): the progress line comes straight after the tabs.
+    expect(screen.queryByText('1st Visit, 9:00 AM')).toBeNull();
     // The fixture's Cook Sanchita / "3 done · 1 cancelled" never appear.
     expect(screen.queryByText(/Sanchita/)).toBeNull();
 

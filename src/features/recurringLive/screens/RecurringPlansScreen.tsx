@@ -25,7 +25,7 @@ import type { PlansSummaryModel } from '../data/summary';
  * a white footer (px 16 / py 12) carrying a pill "Save changes" CTA.
  *
  * `model` is the booking's plans (`plansSummaryFrom`), or the frames' own when absent; plan / visit
- * switching is local UI state over it. An editing control — the dates pencil, add plan, add visit —
+ * switching is local UI state over it. An editing control — the pencil, add plan, add visit —
  * is drawn only when its callback is given, so a real booking shows none of the edits the backend
  * cannot make yet. `edited` shows the `1017:6054` state — the 1st Visit's start time moved to
  * 10:00 AM with "Save changes" below.
@@ -34,10 +34,18 @@ export interface RecurringPlansScreenProps {
   readonly model?: PlansSummaryModel;
   readonly onBack: () => void;
   readonly onTabChange?: ((tab: RecurringTab) => void) | undefined;
+  /** The trash: deletes the Plan on screen (DEC-092). */
   readonly onDelete?: (() => void) | undefined;
+  /** The Plan on screen, by number, whenever it changes. */
+  readonly onPlanChange?: ((planNumber: number) => void) | undefined;
   /** "Save changes" — only drawn while `edited`. */
   readonly onSave?: (() => void) | undefined;
   readonly onEditDates?: (() => void) | undefined;
+  /**
+   * The pencil on a live booking (DEC-093): changes the duration of the visit on screen, one day
+   * at a time. Takes the pencil over from `onEditDates` when given.
+   */
+  readonly onEditDuration?: ((planNumber: number, visitNumber: number) => void) | undefined;
   readonly onAddPlan?: (() => void) | undefined;
   readonly onAddVisit?: (() => void) | undefined;
   readonly onHistoryPress?: ((visitId: string, rowId: string) => void) | undefined;
@@ -53,8 +61,10 @@ export function RecurringPlansScreen({
   onBack,
   onTabChange,
   onDelete,
+  onPlanChange,
   onSave,
   onEditDates,
+  onEditDuration,
   onAddPlan,
   onAddVisit,
   onHistoryPress,
@@ -96,11 +106,13 @@ export function RecurringPlansScreen({
           />
           <PlanVisitBar
             plans={model.plans}
-            activePlanId={planId}
+            // The Plan drawn: the chosen one, or the first once it drops out (deleted).
+            activePlanId={plan?.id ?? planId}
             visits={visits}
             activeVisitId={visitId}
             onPlanChange={(id) => {
               setPlanId(id);
+              onPlanChange?.(planNumberOf(id));
               const first = model.plans.find((candidate) => candidate.id === id)?.visits[0];
               if (first) setVisitId(first.id);
             }}
@@ -127,19 +139,31 @@ export function RecurringPlansScreen({
       {plan === undefined ? null : (
         <SummaryCalendar
           calendar={plan.calendar}
-          onEdit={onEditDates}
+          onEdit={
+            onEditDuration === undefined
+              ? onEditDates
+              : () =>
+                  onEditDuration(
+                    planNumberOf(plan?.id ?? planId),
+                    visitNumberOf(visit?.id ?? visitId),
+                  )
+          }
           testID={`${testID}-calendar`}
         />
       )}
       {visit === undefined ? null : (
         <>
           <BookingDetails tiles={visit.details} testID={`${testID}-details`} />
-          <VisitHistory
-            countLabel={visit.historyCount}
-            rows={visit.history}
-            onRowPress={(rowId) => onHistoryPress?.(visit.id, rowId)}
-            testID={`${testID}-history`}
-          />
+          {/* Only once there is a past visit: Figma draws the section with rows only, and on its
+              own the heading sat over empty space (owner, 2026-10-17). */}
+          {visit.history.length === 0 ? null : (
+            <VisitHistory
+              countLabel={visit.historyCount}
+              rows={visit.history}
+              onRowPress={(rowId) => onHistoryPress?.(visit.id, rowId)}
+              testID={`${testID}-history`}
+            />
+          )}
         </>
       )}
     </Screen>
@@ -163,3 +187,13 @@ const styles = StyleSheet.create({
     borderRadius: lightTheme.radius.pill,
   },
 });
+
+/** The Plan's number from its tab id (`plan-2` → 2), as `plansSummaryFrom` names them. */
+export function planNumberOf(planId: string): number {
+  return Number(planId.replace('plan-', ''));
+}
+
+/** The visit's number from its tab id (`visit-2` → 2), as `plansSummaryFrom` names them. */
+export function visitNumberOf(visitId: string): number {
+  return Number(visitId.replace('visit-', ''));
+}

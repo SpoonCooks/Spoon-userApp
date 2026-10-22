@@ -35,12 +35,6 @@ export const CALENDAR_GEOMETRY = {
   /** `1047:6213` x 323 against the dates' 328.125 right edge. */
   monthOverlap: 5.125,
   disc: 32,
-  /**
-   * `1286:6575` — the frame's grid height (it reserves a fifth row). A MINIMUM: the Live tab draws
-   * whole months across the booking's window, often two months and ten rows, and a fixed 255pt
-   * let those rows spill under the "Tap a date…" hint, which then split the calendar in two.
-   */
-  height: 255,
 } as const;
 
 /** Where a date's disc sits inside the grid, for anchoring its pop-up. */
@@ -88,7 +82,8 @@ const LEGEND: readonly {
 export function VisitsCalendarHeader({ testID = 'visits-calendar-header' }: { testID?: string }) {
   return (
     <View style={styles.header} testID={testID}>
-      <Text variant="spoonButton" color="textPrimary">
+      {/* Never shrunk: squeezed by the spaced-out legend, Android wrapped it to "Your" (S21). */}
+      <Text variant="spoonButton" color="textPrimary" numberOfLines={1} style={styles.title}>
         Your visits
       </Text>
       {LEGEND.map(({ key, label, dot }) => (
@@ -140,7 +135,13 @@ export function VisitsCalendar({
   testID = 'visits-calendar',
 }: VisitsCalendarProps) {
   return (
-    <View style={styles.grid} onLayout={onLayout} testID={testID}>
+    // Exactly as tall as its weeks: the frame's fixed 255pt left empty space under a short plan
+    // (owner, 2026-10-17).
+    <View
+      style={{ height: CALENDAR_GEOMETRY.weekdayRow + weeks.length * CALENDAR_GEOMETRY.rowPitch }}
+      onLayout={onLayout}
+      testID={testID}
+    >
       <View style={styles.row}>
         <View style={styles.dates}>
           {weekdays.map((weekday) => (
@@ -224,10 +225,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  title: { flexShrink: 0 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: lightTheme.space.xs },
   legendDot: { width: 10, height: 10 },
 
-  grid: { minHeight: CALENDAR_GEOMETRY.height },
   weeks: { gap: CALENDAR_GEOMETRY.rowPitch - CALENDAR_GEOMETRY.cell },
   row: { flexDirection: 'row' },
   dates: { flex: 1, flexDirection: 'row', gap: CALENDAR_GEOMETRY.columnGap },

@@ -1,5 +1,5 @@
 import { Keyboard } from 'react-native';
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import { AddressMapScreen } from './AddressMapScreen';
 import type { AddressMapScreenProps } from './AddressMapScreen';
@@ -8,6 +8,9 @@ import type { AddressMapScreenProps } from './AddressMapScreen';
  * The camera call the screen makes through the map's ref. Exposed by the `react-native-maps` mock
  * in `jest.setup.ts`; `clearMocks` empties it between tests.
  */
+const { __getCamera: getCamera, __animateCamera: animateCamera } = jest.requireMock(
+  'react-native-maps',
+) as { __getCamera: jest.Mock; __animateCamera: jest.Mock };
 const { __animateToRegion: animateToRegion } = jest.requireMock('react-native-maps') as {
   __animateToRegion: jest.Mock;
 };
@@ -171,13 +174,13 @@ describe('Map location (1870:2379)', () => {
     expect(screen.getByTestId('address-map-canvas').props.onPress).toBeUndefined();
   });
 
-  it('leaves pan and zoom on, and rotation and tilt off so the centre stays the pin', () => {
+  it('leaves pan, zoom and rotation on, and tilt off so the centre stays the pin', () => {
     render(<AddressMapScreen {...props()} />);
 
     const canvas = screen.getByTestId('address-map-canvas');
     expect(canvas.props.scrollEnabled).toBe(true);
     expect(canvas.props.zoomEnabled).toBe(true);
-    expect(canvas.props.rotateEnabled).toBe(false);
+    expect(canvas.props.rotateEnabled).toBe(true);
     expect(canvas.props.pitchEnabled).toBe(false);
   });
 
@@ -194,6 +197,26 @@ describe('Map location (1870:2379)', () => {
 
     expect(p.onSettle).toHaveBeenCalledTimes(1);
     expect(p.onSettle).toHaveBeenCalledWith({ latitude: 12.9611, longitude: 77.6387 });
+  });
+
+  it('shows a compass once the map is turned, and turns north back up on a tap', async () => {
+    const p = props();
+    render(<AddressMapScreen {...p} />);
+    expect(screen.queryByTestId('address-map-compass')).toBeNull();
+
+    getCamera.mockResolvedValueOnce({ center: POINT, heading: 40, pitch: 0, zoom: 17 });
+    await act(async () => {
+      settle(12.9611, 77.6387);
+    });
+    expect(screen.getByTestId('address-map-compass')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('address-map-compass'));
+    });
+    expect(animateCamera).toHaveBeenCalledWith(expect.objectContaining({ heading: 0 }), {
+      duration: 300,
+    });
+    expect(screen.queryByTestId('address-map-compass')).toBeNull();
   });
 
   it('ignores a settle that lands back on the point already selected', () => {

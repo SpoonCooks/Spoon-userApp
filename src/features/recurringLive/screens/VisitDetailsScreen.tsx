@@ -88,6 +88,11 @@ export interface VisitDetailsScreenProps {
   readonly onTipCook?: (() => void) | undefined;
   /** The header title; "Recurring visit" by default, "On-time visit" for a one-time booking. */
   readonly title?: string | undefined;
+  /**
+   * The action buttons scroll with the page instead of pinning to the bottom — a one-time visit
+   * (owner, 2026-10-14). Recurring visits keep the pinned `Action dock` (`1444:730`).
+   */
+  readonly inlineDock?: boolean | undefined;
   readonly testID?: string | undefined;
 }
 
@@ -112,6 +117,7 @@ export function VisitDetailsScreen({
   addingCookToPool = false,
   onTipCook,
   title = 'Recurring visit',
+  inlineDock = false,
   testID = 'visit-details-screen',
 }: VisitDetailsScreenProps) {
   const model = given ?? visitDemoModel(demoVariant, prepState);
@@ -128,6 +134,17 @@ export function VisitDetailsScreen({
           open();
         };
 
+  const dock = (
+    <ActionDock
+      inline={inlineDock}
+      showModify={upcoming && model.modifySheet !== null}
+      onPaymentDetails={onPaymentDetails}
+      onModifyBooking={onModifyBooking}
+      onHelp={viaWhatsApp(onHelp)}
+      testID={`${testID}-dock`}
+    />
+  );
+
   return (
     <View style={styles.root}>
       <Screen
@@ -136,15 +153,7 @@ export function VisitDetailsScreen({
         testID={testID}
         contentStyle={styles.body}
         header={<VisitHeader title={title} onBack={onBack} testID={`${testID}-header`} />}
-        footer={
-          <ActionDock
-            showModify={upcoming && model.modifySheet !== null}
-            onPaymentDetails={onPaymentDetails}
-            onModifyBooking={onModifyBooking}
-            onHelp={viaWhatsApp(onHelp)}
-            testID={`${testID}-dock`}
-          />
-        }
+        footer={inlineDock ? undefined : dock}
       >
         <VisitStatusBanner
           state={
@@ -237,6 +246,8 @@ export function VisitDetailsScreen({
             testID={`${testID}-rebook`}
           />
         )}
+
+        {inlineDock ? dock : null}
       </Screen>
       <VisitToast ref={toast} testID={`${testID}-toast`} />
     </View>

@@ -27,6 +27,9 @@ import type {
   RecurringStartTimesDto,
   VisitCancellationQuoteDto,
   VisitDetailDto,
+  PlanCancellationDto,
+  PlanCancellationQuoteDto,
+  VisitDurationOptionsDto,
 } from './schemas';
 
 /**
@@ -206,6 +209,38 @@ export function useRecurringBookingCancellationQuote(
   });
 }
 
+/** What deleting a Plan would do (DEC-092); `planNumber` null asks nothing. */
+export function useRecurringPlanCancellationQuote(
+  id: string | null,
+  planNumber: number | null,
+): ScreenQuery<PlanCancellationQuoteDto> {
+  const { api } = useRuntime();
+  const recurring = createRecurringApi(api);
+  return useApiQuery<PlanCancellationQuoteDto>({
+    queryKey: recurringKeys.planCancellationQuote(id ?? 'none', planNumber ?? 0),
+    queryFn: ({ signal }) => recurring.planCancellationQuote(id ?? '', planNumber ?? 0, signal),
+    enabled: id !== null && planNumber !== null,
+    // Re-read each time: a day can be charged between two looks at the Plan.
+    staleTime: 0,
+  });
+}
+
+/** Whether a visit's duration can still change, and the prices (DEC-093); null asks nothing. */
+export function useVisitDurationOptions(
+  id: string | null,
+  visitId: string | null,
+): ScreenQuery<VisitDurationOptionsDto> {
+  const { api } = useRuntime();
+  const recurring = createRecurringApi(api);
+  return useApiQuery<VisitDurationOptionsDto>({
+    queryKey: recurringKeys.visitDurationOptions(id ?? 'none', visitId ?? 'none'),
+    queryFn: ({ signal }) => recurring.visitDurationOptions(id ?? '', visitId ?? '', signal),
+    enabled: id !== null && visitId !== null,
+    // Re-read each time: the T−27h notice can pass between two looks.
+    staleTime: 0,
+  });
+}
+
 export function useBookingPrep(bookingId: string | null): ScreenQuery<BookingPrepDto> {
   const { api } = useRuntime();
   const recurring = createRecurringApi(api);
@@ -267,6 +302,44 @@ export function useCancelRecurringBooking() {
   >({
     mutationFn: ({ id, reason, scope }) => recurring.cancel(id, reason, scope),
     onSuccess(_result, variables) {
+      idempotency.release(variables.scope);
+      invalidate();
+    },
+  });
+}
+
+/** Deletes a Plan from a live booking (DEC-092). */
+export function useCancelRecurringPlan() {
+  const { api } = useRuntime();
+  const recurring = createRecurringApi(api);
+  const invalidate = useInvalidateRecurring();
+  return useMutation<
+    PlanCancellationDto,
+    Error,
+    { id: string; planNumber: number; reason: CancelReasonInput; scope: string }
+  >({
+    mutationFn: ({ id, planNumber, reason, scope }) =>
+      recurring.cancelPlan(id, planNumber, reason, scope),
+    onSuccess(_result, variables) {
+      idempotency.release(variables.scope);
+      invalidate();
+    },
+  });
+}
+
+/** Changes one visit's duration (DEC-093). */
+export function useChangeVisitDuration() {
+  const { api } = useRuntime();
+  const recurring = createRecurringApi(api);
+  const invalidate = useInvalidateRecurring();
+  return useMutation<
+    VisitDetailDto,
+    Error,
+    { id: string; visitId: string; durationMinutes: number; scope: string }
+  >({
+    mutationFn: ({ id, visitId, durationMinutes, scope }) =>
+      recurring.changeVisitDuration(id, visitId, durationMinutes, scope),
+    onSuccess(_visit, variables) {
       idempotency.release(variables.scope);
       invalidate();
     },

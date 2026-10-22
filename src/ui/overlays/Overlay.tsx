@@ -1,7 +1,7 @@
 import { Modal, StyleSheet, View } from 'react-native';
 import type { PropsWithChildren } from 'react';
 
-import { lightTheme } from '@ui/theme/ThemeProvider';
+import { BlurredScrim } from '../v2/Backdrop';
 
 /**
  * Modal host shared by `BottomSheet` and `Dialog`.
@@ -46,6 +46,7 @@ export function Overlay({
       testID={testID}
     >
       <View style={styles.root} accessibilityViewIsModal>
+        <BlurredScrim dim={0.8} />
         {children}
       </View>
     </Modal>
@@ -53,5 +54,5 @@ export function Overlay({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: lightTheme.colors.scrim },
+  root: { flex: 1 },
 });

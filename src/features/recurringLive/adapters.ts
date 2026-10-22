@@ -28,10 +28,19 @@ import type {
  * `todayId` is the Asia/Kolkata date (`todayInKolkata`), only for the Up-next "TODAY" wording.
  */
 export function liveCalendarFrom(booking: RecurringBookingDto, todayId: string): LiveCalendarModel {
-  const groupByDate = new Map(booking.days.map((day) => [day.date, day.group]));
-  const visitsByDate = new Map(booking.days.map((day) => [day.date, day.visits]));
+  const daysByDate = new Map(booking.days.map((day) => [day.date, day]));
 
-  const dates = [booking.window.startDate, booking.window.endDate, ...groupByDate.keys()].sort();
+  /*
+   * From the week of the first visit to the week of the last (`1746:3304` starts on the week of
+   * 28 Sept), not whole months: from the 1st, a plan starting on the 20th drew three greyed weeks
+   * before its first visit (owner, 2026-10-17). The booking's window is the fallback.
+   */
+  const visitDates = booking.days
+    .filter((day) => kindOf(day) !== 'none')
+    .map((day) => day.date)
+    .sort();
+  const dates =
+    visitDates.length > 0 ? visitDates : [booking.window.startDate, booking.window.endDate].sort();
   const first = dates[0] ?? todayId;
   const last = dates[dates.length - 1] ?? todayId;
 
@@ -44,16 +53,44 @@ export function liveCalendarFrom(booking: RecurringBookingDto, todayId: string):
     progressFraction: total === 0 ? 0 : done / total,
     weekdays: WEEKDAYS,
     weeks: weeksBetween(first, last, (id) => {
-      const group = groupByDate.get(id);
-      return group === undefined || (visitsByDate.get(id)?.length ?? 0) === 0 ? 'none' : group;
+      const day = daysByDate.get(id);
+      return day === undefined ? 'none' : kindOf(day);
     }),
     hint: 'Tap a date to check its details',
     visitsByDay: Object.fromEntries(
       booking.days
-        .filter((day) => day.visits.length > 0)
-        .map((day) => [day.date, dayVisitsOf(day.visits)]),
+        .filter((day) => kindOf(day) !== 'none')
+        .map((day) => [day.date, dayVisitsOf(day.visits, autopayNotApproved(booking))]),
     ),
   };
+}
+
+/**
+ * How a date is drawn: by the server's group, except a day still to come whose every visit is
+ * cancelled (one cancelled, or its Plan deleted, DEC-092), which has nothing left to come and is
+ * drawn as a plain date, not an Upcoming ring (owner's device test, 2026-10-17). A past or today's
+ * cancelled visit keeps its mark, so its record can still be opened.
+ */
+function kindOf(day: RecurringBookingDto['days'][number]): CalendarDayKind {
+  if (day.visits.length === 0) return 'none';
+  if (day.group === 'upcoming' && day.visits.every((visit) => visit.status === 'cancelled')) {
+    return 'none';
+  }
+  return day.group;
+}
+
+/**
+ * Whether the booking ended because Autopay was never approved (`expireUnapprovedBookings`): closed
+ * by `system` with no bank-confirmed mandate. Its visits then read "Autopay not approved" rather
+ * than "Cancelled by Spoon", which sounds like Spoon's doing. A booking that closed because its
+ * last visit or Plan was cancelled is `system` too, but its mandate was confirmed (a masked handle).
+ */
+export function autopayNotApproved(booking: RecurringBookingDto): boolean {
+  return (
+    booking.status === 'cancelled' &&
+    booking.cancelledBy === 'system' &&
+    (booking.mandate === null || booking.mandate.handleMasked === null)
+  );
 }
 
 /** Asia/Kolkata's calendar date now — a fixed UTC+5:30, no daylight saving. */
@@ -97,30 +134,25 @@ function daysInMonth(year: number, month: number): number {
 }
 
 /**
- * The dates from `first` to `last`, one row per Mon → Sun week, a month's rows never holding another
- * month's dates (blank cells instead), as `1286:6575` draws a 28 Sept → 18 Oct window: 28–30 Sept
- * on one row, then 1–18 Oct. Only the window's dates are drawn, not the whole months around it:
- * whole months doubled the calendar to ten rows of mostly blank dates.
+ * The weeks from `first`'s to `last`'s, one row per Mon → Sun week, a month's rows never holding
+ * another month's dates (blank cells instead), as `1286:6575` draws Sept → Oct.
  */
 function weeksBetween(
   first: string,
   last: string,
   kindOf: (id: string) => CalendarDayKind,
 ): CalendarWeek[] {
-  const start = parts(first);
   const end = parts(last);
-  let { year, month } = start;
+  let { year, month } = parts(first);
   const weeks: CalendarWeek[] = [];
 
   while (year < end.year || (year === end.year && month <= end.month)) {
     const label = MONTHS[month - 1] ?? '';
-    const fromDay = year === start.year && month === start.month ? start.day : 1;
-    const toDay = year === end.year && month === end.month ? end.day : daysInMonth(year, month);
     let row: (CalendarDay | null)[] = Array.from(
-      { length: weekdayIndex(year, month, fromDay) },
+      { length: weekdayIndex(year, month, 1) },
       () => null,
     );
-    for (let day = fromDay; day <= toDay; day += 1) {
+    for (let day = 1; day <= daysInMonth(year, month); day += 1) {
       const index = weekdayIndex(year, month, day);
       const id = idOf(year, month, day);
       row.push({ id, day, month: label, weekday: WEEKDAYS[index] ?? '', kind: kindOf(id) });
@@ -130,7 +162,7 @@ function weeksBetween(
       }
     }
     if (row.length > 0) {
-      const id = row.find((cell) => cell !== null)?.id ?? idOf(year, month, fromDay);
+      const id = row.find((cell) => cell !== null)?.id ?? idOf(year, month, 1);
       weeks.push({
         id: `w-${id}`,
         monthLabel: label,
@@ -143,7 +175,20 @@ function weeksBetween(
       year += 1;
     }
   }
-  return weeks;
+  // Only the weeks from `first`'s to `last`'s: a row is kept when it holds a date in that range.
+  return weeks.filter((week) => {
+    const ids = week.days.filter((cell) => cell !== null).map((cell) => cell.id);
+    const start = ids[0];
+    const end = ids[ids.length - 1];
+    return start !== undefined && end !== undefined && end >= weekStart(first) && start <= last;
+  });
+}
+
+/** The Monday of `id`'s week, so a row is kept whole even when `first` falls mid-week. */
+function weekStart(id: string): string {
+  const { year, month, day } = parts(id);
+  const date = new Date(Date.UTC(year, month - 1, day - weekdayIndex(year, month, day)));
+  return date.toISOString().slice(0, 10);
 }
 
 function ordinal(value: number): string {
@@ -182,7 +227,7 @@ function cookName(visit: VisitSummaryDto): string | null {
   return visit.cook?.displayName ?? null;
 }
 
-function dayVisitOf(visit: VisitSummaryDto): DayVisit {
+function dayVisitOf(visit: VisitSummaryDto, autopayExpired: boolean): DayVisit {
   const title = `${ordinal(visit.visitNumber)} Visit · ${clockText(visit.startTime)} · ${durationText(visit.durationMinutes)}`;
   const cook = cookName(visit);
 
@@ -204,7 +249,9 @@ function dayVisitOf(visit: VisitSummaryDto): DayVisit {
           ? 'Cancelled by you'
           : visit.cancelledBy === 'payment_failed'
             ? 'Cancelled · payment failed'
-            : 'Cancelled by Spoon',
+            : autopayExpired
+              ? 'Cancelled · Autopay not approved'
+              : 'Cancelled by Spoon',
     };
   }
   if (cook !== null) {
@@ -230,13 +277,13 @@ function dayVisitOf(visit: VisitSummaryDto): DayVisit {
   };
 }
 
-function dayVisitsOf(visits: readonly VisitSummaryDto[]): DayVisits {
+function dayVisitsOf(visits: readonly VisitSummaryDto[], autopayExpired: boolean): DayVisits {
   const ordered = [...visits].sort((a, b) => a.start.localeCompare(b.start));
   const plans = [...new Set(ordered.map((visit) => visit.planNumber))].sort((a, b) => a - b);
   const count = `${ordered.length} ${ordered.length === 1 ? 'visit' : 'visits'}`;
   const planLabel =
     plans.length === 1 ? `Plan ${plans[0]} · ${count}` : `Plans ${plans.join(' & ')} · ${count}`;
-  return { planLabel, visits: ordered.map(dayVisitOf) };
+  return { planLabel, visits: ordered.map((visit) => dayVisitOf(visit, autopayExpired)) };
 }
 
 function upNextOf(visit: VisitSummaryDto, todayId: string): UpNextFixture {

@@ -1,6 +1,7 @@
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -14,6 +15,7 @@ import { RuntimeProvider } from '@core/runtimeContext';
 import { useSessionStore } from '@core/store';
 import { AppUpdateGate } from '@features/appUpdate';
 import { ErrorBoundary, LaunchSplash, ThemeProvider } from '@ui';
+import { BackdropTargetRoot } from '@ui/v2/Backdrop';
 
 /**
  * Root layout: providers, session bootstrap, splash hold.
@@ -83,6 +85,12 @@ export default function RootLayout() {
 
   return (
     <>
+      {/*
+       * Dark clock, battery and network icons on every screen: the app is light only
+       * (`userInterfaceStyle: 'light'`), but left unset Android takes the icon colour from the
+       * phone's own theme, and a phone in dark mode drew them white on the yellow headers.
+       */}
+      <StatusBar style="dark" />
       {fontsPending ? null : <RootProviders runtime={runtime} />}
       {launchSplashDone ? null : (
         <LaunchSplash ready={appReady} onShown={releaseSystemSplash} onDone={finishLaunchSplash} />
@@ -101,13 +109,16 @@ function RootProviders({ runtime }: { readonly runtime: ReturnType<typeof create
               <ErrorBoundary scope="root">
                 {/* Over EVERYTHING, signed in or not: an old build is blocked at the login screen too. */}
                 <AppUpdateGate>
-                  <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="index" />
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(app)" />
-                    {/* Legal sits OUTSIDE both groups on purpose — see `app/legal/[doc].tsx`. */}
-                    <Stack.Screen name="legal/[doc]" />
-                  </Stack>
+                  {/* What every sheet's blurred scrim blurs on Android (`@ui/v2/Backdrop`). */}
+                  <BackdropTargetRoot>
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen name="index" />
+                      <Stack.Screen name="(auth)" />
+                      <Stack.Screen name="(app)" />
+                      {/* Legal sits OUTSIDE both groups on purpose — see `app/legal/[doc].tsx`. */}
+                      <Stack.Screen name="legal/[doc]" />
+                    </Stack>
+                  </BackdropTargetRoot>
                 </AppUpdateGate>
               </ErrorBoundary>
             </ThemeProvider>

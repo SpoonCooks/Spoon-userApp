@@ -29,22 +29,8 @@ export function nearestAvailableId(
   return durations[from]?.id ?? wantedId;
 }
 
-/** Liquid height is proportional to minutes: the frames draw 0.7225 pt/min side, 0.888 centred. */
-export function liquidHeight(minutes: number, focused: boolean): number {
-  return Math.round(minutes * (focused ? 0.888 : 0.7225));
-}
-
-/** "1 hour", "1.5 hours", "45 minutes" — for screen readers. */
-export function spokenDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes} minutes`;
-  const hours = minutes / 60;
-  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
-}
-
-/** The MRP strikes through only when it exists and differs from the price. */
-export function showsMrp(duration: Pick<DurationOption, 'pricePaise' | 'mrpPaise'>): boolean {
-  return duration.mrpPaise !== null && duration.mrpPaise !== duration.pricePaise;
-}
+// The tile helpers live with the carousel, which Home now shares with Recurring.
+export { liquidHeight, showsMrp, spokenDuration } from '@ui/v2/DurationCarousel';
 
 /**
  * The tile as the current CTA prices it: Instant's price for "Book Now", Scheduled's otherwise.

@@ -62,7 +62,8 @@ export function CancelledVisitHost({
     <>
       <VisitDetailsScreen
         model={model}
-        title={booking.slotType === 'instant' ? 'Instant visit' : 'On-time visit'}
+        title="On-time visit"
+        inlineDock
         onBack={onBack}
         onPaymentDetails={() => setPaymentOpen(true)}
         onHelp={onHelp}

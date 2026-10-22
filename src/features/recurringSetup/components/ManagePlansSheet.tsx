@@ -1,4 +1,6 @@
 import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+
+import { BlurredScrim } from '@ui/v2/Backdrop';
 import type { ImageSourcePropType } from 'react-native';
 
 import { Button, Text, useBottomGutter } from '@ui';
@@ -15,9 +17,9 @@ import { CALENDAR_REMOVE_ICON, COOK_VISIT_ICON, RESTART_ROW_ICON } from '../art'
  * visit — removing a plan's only visit is deleting the plan.
  *
  * The frame dims the Summary with `Scrim` (`542:1499`, and the same on `542:1534`, `542:1611`,
- * `542:1688`): black at 40 % under a 12pt `BACKGROUND_BLUR`. The shared `Overlay` is a flat 80 %
- * black — drawn for the photo-heavy sheets — so this sheet hosts its own `Modal`. The blur is not
- * drawn: there is no blur in React Native's core and no blur package (`expo-blur`) in the app.
+ * `542:1688`): black at 40 % under a 12pt `BACKGROUND_BLUR`, drawn by `BlurredScrim`. The shared
+ * `Overlay` is a flat 80 % black — drawn for the photo-heavy sheets — so this sheet hosts its own
+ * `Modal`.
  */
 export interface ManagePlansSheetProps {
   readonly visible: boolean;
@@ -58,6 +60,7 @@ export function ManagePlansSheet({
       testID={`${testID}-modal`}
     >
       <View style={styles.scrim} accessibilityViewIsModal>
+        <BlurredScrim />
         <Pressable
           style={styles.backdrop}
           onPress={onClose}
@@ -156,7 +159,7 @@ const SHEET_FOOT = 32;
 
 const styles = StyleSheet.create({
   /** `542:1499` — black at 40 % over the whole screen. */
-  scrim: { flex: 1, backgroundColor: lightTheme.colors.surfaceScrim },
+  scrim: { flex: 1 },
   backdrop: {
     position: 'absolute',
     top: 0,

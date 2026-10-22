@@ -1,7 +1,6 @@
 import type { RecurringBookingDto, VisitSummaryDto } from '@features/recurringSetup';
 
 import { clockText, durationText, liveCalendarFrom, todayInKolkata } from './adapters';
-import { CALENDAR_DEMO_MODEL } from './data/calendar';
 
 /**
  * The Live booking tab on a real booking. Today is Thu 8 Oct 2026 (Asia/Kolkata); the booking runs
@@ -82,15 +81,16 @@ function booking(overrides: Partial<RecurringBookingDto> = {}): RecurringBooking
 }
 
 describe('liveCalendarFrom', () => {
-  it('lays out the window in Mon → Sun rows, never mixing two months in a row', () => {
+  it('lays out Mon → Sun rows from the first visit’s week to the last’s, never mixing months', () => {
     const { weeks } = liveCalendarFrom(booking(), TODAY);
-    const numbers = (week: (typeof weeks)[number]) => week.days.map((day) => day?.day ?? null);
 
-    // Exactly `1286:6575` (CALENDAR_DEMO_MODEL): the 28 Sept → 18 Oct window, not the whole
-    // months around it. 28 Sept 2026 is a Monday and 1 Oct a Thursday.
-    expect(weeks.map((week) => week.monthLabel)).toEqual(['Sept', 'Oct', 'Oct', 'Oct']);
-    expect(weeks.map(numbers)).toEqual(CALENDAR_DEMO_MODEL.weeks.map(numbers));
-    expect(numbers(weeks[0] as (typeof weeks)[number])).toEqual([
+    // Visits on 28 Sept, today (8 Oct) and 14 Oct: Sept's last week, then Oct to 14's week.
+    expect(weeks[0]?.monthLabel).toBe('Sept');
+    expect(weeks).toHaveLength(4);
+
+    // 28 Sept 2026 is a Monday: Sept's last row is 28, 29, 30 then blanks; Oct opens on a Thursday.
+    const sept = weeks.filter((week) => week.monthLabel === 'Sept');
+    expect(sept.at(-1)?.days.map((day) => day?.day ?? null)).toEqual([
       28,
       29,
       30,
@@ -99,35 +99,23 @@ describe('liveCalendarFrom', () => {
       null,
       null,
     ]);
-    expect(numbers(weeks[3] as (typeof weeks)[number])).toEqual([12, 13, 14, 15, 16, 17, 18]);
+    const oct = weeks.filter((week) => week.monthLabel === 'Oct');
+    expect(oct[0]?.days.map((day) => day?.day ?? null)).toEqual([null, null, null, 1, 2, 3, 4]);
+    expect(oct.at(-1)?.days.map((day) => day?.day ?? null)).toEqual([12, 13, 14, 15, 16, 17, 18]);
     expect(weeks.every((week) => week.days.length === 7)).toBe(true);
   });
 
-  it('starts and ends rows mid-week when the window does, leaving the other cells blank', () => {
+  it("keeps a mid-week window's first and last rows whole, and draws no months beyond it", () => {
     const { weeks } = liveCalendarFrom(
       booking({ window: { startDate: '2026-10-24', endDate: '2026-11-13' }, days: [] }),
       '2026-10-21',
     );
-    // 24 Oct 2026 is a Saturday and 13 Nov a Friday.
-    expect(weeks[0]?.days.map((day) => day?.day ?? null)).toEqual([
-      null,
-      null,
-      null,
-      null,
-      null,
-      24,
-      25,
-    ]);
-    expect(weeks.at(-1)?.days.map((day) => day?.day ?? null)).toEqual([
-      9,
-      10,
-      11,
-      12,
-      13,
-      null,
-      null,
-    ]);
-    expect(weeks).toHaveLength(5);
+    const numbers = (week: (typeof weeks)[number] | undefined) =>
+      week?.days.map((day) => day?.day ?? null);
+    // 24 Oct 2026 is a Saturday and 13 Nov a Friday: their weeks are drawn whole, nothing more.
+    expect(weeks.map((week) => week.monthLabel)).toEqual(['Oct', 'Oct', 'Nov', 'Nov', 'Nov']);
+    expect(numbers(weeks[0])).toEqual([19, 20, 21, 22, 23, 24, 25]);
+    expect(numbers(weeks.at(-1))).toEqual([9, 10, 11, 12, 13, 14, 15]);
   });
 
   it("marks dates by the backend's own grouping, and leaves dates without visits unmarked", () => {
@@ -237,5 +225,29 @@ describe('labels', () => {
   it("takes today's date in Asia/Kolkata, not UTC", () => {
     // 20:00 UTC on 7 Oct is 01:30 on 8 Oct in Kolkata.
     expect(todayInKolkata(new Date('2026-10-07T20:00:00.000Z'))).toBe('2026-10-08');
+  });
+});
+
+describe('a day still to come with every visit cancelled', () => {
+  it('is drawn as a plain date, not an Upcoming ring, and opens nothing', () => {
+    const cancelled = visit({
+      date: '2026-10-14',
+      status: 'cancelled',
+      displayState: 'cancelled',
+      cancelledBy: 'customer',
+    });
+    const model = liveCalendarFrom(
+      booking({
+        days: [
+          { date: TODAY, group: 'today', visits: [visit({ date: TODAY, status: 'charged' })] },
+          { date: '2026-10-14', group: 'upcoming', visits: [cancelled] },
+        ],
+      }),
+      TODAY,
+    );
+    const day14 = model.weeks.flatMap((week) => week.days).find((day) => day?.id === '2026-10-14');
+    // Its week drops out with it: the calendar ends at the last date still marked.
+    expect(day14 === undefined || day14?.kind === 'none').toBe(true);
+    expect(model.visitsByDay['2026-10-14']).toBeUndefined();
   });
 });

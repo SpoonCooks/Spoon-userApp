@@ -222,15 +222,6 @@ export function ServiceVisitScreen({
         testID={testID}
         contentStyle={styles.body}
         header={<VisitHeader title={model.title} onBack={onBack} testID={`${testID}-header`} />}
-        footer={
-          <ActionDock
-            showModify={ahead && onModifyBooking !== undefined}
-            onPaymentDetails={onPaymentDetails}
-            onModifyBooking={onModifyBooking}
-            onHelp={viaWhatsApp(onHelp)}
-            testID={`${testID}-dock`}
-          />
-        }
       >
         {live ? null : banner}
 
@@ -323,6 +314,16 @@ export function ServiceVisitScreen({
             ) : null}
           </>
         ) : null}
+
+        {/* The buttons scroll with the page on a one-time visit (owner, 2026-10-14). */}
+        <ActionDock
+          inline
+          showModify={ahead && onModifyBooking !== undefined}
+          onPaymentDetails={onPaymentDetails}
+          onModifyBooking={onModifyBooking}
+          onHelp={viaWhatsApp(onHelp)}
+          testID={`${testID}-dock`}
+        />
       </Screen>
       <VisitToast ref={toast} testID={`${testID}-toast`} />
     </View>

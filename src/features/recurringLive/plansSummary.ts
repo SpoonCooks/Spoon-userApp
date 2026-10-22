@@ -1,7 +1,7 @@
 import { DURATION_PHOTOS, START_TIME_PHOTOS, TIME_OF_DAY_PHOTOS } from '@features/recurringSetup';
 import type { RecurringBookingDto, VisitSummaryDto } from '@features/recurringSetup';
 
-import { clockText, liveCalendarFrom } from './adapters';
+import { autopayNotApproved, clockText, liveCalendarFrom } from './adapters';
 import type {
   PlansSummaryModel,
   SummaryCalendar,
@@ -15,8 +15,8 @@ import { dayLabel } from './visitDetails';
  * The "Manage plans" tab on a real booking (`1017:433`): one tab per plan, the plan's dates on the
  * booking's calendar, and per visit its time of day, duration and start time over its past visits.
  *
- * Read-only: the backend can read a plan but not change one yet, so the screen draws no editing
- * controls for it (see `RecurringPlansScreen`).
+ * A Plan whose every visit is cancelled (deleted, DEC-092) is left out while the booking is live:
+ * it has nothing left to manage. A closed booking keeps every Plan, as its record.
  */
 type Plan = RecurringBookingDto['plans'][number];
 type PlanVisit = Plan['visits'][number];
@@ -56,7 +56,11 @@ function calendarOf(booking: RecurringBookingDto, plan: Plan, todayId: string): 
   };
 }
 
-function historyRowOf(visit: VisitSummaryDto, todayId: string): SummaryHistoryRow | null {
+function historyRowOf(
+  visit: VisitSummaryDto,
+  todayId: string,
+  autopayExpired: boolean,
+): SummaryHistoryRow | null {
   if (visit.status !== 'completed' && visit.status !== 'cancelled') return null;
   const day =
     visit.date === todayId ? `Today, ${dayLabel(visit.date).split(', ')[1]}` : dayLabel(visit.date);
@@ -74,15 +78,57 @@ function historyRowOf(visit: VisitSummaryDto, todayId: string): SummaryHistoryRo
       ? 'Cancelled by you'
       : visit.cancelledBy === 'payment_failed'
         ? 'Cancelled · payment didn’t go through'
-        : 'Cancelled by Spoon';
+        : autopayExpired
+          ? 'Cancelled · Autopay not approved'
+          : 'Cancelled by Spoon';
   return { id: visit.visitId, status: 'cancelled', title, meta: by };
 }
 
-function visitOf(plan: Plan, visit: PlanVisit, todayId: string): SummaryVisit {
+/** Every visit of a Plan, upcoming and past, once each. */
+function planVisitsOf(booking: RecurringBookingDto, plan: Plan): readonly VisitSummaryDto[] {
+  const all = new Map<string, VisitSummaryDto>();
+  for (const day of booking.days) {
+    for (const visit of day.visits) {
+      if (visit.planNumber === plan.planNumber) all.set(visit.visitId, visit);
+    }
+  }
+  for (const visit of plan.history) all.set(visit.visitId, visit);
+  return [...all.values()];
+}
+
+/** Whether a Plan still has a visit that is not cancelled. A Plan with no visits read yet counts. */
+export function planHasLiveVisit(booking: RecurringBookingDto, planNumber: number): boolean {
+  const plan = booking.plans.find((candidate) => candidate.planNumber === planNumber);
+  if (plan === undefined) return false;
+  const visits = planVisitsOf(booking, plan);
+  return visits.length === 0 || visits.some((visit) => visit.status !== 'cancelled');
+}
+
+/**
+ * The duration caption: the visit's own length, or the range its days to come run to once one day's
+ * duration was changed (DEC-093), e.g. "60–90 mins": short enough to stay on the one line.
+ */
+function durationCaption(visit: PlanVisit, days: readonly VisitSummaryDto[]): string {
+  // The days still to come: a past visit's length is history, not what the visit runs to now.
+  const lengths = days
+    .filter((day) => day.status !== 'cancelled' && day.status !== 'completed')
+    .map((day) => day.durationMinutes);
+  const shortest = Math.min(visit.durationMinutes, ...lengths);
+  const longest = Math.max(visit.durationMinutes, ...lengths);
+  return shortest === longest ? `${visit.durationMinutes} minutes` : `${shortest}–${longest} mins`;
+}
+
+function visitOf(
+  plan: Plan,
+  visit: PlanVisit,
+  days: readonly VisitSummaryDto[],
+  todayId: string,
+  autopayExpired: boolean,
+): SummaryVisit {
   const history = plan.history
     .filter((past) => past.visitNumber === visit.visitNumber)
     .sort((a, b) => b.start.localeCompare(a.start))
-    .map((past) => historyRowOf(past, todayId))
+    .map((past) => historyRowOf(past, todayId, autopayExpired))
     .filter((row): row is SummaryHistoryRow => row !== null);
   const duration = DURATION_PHOTOS[visit.durationMinutes];
   return {
@@ -96,7 +142,10 @@ function visitOf(plan: Plan, visit: PlanVisit, todayId: string): SummaryVisit {
       },
       {
         key: 'duration',
-        caption: `${visit.durationMinutes} minutes`,
+        caption: durationCaption(
+          visit,
+          days.filter((day) => day.visitNumber === visit.visitNumber),
+        ),
         ...(duration === undefined ? {} : { source: duration }),
       },
       {
@@ -111,15 +160,17 @@ function visitOf(plan: Plan, visit: PlanVisit, todayId: string): SummaryVisit {
 }
 
 export function plansSummaryFrom(booking: RecurringBookingDto, todayId: string): PlansSummaryModel {
-  const plans = [...booking.plans]
-    .sort((a, b) => a.planNumber - b.planNumber)
-    .map((plan) => ({
-      id: `plan-${plan.planNumber}`,
-      label: `Plan ${plan.planNumber}`,
-      calendar: calendarOf(booking, plan, todayId),
-      visits: [...plan.visits]
-        .sort((a, b) => a.visitNumber - b.visitNumber)
-        .map((visit) => visitOf(plan, visit, todayId)),
-    }));
+  const autopayExpired = autopayNotApproved(booking);
+  const live = booking.status === 'active' || booking.status === 'pending_mandate';
+  const sorted = [...booking.plans].sort((a, b) => a.planNumber - b.planNumber);
+  const shown = live ? sorted.filter((plan) => planHasLiveVisit(booking, plan.planNumber)) : sorted;
+  const plans = (shown.length === 0 ? sorted : shown).map((plan) => ({
+    id: `plan-${plan.planNumber}`,
+    label: `Plan ${plan.planNumber}`,
+    calendar: calendarOf(booking, plan, todayId),
+    visits: [...plan.visits]
+      .sort((a, b) => a.visitNumber - b.visitNumber)
+      .map((visit) => visitOf(plan, visit, planVisitsOf(booking, plan), todayId, autopayExpired)),
+  }));
   return { plans, activePlanId: plans[0]?.id ?? '' };
 }

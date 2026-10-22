@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { Platform } from 'react-native';
 
 import { getLogger } from '@core/logging';
 
@@ -229,7 +230,15 @@ export async function reverseGeocode(
 
   // Assembled from whichever parts this geocoder filled in — they vary by platform and by
   // locale, so the fields are picked in order of specificity rather than assumed to be present.
-  const title = first.name ?? first.street ?? first.district ?? first.city ?? 'Selected location';
+  // Android's `name` is a bare house number ("57"), a Plus Code ("WM22+C49") or a block
+  // ("BLOCK-D") as often as a place, so there the title is read from its full address line.
+  const title =
+    (Platform.OS === 'android' ? androidAddressTitle(first) : null) ??
+    first.name ??
+    first.street ??
+    first.district ??
+    first.city ??
+    'Selected location';
   const line = [first.street, first.district, first.city, first.region, first.postalCode]
     .filter((part): part is string => typeof part === 'string' && part.length > 0)
     .join(', ');
@@ -243,4 +252,42 @@ export async function reverseGeocode(
     region: first.region ?? null,
     locality: first.district ?? null,
   };
+}
+
+/** A Plus Code ("WM22+C49", "7J4VWM22+96W") — Google's grid reference, not a name anyone uses. */
+const PLUS_CODE = /^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}\b\s*/i;
+
+/**
+ * Android's address title, the way iOS names the same point ("36/3, Sector 2"): the first two
+ * parts of the geocoder's full address line, before the city — "57, 27th Main Rd", "Sri Anthya
+ * Nilayam, 27th Main Rd", "BLOCK-D, ARATT ROYAL MANOR". A leading Plus Code is dropped; a point
+ * with nothing but a code and the city ("WM22+C49, Somasundarapalya, Bengaluru…") keeps the area.
+ * `null` when the line names nothing before the city, so the caller falls back to its fields.
+ */
+export function androidAddressTitle(address: {
+  readonly formattedAddress?: string | null;
+  readonly city?: string | null;
+  readonly region?: string | null;
+  readonly country?: string | null;
+  readonly postalCode?: string | null;
+}): string | null {
+  const full = address.formattedAddress;
+  if (typeof full !== 'string' || full.trim() === '') return null;
+  const stops = [address.city, address.region, address.country]
+    .filter((part): part is string => typeof part === 'string' && part.length > 0)
+    .map((part) => part.toLowerCase());
+  const parts: string[] = [];
+  for (const raw of full.split(',')) {
+    const part = raw.trim().replace(PLUS_CODE, '').trim();
+    if (part === '') continue;
+    const lower = part.toLowerCase();
+    // The city, the state ("Karnataka 560102") and the country end the part a person would name.
+    if (stops.some((stop) => lower === stop || lower.startsWith(`${stop} `))) break;
+    if (address.postalCode != null && lower.endsWith(address.postalCode)) break;
+    // The same building named twice ("Aratt Royal Manor, ARATT ROYAL MANOR") is said once.
+    if (parts.some((kept) => kept.toLowerCase() === lower)) continue;
+    parts.push(part);
+    if (parts.length === 2) break;
+  }
+  return parts.length > 0 ? parts.join(', ') : null;
 }
