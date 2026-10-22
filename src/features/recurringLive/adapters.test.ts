@@ -105,7 +105,7 @@ describe('liveCalendarFrom', () => {
     expect(weeks.every((week) => week.days.length === 7)).toBe(true);
   });
 
-  it('keeps a mid-week window\'s first and last rows whole, and draws no months beyond it', () => {
+  it("keeps a mid-week window's first and last rows whole, and draws no months beyond it", () => {
     const { weeks } = liveCalendarFrom(
       booking({ window: { startDate: '2026-10-24', endDate: '2026-11-13' }, days: [] }),
       '2026-10-21',
